@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${tituloCorreo}">Notificación de reunión de conciliación</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f6f8; font-family: Arial, Helvetica, sans-serif; color: #333333;">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f6f8; padding: 30px 0;">
+    <tr>
+        <td align="center">
+
+            <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #e5e7eb;">
+
+                <tr>
+                    <td style="background-color: #0f172a; padding: 24px 32px; color: #ffffff;">
+                        <h1 style="margin: 0; font-size: 24px;" th:text="${tituloCorreo}">
+                            Notificación de reunión de conciliación
+                        </h1>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 32px;">
+                        <p style="margin: 0 0 16px 0; font-size: 16px;">
+                            Hola
+                            <strong th:text="${nombreDestinatario}">Usuario</strong>,
+                        </p>
+
+                        <p style="margin: 0 0 16px 0; font-size: 16px; line-height: 1.6;" th:text="${mensajePrincipal}">
+                            Se ha generado una notificación relacionada con una reunión de conciliación.
+                        </p>
+
+                        <div style="background-color: #f8fafc; border-left: 4px solid #2563eb; padding: 16px; margin-bottom: 24px;">
+                            <p style="margin: 0 0 10px 0; font-size: 14px; line-height: 1.6;">
+                                <strong>Conciliación:</strong>
+                                <span th:text="${conciliacionId}">1</span>
+                            </p>
+
+                            <p style="margin: 0 0 10px 0; font-size: 14px; line-height: 1.6;">
+                                <strong>Consulta:</strong>
+                                <span th:text="${consultaId}">1</span>
+                            </p>
+
+                            <p style="margin: 0 0 10px 0; font-size: 14px; line-height: 1.6;">
+                                <strong>Sede:</strong>
+                                <span th:text="${sedeNombre}">Sede</span>
+                            </p>
+
+                            <p style="margin: 0; font-size: 14px; line-height: 1.6;">
+                                <strong>Fecha y hora:</strong>
+                                <span th:text="${fechaReunion}">01/01/2026 08:00</span>
+                            </p>
+                        </div>
+
+                        <div th:if="${observaciones != null}"
+                             style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 16px; margin-bottom: 24px;">
+                            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #444444;">
+                                <strong>Observaciones:</strong>
+                                <span th:text="${observaciones}">Observaciones</span>
+                            </p>
+                        </div>
+
+                        <div th:if="${detalleError != null}"
+                             style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 16px; margin-bottom: 24px;">
+                            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #444444;"
+                               th:text="${detalleError}">
+                                Detalle del error.
+                            </p>
+                        </div>
+
+                        <div th:if="${mensajeAdvertencia != null}"
+                             style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 16px; margin-bottom: 24px;">
+                            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #444444;"
+                               th:text="${mensajeAdvertencia}">
+                                Esta notificación requiere atención.
+                            </p>
+                        </div>
+
+                        <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #555555;">
+                            Puedes comunicarte con el consultorio jurídico si requieres más información sobre esta reunión.
+                        </p>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 20px 32px; background-color: #f8fafc; border-top: 1px solid #e5e7eb;">
+                        <p style="margin: 0; font-size: 12px; color: #6b7280;">
+                            Este es un mensaje automático. Por favor, no respondas a este correo.
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>
