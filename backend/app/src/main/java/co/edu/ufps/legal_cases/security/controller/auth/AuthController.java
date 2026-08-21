@@ -1,6 +1,6 @@
 package co.edu.ufps.legal_cases.security.controller.auth;
 
-import org.springframework.beans.factory.annotation.Value;
+import co.edu.ufps.legal_cases.config.security.AuthCookieProperties;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -37,21 +37,19 @@ public class AuthController {
 
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
-    private final boolean authCookieSecure;
-    private final String authCookieSameSite;
+    private final AuthCookieProperties authCookieProperties;
     private final CsrfTokenRepository csrfTokenRepository;
 
     public AuthController(
-            AuthService authService,
-            PasswordResetService passwordResetService,
-            CsrfTokenRepository csrfTokenRepository,
-            @Value("${app.auth.cookie.secure:true}") boolean authCookieSecure,
-            @Value("${app.auth.cookie.same-site:None}") String authCookieSameSite) {
+        AuthService authService,
+        PasswordResetService passwordResetService,
+        CsrfTokenRepository csrfTokenRepository,
+        AuthCookieProperties authCookieProperties) {
+
         this.authService = authService;
         this.passwordResetService = passwordResetService;
-        this.authCookieSecure = authCookieSecure;
-        this.authCookieSameSite = authCookieSameSite;
         this.csrfTokenRepository = csrfTokenRepository;
+        this.authCookieProperties = authCookieProperties;
     }
 
     @PostMapping("/login")
@@ -133,10 +131,10 @@ public class AuthController {
     private ResponseCookie crearCookieAuth(String value, long maxAgeSeconds) {
         return ResponseCookie.from(ACCESS_TOKEN_COOKIE, value)
                 .httpOnly(true)
-                .secure(authCookieSecure)
+                .secure(authCookieProperties.isSecure())
                 .path("/")
                 .maxAge(maxAgeSeconds)
-                .sameSite(authCookieSameSite)
+                .sameSite(authCookieProperties.getSameSite())
                 .build();
     }
 }

@@ -20,6 +20,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 
+import co.edu.ufps.legal_cases.config.security.AuthCookieProperties;
 import co.edu.ufps.legal_cases.security.dto.auth.login.LoginRequestDTO;
 import co.edu.ufps.legal_cases.security.dto.auth.login.LoginResponseDTO;
 import co.edu.ufps.legal_cases.security.dto.auth.login.LoginResultDTO;
@@ -39,12 +40,17 @@ class AuthControllerCsrfTest {
         passwordResetService = mock(PasswordResetService.class);
         csrfTokenRepository = mock(CsrfTokenRepository.class);
 
+        AuthCookieProperties authCookieProperties =
+                new AuthCookieProperties();
+
+        authCookieProperties.setSecure(false);
+        authCookieProperties.setSameSite("Lax");
+
         authController = new AuthController(
                 authService,
                 passwordResetService,
                 csrfTokenRepository,
-                false,
-                "Lax");
+                authCookieProperties);
     }
 
     @Test
@@ -53,59 +59,93 @@ class AuthControllerCsrfTest {
         LoginResultDTO loginResult = mock(LoginResultDTO.class);
         LoginResponseDTO loginResponse = mock(LoginResponseDTO.class);
 
-        when(authService.login(loginRequest)).thenReturn(loginResult);
-        when(loginResult.getToken()).thenReturn("jwt-test");
-        when(loginResult.getResponse()).thenReturn(loginResponse);
+        when(authService.login(loginRequest))
+                .thenReturn(loginResult);
 
-        MockHttpServletRequest request = new MockHttpServletRequest();
-        MockHttpServletResponse response = new MockHttpServletResponse();
+        when(loginResult.getToken())
+                .thenReturn("jwt-test");
+
+        when(loginResult.getResponse())
+                .thenReturn(loginResponse);
+
+        MockHttpServletRequest request =
+                new MockHttpServletRequest();
+
+        MockHttpServletResponse response =
+                new MockHttpServletResponse();
 
         ResponseEntity<LoginResponseDTO> result =
-                authController.login(loginRequest, request, response);
+                authController.login(
+                        loginRequest,
+                        request,
+                        response);
 
-        verify(csrfTokenRepository).saveToken(null, request, response);
+        verify(csrfTokenRepository)
+                .saveToken(null, request, response);
 
-        assertEquals(HttpStatus.OK, result.getStatusCode());
-        assertEquals(loginResponse, result.getBody());
+        assertEquals(
+                HttpStatus.OK,
+                result.getStatusCode());
+
+        assertEquals(
+                loginResponse,
+                result.getBody());
 
         List<String> cookies =
                 response.getHeaders(HttpHeaders.SET_COOKIE);
 
-        assertTrue(cookies.stream()
-                .anyMatch(cookie ->
-                        cookie.startsWith("access_token=jwt-test")));
+        assertTrue(
+                cookies.stream()
+                        .anyMatch(cookie ->
+                                cookie.startsWith(
+                                        "access_token=jwt-test")));
     }
 
     @Test
     void shouldInvalidateCsrfAndAuthCookieOnLogout() {
-        MockHttpServletRequest request = new MockHttpServletRequest();
-        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockHttpServletRequest request =
+                new MockHttpServletRequest();
+
+        MockHttpServletResponse response =
+                new MockHttpServletResponse();
 
         ResponseEntity<Void> result =
-                authController.logout(request, response);
+                authController.logout(
+                        request,
+                        response);
 
-        verify(csrfTokenRepository).saveToken(null, request, response);
+        verify(csrfTokenRepository)
+                .saveToken(null, request, response);
 
-        assertEquals(HttpStatus.OK, result.getStatusCode());
+        assertEquals(
+                HttpStatus.OK,
+                result.getStatusCode());
 
         List<String> cookies =
                 response.getHeaders(HttpHeaders.SET_COOKIE);
 
-        assertTrue(cookies.stream()
-                .anyMatch(cookie ->
-                        cookie.startsWith("access_token=")
-                                && cookie.contains("Max-Age=0")));
+        assertTrue(
+                cookies.stream()
+                        .anyMatch(cookie ->
+                                cookie.startsWith("access_token=")
+                                        && cookie.contains("Max-Age=0")));
     }
 
     @Test
     void shouldNotInvalidateCsrfWhenLoginFails() {
-        LoginRequestDTO loginRequest = mock(LoginRequestDTO.class);
+        LoginRequestDTO loginRequest =
+                mock(LoginRequestDTO.class);
 
-        when(authService.login(any(LoginRequestDTO.class)))
-                .thenThrow(new RuntimeException("Login rechazado"));
+        when(authService.login(
+                any(LoginRequestDTO.class)))
+                .thenThrow(
+                        new RuntimeException("Login rechazado"));
 
-        MockHttpServletRequest request = new MockHttpServletRequest();
-        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockHttpServletRequest request =
+                new MockHttpServletRequest();
+
+        MockHttpServletResponse response =
+                new MockHttpServletResponse();
 
         assertThrows(
                 RuntimeException.class,
@@ -114,7 +154,12 @@ class AuthControllerCsrfTest {
                         request,
                         response));
 
-        verify(csrfTokenRepository, never())
-                .saveToken(null, request, response);
+        verify(
+                csrfTokenRepository,
+                never())
+                .saveToken(
+                        null,
+                        request,
+                        response);
     }
 }

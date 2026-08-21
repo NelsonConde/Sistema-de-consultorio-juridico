@@ -11,13 +11,15 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
+import lombok.AllArgsConstructor;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 import co.edu.ufps.legal_cases.security.filter.jwt.JwtAuthenticationFilter;
-import lombok.AllArgsConstructor;
 
 @Configuration
 @EnableWebSecurity // Activa la seguridad en las peticiones HTTP.
 @EnableMethodSecurity // Habilita @PreAuthorize en controllers y services.
+@EnableConfigurationProperties(AuthCookieProperties.class) // Habilita la inyeccion de propiedades de configuracion en AuthCookieProperties.
 @AllArgsConstructor
 public class SecurityConfig {
 
