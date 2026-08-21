@@ -23,6 +23,10 @@ import co.edu.ufps.legal_cases.security.dto.auth.password.SolicitarRecuperacionP
 import co.edu.ufps.legal_cases.security.service.auth.AuthService;
 import co.edu.ufps.legal_cases.security.service.auth.PasswordResetService;
 import jakarta.validation.Valid;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -35,29 +39,41 @@ public class AuthController {
     private final PasswordResetService passwordResetService;
     private final boolean authCookieSecure;
     private final String authCookieSameSite;
+    private final CsrfTokenRepository csrfTokenRepository;
 
     public AuthController(
             AuthService authService,
             PasswordResetService passwordResetService,
+            CsrfTokenRepository csrfTokenRepository,
             @Value("${app.auth.cookie.secure:true}") boolean authCookieSecure,
             @Value("${app.auth.cookie.same-site:None}") String authCookieSameSite) {
         this.authService = authService;
         this.passwordResetService = passwordResetService;
         this.authCookieSecure = authCookieSecure;
         this.authCookieSameSite = authCookieSameSite;
+        this.csrfTokenRepository = csrfTokenRepository;
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponseDTO> login(@Valid @RequestBody LoginRequestDTO dto) {
+    public ResponseEntity<LoginResponseDTO> login(
+            @Valid @RequestBody LoginRequestDTO dto,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+
         LoginResultDTO result = authService.login(dto);
 
-        ResponseCookie cookie = crearCookieAuth(
+        ResponseCookie authCookie = crearCookieAuth(
                 result.getToken(),
                 ACCESS_TOKEN_MAX_AGE_SECONDS);
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(result.getResponse());
+        // Invalida el token CSRF utilizado durante el login.
+        csrfTokenRepository.saveToken(null, request, response);
+
+        // Agrega la nueva cookie de autenticación sin reemplazar
+        // el Set-Cookie generado al eliminar el CSRF.
+        response.addHeader(HttpHeaders.SET_COOKIE, authCookie.toString());
+
+        return ResponseEntity.ok(result.getResponse());
     }
 
     // Permite al frontend verificar sesión y obtener usuario actual.
@@ -68,12 +84,19 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout() {
-        ResponseCookie cookie = crearCookieAuth("", 0);
+    public ResponseEntity<Void> logout(
+            HttpServletRequest request,
+            HttpServletResponse response) {
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .build();
+        ResponseCookie authCookie = crearCookieAuth("", 0);
+
+        // Elimina el token CSRF asociado al estado autenticado.
+        csrfTokenRepository.saveToken(null, request, response);
+
+        // Elimina también la cookie JWT.
+        response.addHeader(HttpHeaders.SET_COOKIE, authCookie.toString());
+
+        return ResponseEntity.ok().build();
     }
 
     @PatchMapping("/cambiar-password")
