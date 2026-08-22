@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -68,10 +69,62 @@ public interface SeguimientoRepository extends JpaRepository<Seguimiento, Long> 
         // Lista seguimientos activos marcados como alerta disciplinaria.
         List<Seguimiento> findByAlertaDisciplinariaTrueAndActivoTrueOrderByFechaCreacionDesc();
 
-        // Lista alertas disciplinarias activas,
-        // excluyendo consultas archivadas.
+        // Lista alertas disciplinarias activas, excluyendo consultas archivadas.
+        @EntityGraph(attributePaths = {
+                "categoriaSeguimiento",
+                "consulta",
+                "autor"
+        })
         List<Seguimiento> findByAlertaDisciplinariaTrueAndActivoTrueAndConsulta_EstadoNotOrderByFechaCreacionDesc(
-                        EstadoConsulta estado);
+                EstadoConsulta estado);
+        
+        // Filtra el alcance del asesor directamente en base de datos para no exponer
+        // alertas de consultas ajenas. Las relaciones del EntityGraph son las necesarias
+        // para construir el DTO sin depender de cargas LAZY posteriores.
+        @EntityGraph(attributePaths = {
+                "categoriaSeguimiento",
+                "consulta",
+                "autor"
+        })
+        @Query("""
+                        SELECT s
+                        FROM Seguimiento s
+                        JOIN s.consulta c
+                        LEFT JOIN c.estudiante e
+                        LEFT JOIN e.asesor asesorEstudiante
+                        WHERE s.alertaDisciplinaria = true
+                        AND s.activo = true
+                        AND c.estado <> :estadoArchivado
+                        AND (
+                                c.asesor.id = :asesorId
+                                OR asesorEstudiante.id = :asesorId
+                        )
+                        ORDER BY s.fechaCreacion DESC, s.id DESC
+                        """)
+        List<Seguimiento> findAlertasDisciplinariasByAsesorScope(
+                        @Param("asesorId") Long asesorId,
+                        @Param("estadoArchivado") EstadoConsulta estadoArchivado);
+
+        // Filtra el alcance del monitor directamente en base de datos para no exponer
+        // alertas de consultas asignadas a otros monitores.
+        @EntityGraph(attributePaths = {
+                "categoriaSeguimiento",
+                "consulta",
+                "autor"
+        })
+        @Query("""
+                SELECT s
+                FROM Seguimiento s
+                JOIN s.consulta c
+                WHERE s.alertaDisciplinaria = true
+                AND s.activo = true
+                AND c.estado <> :estadoArchivado
+                AND c.monitor.id = :monitorId
+                ORDER BY s.fechaCreacion DESC, s.id DESC
+                """)
+        List<Seguimiento> findAlertasDisciplinariasByMonitorScope(
+                @Param("monitorId") Long monitorId,
+                @Param("estadoArchivado") EstadoConsulta estadoArchivado);
 
         // Lista seguimientos activos por fecha de entrega.
         List<Seguimiento> findByFechaEntregaAndActivoTrueOrderByFechaCreacionDesc(LocalDate fechaEntrega);
