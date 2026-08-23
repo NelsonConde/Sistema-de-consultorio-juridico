@@ -44,7 +44,8 @@ public class FileAccessService {
         switch (resource.type()) {
             case CONSULTA -> consultaAccessService.validarPuedeEditarConsulta(resource.firstId());
             case TAREA -> seguimientoAccessService.validarPuedeEditarSeguimiento(resource.firstId());
-            case RESPUESTA -> respuestaAccessService.validarPuedeResponderSeguimiento(resource.firstId());
+            case RESPUESTA -> respuestaAccessService.validarPuedeSubirArchivoRespuesta(
+                    resource.firstId(), resource.secondId());
             case CONCILIACION -> conciliacionAccessService.validarPuedeReemplazarSolicitud(resource.firstId());
         }
     }
@@ -54,7 +55,8 @@ public class FileAccessService {
         switch (resource.type()) {
             case CONSULTA -> consultaAccessService.validarPuedeVerConsulta(resource.firstId());
             case TAREA -> seguimientoAccessService.validarPuedeVerSeguimiento(resource.firstId());
-            case RESPUESTA -> respuestaAccessService.validarPuedeListarRespuestasDeSeguimiento(resource.firstId());
+            case RESPUESTA -> respuestaAccessService.validarPuedeLeerArchivoRespuesta(
+                    resource.firstId(), resource.secondId());
             case CONCILIACION -> conciliacionAccessService.validarPuedeVerConciliacion(resource.firstId());
         }
     }

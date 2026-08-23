@@ -52,7 +52,7 @@ class FileAccessServiceTest {
 
         service.authorizeUpload("tareas-8-respuestas-21/soporte.pdf");
 
-        verify(respuestaAccessService).validarPuedeResponderSeguimiento(8L);
+        verify(respuestaAccessService).validarPuedeSubirArchivoRespuesta(8L, 21L);
     }
 
     @Test
