@@ -16,6 +16,8 @@ Todos los endpoints requieren usuario autenticado mediante la anotación del con
 
 El controller opera con autenticación general para este grupo de rutas.
 
+Además, cada operación debe identificar un recurso funcional autorizado. Se admiten prefijos de consulta, tarea, respuesta de seguimiento y conciliación. Las operaciones sin contexto, como listar todos los directorios, responden `403 Forbidden`.
+
 ---
 
 ## 2. Carga individual
@@ -121,6 +123,7 @@ La ruta se decodifica y se consulta en el almacenamiento.
 |---|---|---|
 | `200 OK` | `Resource` | Retorna el archivo con `Content-Disposition: attachment`. |
 | `404 Not Found` | Sin cuerpo | El archivo solicitado no fue localizado. |
+| `403 Forbidden` | Error estándar | El usuario no tiene permiso o alcance sobre el recurso documental. |
 | `500 Internal Server Error` | Sin cuerpo | Ocurrió una excepción durante la consulta o construcción de la descarga. |
 
 Cuando no se puede determinar el tipo de contenido del archivo, la respuesta usa:
