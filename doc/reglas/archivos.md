@@ -8,9 +8,16 @@ Los archivos se almacenan como recursos documentales asociados a flujos funciona
 
 ---
 
-## 2. Autenticación
+## 2. Autenticación y autorización
 
-Los endpoints de `/api/files` requieren usuario autenticado. No aplican permisos funcionales granulares por tipo de documento.
+Los endpoints de `/api/files` requieren usuario autenticado y validan permiso y alcance mediante el servicio de acceso del recurso asociado. Se reconocen estas claves lógicas:
+
+- consulta: `{consultaId}/...`;
+- documentos de tarea: `tareas-{seguimientoId}-documentos/...`;
+- documentos de respuesta: `tareas-{seguimientoId}-respuestas-{respuestaId}/...`;
+- conciliación: `conciliacion/{conciliacionId}/...`.
+
+Las operaciones sin recurso identificable, como listar todos los directorios, se rechazan.
 
 ---
 
@@ -48,4 +55,4 @@ Rutas documentales relevantes:
 
 ## 7. Descarga y listado
 
-La descarga se realiza por ruta relativa. Si el recurso no existe, el backend responde como no encontrado. El listado permite consultar archivos y directorios disponibles bajo la raíz configurada.
+La descarga se realiza por clave lógica asociada a un recurso autorizado. Si el recurso no existe, el backend responde como no encontrado. El listado solo permite consultar el prefijo del recurso autorizado.

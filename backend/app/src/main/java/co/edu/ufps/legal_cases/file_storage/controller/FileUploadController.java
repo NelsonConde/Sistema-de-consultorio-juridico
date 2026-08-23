@@ -11,6 +11,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.HandlerMapping;
 
 import co.edu.ufps.legal_cases.file_storage.exception.FileNotFoundException;
+import co.edu.ufps.legal_cases.file_storage.service.FileAccessService;
 import co.edu.ufps.legal_cases.file_storage.service.FileStorageService;
 
 /**
@@ -35,9 +37,13 @@ import co.edu.ufps.legal_cases.file_storage.service.FileStorageService;
 public class FileUploadController {
 
     private final FileStorageService fileStorageService;
+    private final FileAccessService fileAccessService;
 
-    public FileUploadController(FileStorageService fileStorageService) {
+    public FileUploadController(
+            FileStorageService fileStorageService,
+            FileAccessService fileAccessService) {
         this.fileStorageService = fileStorageService;
+        this.fileAccessService = fileAccessService;
     }
 
     @PostMapping("/upload")
@@ -47,12 +53,15 @@ public class FileUploadController {
         Map<String, Object> response = new HashMap<>();
 
         try {
+            fileAccessService.authorizeUpload(path);
             String fileName = fileStorageService.storeFile(file, path);
 
             response.put("fileName", fileName);
             response.put("fileSize", file.getSize());
             response.put("message", "¡Archivo cargado exitosamente!");
             return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            throw e;
         } catch (Exception e) {
             response.put("error", "No se pudo cargar el archivo: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
@@ -64,6 +73,8 @@ public class FileUploadController {
             @RequestParam MultipartFile[] files,
             @RequestParam(required = false) String path) {
         List<Map<String, Object>> results = new ArrayList<>();
+
+        fileAccessService.authorizeUpload(path);
 
         for (MultipartFile file : files) {
             Map<String, Object> fileResponse = new HashMap<>();
@@ -91,6 +102,7 @@ public class FileUploadController {
                     java.nio.charset.StandardCharsets.UTF_8.name()
             );
 
+            fileAccessService.authorizeRead(requestedFile);
             Resource resource = fileStorageService.loadFileAsResource(requestedFile);
 
             String contentType = null;
@@ -104,6 +116,8 @@ public class FileUploadController {
                     .contentType(MediaType.parseMediaType(contentType))
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
                     .body(resource);
+        } catch (AccessDeniedException e) {
+            throw e;
         } catch (FileNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         } catch (Exception e) {
@@ -114,8 +128,11 @@ public class FileUploadController {
     @GetMapping({"/list", "/list/{subDir:.+}"})
     public ResponseEntity<List<String>> listFiles(@PathVariable(required = false) String subDir) {
         try {
+            fileAccessService.authorizeList(subDir);
             List<String> fileNames = fileStorageService.listFiles(subDir);
             return ResponseEntity.ok(fileNames);
+        } catch (AccessDeniedException e) {
+            throw e;
         } catch (FileNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         } catch (Exception e) {
@@ -126,8 +143,10 @@ public class FileUploadController {
     @GetMapping("/directories")
     public ResponseEntity<List<String>> listDirectories() {
         try {
-            List<String> directories = fileStorageService.listDirectories();
-            return ResponseEntity.ok(directories);
+            fileAccessService.denyUnscopedOperation();
+            return ResponseEntity.ok(List.of());
+        } catch (AccessDeniedException e) {
+            throw e;
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }

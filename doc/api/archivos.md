@@ -187,7 +187,7 @@ Estos contratos son interpretables por las utilidades frontend que leen JSON o c
 
 ## 8. Validación de rutas
 
-`FileStorageService` limpia nombres de archivo, normaliza rutas y rechaza nombres o subdirectorios que contengan secuencias `..`. El contrato funcional espera rutas relativas bajo la raíz configurada de almacenamiento.
+`FileStorageService` limpia nombres de archivo, normaliza claves y rechaza rutas absolutas o secuencias `..`. Antes de cargar, listar o descargar, `FileAccessService` resuelve la clave contra el recurso funcional y delega la autorización en el `AccessService` correspondiente. No se permite listar el almacenamiento sin un recurso asociado.
 
 ---
 
