@@ -1,5 +1,6 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
 /**
  * Formulario de eliminación y reactivación de registros.
  *
@@ -250,7 +251,7 @@ export function EliminacionForm() {
     try {
       setLoading(true);
 
-      const res = await fetch(`${API_URL_BASE}/auth/me`, {
+      const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
         method: "GET",
         credentials: "include",
       });
@@ -298,7 +299,7 @@ export function EliminacionForm() {
       await Promise.all(
         SECCIONES.map(async (item) => {
           try {
-            const res = await fetch(`${API_URL_BASE}${item.endpoint}`, {
+            const res = await apiClient.request(`${API_URL_BASE}${item.endpoint}`, {
               credentials: "include",
             });
 
@@ -375,7 +376,7 @@ export function EliminacionForm() {
       ? `${API_URL_BASE}${endpoint}/${id}/reactivar`
       : `${API_URL_BASE}${endpoint}/${id}/activo?activo=true`;
 
-    const res = await fetch(url, {
+    const res = await apiClient.request(url, {
       method: "PATCH",
       credentials: "include",
     });
@@ -390,7 +391,7 @@ export function EliminacionForm() {
   }
 
   async function reactivarConsulta(item) {
-    const res = await fetch(`${API_URL_BASE}/consultas/${item.id}/desarchivar`, {
+    const res = await apiClient.request(`${API_URL_BASE}/consultas/${item.id}/desarchivar`, {
       method: "PATCH",
       credentials: "include",
     });

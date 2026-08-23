@@ -1,5 +1,6 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
   /**
    * Formulario de listado y gestión de consultas jurídicas.
    *
@@ -538,7 +539,7 @@ export function ConsultasJuridicasForm() {
       try {
         setCheckingPermisos(true);
 
-        const res = await fetch(`${API_URL_BASE}/auth/me`, {
+        const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
           method: "GET",
           credentials: "include",
         });
@@ -583,7 +584,7 @@ export function ConsultasJuridicasForm() {
     if (prevAreaId.current === form.areaId) return;
     prevAreaId.current = form.areaId;
     if (form.areaId) {
-      fetch(`${API_URL_BASE}/temas/area/${form.areaId}`, { credentials: "include" })
+      apiClient.request(`${API_URL_BASE}/temas/area/${form.areaId}`, { credentials: "include" })
         .then(r => r.json()).then(d => setTemas(Array.isArray(d) ? d : [])).catch(() => setTemas([]));
     } else { setTemas([]); setTipos([]); }
   }, [form.areaId]);
@@ -593,7 +594,7 @@ export function ConsultasJuridicasForm() {
     if (prevTemaId.current === form.temaId) return;
     prevTemaId.current = form.temaId;
     if (form.temaId) {
-      fetch(`${API_URL_BASE}/tipos/tema/${form.temaId}`, { credentials: "include" })
+      apiClient.request(`${API_URL_BASE}/tipos/tema/${form.temaId}`, { credentials: "include" })
         .then(r => r.json()).then(d => setTipos(Array.isArray(d) ? d : [])).catch(() => setTipos([]));
     } else { setTipos([]); }
   }, [form.temaId]);
@@ -606,7 +607,7 @@ export function ConsultasJuridicasForm() {
     try {
       console.log("[CONSULTAS] Consultando:", url);
 
-      const res = await fetch(url, {
+      const res = await apiClient.request(url, {
         method: "GET",
         credentials: "include",
       });
@@ -674,7 +675,7 @@ export function ConsultasJuridicasForm() {
   async function cargarCatalogos() {
     try {
       const fetchCatalogo = async (url) => {
-        const res = await fetch(url, {
+        const res = await apiClient.request(url, {
           credentials: "include",
         });
 
@@ -750,7 +751,7 @@ export function ConsultasJuridicasForm() {
 
   async function abrirEditar(id) {
     try {
-      const res = await fetch(`${API_URL_BASE}/consultas/${id}`, { credentials: "include" });
+      const res = await apiClient.request(`${API_URL_BASE}/consultas/${id}`, { credentials: "include" });
       const payload = await leerJsonSeguro(res);
 
       if (res.status === 401) {
@@ -771,12 +772,12 @@ export function ConsultasJuridicasForm() {
       const data = payload?.data || payload?.consulta || payload;
 
       if (data.areaId) {
-        const temasRes = await fetch(`${API_URL_BASE}/temas/area/${data.areaId}`, { credentials: "include" });
+        const temasRes = await apiClient.request(`${API_URL_BASE}/temas/area/${data.areaId}`, { credentials: "include" });
         const temasData = await leerJsonSeguro(temasRes);
         setTemas(temasRes.ok ? obtenerArrayDesdeRespuesta(temasData) : []);
       }
       if (data.temaId) {
-        const tiposRes = await fetch(`${API_URL_BASE}/tipos/tema/${data.temaId}`, { credentials: "include" });
+        const tiposRes = await apiClient.request(`${API_URL_BASE}/tipos/tema/${data.temaId}`, { credentials: "include" });
         const tiposData = await leerJsonSeguro(tiposRes);
         setTipos(tiposRes.ok ? obtenerArrayDesdeRespuesta(tiposData) : []);
       }
@@ -818,7 +819,7 @@ export function ConsultasJuridicasForm() {
   async function cargarArchivosCaso(consultaId) {
     setCargandoArchivos(true);
     try {
-      const res = await fetch(`${FILE_STORAGE_API_URL_BASE}/files/list/${consultaId}`, { credentials: "include" });
+      const res = await apiClient.request(`${FILE_STORAGE_API_URL_BASE}/files/list/${consultaId}`, { credentials: "include" });
       if (!res.ok) { setArchivosCaso([]); return; }
       const data = await res.json();
       setArchivosCaso(Array.isArray(data) ? data : []);
@@ -828,7 +829,7 @@ export function ConsultasJuridicasForm() {
 
   const descargarArchivo = async (fileName) => {
     try {
-      const response = await fetch(`${FILE_STORAGE_API_URL_BASE}/files/download/${idEditando}/${encodeURIComponent(fileName)}`, { method: 'GET', credentials: 'include' });
+      const response = await apiClient.request(`${FILE_STORAGE_API_URL_BASE}/files/download/${idEditando}/${encodeURIComponent(fileName)}`, { method: 'GET', credentials: 'include' });
       if (!response.ok) throw new Error('Error descargando archivo');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -878,7 +879,7 @@ export function ConsultasJuridicasForm() {
     }
 
     try {
-      const res = await fetch(`${API_URL_BASE}/consultas/${idEditando}`, {
+      const res = await apiClient.request(`${API_URL_BASE}/consultas/${idEditando}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -941,7 +942,7 @@ export function ConsultasJuridicasForm() {
     }
 
     try {
-      const res = await fetch(
+      const res = await apiClient.request(
         `${API_URL_BASE}/consultas/${id}/estado?estado=${encodeURIComponent(estadoNormalizado)}`,
         {
           method: "PATCH",
@@ -990,7 +991,7 @@ export function ConsultasJuridicasForm() {
     setConfirmArchivar((s) => ({ ...s, loading: true }));
 
     try {
-      const res = await fetch(`${API_URL_BASE}/consultas/${id}/archivar`, {
+      const res = await apiClient.request(`${API_URL_BASE}/consultas/${id}/archivar`, {
         method: "PATCH",
         credentials: "include",
       });

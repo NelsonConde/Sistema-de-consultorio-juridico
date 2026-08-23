@@ -1,3 +1,5 @@
+"use client"
+
 /**
  * Formulario de gestión de áreas jurídicas.
  *
@@ -9,8 +11,9 @@
  *
  * @module components/forms/catalogos/AreaForm
  */
-"use client"
 
+
+import { apiClient } from "@/lib/apiClient";
 import React, { useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
 import { FormInput } from "../parts/FormInput"
@@ -52,7 +55,7 @@ export function AreaForm() {
   useEffect(() => {
     async function verificar() {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, {
+        const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
           credentials: "include",
         })
 
@@ -91,7 +94,7 @@ export function AreaForm() {
    */
   async function cargarAreas() {
     try {
-      const res = await fetch(`${API_URL_BASE}/areas`, {
+      const res = await apiClient.request(`${API_URL_BASE}/areas`, {
         credentials: "include",
       })
 
@@ -138,7 +141,7 @@ export function AreaForm() {
     try {
       setConfirmLoading(true)
 
-      const res = await fetch(
+      const res = await apiClient.request(
         `${API_URL_BASE}/areas/${confirmDialog.id}/activo?activo=false`,
         {
           method: "PATCH",
@@ -181,7 +184,7 @@ export function AreaForm() {
 
       const method = editandoId ? "PUT" : "POST"
 
-      const res = await fetch(url, {
+      const res = await apiClient.request(url, {
         method,
         headers: { "Content-Type": "application/json" },
         credentials: "include",

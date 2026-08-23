@@ -1,3 +1,4 @@
+import { apiClient } from "@/lib/apiClient";
 /**
  * Hook para manejar envíos de formularios al backend.
  *
@@ -66,7 +67,7 @@ export function useApiForm({ endpoint, method = "POST", successMessage = "Regist
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(endpoint, {
+      const response = await apiClient.request(endpoint, {
         method,
         credentials: "include",
         headers: {

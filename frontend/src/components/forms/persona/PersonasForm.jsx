@@ -1,5 +1,6 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
 /**
  * Formulario de listado de personas registradas en el sistema.
  *
@@ -152,7 +153,7 @@ async function leerRespuesta(res) {
 }
 
 async function fetchCatalogo(path) {
-  const res = await fetch(`${API_URL_BASE}${path}`, {
+  const res = await apiClient.request(`${API_URL_BASE}${path}`, {
     method: "GET",
     credentials: "include",
   });
@@ -463,7 +464,7 @@ export function PersonasForm() {
       setError("");
       setMensaje("");
 
-      const meRes = await fetch(`${API_URL_BASE}/auth/me`, {
+      const meRes = await apiClient.request(`${API_URL_BASE}/auth/me`, {
         credentials: "include",
       });
 
@@ -543,7 +544,7 @@ export function PersonasForm() {
   }
 
   async function cargarPersonas() {
-    const personasRes = await fetch(`${API_URL_BASE}/personas/activos`, {
+    const personasRes = await apiClient.request(`${API_URL_BASE}/personas/activos`, {
       credentials: "include",
     });
 
@@ -717,7 +718,7 @@ export function PersonasForm() {
 
       const payload = construirPayload(form, personaEditando.id);
 
-      const res = await fetch(`${API_URL_BASE}/personas/${personaEditando.id}`, {
+      const res = await apiClient.request(`${API_URL_BASE}/personas/${personaEditando.id}`, {
         method: "PUT",
         credentials: "include",
         headers: {
@@ -772,7 +773,7 @@ export function PersonasForm() {
       setError("");
       setMensaje("");
 
-      const res = await fetch(
+      const res = await apiClient.request(
         `${API_URL_BASE}/personas/${personaADesactivar.id}/desactivar`,
         {
           method: "PATCH",

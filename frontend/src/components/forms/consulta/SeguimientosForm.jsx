@@ -1,5 +1,6 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
 /**
  * Formulario de gestión de seguimientos (tareas) de consultas jurídicas.
  *
@@ -457,7 +458,7 @@ export function SeguimientosForm() {
   }, [])
 
   async function apiRequest(url, options = {}) {
-    const res = await fetch(url, {
+    const res = await apiClient.request(url, {
       credentials: "include",
       headers:
         options.body instanceof FormData
@@ -486,7 +487,7 @@ export function SeguimientosForm() {
 
   async function fetchLista(url, mensaje403) {
     try {
-      const res = await fetch(url, { credentials: "include" })
+      const res = await apiClient.request(url, { credentials: "include" })
       const data = await leerRespuesta(res)
 
       if (res.status === 401) {
@@ -512,7 +513,7 @@ export function SeguimientosForm() {
     try {
       setLoading(true)
 
-      const meRes = await fetch(`${API_URL_BASE}/auth/me`, {
+      const meRes = await apiClient.request(`${API_URL_BASE}/auth/me`, {
         credentials: "include",
       })
 
@@ -899,7 +900,7 @@ export function SeguimientosForm() {
 
     formData.append("path", pathTarea(seguimientoId))
 
-    const res = await fetch(`${FILES_API}/files/upload-multiple`, {
+    const res = await apiClient.request(`${FILES_API}/files/upload-multiple`, {
       method: "POST",
       credentials: "include",
       body: formData,
@@ -921,7 +922,7 @@ export function SeguimientosForm() {
         [seguimientoId]: true,
       }))
 
-      const res = await fetch(
+      const res = await apiClient.request(
         `${FILES_API}/files/list/${encodeURIComponent(path)}`,
         {
           credentials: "include",
@@ -961,7 +962,7 @@ export function SeguimientosForm() {
     const path = pathTarea(seguimientoId)
 
     try {
-      const res = await fetch(
+      const res = await apiClient.request(
         `${FILES_API}/files/download/${encodeURIComponent(path)}/${encodeURIComponent(fileName)}`,
         {
           method: "GET",
@@ -1001,7 +1002,7 @@ export function SeguimientosForm() {
 
     formData.append("path", pathRespuesta(seguimientoId, respuestaId))
 
-    const res = await fetch(`${FILES_API}/files/upload-multiple`, {
+    const res = await apiClient.request(`${FILES_API}/files/upload-multiple`, {
       method: "POST",
       credentials: "include",
       body: formData,
@@ -1023,7 +1024,7 @@ export function SeguimientosForm() {
         [respuestaId]: true,
       }))
 
-      const res = await fetch(
+      const res = await apiClient.request(
         `${FILES_API}/files/list/${encodeURIComponent(path)}`,
         {
           credentials: "include",
@@ -1063,7 +1064,7 @@ export function SeguimientosForm() {
     const path = pathRespuesta(seguimientoId, respuestaId)
 
     try {
-      const res = await fetch(
+      const res = await apiClient.request(
         `${FILES_API}/files/download/${encodeURIComponent(path)}/${encodeURIComponent(fileName)}`,
         {
           method: "GET",

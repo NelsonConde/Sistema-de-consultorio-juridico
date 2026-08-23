@@ -1,5 +1,6 @@
 "use client";
 
+import { apiClient } from "@/lib/apiClient";
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -212,7 +213,7 @@ export function ReunionesConciliacionForm() {
   }, [detalle]);
 
   async function apiFetch(path, options = {}, fallback = "Ocurrió un error") {
-    const response = await fetch(`${API_URL_BASE}${path}`, {
+    const response = await apiClient.request(`${API_URL_BASE}${path}`, {
       credentials: "include",
       ...options,
       headers: {
@@ -240,7 +241,7 @@ export function ReunionesConciliacionForm() {
       setError("");
       setMensaje("");
 
-      const meResponse = await fetch(`${API_URL_BASE}/auth/me`, {
+      const meResponse = await apiClient.request(`${API_URL_BASE}/auth/me`, {
         method: "GET",
         credentials: "include",
       });

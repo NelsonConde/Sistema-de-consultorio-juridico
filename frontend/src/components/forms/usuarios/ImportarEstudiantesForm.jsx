@@ -1,5 +1,6 @@
 "use client";
 
+import { apiClient } from "@/lib/apiClient";
 import React, { useRef, useState } from "react";
 import { Upload, Download, FileSpreadsheet, CheckCircle, XCircle, AlertCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -94,7 +95,7 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
       const form = new FormData();
       form.append("archivo", archivoSeleccionado);
 
-      const res = await fetch(`${API_URL_BASE}/estudiantes/importar`, {
+      const res = await apiClient.request(`${API_URL_BASE}/estudiantes/importar`, {
         method: "POST",
         credentials: "include",
         body: form,

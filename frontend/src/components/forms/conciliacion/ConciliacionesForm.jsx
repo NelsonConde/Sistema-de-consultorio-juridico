@@ -1,5 +1,6 @@
 "use client";
 
+import { apiClient } from "@/lib/apiClient";
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -490,7 +491,7 @@ export function ConciliacionesForm() {
   }, [search, conciliaciones.length, pageSize]);
 
   async function apiFetch(path, options = {}, fallback = "No se pudo completar la operación") {
-    const response = await fetch(`${API_URL_BASE}${path}`, {
+    const response = await apiClient.request(`${API_URL_BASE}${path}`, {
       credentials: "include",
       ...options,
       headers: options.body instanceof FormData
@@ -520,7 +521,7 @@ export function ConciliacionesForm() {
       setError("");
       setMensaje("");
 
-      const meResponse = await fetch(`${API_URL_BASE}/auth/me`, {
+      const meResponse = await apiClient.request(`${API_URL_BASE}/auth/me`, {
         method: "GET",
         credentials: "include",
       });
@@ -843,7 +844,7 @@ export function ConciliacionesForm() {
     if (!path) return;
 
     try {
-      const response = await fetch(
+      const response = await apiClient.request(
         `${FILE_STORAGE_API_URL_BASE}/files/download/${encodePath(path)}`,
         { method: "GET", credentials: "include" }
       );

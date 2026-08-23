@@ -1,3 +1,5 @@
+"use client"
+
 /**
  * Formulario de gestión de estudiantes.
  *
@@ -9,8 +11,8 @@
  *
  * @module components/forms/usuarios/EstudiantesForm
  */
-"use client";
 
+import { apiClient } from "@/lib/apiClient";
 import React, { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -44,7 +46,7 @@ export function EstudiantesForm() {
   useEffect(() => {
     const verificarYCargar = async () => {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, {
+        const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
           method: "GET",
           credentials: "include",
         });
@@ -80,7 +82,7 @@ export function EstudiantesForm() {
           url = `${API_URL_BASE}/estudiantes/activos/asesor/${usuario.perfilId}`;
         }
 
-        const estudiantesRes = await fetch(url, {
+        const estudiantesRes = await apiClient.request(url, {
           credentials: "include",
         });
 
@@ -152,7 +154,7 @@ export function EstudiantesForm() {
     try {
       setConfirmLoading(true);
 
-      const res = await fetch(
+      const res = await apiClient.request(
         `${API_URL_BASE}/estudiantes/${confirmDialog.id}/activo?activo=false`,
         {
           method: "PATCH",

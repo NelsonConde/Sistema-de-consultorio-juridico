@@ -1,5 +1,6 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
 import * as React from "react"
 import {
   Sidebar,
@@ -50,7 +51,7 @@ export function AppSidebar({ mainItems = [], footerItems = [] }) {
      */
     const cargarUsuario = async () => {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, {
+        const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
           method: "GET",
           credentials: "include",
         })
@@ -122,15 +123,18 @@ export function AppSidebar({ mainItems = [], footerItems = [] }) {
    */
   const handleLogout = async () => {
     try {
-      await fetch(`${API_URL_BASE}/auth/logout`, {
+      const response = await apiClient.request(`${API_URL_BASE}/auth/logout`, {
         method: "POST",
-        credentials: "include",
       })
+
+      if (!response.ok) {
+        throw new Error("No fue posible cerrar la sesión")
+      }
+
+      router.replace("/")
     } catch (error) {
       console.error("Error cerrando sesión", error)
     }
-
-    router.replace("/") // tu login está en /
   }
 
   return (

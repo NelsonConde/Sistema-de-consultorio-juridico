@@ -1,35 +1,56 @@
-import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { FormFileUpload } from './FormFileUpload';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
-/**
- * Formulario para subir archivos desde el frontend.
- * @returns {JSX.Element} Componente de carga de archivos.
- */
-export default function ArchivoForm() {
+import { apiClient } from "@/lib/apiClient";
+import { API_URL_BASE, FILE_STORAGE_API_URL_BASE } from "@/lib/config";
+import { FormFileUpload } from "./FormFileUpload";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { API_URL_BASE } from '@/lib/config';
 
+/**
+ * Formulario para subir archivos desde el frontend.
+ * @returns {JSX.Element} Componente de carga de archivos.
+ */
 export default function ArchivoForm() {
   const [isUploading, setIsUploading] = useState(false);
   const [directories, setDirectories] = useState([]);
   const [selectedPath, setSelectedPath] = useState("");
 
+  const {
+    setValue,
+    handleSubmit,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm({
+    defaultValues: {
+      archivos: [],
+    },
+  });
+
+  const archivosValue = watch("archivos");
+
   useEffect(() => {
     const fetchDirs = async () => {
       try {
-        const response = await fetch(`${API_URL_BASE}/files/directories`, {
-          credentials: "include",
+        const response = await apiClient.request(`${API_URL_BASE}/files/directories`, {
+          method: "GET",
         });
+
         if (response.ok) {
           const data = await response.json();
           setDirectories(data);
@@ -38,62 +59,55 @@ export default function ArchivoForm() {
         console.error("Error fetching directories:", err);
       }
     };
+
     fetchDirs();
   }, []);
-  
-  const { setValue, handleSubmit, watch, reset, formState: { errors } } = useForm({
-    defaultValues: {
-      archivos: []
-    }
-  });
-
-  const archivosValue = watch("archivos");
 
   const onSubmit = async (data) => {
     if (!data.archivos || (Array.isArray(data.archivos) && data.archivos.length === 0)) {
-      toast.error('Por favor selecciona al menos un archivo');
+      toast.error("Por favor selecciona al menos un archivo");
       return;
     }
 
     setIsUploading(true);
-    
+
     const formData = new FormData();
-    // Determinamos si es un arreglo (múltiple) o un solo archivo
     const isMultiple = Array.isArray(data.archivos);
     let endpoint = `${FILE_STORAGE_API_URL_BASE}/files/upload`;
-    
+
     if (isMultiple) {
-      data.archivos.forEach(file => {
-        formData.append('files', file);
+      data.archivos.forEach((file) => {
+        formData.append("files", file);
       });
       endpoint = `${FILE_STORAGE_API_URL_BASE}/files/upload-multiple`;
     } else {
-      formData.append('file', data.archivos);
+      formData.append("file", data.archivos);
     }
 
     if (selectedPath) {
-      formData.append('path', selectedPath);
+      formData.append("path", selectedPath);
     }
 
     try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        credentials: "include",
+      const response = await apiClient.request(endpoint, {
+        method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error('Error al subir los archivos');
+        throw new Error("Error al subir los archivos");
       }
 
       const responseData = await response.json();
       console.log("Archivos subidos exitosamente:", responseData);
-      toast.success(isMultiple ? 'Archivos subidos correctamente' : 'Archivo subido correctamente');
-      
+      toast.success(
+        isMultiple ? "Archivos subidos correctamente" : "Archivo subido correctamente"
+      );
+
       reset();
     } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Ocurrió un error al enviar los archivos al backend');
+      console.error("Upload error:", error);
+      toast.error("Ocurrió un error al enviar los archivos al backend");
     } finally {
       setIsUploading(false);
     }
@@ -112,7 +126,7 @@ export default function ArchivoForm() {
           <FormFileUpload
             name="archivos"
             label="Documentos a subir"
-            multiple={true} // Permite seleccionar varios archivos a la vez
+            multiple={true}
             setValue={setValue}
             value={archivosValue}
             errors={errors}
@@ -121,27 +135,34 @@ export default function ArchivoForm() {
           <Accordion type="single" collapsible className="w-full border rounded-lg px-4">
             <AccordionItem value="ruta" className="border-none">
               <AccordionTrigger className="hover:no-underline">
-                Ruta de Destino: <span className="font-normal text-muted-foreground ml-2">{selectedPath ? `/${selectedPath}` : 'Raíz'}</span>
+                Ruta de Destino:{" "}
+                <span className="font-normal text-muted-foreground ml-2">
+                  {selectedPath ? `/${selectedPath}` : "Raíz"}
+                </span>
               </AccordionTrigger>
               <AccordionContent>
                 <div className="flex flex-col gap-2 mt-2 max-h-48 overflow-y-auto">
                   <label className="flex items-center space-x-2 p-2 rounded hover:bg-muted cursor-pointer transition-colors">
-                    <input 
-                      type="radio" 
-                      name="path" 
-                      value="" 
+                    <input
+                      type="radio"
+                      name="path"
+                      value=""
                       checked={selectedPath === ""}
                       onChange={() => setSelectedPath("")}
                       className="w-4 h-4 text-primary focus:ring-primary"
                     />
                     <span>/ (Directorio Raíz)</span>
                   </label>
-                  {directories.map(dir => (
-                    <label key={dir} className="flex items-center space-x-2 p-2 rounded hover:bg-muted cursor-pointer transition-colors">
-                      <input 
-                        type="radio" 
-                        name="path" 
-                        value={dir} 
+
+                  {directories.map((dir) => (
+                    <label
+                      key={dir}
+                      className="flex items-center space-x-2 p-2 rounded hover:bg-muted cursor-pointer transition-colors"
+                    >
+                      <input
+                        type="radio"
+                        name="path"
+                        value={dir}
                         checked={selectedPath === dir}
                         onChange={() => setSelectedPath(dir)}
                         className="w-4 h-4 text-primary focus:ring-primary"
@@ -161,7 +182,7 @@ export default function ArchivoForm() {
                 Enviando...
               </>
             ) : (
-              'Enviar Archivos'
+              "Enviar Archivos"
             )}
           </Button>
         </form>

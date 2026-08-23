@@ -1,3 +1,5 @@
+"use client"
+
 /**
  * Formulario de creación de consultas jurídicas.
  *
@@ -11,8 +13,8 @@
  *
  * @module components/forms/consulta/NuevaConsultaForm
  */
-"use client";
 
+import { apiClient } from "@/lib/apiClient";
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -457,7 +459,7 @@ export function NuevaConsultaForm() {
   useEffect(() => {
     async function verificar() {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, {
+        const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
           method: "GET",
           credentials: "include",
         });
@@ -504,7 +506,7 @@ export function NuevaConsultaForm() {
 
   useEffect(() => {
     if (form.areaId) {
-      fetch(`${API_URL_BASE}/temas/area/${form.areaId}`, {
+      apiClient.request(`${API_URL_BASE}/temas/area/${form.areaId}`, {
         credentials: "include",
       })
         .then((r) => {
@@ -533,7 +535,7 @@ export function NuevaConsultaForm() {
 
   useEffect(() => {
     if (form.temaId) {
-      fetch(`${API_URL_BASE}/tipos/tema/${form.temaId}`, {
+      apiClient.request(`${API_URL_BASE}/tipos/tema/${form.temaId}`, {
         credentials: "include",
       })
         .then((r) => {
@@ -563,7 +565,7 @@ export function NuevaConsultaForm() {
   async function cargarCatalogos(puedeAsignar = false) {
     try {
       async function fetchLista(url) {
-        const res = await fetch(url, {
+        const res = await apiClient.request(url, {
           credentials: "include",
         });
 
@@ -652,7 +654,7 @@ export function NuevaConsultaForm() {
     formData.append("path", String(consultaId));
 
     try {
-      const uploadRes = await fetch(
+      const uploadRes = await apiClient.request(
         `${FILE_STORAGE_API_URL_BASE}/files/upload-multiple`,
         {
           method: "POST",
@@ -744,7 +746,7 @@ export function NuevaConsultaForm() {
     };
 
     try {
-      const res = await fetch(`${API_URL_BASE}/consultas`, {
+      const res = await apiClient.request(`${API_URL_BASE}/consultas`, {
         method: "POST",
         credentials: "include",
         headers: {

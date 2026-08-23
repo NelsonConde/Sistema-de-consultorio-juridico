@@ -1,3 +1,5 @@
+"use client"
+
 /**
  * Formulario de gestión de permisos por página para roles del sistema.
  *
@@ -12,8 +14,8 @@
  *
  * @module components/forms/AdminUsuarios/RolePermissionsForm
  */
-"use client";
 
+import { apiClient } from "@/lib/apiClient";
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -466,7 +468,7 @@ export function RolePermissionsForm() {
       setError("");
       setMensaje("");
 
-      const meRes = await fetch(`${API_URL_BASE}/auth/me`, {
+      const meRes = await apiClient.request(`${API_URL_BASE}/auth/me`, {
         method: "GET",
         credentials: "include",
       });
@@ -509,7 +511,7 @@ export function RolePermissionsForm() {
   }
 
   async function cargarRolesActivos() {
-    const res = await fetch(`${API_URL_BASE}/roles/activos`, {
+    const res = await apiClient.request(`${API_URL_BASE}/roles/activos`, {
       credentials: "include",
     });
 
@@ -532,7 +534,7 @@ export function RolePermissionsForm() {
   }
 
   async function cargarPermisosActivos() {
-    const res = await fetch(`${API_URL_BASE}/permisos/activos`, {
+    const res = await apiClient.request(`${API_URL_BASE}/permisos/activos`, {
       credentials: "include",
     });
 
@@ -556,7 +558,7 @@ export function RolePermissionsForm() {
     if (lista.length > 0) return lista;
 
     try {
-      const resTodos = await fetch(`${API_URL_BASE}/permisos`, {
+      const resTodos = await apiClient.request(`${API_URL_BASE}/permisos`, {
         credentials: "include",
       });
 
@@ -570,7 +572,7 @@ export function RolePermissionsForm() {
   }
 
   async function crearPermiso(nombre) {
-    const res = await fetch(`${API_URL_BASE}/permisos`, {
+    const res = await apiClient.request(`${API_URL_BASE}/permisos`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -655,7 +657,7 @@ export function RolePermissionsForm() {
       setError("");
       setMensaje("");
 
-      const res = await fetch(`${API_URL_BASE}/roles/${id}`, {
+      const res = await apiClient.request(`${API_URL_BASE}/roles/${id}`, {
         credentials: "include",
       });
 
@@ -765,7 +767,7 @@ export function RolePermissionsForm() {
   }
 
   async function cambiarPermisoRol(permisoId, method) {
-    const res = await fetch(
+    const res = await apiClient.request(
       `${API_URL_BASE}/roles/${rolId}/permisos/${permisoId}`,
       {
         method,

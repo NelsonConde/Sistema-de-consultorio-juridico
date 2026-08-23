@@ -1,5 +1,6 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
 /**
  * Formulario de creación de usuarios del sistema jurídico.
  *
@@ -152,7 +153,7 @@ export function UsuarioSistemaForm() {
   }
 
   async function fetchLista(url, mensaje403) {
-    const res = await fetch(url, { credentials: "include" });
+    const res = await apiClient.request(url, { credentials: "include" });
 
     if (res.status === 401) {
       router.push("/");
@@ -174,7 +175,7 @@ export function UsuarioSistemaForm() {
 
   async function verificarYCargar() {
     try {
-      const res = await fetch(`${API_URL_BASE}/auth/me`, {
+      const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
         credentials: "include",
       });
 
@@ -306,7 +307,7 @@ export function UsuarioSistemaForm() {
     try {
       setGuardando(true);
 
-      const res = await fetch(`${API_URL_BASE}/${rol}`, {
+      const res = await apiClient.request(`${API_URL_BASE}/${rol}`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

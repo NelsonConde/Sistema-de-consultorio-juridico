@@ -1,5 +1,6 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
 /**
  * Formulario de gestión de tipos de consulta jurídica.
  *
@@ -59,7 +60,7 @@ export function TipoForm() {
   useEffect(() => {
     const verificarYCargar = async () => {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, {
+        const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
           method: "GET",
           credentials: "include",
         });
@@ -81,7 +82,7 @@ export function TipoForm() {
           return;
         }
 
-        const response = await fetch(`${API_URL_BASE}/temas`, {
+        const response = await apiClient.request(`${API_URL_BASE}/temas`, {
           credentials: "include",
         });
 
@@ -121,7 +122,7 @@ export function TipoForm() {
   }, [router]);
 
   async function cargarTipos() {
-    const res = await fetch(`${API_URL_BASE}/tipos`, {
+    const res = await apiClient.request(`${API_URL_BASE}/tipos`, {
       credentials: "include",
     });
 
@@ -157,7 +158,7 @@ export function TipoForm() {
     try {
       setDesactivando(true);
 
-      const res = await fetch(
+      const res = await apiClient.request(
         `${API_URL_BASE}/tipos/${tipoADesactivar.id}/activo?activo=false`,
         {
           method: "PATCH",
@@ -185,7 +186,7 @@ export function TipoForm() {
 
   const onSubmit = async (data) => {
     if (editandoId) {
-      const res = await fetch(`${API_URL_BASE}/tipos/${editandoId}`, {
+      const res = await apiClient.request(`${API_URL_BASE}/tipos/${editandoId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

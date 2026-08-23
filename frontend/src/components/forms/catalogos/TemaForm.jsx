@@ -1,5 +1,6 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
 /**
  * Formulario de gestión de temas jurídicos.
  *
@@ -60,7 +61,7 @@ export function TemaForm() {
   useEffect(() => {
   const verificar = async () => {
     try {
-      const res = await fetch(`${API_URL_BASE}/auth/me`, {
+      const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
         method: "GET",
         credentials: "include",
       });
@@ -89,7 +90,7 @@ export function TemaForm() {
         return;
       }
 
-      const response = await fetch(`${API_URL_BASE}/areas`, {
+      const response = await apiClient.request(`${API_URL_BASE}/areas`, {
         credentials: "include",
       });
 
@@ -127,7 +128,7 @@ export function TemaForm() {
 }, [router]);
 
   async function cargarTemas() {
-    const res = await fetch(`${API_URL_BASE}/temas`, {
+    const res = await apiClient.request(`${API_URL_BASE}/temas`, {
       credentials: "include",
     });
 
@@ -179,7 +180,7 @@ export function TemaForm() {
     try {
       setDesactivando(true);
 
-      const res = await fetch(
+      const res = await apiClient.request(
         `${API_URL_BASE}/temas/${temaADesactivar.id}/activo?activo=false`,
         {
           method: "PATCH",
@@ -212,7 +213,7 @@ export function TemaForm() {
     }
 
     if (editandoId) {
-      const res = await fetch(`${API_URL_BASE}/temas/${editandoId}`, {
+      const res = await apiClient.request(`${API_URL_BASE}/temas/${editandoId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

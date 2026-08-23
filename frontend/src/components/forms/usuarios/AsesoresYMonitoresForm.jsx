@@ -1,5 +1,6 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
 /**
  * Formulario de gestión de asesores y monitores.
  *
@@ -44,7 +45,7 @@ export function AsesoresYMonitoresForm() {
   useEffect(() => {
     const verificarYcargar = async () => {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, {
+        const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
           method: "GET",
           credentials: "include",
         });
@@ -75,10 +76,10 @@ export function AsesoresYMonitoresForm() {
         );
 
         const [asesoresRes, monitoresRes] = await Promise.all([
-          fetch(`${API_URL_BASE}/asesores/activos`, {
+          apiClient.request(`${API_URL_BASE}/asesores/activos`, {
             credentials: "include",
           }),
-          fetch(`${API_URL_BASE}/monitores/activos`, {
+          apiClient.request(`${API_URL_BASE}/monitores/activos`, {
             credentials: "include",
           }),
         ]);
@@ -127,7 +128,7 @@ export function AsesoresYMonitoresForm() {
       const endpoint =
         confirmDialog.rol === "Asesor" ? "asesores" : "monitores";
 
-      const res = await fetch(
+      const res = await apiClient.request(
         `${API_URL_BASE}/${endpoint}/${confirmDialog.id}/activo?activo=false`,
         {
           method: "PATCH",

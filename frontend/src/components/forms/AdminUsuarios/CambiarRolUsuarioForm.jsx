@@ -1,5 +1,6 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
 /**
  * Formulario para cambiar el rol de un usuario del sistema.
  *
@@ -278,7 +279,7 @@ export function CambiarRolUsuarioForm() {
   }
 
   async function fetchJson(url) {
-    const response = await fetch(url, { credentials: "include" });
+    const response = await apiClient.request(url, { credentials: "include" });
 
     if (response.status === 401) {
       router.replace("/");
@@ -297,7 +298,7 @@ export function CambiarRolUsuarioForm() {
     try {
       setLoading(true);
 
-      const meRes = await fetch(`${API_URL_BASE}/auth/me`, {
+      const meRes = await apiClient.request(`${API_URL_BASE}/auth/me`, {
         method: "GET",
         credentials: "include",
       });
@@ -361,7 +362,7 @@ export function CambiarRolUsuarioForm() {
     }
 
     try {
-      const res = await fetch(
+      const res = await apiClient.request(
         `${API_URL_BASE}/${perfilActual.endpointActual}/${usuario.perfilId}`,
         { credentials: "include" }
       );
@@ -487,7 +488,7 @@ export function CambiarRolUsuarioForm() {
     try {
       setGuardando(true);
 
-      const response = await fetch(
+      const response = await apiClient.request(
         `${API_URL_BASE}/usuarios-sistema/${usuarioSeleccionado.id}/perfil/${perfilDestino.endpoint}`,
         {
           method: "PATCH",

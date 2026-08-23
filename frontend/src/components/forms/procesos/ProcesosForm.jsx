@@ -1,5 +1,6 @@
 "use client";
 
+import { apiClient } from "@/lib/apiClient";
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -122,7 +123,7 @@ function mensajeError(payload, defecto) {
  * @throws {Error} Si falla la autenticación, autorización o la solicitud
  */
 async function apiGet(url) {
-  const response = await fetch(url, { credentials: "include" });
+  const response = await apiClient.request(url, { credentials: "include" });
   const payload = await leerRespuesta(response);
   if (response.status === 401) { const e = new Error("Sesión vencida. Inicia sesión nuevamente."); e.status = 401; throw e; }
   if (response.status === 403) { const e = new Error("No tienes permisos para consultar esta información."); e.status = 403; throw e; }
@@ -141,7 +142,7 @@ async function apiGet(url) {
  * @throws {Error} Si falla la autenticación, autorización o la solicitud
  */
 async function apiEnviar(url, options) {
-  const response = await fetch(url, {
+  const response = await apiClient.request(url, {
     credentials: "include",
     headers: { "Content-Type": "application/json", ...(options?.headers || {}) },
     ...options,
