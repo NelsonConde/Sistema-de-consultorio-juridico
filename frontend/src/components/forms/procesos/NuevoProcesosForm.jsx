@@ -1,6 +1,5 @@
 "use client";
 
-import { apiClient } from "@/lib/apiClient";
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -8,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { API_URL_BASE } from "@/lib/config";
 import { PERMISOS } from "@/lib/permission";
 import { tieneAlgunPermiso } from "@/lib/authz";
+import { apiEnviar, apiGet } from "./procesos.service";
 
 const PERMISOS_PROCESOS = {
   VER_PROCESOS: PERMISOS.VER_PROCESOS || "Ver procesos",
@@ -42,41 +42,6 @@ function extraerLista(data) {
   }
 
   return [];
-}
-
-async function leerRespuesta(response) {
-  if (response.status === 204) return null;
-  const text = await response.text();
-  if (!text) return null;
-  try { return JSON.parse(text); } catch { return { mensaje: text }; }
-}
-
-function mensajeError(payload, defecto) {
-  if (!payload) return defecto;
-  if (typeof payload === "string") return payload || defecto;
-  return payload.mensaje || payload.message || payload.error || defecto;
-}
-
-async function apiGet(url) {
-  const response = await apiClient.request(url, { credentials: "include" });
-  const payload = await leerRespuesta(response);
-  if (response.status === 401) { const e = new Error("Sesión vencida. Inicia sesión nuevamente."); e.status = 401; throw e; }
-  if (response.status === 403) { const e = new Error("No tienes permisos para consultar esta información."); e.status = 403; throw e; }
-  if (!response.ok) throw new Error(mensajeError(payload, "No se pudo consultar la información."));
-  return payload;
-}
-
-async function apiEnviar(url, options) {
-  const response = await apiClient.request(url, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...(options?.headers || {}) },
-    ...options,
-  });
-  const payload = await leerRespuesta(response);
-  if (response.status === 401) { const e = new Error("Sesión vencida. Inicia sesión nuevamente."); e.status = 401; throw e; }
-  if (response.status === 403) { const e = new Error("No tienes permisos para realizar esta acción."); e.status = 403; throw e; }
-  if (!response.ok) throw new Error(mensajeError(payload, "No se pudo guardar el proceso."));
-  return payload;
 }
 
 function puedeAccederProcesos(user) {
@@ -398,10 +363,14 @@ export function NuevoProcesoForm() {
     if (!validarAntesDeGuardar()) return;
     try {
       setGuardando(true);
-      await apiEnviar(`${API_URL_BASE}/procesos`, {
-        method: "POST",
-        body: JSON.stringify(normalizarPayload(form)),
-      });
+      await apiEnviar(
+        `${API_URL_BASE}/procesos`,
+        {
+          method: "POST",
+          body: JSON.stringify(normalizarPayload(form)),
+        },
+        "No se pudo guardar el proceso."
+      );
       toast.success("Proceso creado correctamente");
       router.push("/procesos");
     } catch (error) {

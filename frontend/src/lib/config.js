@@ -47,7 +47,7 @@ function normalizarApiUrl(url) {
  * @type {string}
  * @example
  * // Resultado típico en desarrollo: "http://localhost:8080/api"
- * fetch(`${API_URL_BASE}/auth/me`)
+ * apiClient.get(`${API_URL_BASE}/auth/me`)
  */
 export const API_URL_BASE = normalizarApiUrl(
   process.env.NEXT_PUBLIC_API_URL_BASE ||

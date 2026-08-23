@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import { API_URL_BASE } from "@/lib/config";
+import { apiResponse } from "@/lib/api";
 import { PERMISOS } from "@/lib/permission";
 import {
   tieneAlgunPermiso,
@@ -170,9 +171,8 @@ export function PermissionSidebar() {
   React.useEffect(() => {
     const cargarUsuario = async () => {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, {
+        const { response: res, data } = await apiResponse(`${API_URL_BASE}/auth/me`, {
           method: "GET",
-          credentials: "include",
         });
 
         if (res.status === 401) {
@@ -185,7 +185,6 @@ export function PermissionSidebar() {
           return;
         }
 
-        const data = await res.json();
         setUser(data);
       } catch (error) {
         console.error("Error cargando permisos del usuario", error);

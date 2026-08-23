@@ -3,6 +3,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { API_URL_BASE } from "@/lib/config";
+import { apiClient } from "@/lib/apiClient";
+import { apiResponse } from "@/lib/api";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
 import {
@@ -422,14 +424,12 @@ export function EstadisticasForm() {
   useEffect(() => {
     async function init() {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, { credentials: "include" });
+        const { response: res, data: user } = await apiResponse(`${API_URL_BASE}/auth/me`, { method: "GET" });
         if (res.status === 401) { router.replace("/"); return; }
-        const user = await res.json();
         if (!tienePermiso(user, PERMISOS.VER_REPORTES)) { router.replace("/inicio"); return; }
 
-        const resSem = await fetch(`${API_URL_BASE}/estadisticas/semestres`, { credentials: "include" });
+        const { response: resSem, data: lista } = await apiResponse(`${API_URL_BASE}/estadisticas/semestres`, { method: "GET" });
         if (resSem.ok) {
-          const lista = await resSem.json();
           setSemestres(lista);
           const actual = calcularSemestreActual();
           const found  = lista.find((s) => s.año === actual.año && s.semestre === actual.semestre);
@@ -452,13 +452,13 @@ export function EstadisticasForm() {
     if (!sem) return;
     setCargando(true); setError("");
     try {
-      const res = await fetch(
+      const { response: res, data } = await apiResponse(
         `${API_URL_BASE}/estadisticas/${sem.año}/semestre/${sem.semestre}`,
-        { credentials: "include" }
+        { method: "GET" }
       );
       if (res.status === 403) { setError("Sin permiso."); setStats(null); return; }
       if (!res.ok) { setError("Error al cargar estadísticas."); setStats(null); return; }
-      setStats(await res.json());
+      setStats(data);
     } catch { setError("Error de conexión."); }
     finally { setCargando(false); }
   }, [semSel, semestres, modoRango]);
@@ -470,16 +470,16 @@ export function EstadisticasForm() {
     if (fechaInicio > fechaFin)    { setError("La fecha de inicio no puede ser posterior a la de fin."); return; }
     setCargando(true); setError("");
     try {
-      const res = await fetch(
+      const { response: res, data } = await apiResponse(
         `${API_URL_BASE}/estadisticas/reporte?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`,
-        { credentials: "include" }
+        { method: "GET" }
       );
       if (res.status === 403) { setError("Sin permiso."); setStats(null); return; }
       if (!res.ok) {
-        const txt = await res.text();
+        const txt = typeof data === "string" ? data : data?.mensaje || data?.message || "";
         setError(txt || "Error al cargar estadísticas."); setStats(null); return;
       }
-      setStats(await res.json());
+      setStats(data);
     } catch { setError("Error de conexión."); }
     finally { setCargando(false); }
   }, [modoRango, fechaInicio, fechaFin]);
@@ -500,7 +500,7 @@ export function EstadisticasForm() {
         url      = `${API_URL_BASE}/estadisticas/${sem.año}/semestre/${sem.semestre}/pdf`;
         filename = `estadisticas-${sem.año}-s${sem.semestre}.pdf`;
       }
-      const res = await fetch(url, { credentials: "include" });
+      const res = await apiClient.get(url);
       if (!res.ok) { alert("El PDF no está disponible aún."); return; }
       const blob = await res.blob();
       const a    = document.createElement("a");

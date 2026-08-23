@@ -17,6 +17,7 @@ import Pagination from "@/components/ui/Pagination";
 import { API_URL_BASE } from "@/lib/config";
 import { PERMISOS } from "@/lib/permission";
 import { esEstudiante, tienePermiso } from "@/lib/authz";
+import { requestConciliacion } from "./conciliaciones.service";
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 const ESTADOS_FINALES = ["COMPLETO_CONCILIADO", "COMPLETO_NO_CONCILIADO"];
@@ -51,36 +52,6 @@ function extraerLista(data) {
   }
 
   return [];
-}
-
-async function leerRespuesta(response) {
-  if (response.status === 204) return null;
-
-  const text = await response.text();
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { mensaje: text };
-  }
-}
-
-function obtenerMensajeError(data, fallback = "Ocurrió un error") {
-  if (!data) return fallback;
-  if (typeof data === "string") return data || fallback;
-
-  if (data.detalles && typeof data.detalles === "object") {
-    const detalle = Object.values(data.detalles).filter(Boolean).join(". ");
-    if (detalle) return detalle;
-  }
-
-  if (Array.isArray(data.detalles)) {
-    const detalle = data.detalles.filter(Boolean).join(". ");
-    if (detalle) return detalle;
-  }
-
-  return data.mensaje || data.message || data.error || fallback;
 }
 
 function ordenarPorIdAsc(items) {
@@ -213,26 +184,14 @@ export function ReunionesConciliacionForm() {
   }, [detalle]);
 
   async function apiFetch(path, options = {}, fallback = "Ocurrió un error") {
-    const response = await apiClient.request(`${API_URL_BASE}${path}`, {
-      credentials: "include",
-      ...options,
-      headers: {
-        ...(options.headers || {}),
-      },
-    });
-
-    const data = await leerRespuesta(response);
-
-    if (response.status === 401) {
-      router.replace("/");
-      throw new Error("Sesión expirada. Inicia sesión nuevamente.");
+    try {
+      return await requestConciliacion(path, options, fallback);
+    } catch (error) {
+      if (error?.status === 401) {
+        router.replace("/");
+      }
+      throw error;
     }
-
-    if (!response.ok) {
-      throw new Error(obtenerMensajeError(data, fallback));
-    }
-
-    return data;
   }
 
   async function inicializar() {

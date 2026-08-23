@@ -201,19 +201,3 @@ export function seguimientoEstaVencido(tarea) {
 export function pathRespuesta(seguimientoId, respuestaId) {
   return `tareas-${seguimientoId}-respuestas-${respuestaId}`
 }
-
-export async function leerRespuesta(response) {
-  const text = await response.text()
-
-  if (!text) return null
-
-  try {
-    return JSON.parse(text)
-  } catch {
-    return { mensaje: text }
-  }
-}
-
-export function mensajeError(data, defecto) {
-  return data?.mensaje || data?.message || data?.error || defecto
-}

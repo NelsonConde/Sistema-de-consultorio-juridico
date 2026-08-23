@@ -27,16 +27,7 @@ import { tienePermiso } from "@/lib/authz";
 import { getApiErrorDescription, getApiErrorTitle, readResponseBody } from "@/lib/api";
 
 import { VACIOS } from "./nueva-consulta.constants";
-import {
-  idNormalizado,
-  leerRespuesta,
-  numberArray,
-  numberOrNull,
-  obtenerAreaIdAsesor,
-  obtenerAsesorIdEstudiante,
-  textOrNull,
-  validarCoherenciaConsultaFrontend,
-} from "./nueva-consulta.utils";
+import { leerRespuesta, numberArray, numberOrNull, textOrNull } from "./nueva-consulta.utils";
 import { ModalMultiple, ModalSimple } from "./ConsultaSelectionModals";
 
 export function NuevaConsultaForm() {
@@ -87,11 +78,6 @@ export function NuevaConsultaForm() {
     abierto: false,
     busqueda: "",
   });
-
-  const areaSeleccionadaId = useMemo(
-    () => idNormalizado(form.areaId),
-    [form.areaId]
-  );
 
   const asesorSeleccionado = useMemo(
     () => asesores.find((a) => String(a.id) === String(form.asesorId)) || null,
@@ -169,37 +155,15 @@ export function NuevaConsultaForm() {
     [personas, form.personaId, form.partesIds]
   );
 
-  const asesoresDisponiblesPorArea = useMemo(() => {
-    if (!areaSeleccionadaId) {
-      return [];
-    }
-
-    return asesores.filter(
-      (asesor) => obtenerAreaIdAsesor(asesor) === areaSeleccionadaId
-    );
-  }, [asesores, areaSeleccionadaId]);
-
-  const estudiantesDisponiblesPorAsesor = useMemo(() => {
-    if (!form.asesorId) {
-      return [];
-    }
-
-    const asesorId = idNormalizado(form.asesorId);
-
-    return estudiantes.filter(
-      (estudiante) => obtenerAsesorIdEstudiante(estudiante) === asesorId
-    );
-  }, [estudiantes, form.asesorId]);
-
   const asesoresFiltrados = useMemo(() => {
     const t = modalAsesor.busqueda.toLowerCase();
 
     return t
-      ? asesoresDisponiblesPorArea.filter((a) =>
+      ? asesores.filter((a) =>
         `${a.nombre} ${a.documento}`.toLowerCase().includes(t)
       )
-      : asesoresDisponiblesPorArea;
-  }, [asesoresDisponiblesPorArea, modalAsesor.busqueda]);
+      : asesores;
+  }, [asesores, modalAsesor.busqueda]);
 
   const monitoresFiltrados = useMemo(() => {
     const t = modalMonitor.busqueda.toLowerCase();
@@ -215,11 +179,11 @@ export function NuevaConsultaForm() {
     const t = modalEstudiante.busqueda.toLowerCase();
 
     return t
-      ? estudiantesDisponiblesPorAsesor.filter((e) =>
+      ? estudiantes.filter((e) =>
         `${e.nombre} ${e.documento} ${e.codigo}`.toLowerCase().includes(t)
       )
-      : estudiantesDisponiblesPorAsesor;
-  }, [estudiantesDisponiblesPorAsesor, modalEstudiante.busqueda]);
+      : estudiantes;
+  }, [estudiantes, modalEstudiante.busqueda]);
 
   const parteFiltrada = useMemo(() => {
     const t = modalParte.busqueda.toLowerCase();
@@ -431,8 +395,6 @@ export function NuevaConsultaForm() {
       if (name === "areaId") {
         next.temaId = "";
         next.tipoId = "";
-        next.asesorId = "";
-        next.estudianteId = "";
       }
 
       if (name === "temaId") {
@@ -441,24 +403,6 @@ export function NuevaConsultaForm() {
 
       return next;
     });
-  }
-
-  function abrirModalAsesor() {
-    if (!form.areaId) {
-      toast.error("Selecciona primero el área de la consulta.");
-      return;
-    }
-
-    setModalAsesor((prev) => ({ ...prev, abierto: true }));
-  }
-
-  function abrirModalEstudiante() {
-    if (!form.asesorId) {
-      toast.error("Selecciona primero un asesor del área de la consulta.");
-      return;
-    }
-
-    setModalEstudiante((prev) => ({ ...prev, abierto: true }));
   }
 
   async function subirArchivosConsulta(consultaId) {
@@ -515,31 +459,15 @@ export function NuevaConsultaForm() {
     if (!form.pretensiones?.trim()) faltantes.push("pretensiones");
     if (!form.conceptoJuridico?.trim()) faltantes.push("concepto jurídico");
 
-    if (faltantes.length > 0) {
-      toast.error("Faltan datos obligatorios", {
-        description: `Complete o seleccione: ${faltantes.join(", ")}.`,
-      });
-
-      return false;
+    if (faltantes.length === 0) {
+      return true;
     }
 
-    const errorCoherencia = validarCoherenciaConsultaFrontend({
-      form,
-      temas,
-      tipos,
-      asesores,
-      monitores,
-      estudiantes,
+    toast.error("Faltan datos obligatorios", {
+      description: `Complete o seleccione: ${faltantes.join(", ")}.`,
     });
 
-    if (errorCoherencia) {
-      toast.error("Asignación o relación inválida", {
-        description: errorCoherencia,
-      });
-      return false;
-    }
-
-    return true;
+    return false;
   }
 
   async function handleGuardar(e) {
@@ -770,9 +698,13 @@ export function NuevaConsultaForm() {
               <C label="Asesor">
                 <button
                   type="button"
-                  onClick={abrirModalAsesor}
-                  disabled={!form.areaId}
-                  className="flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() =>
+                    setModalAsesor((prev) => ({
+                      ...prev,
+                      abierto: true,
+                    }))
+                  }
+                  className="flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors"
                 >
                   <span
                     className={
@@ -786,9 +718,7 @@ export function NuevaConsultaForm() {
                         ? ` - ${asesorSeleccionado.documento}`
                         : ""
                       }`
-                      : form.areaId
-                        ? "Sin asignar"
-                        : "Seleccione área primero"}
+                      : "Sin asignar"}
                   </span>
                   <span className="text-muted-foreground">▼</span>
                 </button>
@@ -826,9 +756,13 @@ export function NuevaConsultaForm() {
               <C label="Estudiante">
                 <button
                   type="button"
-                  onClick={abrirModalEstudiante}
-                  disabled={!form.asesorId}
-                  className="flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() =>
+                    setModalEstudiante((prev) => ({
+                      ...prev,
+                      abierto: true,
+                    }))
+                  }
+                  className="flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors"
                 >
                   <span
                     className={
@@ -842,9 +776,7 @@ export function NuevaConsultaForm() {
                         ? ` - ${estudianteSeleccionado.codigo}`
                         : ""
                       }`
-                      : form.asesorId
-                        ? "Sin asignar"
-                        : "Seleccione asesor primero"}
+                      : "Sin asignar"}
                   </span>
                   <span className="text-muted-foreground">▼</span>
                 </button>
@@ -1032,7 +964,6 @@ export function NuevaConsultaForm() {
               setForm((prev) => ({
                 ...prev,
                 asesorId: item ? String(item.id) : "",
-                estudianteId: "",
               }));
               setModalAsesor({ abierto: false, busqueda: "" });
             }}

@@ -1,6 +1,7 @@
 "use client"
 
 import { apiClient } from "@/lib/apiClient";
+import { apiResponse, readResponseBody } from "@/lib/api";
 /**
  * Formulario de creación de usuarios del sistema jurídico.
  *
@@ -141,19 +142,12 @@ export function UsuarioSistemaForm() {
   }, []);
 
   async function leerRespuesta(response) {
-    const text = await response.text();
-
-    if (!text) return null;
-
-    try {
-      return JSON.parse(text);
-    } catch {
-      return { mensaje: text };
-    }
+    const data = await readResponseBody(response);
+    return typeof data === "string" ? { mensaje: data } : data;
   }
 
   async function fetchLista(url, mensaje403) {
-    const res = await apiClient.request(url, { credentials: "include" });
+    const { response: res, data } = await apiResponse(url, { method: "GET" });
 
     if (res.status === 401) {
       router.push("/");
@@ -169,7 +163,6 @@ export function UsuarioSistemaForm() {
       return [];
     }
 
-    const data = await res.json();
     return extraerLista(data);
   }
 

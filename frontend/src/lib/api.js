@@ -1,3 +1,5 @@
+import { apiClient } from "@/lib/apiClient";
+
 /**
  * Utilidades para leer y normalizar respuestas HTTP del backend.
  *
@@ -142,3 +144,66 @@ export function getApiErrorDescription(payload, fallback = "Verifica la informac
   const title = getApiErrorTitle(payload, "");
   return title || fallback;
 }
+/**
+ * Error HTTP normalizado para consumidores del frontend.
+ * Conserva el estado y el payload original del backend para que cada módulo
+ * pueda decidir su comportamiento visual sin volver a interpretar la respuesta.
+ */
+export class ApiError extends Error {
+  constructor(message, { status = 0, payload = null, response = null } = {}) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.payload = payload;
+    this.response = response;
+  }
+}
+
+/**
+ * Ejecuta una petición con apiClient y lee su cuerpo una sola vez.
+ * No altera la semántica HTTP: devuelve tanto Response como el cuerpo parseado.
+ */
+export async function apiResponse(path, options = {}) {
+  const response = await apiClient.request(path, options);
+  const data = await readResponseBody(response);
+  return { response, data };
+}
+
+/**
+ * Ejecuta una petición y devuelve únicamente el cuerpo cuando la respuesta es exitosa.
+ * Para errores HTTP lanza ApiError con estado y payload normalizados.
+ * Los mensajes por estado permiten conservar mensajes funcionales específicos
+ * de cada módulo sin duplicar la lectura de respuestas.
+ */
+export async function apiRequestData(
+  path,
+  options = {},
+  {
+    fallback = "Error en la operación",
+    statusMessages = {},
+  } = {}
+) {
+  const { response, data } = await apiResponse(path, options);
+
+  if (response.ok) {
+    return data;
+  }
+
+  const message =
+    statusMessages?.[response.status] ||
+    getApiErrorTitle(data, fallback);
+
+  throw new ApiError(message, {
+    status: response.status,
+    payload: data,
+    response,
+  });
+}
+
+/**
+ * Permite consultar de forma segura el estado HTTP de cualquier error.
+ */
+export function getApiErrorStatus(error) {
+  return Number(error?.status || 0);
+}
+

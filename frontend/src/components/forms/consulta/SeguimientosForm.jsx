@@ -21,6 +21,7 @@ import Pagination from "@/components/ui/Pagination"
 import { FormFileUpload } from "@/components/forms/parts/FormFileUpload"
 import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils"
 import { normalizar } from "@/lib/authz"
+import { apiRequestData } from "@/lib/api"
 
 import {
   ESTADOS_SEGUIMIENTO,
@@ -49,8 +50,6 @@ import {
   extraerLista,
   getAccionRespuesta,
   labelConsulta,
-  leerRespuesta,
-  mensajeError,
   obtenerAutorTarea,
   obtenerCategoriaIdTarea,
   obtenerCategoriaTarea,
@@ -167,53 +166,53 @@ export function SeguimientosForm() {
   }, [])
 
   async function apiRequest(url, options = {}) {
-    const res = await apiClient.request(url, {
-      credentials: "include",
-      headers:
-        options.body instanceof FormData
-          ? options.headers || {}
-          : { "Content-Type": "application/json", ...(options.headers || {}) },
-      ...options,
-    })
+    try {
+      const data = await apiRequestData(
+        url,
+        {
+          headers:
+            options.body instanceof FormData
+              ? options.headers || {}
+              : { "Content-Type": "application/json", ...(options.headers || {}) },
+          ...options,
+        },
+        {
+          fallback: "No se pudo procesar la solicitud",
+          statusMessages: {
+            401: "Sesión vencida",
+            403: "No tienes permisos para realizar esta acción",
+          },
+        }
+      )
 
-    const data = await leerRespuesta(res)
-
-    if (res.status === 401) {
-      router.push("/")
-      throw new Error("Sesión vencida")
+      return typeof data === "string" ? { mensaje: data } : data
+    } catch (error) {
+      if (error?.status === 401) {
+        router.push("/")
+      }
+      throw error
     }
-
-    if (res.status === 403) {
-      throw new Error("No tienes permisos para realizar esta acción")
-    }
-
-    if (!res.ok) {
-      throw new Error(mensajeError(data, "No se pudo procesar la solicitud"))
-    }
-
-    return data
   }
 
   async function fetchLista(url, mensaje403) {
     try {
-      const res = await apiClient.request(url, { credentials: "include" })
-      const data = await leerRespuesta(res)
+      const data = await apiRequestData(
+        url,
+        { method: "GET" },
+        {
+          fallback: "No se pudo cargar la información solicitada",
+          statusMessages: {
+            403: mensaje403 || "No tienes permisos para consultar esta información",
+          },
+        }
+      )
 
-      if (res.status === 401) {
+      return extraerLista(typeof data === "string" ? { mensaje: data } : data)
+    } catch (error) {
+      if (error?.status === 401) {
         router.push("/")
         return []
       }
-
-      if (res.status === 403) {
-        throw new Error(mensaje403 || "No tienes permisos para consultar esta información")
-      }
-
-      if (!res.ok) {
-        throw new Error(mensajeError(data, "No se pudo cargar la información solicitada"))
-      }
-
-      return extraerLista(data)
-    } catch (error) {
       throw error
     }
   }

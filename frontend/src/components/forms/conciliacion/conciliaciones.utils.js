@@ -1,3 +1,5 @@
+import { getApiErrorTitle, readResponseBody } from "@/lib/api";
+
 export function normalizarTexto(value) {
   return String(value || "")
     .trim()
@@ -36,16 +38,8 @@ export function extraerLista(data) {
 }
 
 export async function leerRespuesta(response) {
-  if (response.status === 204) return null;
-
-  const text = await response.text();
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { mensaje: text };
-  }
+  const data = await readResponseBody(response);
+  return typeof data === "string" ? { mensaje: data } : data;
 }
 
 export function obtenerMensajeError(data, fallback = "Ocurrió un error") {
@@ -62,7 +56,7 @@ export function obtenerMensajeError(data, fallback = "Ocurrió un error") {
     if (detalle) return detalle;
   }
 
-  return data.mensaje || data.message || data.error || fallback;
+  return getApiErrorTitle(data, fallback);
 }
 
 export function encodePath(path) {

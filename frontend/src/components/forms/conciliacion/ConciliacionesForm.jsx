@@ -37,16 +37,15 @@ import {
   extraerLista,
   formatearFecha,
   idConsulta,
-  leerRespuesta,
   nombreConsulta,
   nombrePersona,
   normalizarTexto,
-  obtenerMensajeError,
   ordenarPorIdAsc,
   valor,
 } from "./conciliaciones.utils";
 import { esRolAdministrador } from "./conciliaciones.permissions";
 import { ActionCard, CampoConsulta, InfoCard, PersonasCard } from "./ConciliacionesFormParts";
+import { requestConciliacion } from "./conciliaciones.service";
 
 export function ConciliacionesForm() {
   const router = useRouter();
@@ -111,28 +110,14 @@ export function ConciliacionesForm() {
   }, [search, conciliaciones.length, pageSize]);
 
   async function apiFetch(path, options = {}, fallback = "No se pudo completar la operación") {
-    const response = await apiClient.request(`${API_URL_BASE}${path}`, {
-      credentials: "include",
-      ...options,
-      headers: options.body instanceof FormData
-        ? options.headers
-        : {
-            ...(options.headers || {}),
-          },
-    });
-
-    const data = await leerRespuesta(response);
-
-    if (response.status === 401) {
-      router.replace("/");
-      throw new Error("Sesión vencida. Inicia sesión nuevamente.");
+    try {
+      return await requestConciliacion(path, options, fallback);
+    } catch (error) {
+      if (error?.status === 401) {
+        router.replace("/");
+      }
+      throw error;
     }
-
-    if (!response.ok) {
-      throw new Error(obtenerMensajeError(data, fallback));
-    }
-
-    return data;
   }
 
   async function cargarInicial() {
