@@ -2,6 +2,7 @@ package co.edu.ufps.legal_cases.file_storage.service;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -42,7 +43,11 @@ public class FileStorageService {
         }
         fileValidationService.validate(file);
         String fileName = cleanKeyPart(targetFileName, "nombre de archivo");
-        return storeAndRegister(file, buildObjectKey(subDir, fileName));
+        String requestedKey = buildObjectKey(subDir, fileName);
+        String objectKey = fileAssetService.isActive(requestedKey)
+                ? buildObjectKey(subDir, UUID.randomUUID() + "-" + fileName)
+                : requestedKey;
+        return storeAndRegister(file, objectKey);
     }
 
     @Auditable(action = "DESCARGAR_ARCHIVO", entityName = "FileAsset")

@@ -67,6 +67,15 @@ public class FileAssetService {
         asset.setStatus(FileAssetStatus.ACTIVE);
         asset.setActive(true);
         repository.save(asset);
+
+        ResourceReference reference = resolve(objectKey);
+        repository.findByResourceTypeAndResourceIdAndStatusAndObjectKeyNot(
+                        reference.type(), reference.resourceId(), FileAssetStatus.ACTIVE, objectKey)
+                .forEach(previous -> {
+                    previous.setStatus(FileAssetStatus.DELETE_PENDING);
+                    previous.setActive(false);
+                    repository.save(previous);
+                });
     }
 
     private void applyMetadata(

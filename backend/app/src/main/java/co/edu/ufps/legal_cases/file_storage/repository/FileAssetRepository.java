@@ -13,4 +13,10 @@ public interface FileAssetRepository extends JpaRepository<FileAsset, Long> {
     Optional<FileAsset> findByBucketAndObjectKey(String bucket, String objectKey);
 
     List<FileAsset> findByStatusAndUpdatedAtBefore(FileAssetStatus status, java.time.LocalDateTime cutoff);
+
+    List<FileAsset> findByResourceTypeAndResourceIdAndStatusAndObjectKeyNot(
+            String resourceType,
+            Long resourceId,
+            FileAssetStatus status,
+            String objectKey);
 }
