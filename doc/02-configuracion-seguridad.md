@@ -124,13 +124,19 @@ Valores predeterminados definidos por `CorsProperties`:
 
 ## Archivos
 
-El almacenamiento de archivos consume:
+El almacenamiento de archivos usa el bucket privado `legal-documents` de Supabase Storage mediante S3:
 
 ```text
-file.upload-dir=${UPLOAD_DIR:uploads}
+supabase.storage.endpoint=${SUPABASE_STORAGE_ENDPOINT}
+supabase.storage.region=${SUPABASE_STORAGE_REGION}
+supabase.storage.access-key=${SUPABASE_STORAGE_ACCESS_KEY}
+supabase.storage.secret-key=${SUPABASE_STORAGE_SECRET_KEY}
+supabase.storage.bucket=${SUPABASE_STORAGE_BUCKET:legal-documents}
 ```
 
-El valor predeterminado ubica los archivos bajo el directorio `uploads`.
+Las claves de acceso son obligatorias en Railway y no tienen valores predeterminados. No deben exponerse al frontend ni versionarse.
+
+El tamaño máximo de cada archivo y de cada petición multipart es 10 MB, de acuerdo con la restricción configurada en el bucket.
 
 ## Ejecución con Docker Compose
 

@@ -21,6 +21,7 @@
     <properties>
         <java.version>21</java.version>
         <jjwt.version>0.12.6</jjwt.version>
+        <aws.sdk.version>2.31.67</aws.sdk.version>
     </properties>
 
     <dependencies>
@@ -47,6 +48,13 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <!-- Cliente S3 compatible para Supabase Storage -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>${aws.sdk.version}</version>
         </dependency>
 
         <!-- Seguridad y cifrado de contraseñas -->

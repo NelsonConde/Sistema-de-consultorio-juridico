@@ -1,7 +1,6 @@
 package co.edu.ufps.legal_cases.file_storage.controller;
 
-import java.io.IOException;
-import java.nio.file.Files;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -95,11 +94,7 @@ public class FileUploadController {
             Resource resource = fileStorageService.loadFileAsResource(requestedFile);
 
             String contentType = null;
-            try {
-                contentType = Files.probeContentType(resource.getFile().toPath());
-            } catch (IOException ex) {
-                // No se puede determinar el tipo, por ahora se puede ignorar
-            }
+            contentType = URLConnection.guessContentTypeFromName(requestedFile);
 
             if (contentType == null) {
                 contentType = "application/octet-stream";
