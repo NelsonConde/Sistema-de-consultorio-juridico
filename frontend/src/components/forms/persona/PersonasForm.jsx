@@ -23,287 +23,34 @@ import { tienePermiso } from "@/lib/authz";
 import { getApiErrorDescription, getApiErrorTitle } from "@/lib/api";
 import { EMAIL_PATTERN } from "@/lib/form-validation";
 
-const FORM_INICIAL = {
-  tipoPersonaId: "",
-  tipoDocumento: "",
-  numeroDocumento: "",
-  fechaExpedicion: "",
-  ciudadExpedicion: "",
-  nombres: "",
-  apellidos: "",
-  nombreIdentitario: "",
-  pronombre: "",
-  sexo: "",
-  genero: "",
-  orientacionSexual: "",
-  fechaNacimiento: "",
-  telefono: "",
-  correo: "",
-  nacionalidadId: "",
-  estadoCivil: "",
-  escolaridad: "",
-  grupoEtnico: "",
-  condicionActualId: "",
-  sabeLeerEscribir: false,
-  discapacidad: "",
-  caracterizacionPcd: "",
-  necesitaAjustePcd: false,
-  departamentoId: "",
-  municipioId: "",
-  barrioId: "",
-  direccion: "",
-  comuna: "",
-  localidad: "",
-  estrato: 0,
-  tipoVivienda: "",
-  zona: "",
-  tenencia: "",
-  numeroPersonasACargo: 0,
-  ingresosAdicionales: false,
-  energiaElectrica: false,
-  acueducto: false,
-  alcantarillado: false,
-  ocupacionId: "",
-  empresaId: "",
-  salario: 0,
-  cargo: "",
-  direccionEmpresa: "",
-  telefonoEmpresa: "",
-  nombreCompletoAcudiente: "",
-  relacionAcudiente: "",
-  telefonoAcudiente: "",
-  correoAcudiente: "",
-  direccionAcudiente: "",
-  comoSeEntero: "",
-  relacionConUniversidad: "",
-};
-
-const FALLBACK_TIPO_DOCUMENTO_OPTIONS = [
-  { value: "CC", label: "Cédula de Ciudadanía" },
-  { value: "TI", label: "Tarjeta de Identidad" },
-  { value: "CE", label: "Cédula de Extranjería" },
-  { value: "PA", label: "Pasaporte" },
-];
-
-const PRONOMBRE_OPTIONS = [
-  { value: "Él", label: "Él" },
-  { value: "Ella", label: "Ella" },
-  { value: "Elle", label: "Elle" },
-  { value: "Otro", label: "Otro" },
-];
-
-const SEXO_OPTIONS = [
-  { value: "Hombre", label: "Hombre" },
-  { value: "Mujer", label: "Mujer" },
-  { value: "Intersexual", label: "Intersexual" },
-];
-
-const GENERO_OPTIONS = [
-  { value: "Masculino", label: "Masculino" },
-  { value: "Femenino", label: "Femenino" },
-  { value: "No binario", label: "No binario" },
-  { value: "Transgénero", label: "Transgénero" },
-  { value: "Otro", label: "Otro" },
-];
-
-const ORIENTACION_OPTIONS = [
-  { value: "Heterosexual", label: "Heterosexual" },
-  { value: "Homosexual", label: "Homosexual" },
-  { value: "Bisexual", label: "Bisexual" },
-  { value: "Pansexual", label: "Pansexual" },
-  { value: "Asexual", label: "Asexual" },
-  { value: "Otro", label: "Otro" },
-];
-
-const ESTADO_CIVIL_OPTIONS = [
-  { value: "Soltero/a", label: "Soltero/a" },
-  { value: "Casado/a", label: "Casado/a" },
-  { value: "Unión libre", label: "Unión libre" },
-  { value: "Divorciado/a", label: "Divorciado/a" },
-  { value: "Viudo/a", label: "Viudo/a" },
-];
-
-const ESCOLARIDAD_OPTIONS = [
-  { value: "Ninguna", label: "Ninguna" },
-  { value: "Primaria", label: "Primaria" },
-  { value: "Secundaria", label: "Secundaria" },
-  { value: "Técnico", label: "Técnico" },
-  { value: "Tecnólogo", label: "Tecnólogo" },
-  { value: "Universitario", label: "Universitario" },
-  { value: "Postgrado", label: "Postgrado" },
-];
-
-const ZONA_OPTIONS = [
-  { value: "Urbana", label: "Urbana" },
-  { value: "Rural", label: "Rural" },
-];
-
-const REGISTROS_POR_PAGINA_OPTIONS = [5, 10, 20, 50];
-
-async function leerRespuesta(res) {
-  const text = await res.text();
-
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { mensaje: text };
-  }
-}
-
-async function fetchCatalogo(path) {
-  const res = await apiClient.request(`${API_URL_BASE}${path}`, {
-    method: "GET",
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    return [];
-  }
-
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
-}
-
-function toOption(item) {
-  return {
-    value: String(item.id),
-    label: item.nombre || item.descripcion || `Registro ${item.id}`,
-  };
-}
-
-function toDocumentoOption(item) {
-  const value = item.codigo || item.abreviatura || item.nombre || item.descripcion || "";
-  const label = item.nombre || item.descripcion || item.codigo || item.abreviatura || value;
-
-  return { value, label };
-}
-
-function optionsMap(options) {
-  return new Map(options.map((option) => [String(option.value), option.label]));
-}
-
-function labelFromMap(map, value, fallback = "N/A") {
-  if (value === null || value === undefined || value === "") {
-    return fallback;
-  }
-
-  return map.get(String(value)) || fallback;
-}
-
-function nombreCompleto(persona) {
-  return [persona?.nombres, persona?.apellidos].filter(Boolean).join(" ");
-}
-
-function valorTexto(value) {
-  return value || "N/A";
-}
-
-function numberOrNull(value) {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-
-  const number = Number(value);
-  return Number.isNaN(number) ? null : number;
-}
-
-function textOrNull(value) {
-  const text = String(value ?? "").trim();
-  return text === "" ? null : text;
-}
-
-function calcularEsMenorEdad(fechaNacimiento) {
-  if (!fechaNacimiento) return false;
-
-  const nacimiento = new Date(fechaNacimiento);
-  if (Number.isNaN(nacimiento.getTime())) return false;
-
-  const hoy = new Date();
-  let edad = hoy.getFullYear() - nacimiento.getFullYear();
-  const mes = hoy.getMonth() - nacimiento.getMonth();
-
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {
-    edad -= 1;
-  }
-
-  return edad < 18;
-}
-
-function ordenarPorIdAscendente(items) {
-  return [...items].sort((a, b) => {
-    const idA = Number(a?.id ?? Number.MAX_SAFE_INTEGER);
-    const idB = Number(b?.id ?? Number.MAX_SAFE_INTEGER);
-
-    return idA - idB;
-  });
-}
-
-function obtenerPaginasVisibles(paginaActual, totalPaginas) {
-  const paginas = new Set([
-    1,
-    totalPaginas,
-    paginaActual - 1,
-    paginaActual,
-    paginaActual + 1,
-  ]);
-
-  return Array.from(paginas)
-    .filter((pagina) => pagina >= 1 && pagina <= totalPaginas)
-    .sort((a, b) => a - b);
-}
-
-function convertirPersonaAForm(persona) {
-  return {
-    ...FORM_INICIAL,
-    ...persona,
-    tipoPersonaId: persona.tipoPersonaId != null ? String(persona.tipoPersonaId) : "",
-    nacionalidadId: persona.nacionalidadId != null ? String(persona.nacionalidadId) : "",
-    condicionActualId:
-      persona.condicionActualId != null ? String(persona.condicionActualId) : "",
-    departamentoId: persona.departamentoId != null ? String(persona.departamentoId) : "",
-    municipioId: persona.municipioId != null ? String(persona.municipioId) : "",
-    barrioId: persona.barrioId != null ? String(persona.barrioId) : "",
-    ocupacionId: persona.ocupacionId != null ? String(persona.ocupacionId) : "",
-    empresaId: persona.empresaId != null ? String(persona.empresaId) : "",
-    sabeLeerEscribir: Boolean(persona.sabeLeerEscribir),
-    necesitaAjustePcd: Boolean(persona.necesitaAjustePcd),
-    ingresosAdicionales: Boolean(persona.ingresosAdicionales),
-    energiaElectrica: Boolean(persona.energiaElectrica),
-    acueducto: Boolean(persona.acueducto),
-    alcantarillado: Boolean(persona.alcantarillado),
-    estrato: persona.estrato ?? 0,
-    numeroPersonasACargo: persona.numeroPersonasACargo ?? 0,
-    salario: persona.salario ?? 0,
-  };
-}
-
-function construirPayload(form, id) {
-  const esMenorEdad = calcularEsMenorEdad(form.fechaNacimiento);
-
-  return {
-    ...form,
-    id,
-    tipoPersonaId: numberOrNull(form.tipoPersonaId),
-    nacionalidadId: numberOrNull(form.nacionalidadId),
-    condicionActualId: numberOrNull(form.condicionActualId),
-    departamentoId: numberOrNull(form.departamentoId),
-    municipioId: numberOrNull(form.municipioId),
-    barrioId: numberOrNull(form.barrioId),
-    ocupacionId: numberOrNull(form.ocupacionId),
-    empresaId: numberOrNull(form.empresaId),
-    estrato: Number(form.estrato || 0),
-    numeroPersonasACargo: Number(form.numeroPersonasACargo || 0),
-    salario: Number(form.salario || 0),
-    correo: textOrNull(form.correo),
-    correoAcudiente: esMenorEdad ? textOrNull(form.correoAcudiente) : null,
-    nombreCompletoAcudiente: esMenorEdad ? textOrNull(form.nombreCompletoAcudiente) : null,
-    relacionAcudiente: esMenorEdad ? textOrNull(form.relacionAcudiente) : null,
-    telefonoAcudiente: esMenorEdad ? textOrNull(form.telefonoAcudiente) : null,
-    direccionAcudiente: esMenorEdad ? textOrNull(form.direccionAcudiente) : null,
-  };
-}
+import {
+  ESCOLARIDAD_OPTIONS,
+  ESTADO_CIVIL_OPTIONS,
+  FALLBACK_TIPO_DOCUMENTO_OPTIONS,
+  FORM_INICIAL,
+  GENERO_OPTIONS,
+  ORIENTACION_OPTIONS,
+  PRONOMBRE_OPTIONS,
+  REGISTROS_POR_PAGINA_OPTIONS,
+  SEXO_OPTIONS,
+  ZONA_OPTIONS,
+} from "./personas.constants";
+import {
+  calcularEsMenorEdad,
+  construirPayload,
+  convertirPersonaAForm,
+  labelFromMap,
+  nombreCompleto,
+  obtenerPaginasVisibles,
+  optionsMap,
+  ordenarPorIdAscendente,
+  textOrNull,
+  toDocumentoOption,
+  toOption,
+  valorTexto,
+} from "./personas.utils";
+import { Checkbox, Input, Seccion, Select } from "./PersonasFormParts";
+import { fetchCatalogo, leerRespuesta } from "./personas.service";
 
 export function PersonasForm() {
   const [user, setUser] = useState(null);
@@ -1155,70 +902,5 @@ export function PersonasForm() {
         onConfirm={confirmarDesactivarPersona}
       />
     </div>
-  );
-}
-
-function Seccion({ titulo, children }) {
-  return (
-    <section className="rounded-xl border bg-background p-4">
-      <h4 className="mb-4 border-b pb-2 font-semibold">{titulo}</h4>
-
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {children}
-      </div>
-    </section>
-  );
-}
-
-function Input({ label, name, value, onChange, type = "text", min }) {
-  return (
-    <label className="flex flex-col gap-1.5 text-sm">
-      <span className="font-medium">{label}</span>
-      <input
-        type={type}
-        name={name}
-        value={value ?? ""}
-        min={min}
-        onChange={onChange}
-        className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      />
-    </label>
-  );
-}
-
-function Select({ label, name, value, onChange, options, disabled = false }) {
-  return (
-    <label className="flex flex-col gap-1.5 text-sm">
-      <span className="font-medium">{label}</span>
-      <select
-        name={name}
-        value={value ?? ""}
-        onChange={onChange}
-        disabled={disabled}
-        className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <option value="">Seleccione una opción</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function Checkbox({ label, name, checked, onChange }) {
-  return (
-    <label className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
-      <input
-        type="checkbox"
-        name={name}
-        checked={Boolean(checked)}
-        onChange={onChange}
-        className="h-4 w-4"
-      />
-      <span>{label}</span>
-    </label>
   );
 }
