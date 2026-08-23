@@ -24,125 +24,18 @@ import { normalizar, tieneAlgunPermiso, tienePermiso } from "@/lib/authz";
 import Pagination from "@/components/ui/Pagination";
 import { sortByIdAsc } from "@/lib/list-utils";
 
-const PERMISO_GESTIONAR_USUARIOS = "Gestionar usuarios";
+import { PERMISO_GESTIONAR_USUARIOS, TIPOS_PERFIL, VALORES_INICIALES } from "./cambiar-rol.constants";
+import {
+  buscarPerfil,
+  coincideNombreRol,
+  extraerLista,
+  filtrarActivos,
+  mapOption,
+  normalizarTexto,
+  toNumberOrNull,
+  usuarioActivo,
+} from "./cambiar-rol.utils";
 
-const TIPOS_PERFIL = [
-  {
-    value: "ADMINISTRATIVO",
-    label: "Administrativo",
-    endpoint: "administrativo",
-    endpointActual: "administrativos",
-    rolIdFallback: 1,
-    nombresRol: ["Administrador", "Administrativo"],
-  },
-  {
-    value: "ASESOR",
-    label: "Asesor",
-    endpoint: "asesor",
-    endpointActual: "asesores",
-    rolIdFallback: 2,
-    nombresRol: ["Asesor"],
-  },
-  {
-    value: "ESTUDIANTE",
-    label: "Estudiante",
-    endpoint: "estudiante",
-    endpointActual: "estudiantes",
-    rolIdFallback: 3,
-    nombresRol: ["Estudiante"],
-  },
-  {
-    value: "MONITOR",
-    label: "Monitor",
-    endpoint: "monitor",
-    endpointActual: "monitores",
-    rolIdFallback: 4,
-    nombresRol: ["Monitor"],
-  },
-  {
-    value: "CONCILIADOR",
-    label: "Conciliador",
-    endpoint: "conciliador",
-    endpointActual: "conciliadores",
-    rolIdFallback: 5,
-    nombresRol: ["Conciliador"],
-  },
-];
-
-const VALORES_INICIALES = {
-  usuarioSistemaId: "",
-  destino: "",
-  motivo: "",
-  nombre: "",
-  tipoDocumentoId: "",
-  documento: "",
-  telefono: "",
-  usuario: "",
-  codigo: "",
-  sedeId: "",
-  asesorId: "",
-  areaId: "",
-  conciliacion: false,
-  directora: false,
-  tipoConciliador: "",
-};
-
-function usuarioActivo(usuario) {
-  return (
-    usuario?.activo !== false &&
-    String(usuario?.estado || "").toUpperCase() !== "INACTIVO"
-  );
-}
-
-function filtrarActivos(lista) {
-  return Array.isArray(lista) ? lista.filter(usuarioActivo) : [];
-}
-
-function extraerLista(data) {
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.content)) return data.content;
-  if (Array.isArray(data?.data)) return data.data;
-  if (Array.isArray(data?.items)) return data.items;
-  if (Array.isArray(data?.rows)) return data.rows;
-  return [];
-}
-
-function mapOption(item) {
-  return {
-    value: item.id,
-    label:
-      item.displayName ||
-      item.nombre ||
-      item.descripcion ||
-      item.codigo ||
-      String(item.id),
-  };
-}
-
-function normalizarTexto(value) {
-  const text = String(value || "").trim();
-  return text === "" ? null : text;
-}
-
-function toNumberOrNull(value) {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = Number(value);
-  return Number.isNaN(parsed) ? null : parsed;
-}
-
-function buscarPerfil(value) {
-  return TIPOS_PERFIL.find((perfil) => perfil.value === value);
-}
-
-function coincideNombreRol(rol, perfil) {
-  const nombre = normalizar(rol?.nombre);
-  return perfil.nombresRol.some((nombreRol) => normalizar(nombreRol) === nombre);
-}
-
-/**
- * Formulario para cambiar el rol de un usuario del sistema.
- * @returns {JSX.Element} Componente de cambio de rol.
- */
 export function CambiarRolUsuarioForm() {
   const router = useRouter();
 

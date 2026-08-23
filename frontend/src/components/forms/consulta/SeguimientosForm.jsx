@@ -16,346 +16,55 @@ import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { API_URL_BASE, FILE_STORAGE_API_URL_BASE } from "@/lib/config"
-import { PERMISOS } from "@/lib/permission"
-import { tieneAlgunPermiso, tienePermiso } from "@/lib/authz"
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog"
 import Pagination from "@/components/ui/Pagination"
 import { FormFileUpload } from "@/components/forms/parts/FormFileUpload"
 import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils"
+import { normalizar } from "@/lib/authz"
 
-const FORM_TAREA_INICIAL = {
-  categoriaId: "",
-  descripcion: "",
-  fechaEntrega: "",
-  diasNotificacion: "",
-  notificarPartes: false,
-  alertaDisciplinaria: false,
-  notificarEstudiante: true,
-}
-
-const FORM_RESPUESTA_INICIAL = {
-  contenido: "",
-  archivos: [],
-}
-
-const FORM_DECISION_INICIAL = {
-  estado: "APROBADA",
-  observacionRevision: "",
-}
-
-const FORM_ESTADO_SEGUIMIENTO_INICIAL = {
-  estado: "COMPLETADO",
-}
-
-const ESTADOS_SEGUIMIENTO = [
-  { value: "PENDIENTE", label: "Pendiente" },
-  { value: "COMPLETADO", label: "Completado" },
-  { value: "CANCELADO", label: "Cancelado" },
-]
-
-const PERMISOS_LEGACY = {
-  GESTIONAR_CONSULTAS: "Gestionar consultas",
-  GESTIONAR_SEGUIMIENTOS: "Gestionar seguimientos",
-}
-
-function normalizar(value) {
-  return String(value || "")
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-}
-
-function tienePerfil(user, perfil) {
-  return normalizar(user?.tipoPerfil || user?.rolNombre) === normalizar(perfil)
-}
-
-function esEstudiante(user) {
-  return tienePerfil(user, "ESTUDIANTE")
-}
-
-function extraerLista(data) {
-  if (Array.isArray(data)) return data
-  if (!data || typeof data !== "object") return []
-
-  const claves = [
-    "content",
-    "data",
-    "items",
-    "rows",
-    "consultas",
-    "seguimientos",
-    "tareas",
-    "categorias",
-    "respuestas",
-    "pendientes",
-    "resultado",
-    "payload",
-  ]
-
-  for (const clave of claves) {
-    const valor = data[clave]
-
-    if (Array.isArray(valor)) return valor
-
-    if (valor && typeof valor === "object") {
-      const interno = extraerLista(valor)
-      if (interno.length > 0) return interno
-    }
-  }
-
-  return []
-}
-
-function puedeAccederTareasUsuario(user) {
-  return (
-    tienePermiso(user, PERMISOS.ACCEDER_TAREAS) &&
-    tieneAlgunPermiso(user, [
-      PERMISOS.VER_SEGUIMIENTOS,
-      PERMISOS_LEGACY.GESTIONAR_SEGUIMIENTOS,
-    ])
-  )
-}
-
-function puedeVerConsultasUsuario(user) {
-  return tieneAlgunPermiso(user, [
-    PERMISOS.VER_CONSULTAS,
-    PERMISOS_LEGACY.GESTIONAR_CONSULTAS,
-  ])
-}
-
-function puedeCargarCategoriasUsuario(user) {
-  return tieneAlgunPermiso(user, [
-    PERMISOS.VER_SEGUIMIENTOS,
-    PERMISOS.CREAR_SEGUIMIENTOS,
-    PERMISOS.EDITAR_SEGUIMIENTOS,
-    PERMISOS.GESTIONAR_CATEGORIAS_SEGUIMIENTO,
-    PERMISOS_LEGACY.GESTIONAR_SEGUIMIENTOS,
-  ])
-}
-
-function puedeCrearTarea(user) {
-  return tieneAlgunPermiso(user, [
-    PERMISOS.CREAR_SEGUIMIENTOS,
-    PERMISOS_LEGACY.GESTIONAR_SEGUIMIENTOS,
-  ])
-}
-
-function puedeEditarTarea(user) {
-  return tieneAlgunPermiso(user, [
-    PERMISOS.EDITAR_SEGUIMIENTOS,
-    PERMISOS_LEGACY.GESTIONAR_SEGUIMIENTOS,
-  ])
-}
-
-function puedeEliminarTarea(user) {
-  return tieneAlgunPermiso(user, [
-    PERMISOS.ELIMINAR_SEGUIMIENTOS,
-    PERMISOS_LEGACY.GESTIONAR_SEGUIMIENTOS,
-  ])
-}
-
-function puedeResponderTarea(user) {
-  return tienePermiso(user, PERMISOS.RESPONDER_SEGUIMIENTOS)
-}
-
-function puedeRevisarRespuestas(user) {
-  return tienePermiso(user, PERMISOS.APROBAR_RESPUESTAS_SEGUIMIENTO)
-}
-
-function puedeVerAlertasDisciplinarias(user) {
-  return tienePermiso(user, PERMISOS.VER_ALERTAS_DISCIPLINARIAS)
-}
-
-function accionPermitidaPorRegistro(item, accion, permisoGlobal) {
-  const acciones = item?.accionesPermitidas
-
-  if (acciones && typeof acciones[accion] === "boolean") {
-    return acciones[accion]
-  }
-
-  return permisoGlobal
-}
-
-function labelConsulta(consulta) {
-  return [
-    `#${consulta.id || consulta.consultaId}`,
-    consulta.consulta || consulta.descripcion || consulta.hechos || consulta.asunto,
-    consulta.nombre || consulta.apellido
-      ? `${consulta.nombre || ""} ${consulta.apellido || ""}`.trim()
-      : "",
-    consulta.cedula || consulta.documento,
-  ]
-    .filter(Boolean)
-    .join(" - ")
-}
-
-function obtenerTextoTarea(item) {
-  return (
-    item.descripcion ||
-    item.observacion ||
-    item.detalle ||
-    item.comentario ||
-    "Sin descripción"
-  )
-}
-
-function obtenerCategoriaTarea(item) {
-  return (
-    item.categoriaNombre ||
-    item.categoriaSeguimientoNombre ||
-    item.categoria?.nombre ||
-    item.categoriaSeguimiento?.nombre ||
-    item.categoria ||
-    "Sin categoría"
-  )
-}
-
-function obtenerCategoriaIdTarea(item) {
-  return (
-    item.categoriaSeguimientoId ||
-    item.categoriaId ||
-    item.categoria?.id ||
-    item.categoriaSeguimiento?.id ||
-    ""
-  )
-}
-
-function obtenerAutorTarea(item) {
-  return (
-    item.autorNombre ||
-    item.autorUsername ||
-    item.autor ||
-    item.username ||
-    "Sin autor"
-  )
-}
-
-function obtenerFechaTarea(item) {
-  return (
-    item.fechaCreacion ||
-    item.fechaRegistro ||
-    item.createdAt ||
-    item.fecha ||
-    ""
-  )
-}
-
-function obtenerIdTarea(item) {
-  return item?.id || item?.seguimientoId
-}
-
-function ordenarPorFechaDesc(lista) {
-  return [...lista].sort((a, b) => {
-    const fechaA = new Date(a.fechaActualizacion || a.fechaCreacion || a.fechaDecision || 0)
-    const fechaB = new Date(b.fechaActualizacion || b.fechaCreacion || b.fechaDecision || 0)
-    return fechaB.getTime() - fechaA.getTime()
-  })
-}
-
-function ultimaRespuesta(lista = []) {
-  const respuestas = ordenarPorFechaDesc(lista)
-  return respuestas[0] || null
-}
-
-function getAccionRespuesta(ultima, puedeResponder) {
-  if (!puedeResponder) return "NINGUNA"
-  if (!ultima) return "RESPONDER"
-
-  switch (normalizar(ultima.estado)) {
-    case "PENDIENTE":
-      return "EDITAR"
-    case "RECHAZADA":
-      return "RESPONDER_NUEVAMENTE"
-    case "APROBADA":
-      return "SOLO_LECTURA"
-    default:
-      return "NINGUNA"
-  }
-}
-
-function textoAccionRespuesta(accion) {
-  switch (accion) {
-    case "RESPONDER":
-      return "Responder"
-    case "EDITAR":
-      return "Editar respuesta"
-    case "RESPONDER_NUEVAMENTE":
-      return "Responder nuevamente"
-    default:
-      return "Ver respuesta"
-  }
-}
-
-function estadoBadgeClass(estado) {
-  switch (normalizar(estado)) {
-    case "APROBADA":
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
-    case "RECHAZADA":
-      return "border-destructive/30 bg-destructive/10 text-destructive"
-    case "PENDIENTE":
-      return "border-yellow-500/30 bg-yellow-500/10 text-yellow-700"
-    default:
-      return "border-muted bg-muted text-muted-foreground"
-  }
-}
-
-function estadoSeguimientoBadgeClass(estado) {
-  switch (normalizar(estado)) {
-    case "COMPLETADO":
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
-    case "CANCELADO":
-      return "border-destructive/30 bg-destructive/10 text-destructive"
-    case "PENDIENTE":
-      return "border-yellow-500/30 bg-yellow-500/10 text-yellow-700"
-    default:
-      return "border-muted bg-muted text-muted-foreground"
-  }
-}
-
-function textoEstadoSeguimiento(estado) {
-  const encontrado = ESTADOS_SEGUIMIENTO.find((item) => item.value === normalizar(estado))
-  return encontrado?.label || estado || "Sin estado"
-}
-
-function consultaPermiteOperaciones(consulta) {
-  const estado = normalizar(consulta?.estado)
-  return estado !== "CERRADO" && estado !== "ARCHIVADO"
-}
-
-function seguimientoPermiteOperaciones(tarea) {
-  return normalizar(tarea?.estado || "PENDIENTE") === "PENDIENTE"
-}
-
-function seguimientoEstaVencido(tarea) {
-  if (!tarea?.fechaEntrega || !seguimientoPermiteOperaciones(tarea)) return false
-
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
-
-  const fechaEntrega = new Date(`${tarea.fechaEntrega}T00:00:00`)
-  return fechaEntrega.getTime() < hoy.getTime()
-}
-
-function pathRespuesta(seguimientoId, respuestaId) {
-  return `tareas-${seguimientoId}-respuestas-${respuestaId}`
-}
-
-async function leerRespuesta(response) {
-  const text = await response.text()
-
-  if (!text) return null
-
-  try {
-    return JSON.parse(text)
-  } catch {
-    return { mensaje: text }
-  }
-}
-
-function mensajeError(data, defecto) {
-  return data?.mensaje || data?.message || data?.error || defecto
-}
+import {
+  ESTADOS_SEGUIMIENTO,
+  FORM_DECISION_INICIAL,
+  FORM_ESTADO_SEGUIMIENTO_INICIAL,
+  FORM_RESPUESTA_INICIAL,
+  FORM_TAREA_INICIAL,
+} from "./seguimientos.constants"
+import {
+  accionPermitidaPorRegistro,
+  esEstudiante,
+  puedeAccederTareasUsuario,
+  puedeCargarCategoriasUsuario,
+  puedeCrearTarea,
+  puedeEditarTarea,
+  puedeEliminarTarea,
+  puedeResponderTarea,
+  puedeRevisarRespuestas,
+  puedeVerAlertasDisciplinarias,
+  puedeVerConsultasUsuario,
+} from "./seguimientos.permissions"
+import {
+  consultaPermiteOperaciones,
+  estadoBadgeClass,
+  estadoSeguimientoBadgeClass,
+  extraerLista,
+  getAccionRespuesta,
+  labelConsulta,
+  leerRespuesta,
+  mensajeError,
+  obtenerAutorTarea,
+  obtenerCategoriaIdTarea,
+  obtenerCategoriaTarea,
+  obtenerFechaTarea,
+  obtenerIdTarea,
+  obtenerTextoTarea,
+  ordenarPorFechaDesc,
+  pathRespuesta,
+  seguimientoEstaVencido,
+  seguimientoPermiteOperaciones,
+  textoAccionRespuesta,
+  textoEstadoSeguimiento,
+  ultimaRespuesta,
+} from "./seguimientos.utils"
 
 export function SeguimientosForm() {
   const router = useRouter()
