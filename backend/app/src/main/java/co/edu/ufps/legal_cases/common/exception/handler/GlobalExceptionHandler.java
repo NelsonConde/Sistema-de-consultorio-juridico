@@ -19,6 +19,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.common.exception.dto.ErrorResponseDTO;
+import co.edu.ufps.legal_cases.common.exception.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 
@@ -40,6 +41,23 @@ public class GlobalExceptionHandler {
                 request);
 
         return ResponseEntity.badRequest().body(error);
+    }
+
+    // Maneja recursos inexistentes o no disponibles para el solicitante.
+    // La misma respuesta puede utilizarse para ocultar diferencias de existencia
+    // cuando revelarlas permitiría enumerar recursos fuera del alcance.
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponseDTO> manejarResourceNotFoundException(
+            ResourceNotFoundException ex,
+            HttpServletRequest request) {
+
+        ErrorResponseDTO error = construirError(
+                HttpStatus.NOT_FOUND,
+                "Recurso no encontrado",
+                mensajeSeguro(ex.getMessage(), "El recurso solicitado no fue encontrado"),
+                request);
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
 
     // Maneja errores de validación en DTOs con @Valid:

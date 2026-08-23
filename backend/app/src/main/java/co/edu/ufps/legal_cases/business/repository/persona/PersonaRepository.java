@@ -1,9 +1,12 @@
 package co.edu.ufps.legal_cases.business.repository.persona;
 
-import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import co.edu.ufps.legal_cases.business.model.persona.Persona;
@@ -19,7 +22,43 @@ public interface PersonaRepository extends JpaRepository<Persona, Long> {
 
     Optional<Persona> findByNumeroDocumentoAndActivoTrue(String numeroDocumento);
 
-    List<Persona> findByActivoTrueOrderByNombresAscApellidosAsc();
-
     boolean existsByNumeroDocumentoAndIdNot(String numeroDocumento, Long id);
+
+    @Query(value = """
+            SELECT p.id AS id,
+                   p.nombres AS nombres,
+                   p.apellidos AS apellidos,
+                   p.tipoDocumento AS tipoDocumento,
+                   p.numeroDocumento AS numeroDocumento,
+                   tipoPersona.nombre AS tipoPersona,
+                   p.activo AS activo
+            FROM Persona p
+            JOIN p.tipoPersona tipoPersona
+            WHERE (:activo IS NULL OR p.activo = :activo)
+              AND (
+                    :search IS NULL
+                    OR LOWER(p.nombres) LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(p.apellidos) LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(CONCAT(CONCAT(p.nombres, ' '), p.apellidos))
+                        LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(p.numeroDocumento) LIKE LOWER(CONCAT('%', :search, '%'))
+              )
+            ORDER BY LOWER(p.nombres), LOWER(p.apellidos), p.id
+            """, countQuery = """
+            SELECT COUNT(p.id)
+            FROM Persona p
+            WHERE (:activo IS NULL OR p.activo = :activo)
+              AND (
+                    :search IS NULL
+                    OR LOWER(p.nombres) LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(p.apellidos) LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(CONCAT(CONCAT(p.nombres, ' '), p.apellidos))
+                        LIKE LOWER(CONCAT('%', :search, '%'))
+                    OR LOWER(p.numeroDocumento) LIKE LOWER(CONCAT('%', :search, '%'))
+              )
+            """)
+    Page<PersonaResumenProjection> buscarResumen(
+            @Param("search") String search,
+            @Param("activo") Boolean activo,
+            Pageable pageable);
 }

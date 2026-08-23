@@ -6,12 +6,11 @@ import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.EDITAR_PER
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.GESTIONAR_PERSONAS;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_PERSONAS;
 
-import java.util.List;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import co.edu.ufps.legal_cases.business.dto.persona.PersonaPageResponseDTO;
 import co.edu.ufps.legal_cases.business.dto.persona.PersonaDTO;
 import co.edu.ufps.legal_cases.business.service.persona.PersonaService;
 import jakarta.validation.Valid;
@@ -28,8 +27,11 @@ public class PersonaController {
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('" + VER_PERSONAS + "', '" + GESTIONAR_PERSONAS + "')")
-    public List<PersonaDTO> listar() {
-        return personaService.listar();
+    public PersonaPageResponseDTO listar(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return personaService.listar(search, page, size);
     }
 
     @GetMapping("/{id}")
@@ -55,8 +57,11 @@ public class PersonaController {
 
     @GetMapping("/activos")
     @PreAuthorize("hasAnyAuthority('" + VER_PERSONAS + "', '" + GESTIONAR_PERSONAS + "')")
-    public List<PersonaDTO> listarActivos() {
-        return personaService.listarActivos();
+    public PersonaPageResponseDTO listarActivos(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return personaService.listarActivos(search, page, size);
     }
 
     @PatchMapping("/{id}/desactivar")
