@@ -10,7 +10,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,7 +25,8 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
@@ -87,22 +88,43 @@ public class SupabaseStorageProvider implements StorageProvider {
     public Resource load(String objectKey) {
         String key = requireValue(objectKey, "objectKey");
         try {
-            ResponseInputStream<GetObjectResponse> input = client.getObject(GetObjectRequest.builder()
+            HeadObjectResponse metadata = client.headObject(HeadObjectRequest.builder()
                     .bucket(bucket)
                     .key(key)
                     .build());
 
-            return new InputStreamResource(input) {
+            return new AbstractResource() {
+                @Override
+                public InputStream getInputStream() throws IOException {
+                    try {
+                        ResponseInputStream<?> input = client.getObject(GetObjectRequest.builder()
+                                .bucket(bucket)
+                                .key(key)
+                                .build());
+                        return input;
+                    } catch (S3Exception ex) {
+                        throw new IOException("No se pudo abrir el objeto documental", ex);
+                    }
+                }
+
+                @Override
+                public long contentLength() {
+                    return metadata.contentLength();
+                }
+
                 @Override
                 public String getFilename() {
                     int separator = key.lastIndexOf('/');
                     return separator >= 0 ? key.substring(separator + 1) : key;
                 }
+
+                @Override
+                public String getDescription() {
+                    return "Objeto documental " + key;
+                }
             };
-        } catch (NoSuchKeyException ex) {
-            throw new FileNotFoundException("Archivo no encontrado " + key, ex);
         } catch (S3Exception ex) {
-            if (ex.statusCode() == 404) {
+            if (ex instanceof NoSuchKeyException || ex.statusCode() == 404) {
                 throw new FileNotFoundException("Archivo no encontrado " + key, ex);
             }
             throw new FileStorageException("No se pudo cargar el objeto documental", ex);

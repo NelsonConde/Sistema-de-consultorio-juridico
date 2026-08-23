@@ -51,13 +51,16 @@ Parámetros:
 
 Cuando se envía `path`, `fileName` puede incluir el subdirectorio relativo junto al nombre del archivo.
 
-### Respuesta `500 Internal Server Error`
+### Fallos de almacenamiento
 
-Si ocurre una excepción durante el almacenamiento, el controller responde con un objeto propio de la operación:
+Los detalles internos del proveedor no se exponen. El manejador global responde con un identificador de correlación y un mensaje genérico de almacenamiento.
 
 ```json
 {
-  "error": "No se pudo cargar el archivo: <detalle>"
+  "estado": 503,
+  "error": "Almacenamiento no disponible",
+  "mensaje": "No se pudo completar la operación de archivos",
+  "correlacionId": "..."
 }
 ```
 
@@ -94,7 +97,8 @@ El endpoint recorre los archivos recibidos y retorna una lista de resultados. Ca
     "message": "Cargado exitosamente"
   },
   {
-    "error": "Error al cargar: <detalle>"
+    "errorCode": "STORAGE_UPLOAD_FAILED",
+    "message": "No se pudo cargar el archivo"
   }
 ]
 ```

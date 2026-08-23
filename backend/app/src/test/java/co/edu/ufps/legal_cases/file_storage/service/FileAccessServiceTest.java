@@ -65,4 +65,16 @@ class FileAccessServiceTest {
 
         assertThrows(AccessDeniedException.class, () -> service.authorizeRead("../secreto.pdf"));
     }
+
+    @Test
+    void rechazaRutaCodificadaYCaracteresDeControl() {
+        FileAccessService service = new FileAccessService(
+                consultaAccessService,
+                seguimientoAccessService,
+                respuestaAccessService,
+                conciliacionAccessService);
+
+        assertThrows(AccessDeniedException.class, () -> service.authorizeRead("1/%2e%2e/secreto.txt"));
+        assertThrows(AccessDeniedException.class, () -> service.authorizeRead("1/archivo\u0000.txt"));
+    }
 }

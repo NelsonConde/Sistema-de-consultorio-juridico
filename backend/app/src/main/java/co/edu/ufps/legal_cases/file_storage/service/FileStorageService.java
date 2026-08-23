@@ -33,7 +33,11 @@ public class FileStorageService {
     public String storeFile(MultipartFile file, String subDir) {
         fileValidationService.validate(file);
         String fileName = cleanFileName(file);
-        return storeAndRegister(file, buildObjectKey(subDir, fileName));
+        String requestedKey = buildObjectKey(subDir, fileName);
+        String objectKey = fileAssetService.isActive(requestedKey)
+                ? buildObjectKey(subDir, UUID.randomUUID() + "-" + fileName)
+                : requestedKey;
+        return storeAndRegister(file, objectKey);
     }
 
     @Auditable(action = "REEMPLAZAR_ARCHIVO", entityName = "FileAsset")
@@ -128,7 +132,9 @@ public class FileStorageService {
             throw new FileStorageException("La " + description + " es obligatoria");
         }
         String normalized = value.replace('\\', '/');
-        if (normalized.startsWith("/") || normalized.contains("..")) {
+        if (normalized.startsWith("/") || normalized.contains("..")
+                || normalized.contains("%") || normalized.indexOf('\0') >= 0
+                || normalized.chars().anyMatch(Character::isISOControl)) {
             throw new FileStorageException("La " + description + " contiene una ruta inválida");
         }
         return normalized;

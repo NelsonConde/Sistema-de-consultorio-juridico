@@ -100,7 +100,9 @@ public class FileAccessService {
             throw new AccessDeniedException("La ruta de archivo es obligatoria");
         }
         String key = rawKey.replace('\\', '/');
-        if (key.startsWith("/") || key.contains("..")) {
+        if (key.startsWith("/") || key.contains("..")
+                || key.contains("%") || key.indexOf('\0') >= 0
+                || key.chars().anyMatch(Character::isISOControl)) {
             throw new AccessDeniedException("La ruta de archivo es inválida");
         }
         return key;
