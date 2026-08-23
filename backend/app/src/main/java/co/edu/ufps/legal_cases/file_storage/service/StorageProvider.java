@@ -15,6 +15,8 @@ public interface StorageProvider {
 
     Resource load(String objectKey);
 
+    void delete(String objectKey);
+
     List<String> list(String prefix);
 
     List<String> listDirectories(String prefix);

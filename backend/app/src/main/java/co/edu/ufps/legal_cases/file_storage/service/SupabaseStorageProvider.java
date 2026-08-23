@@ -26,6 +26,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -105,6 +106,18 @@ public class SupabaseStorageProvider implements StorageProvider {
                 throw new FileNotFoundException("Archivo no encontrado " + key, ex);
             }
             throw new FileStorageException("No se pudo cargar el objeto documental", ex);
+        }
+    }
+
+    @Override
+    public void delete(String objectKey) {
+        try {
+            client.deleteObject(DeleteObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(requireValue(objectKey, "objectKey"))
+                    .build());
+        } catch (S3Exception ex) {
+            throw new FileStorageException("No se pudo eliminar el objeto documental", ex);
         }
     }
 

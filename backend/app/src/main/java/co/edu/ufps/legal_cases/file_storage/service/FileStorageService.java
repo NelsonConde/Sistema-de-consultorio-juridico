@@ -15,14 +15,18 @@ import co.edu.ufps.legal_cases.file_storage.exception.FileStorageException;
 public class FileStorageService {
 
     private final StorageProvider storageProvider;
+    private final FileAssetService fileAssetService;
 
-    public FileStorageService(StorageProvider storageProvider) {
+    public FileStorageService(
+            StorageProvider storageProvider,
+            FileAssetService fileAssetService) {
         this.storageProvider = storageProvider;
+        this.fileAssetService = fileAssetService;
     }
 
     public String storeFile(MultipartFile file, String subDir) {
         String fileName = cleanFileName(file);
-        return storageProvider.store(file, buildObjectKey(subDir, fileName));
+        return storeAndRegister(file, buildObjectKey(subDir, fileName));
     }
 
     public String storeFileAs(MultipartFile file, String subDir, String targetFileName) {
@@ -30,7 +34,7 @@ public class FileStorageService {
             throw new FileStorageException("El archivo es obligatorio");
         }
         String fileName = cleanKeyPart(targetFileName, "nombre de archivo");
-        return storageProvider.store(file, buildObjectKey(subDir, fileName));
+        return storeAndRegister(file, buildObjectKey(subDir, fileName));
     }
 
     public Resource loadFileAsResource(String fileName) {
@@ -43,6 +47,21 @@ public class FileStorageService {
 
     public List<String> listDirectories() {
         return storageProvider.listDirectories("");
+    }
+
+    private String storeAndRegister(MultipartFile file, String objectKey) {
+        String storedKey = storageProvider.store(file, objectKey);
+        try {
+            fileAssetService.register(storedKey, file);
+            return storedKey;
+        } catch (RuntimeException ex) {
+            try {
+                storageProvider.delete(storedKey);
+            } catch (RuntimeException cleanupException) {
+                ex.addSuppressed(cleanupException);
+            }
+            throw ex;
+        }
     }
 
     private static String cleanFileName(MultipartFile file) {
