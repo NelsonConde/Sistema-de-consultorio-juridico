@@ -18,6 +18,7 @@ El backend incluye un módulo de almacenamiento para cargar, listar y descargar 
 | `SupabaseStorageProvider` | Implementación S3 para Supabase Storage. |
 | `FileAsset` | Metadatos de cada objeto y asociación con su recurso funcional. |
 | `FileAssetService` | Registra o actualiza metadatos después de una carga. |
+| `FileValidationService` | Aplica tamaño, extensión y firmas básicas de contenido. |
 | `FileStorageException` | Excepción de almacenamiento. |
 | `FileNotFoundException` | Excepción de archivo o directorio no encontrado. |
 | `ConciliacionDocumentoService` | Usa almacenamiento para solicitud y acta PDF de conciliación. |
@@ -38,7 +39,7 @@ supabase.storage.bucket=${SUPABASE_STORAGE_BUCKET:legal-documents}
 
 Las credenciales son obligatorias y deben inyectarse en Railway. No se deben guardar claves reales en el repositorio.
 
-Cada carga exitosa registra un `FileAsset` con bucket, clave de objeto, recurso asociado, usuario, tamaño, tipo MIME y checksum SHA-256. Si el registro falla, se intenta eliminar el objeto recién cargado.
+Cada carga exitosa registra un `FileAsset` con bucket, clave de objeto, recurso asociado, usuario, tamaño, tipo MIME y checksum SHA-256. Si el registro falla, se intenta eliminar el objeto recién cargado. Se aceptan archivos PDF, imágenes PNG/JPEG, documentos Office y texto hasta 10 MB; PDF, PNG y JPEG además se contrastan contra su firma básica.
 
 ---
 

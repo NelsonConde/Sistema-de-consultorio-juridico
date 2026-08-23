@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import co.edu.ufps.legal_cases.audit.aop.log.Auditable;
 import co.edu.ufps.legal_cases.file_storage.exception.FileStorageException;
 
 /** Fachada compatible con la API existente para almacenamiento documental. */
@@ -16,31 +17,40 @@ public class FileStorageService {
 
     private final StorageProvider storageProvider;
     private final FileAssetService fileAssetService;
+    private final FileValidationService fileValidationService;
 
     public FileStorageService(
             StorageProvider storageProvider,
-            FileAssetService fileAssetService) {
+            FileAssetService fileAssetService,
+            FileValidationService fileValidationService) {
         this.storageProvider = storageProvider;
         this.fileAssetService = fileAssetService;
+        this.fileValidationService = fileValidationService;
     }
 
+    @Auditable(action = "CARGAR_ARCHIVO", entityName = "FileAsset")
     public String storeFile(MultipartFile file, String subDir) {
+        fileValidationService.validate(file);
         String fileName = cleanFileName(file);
         return storeAndRegister(file, buildObjectKey(subDir, fileName));
     }
 
+    @Auditable(action = "REEMPLAZAR_ARCHIVO", entityName = "FileAsset")
     public String storeFileAs(MultipartFile file, String subDir, String targetFileName) {
         if (file == null) {
             throw new FileStorageException("El archivo es obligatorio");
         }
+        fileValidationService.validate(file);
         String fileName = cleanKeyPart(targetFileName, "nombre de archivo");
         return storeAndRegister(file, buildObjectKey(subDir, fileName));
     }
 
+    @Auditable(action = "DESCARGAR_ARCHIVO", entityName = "FileAsset")
     public Resource loadFileAsResource(String fileName) {
         return storageProvider.load(normalizeKey(fileName, "ruta de archivo"));
     }
 
+    @Auditable(action = "LISTAR_ARCHIVOS", entityName = "FileAsset")
     public List<String> listFiles(String subDir) {
         return storageProvider.list(normalizePrefix(subDir));
     }
