@@ -1,0 +1,23 @@
+/** Valores iniciales del formulario de nueva consulta. */
+export const VACIOS = {
+  fecha: "",
+  descripcion: "",
+  hechos: "",
+  pretensiones: "",
+  conceptoJuridico: "",
+  tramite: "",
+  observaciones: "",
+  tipoViolencia: "",
+  estado: "",
+  resultado: "",
+  personaId: "",
+  sedeId: "",
+  areaId: "",
+  temaId: "",
+  tipoId: "",
+  asesorId: "",
+  monitorId: "",
+  estudianteId: "",
+  partesIds: [],
+  contrapartesIds: [],
+};
