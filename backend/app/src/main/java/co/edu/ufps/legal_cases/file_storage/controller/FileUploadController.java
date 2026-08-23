@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
+import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -24,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.HandlerMapping;
 
 import co.edu.ufps.legal_cases.file_storage.exception.FileNotFoundException;
+import co.edu.ufps.legal_cases.file_storage.exception.FileStorageException;
 import co.edu.ufps.legal_cases.file_storage.service.FileAccessService;
 import co.edu.ufps.legal_cases.file_storage.service.FileStorageService;
 
@@ -35,6 +39,8 @@ import co.edu.ufps.legal_cases.file_storage.service.FileStorageService;
 @RequestMapping("/api/files")
 @PreAuthorize("isAuthenticated()")
 public class FileUploadController {
+
+    private static final Logger log = LoggerFactory.getLogger(FileUploadController.class);
 
     private final FileStorageService fileStorageService;
     private final FileAccessService fileAccessService;
@@ -62,9 +68,11 @@ public class FileUploadController {
             return ResponseEntity.ok(response);
         } catch (AccessDeniedException e) {
             throw e;
+        } catch (BusinessException | FileStorageException e) {
+            throw e;
         } catch (Exception e) {
-            response.put("error", "No se pudo cargar el archivo: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+            log.error("Error inesperado cargando archivo", e);
+            throw new FileStorageException("No se pudo cargar el archivo", e);
         }
     }
 
@@ -85,7 +93,18 @@ public class FileUploadController {
                 fileResponse.put("fileSize", file.getSize());
                 fileResponse.put("message", "Cargado exitosamente");
             } catch (Exception e) {
-                fileResponse.put("error", "Error al cargar: " + e.getMessage());
+                if (e instanceof BusinessException) {
+                    fileResponse.put("errorCode", "FILE_VALIDATION_FAILED");
+                    fileResponse.put("message", "El archivo no cumple las reglas de validación");
+                } else if (e instanceof FileStorageException) {
+                    log.error("Error de almacenamiento cargando archivo múltiple", e);
+                    fileResponse.put("errorCode", "STORAGE_UPLOAD_FAILED");
+                    fileResponse.put("message", "No se pudo cargar el archivo");
+                } else {
+                    log.error("Error inesperado cargando archivo múltiple", e);
+                    fileResponse.put("errorCode", "FILE_UPLOAD_FAILED");
+                    fileResponse.put("message", "No se pudo cargar el archivo");
+                }
             }
             results.add(fileResponse);
         }
@@ -120,8 +139,11 @@ public class FileUploadController {
             throw e;
         } catch (FileNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (FileStorageException e) {
+            throw e;
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            log.error("Error inesperado descargando archivo", e);
+            throw new FileStorageException("No se pudo descargar el archivo", e);
         }
     }
 
@@ -135,8 +157,11 @@ public class FileUploadController {
             throw e;
         } catch (FileNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (FileStorageException e) {
+            throw e;
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            log.error("Error inesperado listando archivos", e);
+            throw new FileStorageException("No se pudieron listar los archivos", e);
         }
     }
 

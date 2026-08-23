@@ -186,6 +186,8 @@ GET /api/files/directories
 
 Estos contratos son interpretables por las utilidades frontend que leen JSON o cuerpo vacío, según la operación consumida.
 
+Los errores de almacenamiento no exponen mensajes del proveedor. Las cargas individuales usan el error estándar de la API; las cargas múltiples devuelven códigos seguros como `FILE_VALIDATION_FAILED`, `STORAGE_UPLOAD_FAILED` o `FILE_UPLOAD_FAILED`.
+
 ---
 
 ## 8. Validación de rutas

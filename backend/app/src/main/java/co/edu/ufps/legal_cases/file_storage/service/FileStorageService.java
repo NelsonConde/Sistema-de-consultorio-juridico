@@ -60,15 +60,38 @@ public class FileStorageService {
     }
 
     private String storeAndRegister(MultipartFile file, String objectKey) {
-        String storedKey = storageProvider.store(file, objectKey);
+        boolean existingActive = fileAssetService.isActive(objectKey);
+        if (!existingActive) {
+            fileAssetService.begin(objectKey, file);
+        }
         try {
-            fileAssetService.register(storedKey, file);
+            String storedKey = storageProvider.store(file, objectKey);
+            fileAssetService.activate(storedKey, file);
             return storedKey;
         } catch (RuntimeException ex) {
+            if (existingActive) {
+                // No se elimina la clave anterior: el reemplazo pudo no haber
+                // llegado a completarse y debe conservarse el documento válido.
+                throw ex;
+            }
+            boolean cleanupSucceeded = true;
             try {
-                storageProvider.delete(storedKey);
+                storageProvider.delete(objectKey);
             } catch (RuntimeException cleanupException) {
+                cleanupSucceeded = false;
+                try {
+                    fileAssetService.markDeletePending(objectKey);
+                } catch (RuntimeException stateException) {
+                    cleanupException.addSuppressed(stateException);
+                }
                 ex.addSuppressed(cleanupException);
+            }
+            if (cleanupSucceeded) {
+                try {
+                    fileAssetService.markFailed(objectKey);
+                } catch (RuntimeException stateException) {
+                    ex.addSuppressed(stateException);
+                }
             }
             throw ex;
         }

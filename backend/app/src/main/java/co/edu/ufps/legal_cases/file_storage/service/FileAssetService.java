@@ -10,10 +10,12 @@ import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.web.multipart.MultipartFile;
 
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.file_storage.model.FileAsset;
+import co.edu.ufps.legal_cases.file_storage.model.FileAssetStatus;
 import co.edu.ufps.legal_cases.file_storage.repository.FileAssetRepository;
 import co.edu.ufps.legal_cases.security.service.context.UsuarioActualService;
 
@@ -38,11 +40,40 @@ public class FileAssetService {
         this.bucket = bucket;
     }
 
-    @Transactional
-    public void register(String objectKey, MultipartFile file) {
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void begin(String objectKey, MultipartFile file) {
         ResourceReference reference = resolve(objectKey);
         FileAsset asset = repository.findByBucketAndObjectKey(bucket, objectKey)
                 .orElseGet(FileAsset::new);
+
+        applyMetadata(asset, objectKey, file, reference);
+        asset.setStatus(FileAssetStatus.PENDING);
+        asset.setActive(false);
+
+        repository.save(asset);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isActive(String objectKey) {
+        return repository.findByBucketAndObjectKey(bucket, objectKey)
+                .map(asset -> asset.getStatus() == FileAssetStatus.ACTIVE)
+                .orElse(false);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void activate(String objectKey, MultipartFile file) {
+        FileAsset asset = find(objectKey);
+        applyMetadata(asset, objectKey, file, resolve(objectKey));
+        asset.setStatus(FileAssetStatus.ACTIVE);
+        asset.setActive(true);
+        repository.save(asset);
+    }
+
+    private void applyMetadata(
+            FileAsset asset,
+            String objectKey,
+            MultipartFile file,
+            ResourceReference reference) {
 
         asset.setBucket(bucket);
         asset.setObjectKey(objectKey);
@@ -57,9 +88,35 @@ public class FileAssetService {
         asset.setSize(file.getSize());
         asset.setChecksum(checksum(file));
         asset.setUploadedBy(usuarioActualService.obtenerUsuarioActual());
-        asset.setActive(true);
+    }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void activate(String objectKey) {
+        FileAsset asset = find(objectKey);
+        asset.setStatus(FileAssetStatus.ACTIVE);
+        asset.setActive(true);
         repository.save(asset);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markFailed(String objectKey) {
+        FileAsset asset = find(objectKey);
+        asset.setStatus(FileAssetStatus.FAILED);
+        asset.setActive(false);
+        repository.save(asset);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markDeletePending(String objectKey) {
+        FileAsset asset = find(objectKey);
+        asset.setStatus(FileAssetStatus.DELETE_PENDING);
+        asset.setActive(false);
+        repository.save(asset);
+    }
+
+    private FileAsset find(String objectKey) {
+        return repository.findByBucketAndObjectKey(bucket, objectKey)
+                .orElseThrow(() -> new BusinessException("Metadatos documentales no encontrados"));
     }
 
     private static String checksum(MultipartFile file) {

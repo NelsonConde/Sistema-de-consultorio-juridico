@@ -19,8 +19,10 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.common.exception.dto.ErrorResponseDTO;
+import co.edu.ufps.legal_cases.file_storage.exception.FileStorageException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import java.util.UUID;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -164,6 +166,23 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
     }
 
+    @ExceptionHandler(FileStorageException.class)
+    public ResponseEntity<ErrorResponseDTO> manejarErrorDeAlmacenamiento(
+            FileStorageException ex,
+            HttpServletRequest request) {
+
+        String correlationId = obtenerCorrelationId(request);
+        log.error("Error de almacenamiento [{}] en {}", correlationId, request.getRequestURI(), ex);
+
+        ErrorResponseDTO error = construirError(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Almacenamiento no disponible",
+                "No se pudo completar la operación de archivos",
+                request);
+
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
+    }
+
     // Maneja cualquier excepción no controlada.
     // El detalle técnico queda en logs, pero no se expone al cliente.
     @ExceptionHandler(Exception.class)
@@ -194,6 +213,7 @@ public class GlobalExceptionHandler {
                 .error(error)
                 .mensaje(mensaje)
                 .ruta(request.getRequestURI())
+                .correlacionId(obtenerCorrelationId(request))
                 .build();
     }
 
@@ -210,8 +230,23 @@ public class GlobalExceptionHandler {
                 .error(error)
                 .mensaje(mensaje)
                 .ruta(request.getRequestURI())
+                .correlacionId(obtenerCorrelationId(request))
                 .detalles(detalles)
                 .build();
+    }
+
+    private String obtenerCorrelationId(HttpServletRequest request) {
+        String header = request.getHeader("X-Request-ID");
+        if (header != null && !header.isBlank()) {
+            return header;
+        }
+        Object current = request.getAttribute("correlacionId");
+        if (current != null) {
+            return current.toString();
+        }
+        String generated = UUID.randomUUID().toString();
+        request.setAttribute("correlacionId", generated);
+        return generated;
     }
 
     private String construirMensajeParametroInvalido(MethodArgumentTypeMismatchException ex) {

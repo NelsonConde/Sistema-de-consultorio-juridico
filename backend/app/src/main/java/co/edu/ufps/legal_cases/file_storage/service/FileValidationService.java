@@ -7,7 +7,7 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import co.edu.ufps.legal_cases.file_storage.exception.FileStorageException;
+import co.edu.ufps.legal_cases.common.exception.BusinessException;
 
 @Service
 public class FileValidationService {
@@ -18,15 +18,15 @@ public class FileValidationService {
 
     public void validate(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new FileStorageException("El archivo es obligatorio");
+            throw new BusinessException("El archivo es obligatorio");
         }
         if (file.getSize() > MAX_FILE_SIZE) {
-            throw new FileStorageException("El archivo supera el límite de 10 MB");
+            throw new BusinessException("El archivo supera el límite de 10 MB");
         }
 
         String fileName = file.getOriginalFilename();
         if (fileName == null || fileName.isBlank()) {
-            throw new FileStorageException("El archivo debe tener un nombre");
+            throw new BusinessException("El archivo debe tener un nombre");
         }
 
         int extensionSeparator = fileName.lastIndexOf('.');
@@ -34,7 +34,7 @@ public class FileValidationService {
                 ? ""
                 : fileName.substring(extensionSeparator + 1).toLowerCase(Locale.ROOT);
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
-            throw new FileStorageException("El tipo de archivo no está permitido");
+            throw new BusinessException("El tipo de archivo no está permitido");
         }
 
         validateKnownSignature(file, extension);
@@ -44,18 +44,18 @@ public class FileValidationService {
         try {
             byte[] header = file.getBytes();
             if ("pdf".equals(extension) && !startsWith(header, "%PDF-".getBytes())) {
-                throw new FileStorageException("El contenido no corresponde a un PDF");
+                throw new BusinessException("El contenido no corresponde a un PDF");
             }
             if ("png".equals(extension) && !startsWith(header,
                     new byte[] {(byte) 0x89, 'P', 'N', 'G'})) {
-                throw new FileStorageException("El contenido no corresponde a una imagen PNG");
+                throw new BusinessException("El contenido no corresponde a una imagen PNG");
             }
             if (("jpg".equals(extension) || "jpeg".equals(extension))
                     && !startsWith(header, new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF})) {
-                throw new FileStorageException("El contenido no corresponde a una imagen JPEG");
+                throw new BusinessException("El contenido no corresponde a una imagen JPEG");
             }
         } catch (IOException ex) {
-            throw new FileStorageException("No se pudo validar el contenido del archivo", ex);
+            throw new BusinessException("No se pudo validar el contenido del archivo");
         }
     }
 

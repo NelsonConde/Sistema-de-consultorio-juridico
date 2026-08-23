@@ -31,6 +31,8 @@ El almacenamiento trabaja con rutas relativas bajo una raíz configurada. El ser
 
 La carga puede ser individual o múltiple. En carga múltiple, cada archivo genera un resultado propio. Una respuesta puede contener archivos cargados exitosamente y errores individuales.
 
+La persistencia documental usa estados `PENDING`, `ACTIVE`, `FAILED` y `DELETE_PENDING`. Un objeto solo se considera disponible cuando su metadato está en `ACTIVE`.
+
 ---
 
 ## 5. Validaciones documentales específicas

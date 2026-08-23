@@ -31,5 +31,7 @@ public class ErrorResponseDTO {
 
     private String ruta;
 
+    private String correlacionId;
+
     private Map<String, String> detalles;
 }

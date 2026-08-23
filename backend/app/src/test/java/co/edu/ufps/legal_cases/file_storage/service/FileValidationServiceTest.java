@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
-import co.edu.ufps.legal_cases.file_storage.exception.FileStorageException;
+import co.edu.ufps.legal_cases.common.exception.BusinessException;
 
 class FileValidationServiceTest {
 
@@ -30,7 +30,7 @@ class FileValidationServiceTest {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "solicitud.pdf", "application/pdf", "texto".getBytes(StandardCharsets.UTF_8));
 
-        assertThrows(FileStorageException.class, () -> service.validate(file));
+        assertThrows(BusinessException.class, () -> service.validate(file));
     }
 
     @Test
@@ -38,6 +38,6 @@ class FileValidationServiceTest {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "archivo.exe", "application/octet-stream", new byte[] {1, 2, 3});
 
-        assertThrows(FileStorageException.class, () -> service.validate(file));
+        assertThrows(BusinessException.class, () -> service.validate(file));
     }
 }

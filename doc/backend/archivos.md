@@ -17,7 +17,8 @@ El backend incluye un módulo de almacenamiento para cargar, listar y descargar 
 | `StorageProvider` | Contrato interno para desacoplar la aplicación del proveedor físico. |
 | `SupabaseStorageProvider` | Implementación S3 para Supabase Storage. |
 | `FileAsset` | Metadatos de cada objeto y asociación con su recurso funcional. |
-| `FileAssetService` | Registra o actualiza metadatos después de una carga. |
+| `FileAssetService` | Gestiona estados PENDING, ACTIVE, FAILED y DELETE_PENDING. |
+| `FileAssetReconciliationService` | Reintenta limpiar objetos de operaciones incompletas. |
 | `FileValidationService` | Aplica tamaño, extensión y firmas básicas de contenido. |
 | `FileStorageException` | Excepción de almacenamiento. |
 | `FileNotFoundException` | Excepción de archivo o directorio no encontrado. |
@@ -39,7 +40,7 @@ supabase.storage.bucket=${SUPABASE_STORAGE_BUCKET:legal-documents}
 
 Las credenciales son obligatorias y deben inyectarse en Railway. No se deben guardar claves reales en el repositorio.
 
-Cada carga exitosa registra un `FileAsset` con bucket, clave de objeto, recurso asociado, usuario, tamaño, tipo MIME y checksum SHA-256. Si el registro falla, se intenta eliminar el objeto recién cargado. Se aceptan archivos PDF, imágenes PNG/JPEG, documentos Office y texto hasta 10 MB; PDF, PNG y JPEG además se contrastan contra su firma básica.
+Cada carga inicia un `FileAsset` en estado `PENDING`, pasa a `ACTIVE` cuando el objeto se confirma en Storage y se marca como `FAILED` o `DELETE_PENDING` si la compensación requiere reintento. El reconciliador revisa operaciones antiguas periódicamente. Cada registro conserva bucket, clave, recurso, usuario, tamaño, tipo MIME y checksum SHA-256.
 
 ---
 

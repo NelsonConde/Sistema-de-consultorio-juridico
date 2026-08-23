@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
 import jakarta.persistence.Column;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -61,6 +63,10 @@ public class FileAsset {
     @Column(nullable = false)
     private Boolean active = true;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private FileAssetStatus status = FileAssetStatus.PENDING;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -72,6 +78,9 @@ public class FileAsset {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }
+        if (updatedAt == null) {
+            updatedAt = createdAt;
+        }
         normalizeState();
     }
 
@@ -82,8 +91,9 @@ public class FileAsset {
     }
 
     private void normalizeState() {
-        if (active == null) {
-            active = true;
+        if (status == null) {
+            status = Boolean.TRUE.equals(active) ? FileAssetStatus.ACTIVE : FileAssetStatus.FAILED;
         }
+        active = status == FileAssetStatus.ACTIVE;
     }
 }
