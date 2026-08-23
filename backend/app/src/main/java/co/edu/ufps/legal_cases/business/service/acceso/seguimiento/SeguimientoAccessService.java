@@ -16,6 +16,7 @@ import co.edu.ufps.legal_cases.business.model.seguimiento.Seguimiento;
 import co.edu.ufps.legal_cases.business.repository.seguimiento.SeguimientoRepository;
 import co.edu.ufps.legal_cases.business.service.acceso.consulta.ConsultaAccessService;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import co.edu.ufps.legal_cases.security.dto.account.PerfilUsuarioActual;
 import co.edu.ufps.legal_cases.security.service.context.UsuarioActualService;
 import lombok.AllArgsConstructor;
 
@@ -126,11 +127,25 @@ public class SeguimientoAccessService {
     }
 
     @Transactional(readOnly = true)
-    public void validarPuedeListarAlertasDisciplinarias() {
+    public AlcanceAlertasDisciplinarias resolverAlcanceAlertasDisciplinarias() {
         validarTienePermiso(VER_ALERTAS_DISCIPLINARIAS);
+
+        if (usuarioActualService.esRolAdministrador()) {
+            return AlcanceAlertasDisciplinarias.global();
+        }
+
+        PerfilUsuarioActual perfil = usuarioActualService.obtenerPerfilActual();
+
+        return switch (perfil.getTipoPerfil()) {
+            case ASESOR -> AlcanceAlertasDisciplinarias.asesor(perfil.getPerfilId());
+            case MONITOR -> AlcanceAlertasDisciplinarias.monitor(perfil.getPerfilId());
+            default -> throw new AccessDeniedException(
+                    "El perfil actual no tiene alcance para consultar alertas disciplinarias");
+        };
     }
 
-    // Valida solo que tenga el permiso de ver seguimientos, sin restricción de alcance.
+    // Valida solo que tenga el permiso de ver seguimientos, sin restricción de
+    // alcance.
     // El filtro de alcance se aplica después con puedeVerSeguimiento en el stream.
     @Transactional(readOnly = true)
     public void validarTienePermisoVerSeguimientos() {
