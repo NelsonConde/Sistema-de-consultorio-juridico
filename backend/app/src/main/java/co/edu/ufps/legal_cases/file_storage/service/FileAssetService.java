@@ -1,31 +1,25 @@
 package co.edu.ufps.legal_cases.file_storage.service;
 
-import java.io.IOException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.List;
+import java.util.UUID;
+import java.util.ArrayList;
+import java.util.Comparator;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
-import org.springframework.web.multipart.MultipartFile;
 
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.file_storage.model.FileAsset;
 import co.edu.ufps.legal_cases.file_storage.model.FileAssetStatus;
+import co.edu.ufps.legal_cases.file_storage.model.FileResourceType;
 import co.edu.ufps.legal_cases.file_storage.repository.FileAssetRepository;
 import co.edu.ufps.legal_cases.security.service.context.UsuarioActualService;
 
+/** Persistencia de metadata documental, separada del proveedor físico. */
 @Service
 public class FileAssetService {
-
-    private static final Pattern CONSULTA = Pattern.compile("^(\\d+)(?:/.*)?$");
-    private static final Pattern TAREA = Pattern.compile("^tareas-(\\d+)-documentos(?:/.*)?$");
-    private static final Pattern RESPUESTA = Pattern.compile("^tareas-(\\d+)-respuestas-(\\d+)(?:/.*)?$");
-    private static final Pattern CONCILIACION = Pattern.compile("^conciliacion/(\\d+)(?:/.*)?$");
 
     private final FileAssetRepository repository;
     private final UsuarioActualService usuarioActualService;
@@ -40,122 +34,145 @@ public class FileAssetService {
         this.bucket = bucket;
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void begin(String objectKey, MultipartFile file) {
-        ResourceReference reference = resolve(objectKey);
-        FileAsset asset = repository.findByBucketAndObjectKey(bucket, objectKey)
-                .orElseGet(FileAsset::new);
+    @Transactional
+    public FileAsset startUpload(
+            FileResourceType resourceType,
+            Long resourceId,
+            String originalFileName,
+            String contentType,
+            long size,
+            String checksum) {
+        if (resourceType == null || resourceId == null || resourceId <= 0) {
+            throw new BusinessException("El recurso documental es obligatorio");
+        }
 
-        applyMetadata(asset, objectKey, file, reference);
-        asset.setStatus(FileAssetStatus.PENDING);
+        String safeName = cleanFileName(originalFileName);
+        FileAsset asset = new FileAsset();
+        asset.setUploadId(UUID.randomUUID());
+        asset.setBucket(bucket);
+        asset.setObjectKey(resourceType.name().toLowerCase() + "/" + resourceId + "/"
+                + UUID.randomUUID() + "-" + safeName);
+        asset.setResourceType(resourceType.name());
+        asset.setResourceId(resourceId);
+        asset.setOriginalFileName(safeName);
+        asset.setContentType(contentType);
+        asset.setSize(size);
+        asset.setChecksum(checksum == null ? "" : checksum);
+        asset.setUploadedBy(usuarioActualService.obtenerUsuarioActual());
+        asset.setStatus(FileAssetStatus.UPLOADING);
         asset.setActive(false);
-
-        repository.save(asset);
+        return repository.save(asset);
     }
 
     @Transactional(readOnly = true)
-    public boolean isActive(String objectKey) {
-        return repository.findByBucketAndObjectKey(bucket, objectKey)
-                .map(asset -> asset.getStatus() == FileAssetStatus.ACTIVE)
-                .orElse(false);
+    public FileAsset findByUploadId(UUID uploadId) {
+        return repository.findByUploadId(uploadId)
+                .orElseThrow(() -> new BusinessException("La carga documental no existe"));
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void activate(String objectKey, MultipartFile file) {
-        FileAsset asset = find(objectKey);
-        applyMetadata(asset, objectKey, file, resolve(objectKey));
-        asset.setStatus(FileAssetStatus.ACTIVE);
+    @Transactional(readOnly = true)
+    public FileAsset findReady(Long id) {
+        FileAsset asset = repository.findById(id)
+                .orElseThrow(() -> new BusinessException("Archivo no encontrado"));
+        if (asset.getStatus() != FileAssetStatus.READY
+                && asset.getStatus() != FileAssetStatus.ACTIVE) {
+            throw new BusinessException("El archivo no está disponible");
+        }
+        return asset;
+    }
+
+    @Transactional(readOnly = true)
+    public List<FileAsset> listReady(FileResourceType resourceType, Long resourceId) {
+        List<FileAsset> assets = new ArrayList<>(repository
+                .findByResourceTypeAndResourceIdAndStatusInOrderByCreatedAtDesc(
+                resourceType.name(),
+                resourceId,
+                List.of(FileAssetStatus.READY, FileAssetStatus.ACTIVE)));
+        if (resourceType == FileResourceType.RESPUESTA) {
+            assets.addAll(repository.findByResourceTypeAndResourceIdAndStatusInOrderByCreatedAtDesc(
+                    "SEGUIMIENTO_RESPUESTA",
+                    resourceId,
+                    List.of(FileAssetStatus.READY, FileAssetStatus.ACTIVE)));
+        }
+        assets.sort(Comparator.comparing(FileAsset::getCreatedAt,
+                Comparator.nullsLast(Comparator.reverseOrder())));
+        return assets;
+    }
+
+    @Transactional
+    public FileAsset markReady(UUID uploadId, long size, String contentType) {
+        FileAsset asset = findByUploadId(uploadId);
+        if (asset.getStatus() != FileAssetStatus.UPLOADING
+                && asset.getStatus() != FileAssetStatus.PENDING) {
+            if (asset.getStatus() == FileAssetStatus.READY
+                    || asset.getStatus() == FileAssetStatus.ACTIVE) {
+                return asset;
+            }
+            throw new BusinessException("La carga documental no puede finalizarse");
+        }
+        asset.setSize(size);
+        if (contentType != null && !contentType.isBlank()) {
+            asset.setContentType(contentType);
+        }
+        asset.setStatus(FileAssetStatus.READY);
         asset.setActive(true);
-        repository.save(asset);
-
-        ResourceReference reference = resolve(objectKey);
-        repository.findByResourceTypeAndResourceIdAndStatusAndObjectKeyNot(
-                        reference.type(), reference.resourceId(), FileAssetStatus.ACTIVE, objectKey)
-                .forEach(previous -> {
-                    previous.setStatus(FileAssetStatus.DELETE_PENDING);
-                    previous.setActive(false);
-                    repository.save(previous);
-                });
+        return repository.save(asset);
     }
 
-    private void applyMetadata(
-            FileAsset asset,
-            String objectKey,
-            MultipartFile file,
-            ResourceReference reference) {
-
-        asset.setBucket(bucket);
-        asset.setObjectKey(objectKey);
-        asset.setResourceType(reference.type());
-        asset.setResourceId(reference.resourceId());
-        asset.setOriginalFileName(file.getOriginalFilename() == null
-                ? "unnamed"
-                : file.getOriginalFilename());
-        asset.setContentType(file.getContentType() == null
-                ? "application/octet-stream"
-                : file.getContentType());
-        asset.setSize(file.getSize());
-        asset.setChecksum(checksum(file));
-        asset.setUploadedBy(usuarioActualService.obtenerUsuarioActual());
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void activate(String objectKey) {
-        FileAsset asset = find(objectKey);
-        asset.setStatus(FileAssetStatus.ACTIVE);
-        asset.setActive(true);
-        repository.save(asset);
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void markFailed(String objectKey) {
-        FileAsset asset = find(objectKey);
+    @Transactional
+    public void markUploadFailed(UUID uploadId) {
+        FileAsset asset = findByUploadId(uploadId);
         asset.setStatus(FileAssetStatus.FAILED);
         asset.setActive(false);
         repository.save(asset);
     }
 
+    @Transactional
+    public void markFailedByObjectKey(String objectKey) {
+        repository.findByBucketAndObjectKey(bucket, objectKey).ifPresent(asset -> {
+            asset.setStatus(FileAssetStatus.FAILED);
+            asset.setActive(false);
+            repository.save(asset);
+        });
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void markDeletePending(String objectKey) {
-        FileAsset asset = find(objectKey);
+    public FileAsset markDeleted(Long id) {
+        FileAsset asset = repository.findById(id)
+                .orElseThrow(() -> new BusinessException("Archivo no encontrado"));
+        asset.setStatus(FileAssetStatus.DELETED);
+        asset.setActive(false);
+        return repository.save(asset);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public FileAsset markDeletePending(Long id) {
+        FileAsset asset = repository.findById(id)
+                .orElseThrow(() -> new BusinessException("Archivo no encontrado"));
         asset.setStatus(FileAssetStatus.DELETE_PENDING);
         asset.setActive(false);
-        repository.save(asset);
+        return repository.save(asset);
     }
 
-    private FileAsset find(String objectKey) {
-        return repository.findByBucketAndObjectKey(bucket, objectKey)
-                .orElseThrow(() -> new BusinessException("Metadatos documentales no encontrados"));
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public FileAsset restoreReady(Long id) {
+        FileAsset asset = repository.findById(id)
+                .orElseThrow(() -> new BusinessException("Archivo no encontrado"));
+        asset.setStatus(FileAssetStatus.READY);
+        asset.setActive(true);
+        return repository.save(asset);
     }
 
-    private static String checksum(MultipartFile file) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(file.getBytes()));
-        } catch (IOException | NoSuchAlgorithmException ex) {
-            throw new BusinessException("No se pudo calcular la huella del archivo");
+    private static String cleanFileName(String originalName) {
+        if (originalName == null || originalName.isBlank()) {
+            throw new BusinessException("El archivo debe tener un nombre");
         }
-    }
-
-    private static ResourceReference resolve(String objectKey) {
-        Matcher matcher = RESPUESTA.matcher(objectKey);
-        if (matcher.matches()) {
-            return new ResourceReference("SEGUIMIENTO_RESPUESTA", Long.valueOf(matcher.group(2)));
+        String normalized = org.springframework.util.StringUtils.cleanPath(originalName).replace('\\', '/');
+        if (normalized.contains("/") || normalized.contains("..")
+                || normalized.indexOf('\0') >= 0
+                || normalized.chars().anyMatch(Character::isISOControl)) {
+            throw new BusinessException("El nombre del archivo no es válido");
         }
-        matcher = TAREA.matcher(objectKey);
-        if (matcher.matches()) {
-            return new ResourceReference("SEGUIMIENTO", Long.valueOf(matcher.group(1)));
-        }
-        matcher = CONCILIACION.matcher(objectKey);
-        if (matcher.matches()) {
-            return new ResourceReference("CONCILIACION", Long.valueOf(matcher.group(1)));
-        }
-        matcher = CONSULTA.matcher(objectKey);
-        if (matcher.matches()) {
-            return new ResourceReference("CONSULTA", Long.valueOf(matcher.group(1)));
-        }
-        throw new BusinessException("El archivo no está asociado a un recurso válido");
-    }
-
-    private record ResourceReference(String type, Long resourceId) {
+        return normalized;
     }
 }

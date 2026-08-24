@@ -17,6 +17,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -37,6 +38,10 @@ public class FileAsset {
 
     @Column(name = "object_key", nullable = false, length = 500)
     private String objectKey;
+
+    /** Identificador público de la sesión de carga; nunca es una clave del bucket. */
+    @Column(name = "upload_id", unique = true, length = 36)
+    private UUID uploadId;
 
     @Column(name = "resource_type", nullable = false, length = 40)
     private String resourceType;
@@ -94,6 +99,6 @@ public class FileAsset {
         if (status == null) {
             status = Boolean.TRUE.equals(active) ? FileAssetStatus.ACTIVE : FileAssetStatus.FAILED;
         }
-        active = status == FileAssetStatus.ACTIVE;
+        active = status == FileAssetStatus.ACTIVE || status == FileAssetStatus.READY;
     }
 }

@@ -40,6 +40,42 @@ public class FileValidationService {
         validateKnownSignature(file, extension);
     }
 
+    /** Valida metadatos antes de emitir una URL firmada. */
+    public void validateMetadata(String fileName, long size, String contentType) {
+        if (fileName == null || fileName.isBlank()) {
+            throw new BusinessException("El archivo debe tener un nombre");
+        }
+        if (size <= 0 || size > MAX_FILE_SIZE) {
+            throw new BusinessException("El archivo supera el límite de 10 MB");
+        }
+
+        int extensionSeparator = fileName.lastIndexOf('.');
+        String extension = extensionSeparator < 0
+                ? ""
+                : fileName.substring(extensionSeparator + 1).toLowerCase(Locale.ROOT);
+        if (!ALLOWED_EXTENSIONS.contains(extension)) {
+            throw new BusinessException("El tipo de archivo no está permitido");
+        }
+        if (contentType == null || contentType.isBlank()) {
+            throw new BusinessException("El tipo de contenido es obligatorio");
+        }
+    }
+
+    public void validateChecksum(String checksum) {
+        if (checksum != null && !checksum.isBlank()
+                && !checksum.matches("^[0-9a-fA-F]{64}$")) {
+            throw new BusinessException("La huella del archivo no es válida");
+        }
+    }
+
+    public long maxFileSize() {
+        return MAX_FILE_SIZE;
+    }
+
+    public Set<String> allowedExtensions() {
+        return ALLOWED_EXTENSIONS;
+    }
+
     private void validateKnownSignature(MultipartFile file, String extension) {
         try {
             byte[] header = file.getBytes();

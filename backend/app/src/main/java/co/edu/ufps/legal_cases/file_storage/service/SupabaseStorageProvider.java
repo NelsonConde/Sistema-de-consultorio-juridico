@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +26,9 @@ import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
@@ -42,6 +47,7 @@ public class SupabaseStorageProvider implements StorageProvider {
 
     private final String bucket;
     private final S3Client client;
+    private final S3Presigner presigner;
 
     public SupabaseStorageProvider(
             @Value("${supabase.storage.endpoint}") String endpoint,
@@ -59,6 +65,16 @@ public class SupabaseStorageProvider implements StorageProvider {
                 .endpointOverride(URI.create(resolvedEndpoint))
                 .region(Region.of(resolvedRegion))
                 .forcePathStyle(true)
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(resolvedAccessKey, resolvedSecretKey)))
+                .build();
+
+        this.presigner = S3Presigner.builder()
+                .endpointOverride(URI.create(resolvedEndpoint))
+                .region(Region.of(resolvedRegion))
+                .serviceConfiguration(software.amazon.awssdk.services.s3.S3Configuration.builder()
+                        .pathStyleAccessEnabled(true)
+                        .build())
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(resolvedAccessKey, resolvedSecretKey)))
                 .build();
@@ -177,6 +193,68 @@ public class SupabaseStorageProvider implements StorageProvider {
         return directories.stream().sorted().collect(Collectors.toList());
     }
 
+    @Override
+    public PresignedUpload createUploadUrl(
+            String objectKey,
+            String contentType,
+            long contentLength,
+            Duration validity) {
+        try {
+            var putRequest = software.amazon.awssdk.services.s3.model.PutObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(requireValue(objectKey, "objectKey"))
+                    .contentType(contentType)
+                    .contentLength(contentLength)
+                    .build();
+
+            var presigned = presigner.presignPutObject(PutObjectPresignRequest.builder()
+                    .signatureDuration(validity)
+                    .putObjectRequest(putRequest)
+                    .build());
+
+            return new PresignedUpload(presigned.url().toString(),
+                    Instant.now().plus(validity));
+        } catch (RuntimeException ex) {
+            throw new FileStorageException("No se pudo preparar la carga documental", ex);
+        }
+    }
+
+    @Override
+    public StorageObjectMetadata head(String objectKey) {
+        try {
+            HeadObjectResponse response = client.headObject(HeadObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(requireValue(objectKey, "objectKey"))
+                    .build());
+            return new StorageObjectMetadata(response.contentLength(), response.contentType());
+        } catch (S3Exception ex) {
+            if (ex.statusCode() == 404) {
+                throw new FileNotFoundException("Objeto documental no encontrado", ex);
+            }
+            throw new FileStorageException("No se pudo verificar el objeto documental", ex);
+        }
+    }
+
+    @Override
+    public PresignedDownload createDownloadUrl(String objectKey, Duration validity) {
+        try {
+            var getRequest = GetObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(requireValue(objectKey, "objectKey"))
+                    .build();
+
+            var presigned = presigner.presignGetObject(GetObjectPresignRequest.builder()
+                    .signatureDuration(validity)
+                    .getObjectRequest(getRequest)
+                    .build());
+
+            return new PresignedDownload(presigned.url().toString(),
+                    Instant.now().plus(validity));
+        } catch (RuntimeException ex) {
+            throw new FileStorageException("No se pudo preparar la descarga documental", ex);
+        }
+    }
+
     private List<String> listAllKeys() {
         List<String> keys = new ArrayList<>();
         String continuationToken = null;
@@ -213,5 +291,6 @@ public class SupabaseStorageProvider implements StorageProvider {
     @PreDestroy
     void close() {
         client.close();
+        presigner.close();
     }
 }
