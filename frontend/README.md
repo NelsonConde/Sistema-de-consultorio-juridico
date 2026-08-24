@@ -56,14 +56,14 @@ La configuración central de API se encuentra en:
 src/lib/config.js
 ```
 
-Desde ese archivo se exportan las constantes:
+Desde ese archivo se exporta la constante:
 
 ```javascript
 API_URL_BASE
-FILE_STORAGE_API_URL_BASE
 ```
 
-Los componentes deben usar estas constantes para consumir backend y archivos.
+Los componentes usan `API_URL_BASE` para consumir el backend. El módulo
+`src/lib/fileApi.js` centraliza el protocolo de archivos.
 
 ## Variables de entorno
 
@@ -73,7 +73,6 @@ El frontend usa variables públicas de Next.js para conocer las URLs del backend
 |---|---|
 | `NEXT_PUBLIC_API_URL` | Define la URL pública base del backend. |
 | `NEXT_PUBLIC_API_URL_BASE` | Define la URL pública base de la API. |
-| `NEXT_PUBLIC_FILE_STORAGE_API_URL_BASE` | Define la URL pública base para archivos. |
 
 Las variables `NEXT_PUBLIC_*` son visibles para el navegador y no deben contener secretos, tokens, llaves, credenciales ni datos sensibles.
 
@@ -121,32 +120,19 @@ El frontend contiene pantallas y componentes para:
 
 ## Archivos
 
-Los endpoints de archivos usan:
+Las páginas no construyen rutas, carpetas ni claves de Storage. Deben usar
+`src/lib/fileApi.js`, entregando un recurso funcional, por ejemplo:
 
 ```javascript
-FILE_STORAGE_API_URL_BASE
+await fileApi.uploadMany({ type: "consulta", id: consultaId }, archivos);
+const archivos = await fileApi.list({ type: "consulta", id: consultaId });
+await fileApi.download(archivo, { type: "consulta", id: consultaId });
 ```
 
-Las peticiones de archivos protegidas también deben usar:
-
-```javascript
-credentials: "include"
-```
-
-Cuando un flujo requiera subir documentos, se debe usar `multipart/form-data`.
-
-Ejemplo general:
-
-```javascript
-const formData = new FormData();
-formData.append("file", archivo);
-
-const response = await fetch(`${FILE_STORAGE_API_URL_BASE}/files/upload`, {
-  method: "POST",
-  credentials: "include",
-  body: formData,
-});
-```
+El cliente solicita una URL firmada al backend, transfiere el archivo
+directamente al bucket privado y confirma la carga. Las credenciales de
+Supabase nunca llegan al navegador. Los contratos completos están en
+`docs/file-storage-api.md`.
 
 ## Conciliación
 
@@ -254,7 +240,7 @@ npm run test:headed
 
 - No hardcodear URLs del backend.
 - Usar `API_URL_BASE` para endpoints funcionales.
-- Usar `FILE_STORAGE_API_URL_BASE` para endpoints de archivos.
+- Usar `fileApi` para operaciones de archivos.
 - Usar `credentials: "include"` en peticiones protegidas.
 - Manejar `401` como sesión no válida.
 - Manejar `403` como falta de permiso o alcance.

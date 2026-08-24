@@ -1,6 +1,7 @@
 "use client"
 
 import { apiClient } from "@/lib/apiClient";
+import { fileApi } from "@/lib/fileApi";
   /**
    * Formulario de listado y gestión de consultas jurídicas.
    *
@@ -21,7 +22,7 @@ import { useRouter } from "next/navigation";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
 
-import { API_URL_BASE, FILE_STORAGE_API_URL_BASE } from "@/lib/config";
+import { API_URL_BASE } from "@/lib/config";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import Pagination from "@/components/ui/Pagination";
 import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems } from "@/lib/list-utils";
@@ -542,24 +543,17 @@ export function ConsultasJuridicasForm() {
   async function cargarArchivosCaso(consultaId) {
     setCargandoArchivos(true);
     try {
-      const res = await apiClient.request(`${FILE_STORAGE_API_URL_BASE}/files/list/${consultaId}`, { credentials: "include" });
-      if (!res.ok) { setArchivosCaso([]); return; }
-      const data = await res.json();
-      setArchivosCaso(Array.isArray(data) ? data : []);
-    } catch { setArchivosCaso([]); }
+      setArchivosCaso(await fileApi.list({ type: "consulta", id: consultaId }));
+    } catch (error) {
+      console.error(error);
+      setArchivosCaso([]);
+    }
     finally { setCargandoArchivos(false); }
   }
 
-  const descargarArchivo = async (fileName) => {
+  const descargarArchivo = async (file) => {
     try {
-      const response = await apiClient.request(`${FILE_STORAGE_API_URL_BASE}/files/download/${idEditando}/${encodeURIComponent(fileName)}`, { method: 'GET', credentials: 'include' });
-      if (!response.ok) throw new Error('Error descargando archivo');
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = fileName;
-      document.body.appendChild(a); a.click(); a.remove();
-      window.URL.revokeObjectURL(url);
+      await fileApi.download(file, { type: "consulta", id: idEditando });
     } catch (error) { console.error(error); }
   };
 
@@ -973,10 +967,10 @@ export function ConsultasJuridicasForm() {
                   <p className="text-sm text-muted-foreground">No hay archivos adjuntos.</p>
                 ) : (
                   <ul className="space-y-2">
-                    {archivosCaso.map(fileName => (
-                      <li key={fileName} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                        <span className="truncate">{fileName}</span>
-                        <button type="button" onClick={() => descargarArchivo(fileName)} className="text-primary hover:underline">Descargar</button>
+                    {archivosCaso.map((file) => (
+                      <li key={file.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                        <span className="truncate">{file.fileName}</span>
+                        <button type="button" onClick={() => descargarArchivo(file)} className="text-primary hover:underline">Descargar</button>
                       </li>
                     ))}
                   </ul>

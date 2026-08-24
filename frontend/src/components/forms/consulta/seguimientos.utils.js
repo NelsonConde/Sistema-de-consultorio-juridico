@@ -198,10 +198,6 @@ export function seguimientoEstaVencido(tarea) {
   return fechaEntrega.getTime() < hoy.getTime()
 }
 
-export function pathRespuesta(seguimientoId, respuestaId) {
-  return `tareas-${seguimientoId}-respuestas-${respuestaId}`
-}
-
 export async function leerRespuesta(response) {
   const text = await response.text()
 

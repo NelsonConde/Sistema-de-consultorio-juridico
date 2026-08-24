@@ -1,5 +1,4 @@
-import React from 'react';
-import { FormFileUpload } from './FormFileUpload';
+import { FormFileUpload } from "./FormFileUpload";
 
 /**
  * Sección de formulario para subir archivos asociados a una consulta.
@@ -19,7 +18,7 @@ export default function ArchivosConsultaForm({ archivos, onChange }) {
         name="archivos"
         label="Documentos a subir"
         multiple={true}
-        setValue={(name, value) => onChange(value)}
+        setValue={(_name, value) => onChange(value)}
         value={archivos}
         errors={{}}
       />

@@ -65,13 +65,6 @@ export function obtenerMensajeError(data, fallback = "Ocurrió un error") {
   return data.mensaje || data.message || data.error || fallback;
 }
 
-export function encodePath(path) {
-  return String(path || "")
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-}
-
 export function archivoEsPdf(file) {
   if (!file) return false;
   const nombre = String(file.name || "").toLowerCase();

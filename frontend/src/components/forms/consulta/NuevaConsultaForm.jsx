@@ -15,19 +15,20 @@
  */
 
 import { apiClient } from "@/lib/apiClient";
-import React, { useEffect, useMemo, useState } from "react";
+import { fileApi } from "@/lib/fileApi";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 
-import { API_URL_BASE, FILE_STORAGE_API_URL_BASE } from "@/lib/config";
+import { API_URL_BASE } from "@/lib/config";
 import ArchivosConsultaForm from "../parts/ArchivosConsultaForm";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
 import { getApiErrorDescription, getApiErrorTitle, readResponseBody } from "@/lib/api";
 
 import { VACIOS } from "./nueva-consulta.constants";
-import { leerRespuesta, numberArray, numberOrNull, textOrNull } from "./nueva-consulta.utils";
+import { numberArray, numberOrNull, textOrNull } from "./nueva-consulta.utils";
 import { ModalMultiple, ModalSimple } from "./ConsultaSelectionModals";
 
 export function NuevaConsultaForm() {
@@ -410,32 +411,23 @@ export function NuevaConsultaForm() {
       return true;
     }
 
-    const formData = new FormData();
-
-    archivos.forEach((file) => {
-      formData.append("files", file);
-    });
-
-    formData.append("path", String(consultaId));
-
     try {
-      const uploadRes = await apiClient.request(
-        `${FILE_STORAGE_API_URL_BASE}/files/upload-multiple`,
-        {
-          method: "POST",
-          credentials: "include",
-          body: formData,
-        }
+      const results = await fileApi.uploadMany(
+        { type: "consulta", id: consultaId },
+        archivos
       );
+      const failed = results.filter((result) => !result.ok);
 
-      if (uploadRes.ok) {
+      if (failed.length === 0) {
         toast.success("Archivos subidos correctamente");
         return true;
       }
 
-      const errorText = await uploadRes.text();
-      console.error("Error subiendo archivos:", errorText);
-      toast.warning("La consulta se creó, pero no se pudieron subir los archivos");
+      toast.warning(
+        failed.length === archivos.length
+          ? "La consulta se creó, pero no se pudieron subir los archivos"
+          : `La consulta se creó; ${failed.length} archivo(s) no pudieron subirse`
+      );
       return false;
     } catch (error) {
       console.error("Error subiendo archivos:", error);

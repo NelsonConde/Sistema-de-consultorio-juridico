@@ -1,7 +1,8 @@
 "use client";
 
 import { apiClient } from "@/lib/apiClient";
-import React, { useEffect, useMemo, useState } from "react";
+import { fileApi } from "@/lib/fileApi";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -19,7 +20,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Pagination from "@/components/ui/Pagination";
-import { API_URL_BASE, FILE_STORAGE_API_URL_BASE } from "@/lib/config";
+import { API_URL_BASE } from "@/lib/config";
 import { PERMISOS } from "@/lib/permission";
 import {
   esConciliador,
@@ -32,18 +33,14 @@ import { ESTADOS_FINALES, ESTADOS_NO_FINALES, PAGE_SIZE_OPTIONS } from "./concil
 import {
   archivoEsPdf,
   badgeEstadoClass,
-  encodePath,
   etiquetaEstado,
   extraerLista,
   formatearFecha,
-  idConsulta,
   leerRespuesta,
-  nombreConsulta,
   nombrePersona,
   normalizarTexto,
   obtenerMensajeError,
   ordenarPorIdAsc,
-  valor,
 } from "./conciliaciones.utils";
 import { esRolAdministrador } from "./conciliaciones.permissions";
 import { ActionCard, CampoConsulta, InfoCard, PersonasCard } from "./ConciliacionesFormParts";
@@ -460,33 +457,14 @@ export function ConciliacionesForm() {
     }
   }
 
-  async function descargarDocumento(path) {
-    if (!path) return;
+  async function descargarDocumento(fileId, conciliacionId) {
+    if (!fileId || !conciliacionId) return;
 
     try {
-      const response = await apiClient.request(
-        `${FILE_STORAGE_API_URL_BASE}/files/download/${encodePath(path)}`,
-        { method: "GET", credentials: "include" }
-      );
-
-      if (response.status === 401) {
-        router.replace("/");
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("No se pudo descargar el documento");
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = String(path).split("/").pop() || "documento.pdf";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      const files = await fileApi.list({ type: "conciliacion", id: conciliacionId });
+      const file = files.find((item) => Number(item.id) === Number(fileId));
+      if (!file) throw new Error("El documento ya no está disponible");
+      await fileApi.download(file, { type: "conciliacion", id: conciliacionId });
     } catch (err) {
       console.error(err);
       setError(err.message || "No se pudo descargar el documento");
@@ -669,8 +647,8 @@ export function ConciliacionesForm() {
                           type="button"
                           size="sm"
                           variant="outline"
-                          disabled={!item.documentoSolicitudPath}
-                          onClick={() => descargarDocumento(item.documentoSolicitudPath)}
+                          disabled={!item.documentoSolicitudFileId}
+                          onClick={() => descargarDocumento(item.documentoSolicitudFileId, item.id)}
                         >
                           Solicitud
                         </Button>
@@ -678,8 +656,8 @@ export function ConciliacionesForm() {
                           type="button"
                           size="sm"
                           variant="outline"
-                          disabled={!item.actaPath}
-                          onClick={() => descargarDocumento(item.actaPath)}
+                          disabled={!item.actaFileId}
+                          onClick={() => descargarDocumento(item.actaFileId, item.id)}
                         >
                           Acta
                         </Button>
@@ -759,8 +737,8 @@ export function ConciliacionesForm() {
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={!detalle.documentoSolicitudPath}
-                    onClick={() => descargarDocumento(detalle.documentoSolicitudPath)}
+                    disabled={!detalle.documentoSolicitudFileId}
+                    onClick={() => descargarDocumento(detalle.documentoSolicitudFileId, detalle.id)}
                   >
                     <Download className="mr-2 h-4 w-4" />
                     Descargar solicitud
@@ -768,8 +746,8 @@ export function ConciliacionesForm() {
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={!detalle.actaPath}
-                    onClick={() => descargarDocumento(detalle.actaPath)}
+                    disabled={!detalle.actaFileId}
+                    onClick={() => descargarDocumento(detalle.actaFileId, detalle.id)}
                   >
                     <Download className="mr-2 h-4 w-4" />
                     Descargar acta

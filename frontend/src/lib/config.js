@@ -8,7 +8,6 @@
  * Variables de entorno soportadas (en orden de prioridad):
  * - `NEXT_PUBLIC_API_URL_BASE`
  * - `NEXT_PUBLIC_API_URL`
- * - `NEXT_PUBLIC_FILE_STORAGE_API_URL_BASE`
  *
  * @module lib/config
  */
@@ -51,19 +50,6 @@ function normalizarApiUrl(url) {
  */
 export const API_URL_BASE = normalizarApiUrl(
   process.env.NEXT_PUBLIC_API_URL_BASE ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    "http://localhost:8080/api"
-);
-
-/**
- * URL base del servicio de almacenamiento de archivos.
- * Por defecto apunta al mismo backend que `API_URL_BASE`.
- *
- * @type {string}
- */
-export const FILE_STORAGE_API_URL_BASE = normalizarApiUrl(
-  process.env.NEXT_PUBLIC_FILE_STORAGE_API_URL_BASE ||
-    process.env.NEXT_PUBLIC_API_URL_BASE ||
     process.env.NEXT_PUBLIC_API_URL ||
     "http://localhost:8080/api"
 );
