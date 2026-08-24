@@ -30,9 +30,9 @@ public class ConciliacionResponseDTO {
 
     private LocalDateTime fechaConciliacion;
 
-    private String documentoSolicitudPath;
+    private Long documentoSolicitudFileId;
 
-    private String actaPath;
+    private Long actaFileId;
 
     private Long solicitadoPorId;
 

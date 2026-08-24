@@ -42,8 +42,10 @@ public class ConciliacionMapper {
         aplicarEstado(dto, conciliacion.getEstado());
 
         dto.setFechaConciliacion(conciliacion.getFechaConciliacion());
-        dto.setDocumentoSolicitudPath(conciliacion.getDocumentoSolicitudPath());
-        dto.setActaPath(conciliacion.getActaPath());
+        dto.setDocumentoSolicitudFileId(conciliacion.getDocumentoSolicitud() == null
+                ? null : conciliacion.getDocumentoSolicitud().getId());
+        dto.setActaFileId(conciliacion.getActa() == null
+                ? null : conciliacion.getActa().getId());
 
         dto.setSolicitadoPorId(conciliacion.getSolicitadoPor() != null
                 ? conciliacion.getSolicitadoPor().getId()
@@ -92,8 +94,10 @@ public class ConciliacionMapper {
             dto.setContrapartes(convertirAPersonasDTO(consulta.getContrapartes()));
         }
 
-        dto.setDocumentoSolicitudPath(conciliacion.getDocumentoSolicitudPath());
-        dto.setActaPath(conciliacion.getActaPath());
+        dto.setDocumentoSolicitudFileId(conciliacion.getDocumentoSolicitud() == null
+                ? null : conciliacion.getDocumentoSolicitud().getId());
+        dto.setActaFileId(conciliacion.getActa() == null
+                ? null : conciliacion.getActa().getId());
 
         dto.setSolicitadoPorId(conciliacion.getSolicitadoPor() != null
                 ? conciliacion.getSolicitadoPor().getId()
