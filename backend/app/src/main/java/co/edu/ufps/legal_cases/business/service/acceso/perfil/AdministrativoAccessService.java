@@ -9,8 +9,6 @@ import co.edu.ufps.legal_cases.business.repository.perfil.AdministrativoReposito
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.security.service.context.UsuarioActualService;
 
-// Este servicio regula funcionalidades de gestion de administrativos, solo un director admin puede gestionar administrativos
-// Al igual que en consulta donde esta comentado el paso a paso de validacion
 @Service
 public class AdministrativoAccessService {
 
@@ -20,37 +18,42 @@ public class AdministrativoAccessService {
     public AdministrativoAccessService(
             UsuarioActualService usuarioActualService,
             AdministrativoRepository administrativoRepository) {
+
         this.usuarioActualService = usuarioActualService;
         this.administrativoRepository = administrativoRepository;
     }
 
-    // Valida la regla especial del sistema:
-    // solo una administrativa marcada como directora puede gestionar administradores.
     @Transactional(readOnly = true)
     public void validarPuedeGestionarAdministradores() {
-        if (!usuarioActualService.esRolAdministrador()) {
-            throw new AccessDeniedException("Solo un administrador puede gestionar administrativos");
+        if (!usuarioActualService.esAdministradorOperativo()) {
+            throw new AccessDeniedException(
+                    "Solo un administrador puede gestionar administrativos");
         }
 
-        Administrativo administrativoActual = obtenerAdministrativoActual();
+        Administrativo actual = obtenerAdministrativoActual();
 
-        if (!Boolean.TRUE.equals(administrativoActual.getDirectora())) {
-            throw new AccessDeniedException("Solo la directora puede gestionar administrativos");
+        if (!Boolean.TRUE.equals(actual.getDirectora())) {
+            throw new AccessDeniedException(
+                    "Solo la directora puede gestionar administrativos");
         }
     }
 
     @Transactional(readOnly = true)
     public void validarPuedeVerAdministradores() {
-        if (!usuarioActualService.esRolAdministrador()) {
-            throw new AccessDeniedException("Solo un administrador puede consultar administrativos");
+        if (!usuarioActualService.esAdministradorOperativo()) {
+            throw new AccessDeniedException(
+                    "Solo un administrador puede consultar administrativos");
         }
     }
 
     private Administrativo obtenerAdministrativoActual() {
-        Long usuarioActualId = usuarioActualService.obtenerUsuarioActualId();
+        Long usuarioId =
+                usuarioActualService.obtenerUsuarioActualId();
 
-        return administrativoRepository.findByUsuarioSistema_IdAndActivoTrue(usuarioActualId)
-                .orElseThrow(() -> new BusinessException(
-                        "El usuario actual no tiene un perfil administrativo activo"));
+        return administrativoRepository
+                .findByUsuarioSistema_IdAndActivoTrue(usuarioId)
+                .orElseThrow(() ->
+                        new BusinessException(
+                                "El usuario actual no tiene un perfil administrativo activo"));
     }
 }

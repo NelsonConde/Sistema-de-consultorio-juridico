@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import co.edu.ufps.legal_cases.common.exception.AdministracionInvariantException;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.common.exception.dto.ErrorResponseDTO;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,6 +27,23 @@ import jakarta.validation.ConstraintViolationException;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(AdministracionInvariantException.class)
+    public ResponseEntity<ErrorResponseDTO>
+            manejarAdministracionInvariantException(
+                    AdministracionInvariantException ex,
+                    HttpServletRequest request) {
+
+        ErrorResponseDTO error = construirError(
+                HttpStatus.CONFLICT,
+                "Conflicto de administración",
+                mensajeSeguro(
+                        ex.getMessage(),
+                        "La operación compromete la continuidad administrativa"),
+                request);
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
 
     // Maneja reglas de negocio controladas por los services.
     @ExceptionHandler(BusinessException.class)
