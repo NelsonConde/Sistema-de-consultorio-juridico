@@ -17,12 +17,8 @@ import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
 import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaRepository;
 import co.edu.ufps.legal_cases.security.service.account.perfil.PerfilUsuarioResolverService;
 
-// Servicio de contexto para consultar el usuario autenticado.
-// Centraliza el acceso a Spring Security y evita duplicar lecturas del usuario actual.
 @Service
 public class UsuarioActualService {
-
-    private static final String ROL_ADMINISTRADOR = "Administrador";
 
     private final UsuarioSistemaRepository usuarioSistemaRepository;
     private final PerfilUsuarioResolverService perfilUsuarioResolverService;
@@ -30,6 +26,7 @@ public class UsuarioActualService {
     public UsuarioActualService(
             UsuarioSistemaRepository usuarioSistemaRepository,
             PerfilUsuarioResolverService perfilUsuarioResolverService) {
+
         this.usuarioSistemaRepository = usuarioSistemaRepository;
         this.perfilUsuarioResolverService = perfilUsuarioResolverService;
     }
@@ -40,10 +37,11 @@ public class UsuarioActualService {
 
         UsuarioSistema usuario = usuarioSistemaRepository
                 .findWithRolAndPermisosByUsernameIgnoreCase(username)
-                .orElseThrow(() -> new BusinessException("Usuario autenticado no encontrado"));
+                .orElseThrow(() ->
+                        new BusinessException(
+                                "Usuario autenticado no encontrado"));
 
         validarUsuarioPuedeOperar(usuario);
-
         return usuario;
     }
 
@@ -54,9 +52,9 @@ public class UsuarioActualService {
 
     @Transactional(readOnly = true)
     public PerfilUsuarioActual obtenerPerfilActual() {
-        UsuarioSistema usuario = obtenerUsuarioActual();
-
-        return perfilUsuarioResolverService.obtenerPerfilActivoObligatorio(usuario);
+        return perfilUsuarioResolverService
+                .obtenerPerfilActivoObligatorio(
+                        obtenerUsuarioActual());
     }
 
     @Transactional(readOnly = true)
@@ -76,31 +74,25 @@ public class UsuarioActualService {
 
         Authentication authentication = obtenerAuthentication();
 
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return false;
-        }
-
-        return obtenerAuthorities(authentication)
-                .stream()
-                .anyMatch(authority -> Objects.equals(authority.getAuthority(), permiso));
+        return authentication != null
+                && authentication.isAuthenticated()
+                && obtenerAuthorities(authentication).stream()
+                        .anyMatch(authority ->
+                                Objects.equals(
+                                        authority.getAuthority(),
+                                        permiso));
     }
 
     public boolean tieneAlgunPermiso(String... permisos) {
-        if (permisos == null || permisos.length == 0) {
-            return false;
-        }
-
-        return Arrays.stream(permisos)
-                .anyMatch(this::tienePermiso);
+        return permisos != null
+                && permisos.length > 0
+                && Arrays.stream(permisos).anyMatch(this::tienePermiso);
     }
 
     public boolean tieneTodosLosPermisos(String... permisos) {
-        if (permisos == null || permisos.length == 0) {
-            return false;
-        }
-
-        return Arrays.stream(permisos)
-                .allMatch(this::tienePermiso);
+        return permisos != null
+                && permisos.length > 0
+                && Arrays.stream(permisos).allMatch(this::tienePermiso);
     }
 
     @Transactional(readOnly = true)
@@ -130,19 +122,24 @@ public class UsuarioActualService {
 
     @Transactional(readOnly = true)
     public boolean esRolAdministrador() {
+        return esAdministradorOperativo();
+    }
+
+    @Transactional(readOnly = true)
+    public boolean esAdministradorOperativo() {
         UsuarioSistema usuario = obtenerUsuarioActual();
 
-        return usuario.getRol() != null
-                && ROL_ADMINISTRADOR.equalsIgnoreCase(usuario.getRol().getNombre());
+        return usuario.getTipoPerfilActual()
+                        == TipoPerfilUsuario.ADMINISTRATIVO
+                && usuario.getRol() != null
+                && usuario.getRol().getTipoPerfil()
+                        == TipoPerfilUsuario.ADMINISTRATIVO;
     }
 
     @Transactional(readOnly = true)
     public boolean esTipoPerfil(TipoPerfilUsuario tipoPerfil) {
-        if (tipoPerfil == null) {
-            return false;
-        }
-
-        return obtenerTipoPerfilActual() == tipoPerfil;
+        return tipoPerfil != null
+                && obtenerTipoPerfilActual() == tipoPerfil;
     }
 
     private String obtenerUsernameAutenticado() {
@@ -155,7 +152,8 @@ public class UsuarioActualService {
         String username = authentication.getName();
 
         if (username == null || username.isBlank()) {
-            throw new BusinessException("No se pudo identificar el usuario autenticado");
+            throw new BusinessException(
+                    "No se pudo identificar el usuario autenticado");
         }
 
         return username;
@@ -165,19 +163,24 @@ public class UsuarioActualService {
         return SecurityContextHolder.getContext().getAuthentication();
     }
 
-    private Collection<? extends GrantedAuthority> obtenerAuthorities(Authentication authentication) {
+    private Collection<? extends GrantedAuthority> obtenerAuthorities(
+            Authentication authentication) {
         return authentication.getAuthorities();
     }
 
     private void validarUsuarioPuedeOperar(UsuarioSistema usuario) {
         if (!Boolean.TRUE.equals(usuario.getActivo())) {
-            throw new BusinessException("El usuario se encuentra inactivo");
+            throw new BusinessException(
+                    "El usuario se encuentra inactivo");
         }
 
-        if (usuario.getRol() == null || !Boolean.TRUE.equals(usuario.getRol().getActivo())) {
-            throw new BusinessException("El rol del usuario se encuentra inactivo");
+        if (usuario.getRol() == null
+                || !Boolean.TRUE.equals(usuario.getRol().getActivo())) {
+            throw new BusinessException(
+                    "El rol del usuario se encuentra inactivo");
         }
 
-        perfilUsuarioResolverService.obtenerPerfilActivoObligatorio(usuario);
+        perfilUsuarioResolverService
+                .obtenerPerfilActivoObligatorio(usuario);
     }
 }

@@ -11,6 +11,7 @@ import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
 import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaRepository;
 import co.edu.ufps.legal_cases.security.service.account.usuario.UsuarioSistemaMapper;
 import co.edu.ufps.legal_cases.security.service.account.usuario.UsuarioSistemaValidator;
+import co.edu.ufps.legal_cases.security.service.invariant.administracion.AdministracionInvariantService;
 
 @Service
 public class UsuarioSistemaService {
@@ -18,14 +19,19 @@ public class UsuarioSistemaService {
     private final UsuarioSistemaRepository usuarioSistemaRepository;
     private final UsuarioSistemaMapper usuarioSistemaMapper;
     private final UsuarioSistemaValidator usuarioSistemaValidator;
+    private final AdministracionInvariantService administracionInvariantService;
 
     public UsuarioSistemaService(
             UsuarioSistemaRepository usuarioSistemaRepository,
             UsuarioSistemaMapper usuarioSistemaMapper,
-            UsuarioSistemaValidator usuarioSistemaValidator) {
+            UsuarioSistemaValidator usuarioSistemaValidator,
+            AdministracionInvariantService administracionInvariantService) {
+
         this.usuarioSistemaRepository = usuarioSistemaRepository;
         this.usuarioSistemaMapper = usuarioSistemaMapper;
         this.usuarioSistemaValidator = usuarioSistemaValidator;
+        this.administracionInvariantService =
+                administracionInvariantService;
     }
 
     @Transactional(readOnly = true, noRollbackFor = BusinessException.class)
@@ -46,26 +52,40 @@ public class UsuarioSistemaService {
 
     @Transactional(readOnly = true)
     public UsuarioSistemaDTO obtenerPorId(Long id) {
-        UsuarioSistema usuario = buscarUsuarioConRolYPermisos(id);
+        usuarioSistemaValidator.validarIdObligatorio(id);
 
-        return usuarioSistemaMapper.convertirADTO(usuario);
+        return usuarioSistemaMapper.convertirADTO(
+                buscarUsuarioConRolYPermisos(id));
     }
 
     @Transactional
-    public UsuarioSistemaDTO cambiarEstado(Long id, Boolean activo) {
-        UsuarioSistema usuario = buscarUsuarioConRolYPermisos(id);
+    public UsuarioSistemaDTO cambiarEstado(
+            Long id,
+            Boolean activo) {
+
+        usuarioSistemaValidator.validarIdObligatorio(id);
+        usuarioSistemaValidator.validarEstadoObligatorio(activo);
+
+        administracionInvariantService
+                .validarCambioEstadoUsuario(id, activo);
+
+        UsuarioSistema usuario =
+                buscarUsuarioConRolYPermisos(id);
 
         usuarioSistemaValidator.validarCambioEstado(usuario, activo);
 
         usuario.setActivo(activo);
 
-        return usuarioSistemaMapper.convertirADTO(usuarioSistemaRepository.save(usuario));
+        return usuarioSistemaMapper.convertirADTO(
+                usuarioSistemaRepository.save(usuario));
     }
 
     private UsuarioSistema buscarUsuarioConRolYPermisos(Long id) {
-        usuarioSistemaValidator.validarIdObligatorio(id);
-
-        return usuarioSistemaRepository.findWithRolAndPermisosById(id)
-                .orElseThrow(() -> new BusinessException("Usuario del sistema no encontrado con id: " + id));
+        return usuarioSistemaRepository
+                .findWithRolAndPermisosById(id)
+                .orElseThrow(() ->
+                        new BusinessException(
+                                "Usuario del sistema no encontrado con id: "
+                                        + id));
     }
 }
