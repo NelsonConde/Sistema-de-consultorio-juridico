@@ -1,1 +1,0 @@
-administracion-invariant-init.sql
