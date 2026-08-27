@@ -10,31 +10,17 @@ import { API_URL_BASE } from "@/lib/config";
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 function descargarPlantilla() {
-  // Genera y descarga la plantilla desde el servidor si existe,
-  // o la construye en el cliente con los encabezados correctos.
-  // Como el backend no provee el archivo, lo generamos con una librería
-  // ya disponible en el navegador (Blob + URL object).
-
-  // Contenido CSV mínimo con los encabezados + fila de ejemplo,
-  // compatible con Excel cuando se abre como .csv UTF-8
-  const encabezados = [
-    "nombre", "tipoDocumentoId", "documento", "email",
-    "telefono", "usuario", "sedeId", "codigo", "asesorId", "activo", "conciliacion",
-  ];
-  const ejemplo = [
-    "Juan Pérez", "1", "12345678", "juan.perez@correo.com",
-    "3001234567", "juanperez", "1", "20241001", "1", "TRUE", "FALSE",
-  ];
-
-  const csv = [encabezados.join(","), ejemplo.join(",")].join("\n");
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
+  // El backend procesa exclusivamente libros XLSX con Apache POI.
+  // La plantilla se sirve como archivo real para que encabezados y tipos
+  // coincidan con EstudianteExcelService.
   const a = document.createElement("a");
-  a.href = url;
-  a.download = "plantilla_importacion_estudiantes.csv";
+  a.href = "/plantilla_importacion_estudiantes.xlsx";
+  a.download = "plantilla_importacion_estudiantes.xlsx";
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
 }
+
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
@@ -57,9 +43,9 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
 
     if (!file) return;
 
-    const esXlsx = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
+    const esXlsx = file.name.toLowerCase().endsWith(".xlsx");
     if (!esXlsx) {
-      setErrorFormato("Solo se aceptan archivos Excel (.xlsx). Descarga la plantilla para ver el formato correcto.");
+      setErrorFormato("Solo se aceptan archivos Excel .xlsx, que es el formato procesado por el backend. Descarga la plantilla para ver el formato correcto.");
       setArchivoSeleccionado(null);
       return;
     }
@@ -180,7 +166,7 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
           <input
             ref={inputRef}
             type="file"
-            accept=".xlsx,.xls"
+            accept=".xlsx"
             className="hidden"
             onChange={onInputChange}
           />

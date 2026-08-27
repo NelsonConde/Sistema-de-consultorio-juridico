@@ -101,6 +101,39 @@ export function ConciliacionesForm() {
     puedeReemplazarSolicitud ||
     puedeDesactivar;
 
+  const conciliacionesActivasNoFinalizadasPorConsulta = useMemo(() => {
+    const ids = new Set();
+
+    conciliaciones.forEach((item) => {
+      const estado = normalizarTexto(item?.estadoCodigo || item?.estadoNombre);
+      const activa = item?.activo !== false;
+      const finalizada = estado === "COMPLETO_CONCILIADO" || estado === "COMPLETO_NO_CONCILIADO";
+
+      if (activa && !finalizada && item?.consultaId) {
+        ids.add(String(item.consultaId));
+      }
+    });
+
+    return ids;
+  }, [conciliaciones]);
+
+  const consultasDisponiblesParaConciliacion = useMemo(() => {
+    return consultas.filter((consulta) => {
+      const estado = normalizarTexto(consulta?.estado || consulta?.estadoConsulta || consulta?.estadoNombre);
+      const consultaId = String(idConsulta(consulta) || "");
+      const cerradaOArchivada = ["CERRADO", "CERRADA", "ARCHIVADO", "ARCHIVADA"].includes(estado);
+
+      return Boolean(consultaId)
+        && !cerradaOArchivada
+        && !conciliacionesActivasNoFinalizadasPorConsulta.has(consultaId);
+    });
+  }, [consultas, conciliacionesActivasNoFinalizadasPorConsulta]);
+
+  const detalleFinalizado = useMemo(() => {
+    const estado = normalizarTexto(detalle?.estadoCodigo || detalle?.estadoNombre);
+    return estado === "COMPLETO_CONCILIADO" || estado === "COMPLETO_NO_CONCILIADO";
+  }, [detalle]);
+
   useEffect(() => {
     cargarInicial();
   }, []);
@@ -264,6 +297,23 @@ export function ConciliacionesForm() {
       return;
     }
 
+    const consultaSeleccionada = consultas.find(
+      (consulta) => String(idConsulta(consulta)) === String(crearConsultaId)
+    );
+    const estadoConsulta = normalizarTexto(
+      consultaSeleccionada?.estado || consultaSeleccionada?.estadoConsulta || consultaSeleccionada?.estadoNombre
+    );
+
+    if (["CERRADO", "CERRADA", "ARCHIVADO", "ARCHIVADA"].includes(estadoConsulta)) {
+      setError("No se puede crear una conciliación sobre una consulta cerrada o archivada.");
+      return;
+    }
+
+    if (conciliacionesActivasNoFinalizadasPorConsulta.has(String(crearConsultaId))) {
+      setError("La consulta ya tiene una conciliación activa no finalizada.");
+      return;
+    }
+
     if (!archivoEsPdf(archivoSolicitud)) {
       setError("La solicitud es obligatoria y debe ser un archivo PDF.");
       return;
@@ -302,6 +352,10 @@ export function ConciliacionesForm() {
 
   async function asignarEstudiante() {
     if (!detalle?.id) return;
+    if (detalleFinalizado) {
+      setError("No se puede modificar una conciliación finalizada.");
+      return;
+    }
     if (!estudianteId) {
       setError("Selecciona un estudiante habilitado para conciliación.");
       return;
@@ -319,6 +373,10 @@ export function ConciliacionesForm() {
 
   async function asignarConciliador() {
     if (!detalle?.id) return;
+    if (detalleFinalizado) {
+      setError("No se puede modificar una conciliación finalizada.");
+      return;
+    }
     if (!conciliadorId) {
       setError("Selecciona un conciliador activo.");
       return;
@@ -336,8 +394,17 @@ export function ConciliacionesForm() {
 
   async function cambiarEstado() {
     if (!detalle?.id) return;
+    if (detalleFinalizado) {
+      setError("No se puede modificar una conciliación finalizada.");
+      return;
+    }
     if (!estadoNoFinal) {
       setError("Selecciona un estado válido.");
+      return;
+    }
+
+    if (estadoNoFinal === "ESPERANDO_REUNION" && (!detalle.estudianteId || !detalle.conciliadorId)) {
+      setError("Para pasar a esperando reunión debe asignar estudiante y conciliador.");
       return;
     }
 
@@ -354,6 +421,16 @@ export function ConciliacionesForm() {
   async function finalizarConciliacion(event) {
     event.preventDefault();
     if (!detalle?.id) return;
+
+    if (detalleFinalizado) {
+      setError("La conciliación ya se encuentra finalizada.");
+      return;
+    }
+
+    if (!detalle.estudianteId || !detalle.conciliadorId) {
+      setError("Para finalizar la conciliación debe asignar estudiante y conciliador.");
+      return;
+    }
 
     if (!estadoFinal) {
       setError("Selecciona el estado final.");
@@ -576,7 +653,7 @@ export function ConciliacionesForm() {
             <CampoConsulta
               label="Consulta"
               consultaId={crearConsultaId}
-              consultas={consultas}
+              consultas={consultasDisponiblesParaConciliacion}
               onSeleccionar={setCrearConsultaId}
               required
             />
@@ -764,7 +841,7 @@ export function ConciliacionesForm() {
 
               {mostrarPanelGestion ? (
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                  {puedeAsignarEstudiante && (
+                  {puedeAsignarEstudiante && !detalleFinalizado && (
                     <ActionCard title="Asignar estudiante">
                       <div className="flex flex-col gap-2 sm:flex-row">
                         <select
@@ -786,7 +863,7 @@ export function ConciliacionesForm() {
                     </ActionCard>
                   )}
 
-                  {puedeAsignarConciliador && (
+                  {puedeAsignarConciliador && !detalleFinalizado && (
                     <ActionCard title="Asignar conciliador">
                       <div className="flex flex-col gap-2 sm:flex-row">
                         <select
@@ -808,7 +885,7 @@ export function ConciliacionesForm() {
                     </ActionCard>
                   )}
 
-                  {puedeCambiarEstado && (
+                  {puedeCambiarEstado && !detalleFinalizado && (
                     <ActionCard title="Cambiar estado no final">
                       <div className="flex flex-col gap-2 sm:flex-row">
                         <select
@@ -829,7 +906,7 @@ export function ConciliacionesForm() {
                     </ActionCard>
                   )}
 
-                  {puedeFinalizar && (
+                  {puedeFinalizar && !detalleFinalizado && (
                     <ActionCard title="Finalizar con acta">
                       <form onSubmit={finalizarConciliacion} className="space-y-3">
                         <select
@@ -857,7 +934,7 @@ export function ConciliacionesForm() {
                     </ActionCard>
                   )}
 
-                  {puedeReemplazarSolicitud && (
+                  {puedeReemplazarSolicitud && !detalleFinalizado && (
                     <ActionCard title="Reemplazar solicitud">
                       <form onSubmit={reemplazarSolicitud} className="space-y-3">
                         <input
@@ -874,7 +951,7 @@ export function ConciliacionesForm() {
                     </ActionCard>
                   )}
 
-                  {puedeDesactivar && (
+                  {puedeDesactivar && !detalleFinalizado && (
                     <ActionCard title="Desactivar conciliación">
                       <Button type="button" variant="destructive" onClick={desactivarConciliacion} disabled={saving}>
                         <Trash2 className="mr-2 h-4 w-4" />

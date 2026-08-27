@@ -22,6 +22,7 @@ import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { PERMISOS } from "@/lib/permission";
 import { normalizar, tieneAlgunPermiso, tienePermiso } from "@/lib/authz";
+import { digitsOnlyRule, maxLengthRule } from "@/lib/form-validation";
 import Pagination from "@/components/ui/Pagination";
 import { sortByIdAsc } from "@/lib/list-utils";
 
@@ -453,17 +454,19 @@ export function CambiarRolUsuarioForm() {
         <FormInput
           name="motivo"
           label="Motivo del cambio"
+          maxLength={255}
           register={register}
           errors={errors}
-          rules={{ required: REQUIRED }}
+          rules={{ required: REQUIRED, ...maxLengthRule(255) }}
         />
 
         <FormInput
           name="nombre"
           label="Nombre completo"
+          maxLength={120}
           register={register}
           errors={errors}
-          rules={{ required: REQUIRED }}
+          rules={{ required: REQUIRED, ...maxLengthRule(120) }}
         />
 
         {tiposDocumento.length > 0 && (
@@ -486,6 +489,7 @@ export function CambiarRolUsuarioForm() {
         <FormInput
           name="documento"
           label="Documento"
+          maxLength={30}
           register={register}
           errors={errors}
           rules={{
@@ -495,31 +499,36 @@ export function CambiarRolUsuarioForm() {
               destino === "CONCILIADOR"
                 ? REQUIRED
                 : false,
+            ...maxLengthRule(30),
           }}
         />
 
         <FormInput
           name="telefono"
           label="Teléfono"
+          digitsOnly
+          maxLength={30}
           register={register}
           errors={errors}
-          rules={{ required: REQUIRED }}
+          rules={{ ...digitsOnlyRule({ required: true, maxLength: 30 }) }}
         />
 
         <FormInput
           name="usuario"
           label="Usuario"
+          maxLength={100}
           register={register}
           errors={errors}
-          rules={{ required: REQUIRED }}
+          rules={{ required: REQUIRED, ...maxLengthRule(100) }}
         />
 
         <FormInput
           name="codigo"
           label="Código"
+          maxLength={30}
           register={register}
           errors={errors}
-          rules={{ required: REQUIRED }}
+          rules={{ required: REQUIRED, ...maxLengthRule(30) }}
         />
 
         {sedes.length > 0 && (

@@ -65,7 +65,7 @@ export function ProcesosForm() {
   const mapaConsultas = useMemo(() => crearMapa(consultas), [consultas]);
 
   const especialidadesFiltradas = useMemo(() => {
-    if (!form.organoControlId) return especialidades;
+    if (!form.organoControlId) return [];
     return especialidades.filter((e) => Number(e.organoControlId) === Number(form.organoControlId));
   }, [especialidades, form.organoControlId]);
 
@@ -178,6 +178,17 @@ export function ProcesosForm() {
     if (form.especialidadId && !form.organoControlId) {
       toast.error("Selecciona primero un órgano de control");
       return false;
+    }
+
+    if (form.especialidadId && form.organoControlId) {
+      const especialidad = especialidades.find(
+        (item) => Number(item.id) === Number(form.especialidadId)
+      );
+
+      if (!especialidad || Number(especialidad.organoControlId) !== Number(form.organoControlId)) {
+        toast.error("La especialidad no pertenece al órgano de control seleccionado");
+        return false;
+      }
     }
 
     return true;

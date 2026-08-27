@@ -1,5 +1,7 @@
 "use client";
 
+import { sanitizeDigits } from "@/lib/form-validation";
+
 export function Seccion({ titulo, children }) {
   return (
     <section className="rounded-xl border bg-background p-4">
@@ -12,7 +14,24 @@ export function Seccion({ titulo, children }) {
   );
 }
 
-export function Input({ label, name, value, onChange, type = "text", min }) {
+export function Input({
+  label,
+  name,
+  value,
+  onChange,
+  type = "text",
+  min,
+  max,
+  maxLength,
+  digitsOnly = false,
+}) {
+  function handleChange(event) {
+    if (digitsOnly) {
+      event.target.value = sanitizeDigits(event.target.value, maxLength);
+    }
+    onChange(event);
+  }
+
   return (
     <label className="flex flex-col gap-1.5 text-sm">
       <span className="font-medium">{label}</span>
@@ -21,7 +40,11 @@ export function Input({ label, name, value, onChange, type = "text", min }) {
         name={name}
         value={value ?? ""}
         min={min}
-        onChange={onChange}
+        max={max}
+        maxLength={maxLength}
+        inputMode={digitsOnly ? "numeric" : undefined}
+        pattern={digitsOnly ? "[0-9]*" : undefined}
+        onChange={handleChange}
         className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
     </label>

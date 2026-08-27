@@ -205,15 +205,15 @@ export function validarCoherenciaConsultaFrontend({
   const monitorId = idNormalizado(form?.monitorId);
   const estudianteId = idNormalizado(form?.estudianteId);
 
-  if (temaId && !temas.some((tema) => idNormalizado(tema?.id) === temaId)) {
+  if (temaId && temas.length > 0 && !temas.some((tema) => idNormalizado(tema?.id) === temaId)) {
     return "El tema seleccionado no pertenece al área de la consulta";
   }
 
-  if (tipoId && !tipos.some((tipo) => idNormalizado(tipo?.id) === tipoId)) {
+  if (tipoId && tipos.length > 0 && !tipos.some((tipo) => idNormalizado(tipo?.id) === tipoId)) {
     return "El tipo seleccionado no pertenece al tema de la consulta";
   }
 
-  if (asesorId) {
+  if (asesorId && asesores.length > 0) {
     const asesor = asesores.find((item) => idNormalizado(item?.id) === asesorId);
 
     if (!asesor) {
@@ -225,7 +225,7 @@ export function validarCoherenciaConsultaFrontend({
     }
   }
 
-  if (monitorId) {
+  if (monitorId && monitores.length > 0) {
     const monitor = monitores.find((item) => idNormalizado(item?.id) === monitorId);
 
     if (!monitor) {
@@ -233,7 +233,7 @@ export function validarCoherenciaConsultaFrontend({
     }
   }
 
-  if (estudianteId) {
+  if (estudianteId && estudiantes.length > 0) {
     const estudiante = estudiantes.find(
       (item) => idNormalizado(item?.id) === estudianteId
     );
@@ -252,16 +252,18 @@ export function validarCoherenciaConsultaFrontend({
       return "El estudiante asignado no pertenece al asesor seleccionado";
     }
 
-    const asesorDelEstudiante = asesores.find(
-      (item) => idNormalizado(item?.id) === asesorEstudianteId
-    );
+    if (asesores.length > 0) {
+      const asesorDelEstudiante = asesores.find(
+        (item) => idNormalizado(item?.id) === asesorEstudianteId
+      );
 
-    if (!asesorDelEstudiante) {
-      return "El asesor asignado al estudiante no existe o está inactivo";
-    }
+      if (!asesorDelEstudiante) {
+        return "El asesor asignado al estudiante no existe o está inactivo";
+      }
 
-    if (!areaId || obtenerAreaIdAsesor(asesorDelEstudiante) !== areaId) {
-      return "El asesor del estudiante no pertenece al área de la consulta";
+      if (!areaId || obtenerAreaIdAsesor(asesorDelEstudiante) !== areaId) {
+        return "El asesor del estudiante no pertenece al área de la consulta";
+      }
     }
   }
 
