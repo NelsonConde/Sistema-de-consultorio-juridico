@@ -1,16 +1,15 @@
 import { API_URL_BASE } from "@/lib/config";
+import { apiResponse } from "@/lib/api";
 
 export async function fetchCatalogo(path) {
-  const res = await fetch(`${API_URL_BASE}${path}`, {
+  const { response: res, data } = await apiResponse(`${API_URL_BASE}${path}`, {
     method: "GET",
-    credentials: "include",
   });
 
   if (!res.ok) {
     return [];
   }
 
-  const data = await res.json();
   return Array.isArray(data) ? data : [];
 }
 

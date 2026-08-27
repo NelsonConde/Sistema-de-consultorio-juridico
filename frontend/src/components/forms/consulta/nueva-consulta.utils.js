@@ -1,13 +1,8 @@
+import { readResponseBody } from "@/lib/api";
+
 export async function leerRespuesta(res) {
-  const text = await res.text();
-
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { mensaje: text };
-  }
+  const data = await readResponseBody(res);
+  return typeof data === "string" ? { mensaje: data } : data;
 }
 
 export function textOrNull(value) {

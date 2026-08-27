@@ -1,6 +1,6 @@
 "use client";
 
-import { apiClient } from "@/lib/apiClient";
+import { apiResponse } from "@/lib/api";
 import React, { useRef, useState } from "react";
 import { Upload, Download, FileSpreadsheet, CheckCircle, XCircle, AlertCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -95,15 +95,14 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
       const form = new FormData();
       form.append("archivo", archivoSeleccionado);
 
-      const res = await apiClient.request(`${API_URL_BASE}/estudiantes/importar`, {
+      const { response: res, data } = await apiResponse(`${API_URL_BASE}/estudiantes/importar`, {
         method: "POST",
-        credentials: "include",
         body: form,
       });
 
       // Error de formato (texto plano del backend)
       if (res.status === 400) {
-        const text = await res.text();
+        const text = typeof data === "string" ? data : data ? JSON.stringify(data) : "";
         setErrorFormato(text || "El archivo no tiene el formato correcto.");
         return;
       }
@@ -114,17 +113,14 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
       }
 
       if (!res.ok) {
-        const text = await res.text();
-        try {
-          const json = JSON.parse(text);
-          setErrorFormato(json.mensaje || "Error interno del servidor.");
-        } catch {
-          setErrorFormato("Error interno del servidor.");
-        }
+        setErrorFormato(
+          data && typeof data === "object"
+            ? data.mensaje || "Error interno del servidor."
+            : "Error interno del servidor."
+        );
         return;
       }
 
-      const data = await res.json();
       setResultado(data);
 
       if (data.fallidos === 0) {

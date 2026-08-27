@@ -27,6 +27,29 @@ public class RolValidator {
         }
     }
 
+    public void validarSolicitudActualizacion(Long id, RolDTO dto) {
+        validarIdObligatorio(id);
+        validarDtoObligatorio(dto);
+
+        if (dto.getId() != null && !Objects.equals(dto.getId(), id)) {
+            throw new BusinessException("No se permite cambiar el id del rol");
+        }
+
+        validarListaPermisos(dto.getPermisoIds());
+    }
+
+    public void validarIdObligatorio(Long id) {
+        if (id == null) {
+            throw new BusinessException("El id del rol es obligatorio");
+        }
+    }
+
+    public void validarEstadoObligatorio(Boolean activo) {
+        if (activo == null) {
+            throw new BusinessException("El estado del rol es obligatorio");
+        }
+    }
+
     public void validarActualizacion(Rol rol, RolDTO dto) {
         validarDtoObligatorio(dto);
 

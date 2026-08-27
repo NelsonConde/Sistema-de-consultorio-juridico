@@ -15,6 +15,7 @@ import co.edu.ufps.legal_cases.security.repository.access.PermisoRepository;
 import co.edu.ufps.legal_cases.security.repository.access.RolRepository;
 import co.edu.ufps.legal_cases.security.service.access.rol.RolMapper;
 import co.edu.ufps.legal_cases.security.service.access.rol.RolValidator;
+import co.edu.ufps.legal_cases.security.service.invariant.administracion.AdministracionInvariantService;
 
 @Service
 public class RolService {
@@ -23,16 +24,19 @@ public class RolService {
     private final PermisoRepository permisoRepository;
     private final RolMapper rolMapper;
     private final RolValidator rolValidator;
+    private final AdministracionInvariantService administracionInvariantService;
 
     public RolService(
             RolRepository rolRepository,
             PermisoRepository permisoRepository,
             RolMapper rolMapper,
-            RolValidator rolValidator) {
+            RolValidator rolValidator,
+            AdministracionInvariantService administracionInvariantService) {
         this.rolRepository = rolRepository;
         this.permisoRepository = permisoRepository;
         this.rolMapper = rolMapper;
         this.rolValidator = rolValidator;
+        this.administracionInvariantService = administracionInvariantService;
     }
 
     @Transactional(readOnly = true)
@@ -79,6 +83,13 @@ public class RolService {
 
     @Transactional
     public RolDTO actualizar(Long id, RolDTO dto) {
+        rolValidator.validarSolicitudActualizacion(id, dto);
+
+        administracionInvariantService.validarActualizacionRol(
+                id,
+                dto.getActivo(),
+                dto.getPermisoIds());
+
         Rol rol = buscarRolConPermisos(id);
 
         rolValidator.validarActualizacion(rol, dto);
@@ -108,6 +119,11 @@ public class RolService {
 
     @Transactional
     public RolDTO cambiarEstado(Long id, Boolean activo) {
+        rolValidator.validarIdObligatorio(id);
+        rolValidator.validarEstadoObligatorio(activo);
+
+        administracionInvariantService.validarCambioEstadoRol(id, activo);
+
         Rol rol = buscarRolConPermisos(id);
 
         rolValidator.validarCambioEstado(rol, activo);
@@ -131,9 +147,14 @@ public class RolService {
 
     @Transactional
     public RolDTO quitarPermiso(Long rolId, Long permisoId) {
-        Rol rol = buscarRolConPermisos(rolId);
-
+        rolValidator.validarIdObligatorio(rolId);
         rolValidator.validarPermisoIdObligatorio(permisoId);
+
+        administracionInvariantService.validarRetiroPermisoRol(
+                rolId,
+                permisoId);
+
+        Rol rol = buscarRolConPermisos(rolId);
 
         boolean eliminado = rol.getPermisos()
                 .removeIf(permiso -> permiso.getId().equals(permisoId));

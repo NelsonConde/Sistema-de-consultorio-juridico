@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { RefreshCw, LayoutDashboard, FileText, ClipboardList, MessageSquare, ChevronRight, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { API_URL_BASE } from "@/lib/config"
+import { apiResponse } from "@/lib/api"
 import { PERMISOS } from "@/lib/permission"
 import {
   tienePermiso, esAdministrativo, esAsesor, esMonitor, esEstudiante,
@@ -458,9 +459,9 @@ export function InicioForm() {
         else if (esEstudiante(u)) url = `${API_URL_BASE}/estadisticas/${año}/semestre/${semestre}/estudiante/${pid}`
       }
       if (!url) { setStats(null); return }
-      const res = await fetch(url, { credentials: "include" })
+      const { response: res, data } = await apiResponse(url, { method: "GET" })
       if (!res.ok) { setStats(null); return }
-      setStats(await res.json())
+      setStats(data)
     } catch (err) {
       console.error(err); setError("No se pudieron cargar las estadísticas.")
     } finally {
@@ -472,9 +473,8 @@ export function InicioForm() {
   const cargarConsultasPendientes = React.useCallback(async () => {
     setCargandoConsultas(true)
     try {
-      const res = await fetch(`${API_URL_BASE}/consultas`, { credentials: "include" })
+      const { response: res, data: payload } = await apiResponse(`${API_URL_BASE}/consultas`, { method: "GET" })
       if (!res.ok) return
-      const payload = await res.json()
       const lista = obtenerArrayDesdeRespuesta(payload)
       const pendientes = lista
         .filter((c) => {
@@ -494,19 +494,18 @@ export function InicioForm() {
   const cargarTareasPendientes = React.useCallback(async () => {
     setCargandoTareas(true)
     try {
-      const resConsultas = await fetch(`${API_URL_BASE}/consultas`, { credentials: "include" })
+      const { response: resConsultas, data: payload } = await apiResponse(`${API_URL_BASE}/consultas`, { method: "GET" })
       if (!resConsultas.ok) { setTareasPendientes([]); return }
 
-      const payload = await resConsultas.json()
       const consultas = obtenerArrayDesdeRespuesta(payload).slice(0, 5)
 
       const resultados = await Promise.allSettled(
         consultas.map((c) => {
           const cid = c.id || c.consultaId
-          return fetch(
+          return apiResponse(
             `${API_URL_BASE}/seguimientos/consulta/${cid}/visibles-estudiante`,
-            { credentials: "include" }
-          ).then((r) => r.ok ? r.json() : [])
+            { method: "GET" }
+          ).then(({ response, data }) => response.ok ? data : [])
         })
       )
 
@@ -531,9 +530,8 @@ export function InicioForm() {
   const cargarRespuestasPendientes = React.useCallback(async () => {
     setCargandoRespuestas(true)
     try {
-      const res = await fetch(`${API_URL_BASE}/seguimientos/respuestas/pendientes`, { credentials: "include" })
+      const { response: res, data: payload } = await apiResponse(`${API_URL_BASE}/seguimientos/respuestas/pendientes`, { method: "GET" })
       if (!res.ok) return
-      const payload = await res.json()
       const lista = obtenerArrayDesdeRespuesta(payload)
       setRespuestasPendientes(lista.slice(0, 10))
     } catch (err) {
@@ -547,10 +545,9 @@ export function InicioForm() {
   React.useEffect(() => {
     async function init() {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, { credentials: "include" })
+        const { response: res, data: u } = await apiResponse(`${API_URL_BASE}/auth/me`, { method: "GET" })
         if (res.status === 401) { router.replace("/"); return }
         if (!res.ok) { setCargandoStats(false); return }
-        const u = await res.json()
         setUser(u)
 
         await Promise.allSettled([

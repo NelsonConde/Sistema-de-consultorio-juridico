@@ -24,7 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import Pagination from "@/components/ui/Pagination";
 import { API_URL_BASE } from "@/lib/config";
-import { getApiErrorDescription, readResponseBody } from "@/lib/api";
+import { apiResponse, getApiErrorDescription } from "@/lib/api";
 import { toast } from "sonner";
 
 /**
@@ -58,11 +58,9 @@ export function AuditLogsTable() {
         url.searchParams.append("username", search.trim())
       }
 
-      const response = await fetch(url.toString(), {
-        credentials: "include"
+      const { response, data } = await apiResponse(url.toString(), {
+        method: "GET",
       })
-
-      const data = await readResponseBody(response)
 
       if (!response.ok) {
         throw new Error(getApiErrorDescription(data, "Error cargando los registros de auditoría"))

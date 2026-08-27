@@ -43,6 +43,7 @@ import {
   ordenarConsultasPorIdAscendente,
   textoNormalizado,
   textoVacio,
+  validarCoherenciaConsultaFrontend,
 } from "./consultas-juridicas.utils";
 import { ModalMultiple, ModalSimple } from "./ConsultaSelectionModals";
 
@@ -562,6 +563,22 @@ export function ConsultasJuridicasForm() {
 
     if (!puedeEditarConsultas) {
       toast.error("No tienes permisos para editar consultas.");
+      return;
+    }
+
+    const errorCoherencia = validarCoherenciaConsultaFrontend({
+      form,
+      temas,
+      tipos,
+      asesores,
+      monitores,
+      estudiantes,
+    });
+
+    if (errorCoherencia) {
+      toast.error("Asignación o relación inválida", {
+        description: errorCoherencia,
+      });
       return;
     }
 

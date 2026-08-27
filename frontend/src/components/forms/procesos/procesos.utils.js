@@ -42,35 +42,6 @@ export function extraerLista(data) {
   return [];
 }
 
-/**
- * Lee la respuesta de una solicitud fetch y la parsea como JSON.
- * Maneja respuestas vacías y errores de parseo.
- * 
- * @async
- * @param {Response} response - Objeto Response de fetch
- * @returns {Promise<*>} Datos parseados o null si está vacío
- */
-export async function leerRespuesta(response) {
-  if (response.status === 204) return null;
-  const text = await response.text();
-  if (!text) return null;
-  try { return JSON.parse(text); } catch { return { mensaje: text }; }
-}
-
-/**
- * Extrae un mensaje de error de un payload de respuesta.
- * Busca en propiedades comunes (mensaje, message, error).
- * 
- * @param {*} payload - Objeto de respuesta del backend
- * @param {string} defecto - Mensaje por defecto si no se encuentra uno
- * @returns {string} Mensaje de error encontrado o mensaje por defecto
- */
-export function mensajeError(payload, defecto) {
-  if (!payload) return defecto;
-  if (typeof payload === "string") return payload || defecto;
-  return payload.mensaje || payload.message || payload.error || defecto;
-}
-
 export function ordenarActivosPrimero(lista) {
   return [...lista].sort((a, b) => {
     const activoA = a.activo === false ? 1 : 0;

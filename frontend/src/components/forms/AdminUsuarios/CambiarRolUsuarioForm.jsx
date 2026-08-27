@@ -1,6 +1,7 @@
 "use client"
 
 import { apiClient } from "@/lib/apiClient";
+import { apiResponse, readResponseBody } from "@/lib/api";
 /**
  * Formulario para cambiar el rol de un usuario del sistema.
  *
@@ -160,19 +161,12 @@ export function CambiarRolUsuarioForm() {
   }, [perfilDestino]);
 
   async function leerRespuesta(response) {
-    const text = await response.text();
-
-    if (!text) return null;
-
-    try {
-      return JSON.parse(text);
-    } catch {
-      return { mensaje: text };
-    }
+    const data = await readResponseBody(response);
+    return typeof data === "string" ? { mensaje: data } : data;
   }
 
   async function fetchJson(url) {
-    const response = await apiClient.request(url, { credentials: "include" });
+    const { response, data } = await apiResponse(url, { method: "GET" });
 
     if (response.status === 401) {
       router.replace("/");
@@ -183,7 +177,6 @@ export function CambiarRolUsuarioForm() {
       return [];
     }
 
-    const data = await response.json();
     return extraerLista(data);
   }
 

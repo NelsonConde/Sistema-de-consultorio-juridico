@@ -213,3 +213,7 @@ export async function leerRespuesta(response) {
 export function mensajeError(data, defecto) {
   return data?.mensaje || data?.message || data?.error || defecto
 }
+
+export function pathRespuesta(seguimientoId, respuestaId) {
+  return `tareas-${seguimientoId}-respuestas-${respuestaId}`
+}

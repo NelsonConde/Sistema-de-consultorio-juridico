@@ -1,6 +1,7 @@
 "use client"
 
 import { apiClient } from "@/lib/apiClient";
+import { readResponseBody } from "@/lib/api";
 /**
  * Formulario de eliminación y reactivación de registros.
  *
@@ -180,15 +181,8 @@ function detalleItem(item, tipo) {
  * @returns {Promise<any>} Resultado parseado.
  */
 async function leerRespuesta(response) {
-  const text = await response.text();
-
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { mensaje: text };
-  }
+  const data = await readResponseBody(response);
+  return typeof data === "string" ? { mensaje: data } : data;
 }
 
 /**

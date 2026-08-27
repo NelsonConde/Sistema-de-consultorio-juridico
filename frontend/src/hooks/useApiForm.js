@@ -1,4 +1,3 @@
-import { apiClient } from "@/lib/apiClient";
 /**
  * Hook para manejar envíos de formularios al backend.
  *
@@ -13,9 +12,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  apiResponse,
   getApiErrorDescription,
   getApiErrorTitle,
-  readResponseBody,
 } from "@/lib/api";
 
 /**
@@ -67,16 +66,13 @@ export function useApiForm({ endpoint, method = "POST", successMessage = "Regist
     setIsSubmitting(true);
 
     try {
-      const response = await apiClient.request(endpoint, {
+      const { response, data: payload } = await apiResponse(endpoint, {
         method,
-        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(data),
       });
-
-      const payload = await readResponseBody(response);
 
       if (response.status === 401) {
         toast.error("Sesión expirada", {

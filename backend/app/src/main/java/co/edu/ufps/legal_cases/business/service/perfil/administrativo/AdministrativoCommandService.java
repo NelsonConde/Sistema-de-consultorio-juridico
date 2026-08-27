@@ -24,6 +24,7 @@ import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
 import co.edu.ufps.legal_cases.security.service.account.usuario.UsuarioSistemaPerfilEstadoService;
 import co.edu.ufps.legal_cases.security.service.account.usuario.UsuarioSistemaRegistroService;
+import co.edu.ufps.legal_cases.security.service.invariant.administracion.AdministracionInvariantService;
 
 @Service
 public class AdministrativoCommandService {
@@ -36,6 +37,7 @@ public class AdministrativoCommandService {
     private final AdministrativoAccessService administrativoAccessService;
     private final AdministrativoValidator administrativoValidator;
     private final AdministrativoMapper administrativoMapper;
+    private final AdministracionInvariantService administracionInvariantService;
 
     public AdministrativoCommandService(
             AdministrativoRepository administrativoRepository,
@@ -45,7 +47,8 @@ public class AdministrativoCommandService {
             UsuarioSistemaPerfilEstadoService usuarioSistemaPerfilEstadoService,
             AdministrativoAccessService administrativoAccessService,
             AdministrativoValidator administrativoValidator,
-            AdministrativoMapper administrativoMapper) {
+            AdministrativoMapper administrativoMapper,
+            AdministracionInvariantService administracionInvariantService) {
         this.administrativoRepository = administrativoRepository;
         this.tipoDocumentoRepository = tipoDocumentoRepository;
         this.sedeRepository = sedeRepository;
@@ -54,6 +57,7 @@ public class AdministrativoCommandService {
         this.administrativoAccessService = administrativoAccessService;
         this.administrativoValidator = administrativoValidator;
         this.administrativoMapper = administrativoMapper;
+        this.administracionInvariantService = administracionInvariantService;
     }
 
     @Transactional
@@ -124,6 +128,7 @@ public class AdministrativoCommandService {
     public AdministrativoDTO cambiarEstado(Long id, Boolean activo) {
         administrativoAccessService.validarPuedeGestionarAdministradores();
 
+        administracionInvariantService.validarCambioEstadoAdministrativo(id, activo);
         Administrativo administrativo = buscarPorId(id);
 
         administrativoValidator.validarCambioEstado(administrativo, activo);
@@ -146,6 +151,7 @@ public class AdministrativoCommandService {
     public AdministrativoDTO cambiarDirectora(Long id, Boolean directora) {
         administrativoAccessService.validarPuedeGestionarAdministradores();
 
+        administracionInvariantService.validarCambioDirectora(id, directora);
         Administrativo administrativo = buscarPorId(id);
 
         administrativoValidator.validarCambioDirectora(administrativo, directora);
@@ -160,6 +166,7 @@ public class AdministrativoCommandService {
     public void eliminar(Long id) {
         administrativoAccessService.validarPuedeGestionarAdministradores();
 
+        administracionInvariantService.validarEliminacionAdministrativo(id);
         Administrativo administrativo = buscarPorId(id);
 
         // Se conserva el perfil y se desactiva porque tiene usuario del sistema

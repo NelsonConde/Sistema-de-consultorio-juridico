@@ -23,6 +23,7 @@ import { FormInput } from "../parts/FormInput";
 import { FormCheckbox } from "../parts/FormCheckbox";
 import { Button } from "@/components/ui/button";
 import { API_URL_BASE } from "@/lib/config";
+import { apiResponse } from "@/lib/api";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
 import { toast } from "sonner";
@@ -210,9 +211,8 @@ export function PersonaForm({ onSubmit, initialValues }) {
 
   async function verificarSesion() {
     try {
-      const res = await fetch(`${API_URL_BASE}/auth/me`, {
+      const { response: res, data } = await apiResponse(`${API_URL_BASE}/auth/me`, {
         method: "GET",
-        credentials: "include",
       });
 
       if (res.status === 401) {
@@ -225,7 +225,7 @@ export function PersonaForm({ onSubmit, initialValues }) {
         return;
       }
 
-      const user = await res.json();
+      const user = data;
 
       const puedeEntrarRecepcion = tienePermiso(
         user,

@@ -1,3 +1,5 @@
+import { readResponseBody } from "@/lib/api";
+
 export function normalizar(value) {
   return String(value || "")
     .trim()
@@ -90,15 +92,8 @@ export function paginaMarcada(page, permisosRol) {
 }
 
 export async function leerRespuesta(response) {
-  const text = await response.text();
-
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { mensaje: text };
-  }
+  const data = await readResponseBody(response);
+  return typeof data === "string" ? { mensaje: data } : data;
 }
 
 export function extraerLista(data) {

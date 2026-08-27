@@ -24,6 +24,30 @@ public class PermisoValidator {
         }
     }
 
+    public void validarSolicitudActualizacion(Long id, PermisoDTO dto) {
+        validarIdObligatorio(id);
+        validarDtoObligatorio(dto);
+
+        if (dto.getId() != null && !Objects.equals(dto.getId(), id)) {
+            throw new BusinessException(
+                    "No se permite cambiar el id del permiso");
+        }
+    }
+
+    public void validarIdObligatorio(Long id) {
+        if (id == null) {
+            throw new BusinessException(
+                    "El id del permiso es obligatorio");
+        }
+    }
+
+    public void validarEstadoObligatorio(Boolean activo) {
+        if (activo == null) {
+            throw new BusinessException(
+                    "El estado activo es obligatorio");
+        }
+    }
+
     public void validarActualizacion(Permiso permiso, PermisoDTO dto) {
         validarDtoObligatorio(dto);
 
