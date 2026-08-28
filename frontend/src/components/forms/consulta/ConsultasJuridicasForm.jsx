@@ -566,6 +566,44 @@ export function ConsultasJuridicasForm() {
       return;
     }
 
+    const camposObligatorios = [
+      [form.fecha, "La fecha es obligatoria"],
+      [form.descripcion, "La descripción es obligatoria"],
+      [form.hechos, "Los hechos son obligatorios"],
+      [form.pretensiones, "Las pretensiones son obligatorias"],
+      [form.conceptoJuridico, "El concepto jurídico es obligatorio"],
+      [form.tramite, "El trámite es obligatorio"],
+      [form.personaId, "La parte principal es obligatoria"],
+      [form.sedeId, "La sede es obligatoria"],
+      [form.areaId, "El área es obligatoria"],
+      [form.temaId, "El tema es obligatorio"],
+    ];
+
+    const campoFaltante = camposObligatorios.find(([valor]) =>
+      valor === null || valor === undefined || String(valor).trim() === ""
+    );
+
+    if (campoFaltante) {
+      toast.error(campoFaltante[1]);
+      return;
+    }
+
+    const limitesTexto = [
+      [form.descripcion, 500, "La descripción"],
+      [form.tramite, 100, "El trámite"],
+      [form.tipoViolencia, 100, "El tipo de violencia"],
+      [form.resultado, 100, "El resultado"],
+    ];
+
+    const limiteExcedido = limitesTexto.find(([valor, max]) =>
+      String(valor || "").length > max
+    );
+
+    if (limiteExcedido) {
+      toast.error(`${limiteExcedido[2]} no puede superar ${limiteExcedido[1]} caracteres`);
+      return;
+    }
+
     const errorCoherencia = validarCoherenciaConsultaFrontend({
       form,
       temas,
@@ -661,6 +699,32 @@ export function ConsultasJuridicasForm() {
     if (!estadoNormalizado || estadoNormalizado === "ARCHIVADO") {
       toast.error("Selecciona un estado operativo válido. Para archivar usa el botón Archivar.");
       return;
+    }
+
+    if (["ACTIVO", "EN_PROCESO", "URGENTE"].includes(estadoNormalizado)) {
+      if (!form.asesorId) {
+        toast.error("No se puede activar la consulta porque no tiene asesor asignado");
+        return;
+      }
+
+      if (!form.estudianteId) {
+        toast.error("No se puede activar la consulta porque no tiene estudiante asignado");
+        return;
+      }
+
+      const errorCoherencia = validarCoherenciaConsultaFrontend({
+        form,
+        temas,
+        tipos,
+        asesores,
+        monitores,
+        estudiantes,
+      });
+
+      if (errorCoherencia) {
+        toast.error("Asignación o relación inválida", { description: errorCoherencia });
+        return;
+      }
     }
 
     if (estadoNormalizado === "CERRADO") {
@@ -847,7 +911,7 @@ export function ConsultasJuridicasForm() {
                     <input value={labelEstadoConsulta(form.estado)} disabled className={ic} />
                   )}
                 </C>
-                <C label="Trámite *"><input name="tramite" value={form.tramite} onChange={handleChange} required placeholder="Ej: Conciliación" className={ic} /></C>
+                <C label="Trámite *"><input name="tramite" value={form.tramite} onChange={handleChange} required maxLength={100} placeholder="Ej: Conciliación" className={ic} /></C>
                 <C label="Sede *">
                   <select name="sedeId" value={form.sedeId} onChange={handleChange} required className={ic}>
                     <option value="">Seleccione</option>
@@ -872,8 +936,8 @@ export function ConsultasJuridicasForm() {
                     {tipos.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
                   </select>
                 </C>
-                <C label="Tipo de violencia"><input name="tipoViolencia" value={form.tipoViolencia} onChange={handleChange} placeholder="Opcional" className={ic} /></C>
-                <C label="Resultado"><input name="resultado" value={form.resultado} onChange={handleChange} placeholder="Opcional" className={ic} /></C>
+                <C label="Tipo de violencia"><input name="tipoViolencia" value={form.tipoViolencia} onChange={handleChange} maxLength={100} placeholder="Opcional" className={ic} /></C>
+                <C label="Resultado"><input name="resultado" value={form.resultado} onChange={handleChange} maxLength={100} placeholder="Opcional" className={ic} /></C>
 
                 {puedeAsignarResponsablesConsulta ? (
                   <>
@@ -970,7 +1034,7 @@ export function ConsultasJuridicasForm() {
                 </button>
               </C>
 
-              <C label="Descripción *"><textarea name="descripcion" value={form.descripcion} onChange={handleChange} required rows={3} placeholder="Resumen de la consulta" className={ic} /></C>
+              <C label="Descripción *"><textarea name="descripcion" value={form.descripcion} onChange={handleChange} required maxLength={500} rows={3} placeholder="Resumen de la consulta" className={ic} /></C>
               <C label="Hechos *"><textarea name="hechos" value={form.hechos} onChange={handleChange} required rows={3} placeholder="Descripción de los hechos" className={ic} /></C>
               <C label="Pretensiones *"><textarea name="pretensiones" value={form.pretensiones} onChange={handleChange} required rows={3} placeholder="Qué solicita el consultante" className={ic} /></C>
               <C label="Concepto jurídico *"><textarea name="conceptoJuridico" value={form.conceptoJuridico} onChange={handleChange} required rows={3} placeholder="Fundamento legal aplicable" className={ic} /></C>

@@ -175,6 +175,24 @@ export function AreaForm() {
    * @param {{ nombre: string }} data - Datos del formulario validados por react-hook-form.
    */
   const onSubmit = async (data) => {
+    const nombre = String(data?.nombre || "").trim()
+    const existente = areas.find(
+      (area) => String(area?.nombre || "").trim().toLowerCase() === nombre.toLowerCase()
+    )
+
+    if (existente && String(existente.id) !== String(editandoId || "")) {
+      toast.error("Ya existe un área con ese nombre")
+      return
+    }
+
+    if (editandoId) {
+      const actual = areas.find((area) => String(area.id) === String(editandoId))
+      if (actual && String(actual.nombre || "").trim().toLowerCase() === nombre.toLowerCase()) {
+        toast.info("No hay cambios para actualizar")
+        return
+      }
+    }
+
     setIsSubmitting(true)
 
     try {
@@ -257,7 +275,8 @@ export function AreaForm() {
           label="Nombre del área"
           register={register}
           errors={errors}
-          rules={{ required: "El nombre es obligatorio" }}
+          rules={{ required: "El nombre es obligatorio", maxLength: { value: 50, message: "El nombre no puede superar los 50 caracteres" } }}
+          maxLength={50}
         />
 
         <div className="flex gap-3">

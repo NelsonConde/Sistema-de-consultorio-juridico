@@ -29,6 +29,12 @@ import { getApiErrorDescription, getApiErrorTitle, readResponseBody } from "@/li
 
 import { VACIOS } from "./nueva-consulta.constants";
 import { numberArray, numberOrNull, textOrNull } from "./nueva-consulta.utils";
+import {
+  idNormalizado,
+  obtenerAreaIdAsesor,
+  obtenerAsesorIdEstudiante,
+  validarCoherenciaConsultaFrontend,
+} from "./consultas-juridicas.utils";
 import { ModalMultiple, ModalSimple } from "./ConsultaSelectionModals";
 
 export function NuevaConsultaForm() {
@@ -79,6 +85,28 @@ export function NuevaConsultaForm() {
     abierto: false,
     busqueda: "",
   });
+
+  const areaSeleccionadaId = useMemo(
+    () => idNormalizado(form.areaId),
+    [form.areaId]
+  );
+
+  const asesoresDisponiblesPorArea = useMemo(() => {
+    if (!areaSeleccionadaId) return [];
+
+    return asesores.filter(
+      (asesor) => obtenerAreaIdAsesor(asesor) === areaSeleccionadaId
+    );
+  }, [asesores, areaSeleccionadaId]);
+
+  const estudiantesDisponiblesPorAsesor = useMemo(() => {
+    if (!form.asesorId) return [];
+
+    const asesorId = idNormalizado(form.asesorId);
+    return estudiantes.filter(
+      (estudiante) => obtenerAsesorIdEstudiante(estudiante) === asesorId
+    );
+  }, [estudiantes, form.asesorId]);
 
   const asesorSeleccionado = useMemo(
     () => asesores.find((a) => String(a.id) === String(form.asesorId)) || null,
@@ -160,11 +188,11 @@ export function NuevaConsultaForm() {
     const t = modalAsesor.busqueda.toLowerCase();
 
     return t
-      ? asesores.filter((a) =>
+      ? asesoresDisponiblesPorArea.filter((a) =>
         `${a.nombre} ${a.documento}`.toLowerCase().includes(t)
       )
-      : asesores;
-  }, [asesores, modalAsesor.busqueda]);
+      : asesoresDisponiblesPorArea;
+  }, [asesoresDisponiblesPorArea, modalAsesor.busqueda]);
 
   const monitoresFiltrados = useMemo(() => {
     const t = modalMonitor.busqueda.toLowerCase();
@@ -180,11 +208,11 @@ export function NuevaConsultaForm() {
     const t = modalEstudiante.busqueda.toLowerCase();
 
     return t
-      ? estudiantes.filter((e) =>
+      ? estudiantesDisponiblesPorAsesor.filter((e) =>
         `${e.nombre} ${e.documento} ${e.codigo}`.toLowerCase().includes(t)
       )
-      : estudiantes;
-  }, [estudiantes, modalEstudiante.busqueda]);
+      : estudiantesDisponiblesPorAsesor;
+  }, [estudiantesDisponiblesPorAsesor, modalEstudiante.busqueda]);
 
   const parteFiltrada = useMemo(() => {
     const t = modalParte.busqueda.toLowerCase();
@@ -396,6 +424,8 @@ export function NuevaConsultaForm() {
       if (name === "areaId") {
         next.temaId = "";
         next.tipoId = "";
+        next.asesorId = "";
+        next.estudianteId = "";
       }
 
       if (name === "temaId") {
@@ -452,6 +482,42 @@ export function NuevaConsultaForm() {
     if (!form.conceptoJuridico?.trim()) faltantes.push("concepto jurídico");
 
     if (faltantes.length === 0) {
+      const errorCoherencia = validarCoherenciaConsultaFrontend({
+        form,
+        temas,
+        tipos,
+        asesores,
+        monitores,
+        estudiantes,
+      });
+
+      if (errorCoherencia) {
+        toast.error("Asignación o relación inválida", {
+          description: errorCoherencia,
+        });
+        return false;
+      }
+
+      if (String(form.descripcion || "").trim().length > 500) {
+        toast.error("La descripción no puede superar los 500 caracteres");
+        return false;
+      }
+
+      if (String(form.tramite || "").trim().length > 100) {
+        toast.error("El trámite no puede superar los 100 caracteres");
+        return false;
+      }
+
+      if (String(form.tipoViolencia || "").trim().length > 100) {
+        toast.error("El tipo de violencia no puede superar los 100 caracteres");
+        return false;
+      }
+
+      if (String(form.resultado || "").trim().length > 100) {
+        toast.error("El resultado no puede superar los 100 caracteres");
+        return false;
+      }
+
       return true;
     }
 
@@ -587,6 +653,7 @@ export function NuevaConsultaForm() {
               onChange={handleChange}
               required
               placeholder="Ej: Conciliación"
+              maxLength={100}
               className={ic}
             />
           </C>
@@ -671,6 +738,7 @@ export function NuevaConsultaForm() {
               value={form.tipoViolencia}
               onChange={handleChange}
               placeholder="Opcional"
+              maxLength={100}
               className={ic}
             />
           </C>
@@ -681,6 +749,7 @@ export function NuevaConsultaForm() {
               value={form.resultado}
               onChange={handleChange}
               placeholder="Opcional"
+              maxLength={100}
               className={ic}
             />
           </C>
@@ -690,6 +759,7 @@ export function NuevaConsultaForm() {
               <C label="Asesor">
                 <button
                   type="button"
+                  disabled={!form.areaId}
                   onClick={() =>
                     setModalAsesor((prev) => ({
                       ...prev,
@@ -748,6 +818,7 @@ export function NuevaConsultaForm() {
               <C label="Estudiante">
                 <button
                   type="button"
+                  disabled={!form.asesorId}
                   onClick={() =>
                     setModalEstudiante((prev) => ({
                       ...prev,
@@ -862,7 +933,7 @@ export function NuevaConsultaForm() {
             name="descripcion"
             value={form.descripcion}
             onChange={handleChange}
-            maxLength={2000}
+            maxLength={500}
             required
             rows={3}
             placeholder="Resumen de la consulta"
@@ -956,6 +1027,7 @@ export function NuevaConsultaForm() {
               setForm((prev) => ({
                 ...prev,
                 asesorId: item ? String(item.id) : "",
+                estudianteId: "",
               }));
               setModalAsesor({ abierto: false, busqueda: "" });
             }}

@@ -185,6 +185,31 @@ export function TipoForm() {
   }
 
   const onSubmit = async (data) => {
+    const nombre = String(data?.nombre || "").trim();
+    const temaId = String(data?.temaId || "");
+    const duplicado = tipos.find((tipo) =>
+      String(tipo?.nombre || "").trim().toLowerCase() === nombre.toLowerCase()
+      && String(tipo?.temaId ?? tipo?.tema?.id ?? "") === temaId
+      && String(tipo?.id) !== String(editandoId || "")
+    );
+
+    if (duplicado) {
+      toast.error("Ya existe un tipo con ese nombre en el tema seleccionado");
+      return;
+    }
+
+    if (editandoId) {
+      const actual = tipos.find((tipo) => String(tipo?.id) === String(editandoId));
+      const sinCambios = actual
+        && String(actual?.nombre || "").trim().toLowerCase() === nombre.toLowerCase()
+        && String(actual?.temaId ?? actual?.tema?.id ?? "") === temaId;
+
+      if (sinCambios) {
+        toast.info("No hay cambios para actualizar");
+        return;
+      }
+    }
+
     if (editandoId) {
       const res = await apiClient.request(`${API_URL_BASE}/tipos/${editandoId}`, {
         method: "PUT",
@@ -253,7 +278,8 @@ export function TipoForm() {
           label="Nombre del tipo"
           register={register}
           errors={errors}
-          rules={{ required: "El nombre es obligatorio" }}
+          rules={{ required: "El nombre es obligatorio", maxLength: { value: 80, message: "El nombre no puede superar los 80 caracteres" } }}
+          maxLength={80}
         />
 
         <FormSelect

@@ -27,7 +27,7 @@ import { apiResponse } from "@/lib/api";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
 import { toast } from "sonner";
-import { maxNumberRule, nonNegativeNumberRule, optionalEmailRule } from "@/lib/form-validation";
+import { digitsOnlyRule, maxLengthRule, maxNumberRule, nonNegativeNumberRule, optionalEmailRule } from "@/lib/form-validation";
 
 import {
   FORM_DEFAULTS,
@@ -456,9 +456,10 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="numeroDocumento"
                 label={requiredLabel("Número de documento")}
                 placeholder="Ej: 1090123456"
+                maxLength={30}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(30, "El número de documento no puede superar los 30 caracteres") }}
               />
 
               <FormInput
@@ -475,27 +476,30 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="ciudadExpedicion"
                 label={requiredLabel("Ciudad de expedición")}
                 placeholder="Ej: Cúcuta"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormInput
                 name="nombres"
                 label={requiredLabel("Nombres")}
                 placeholder="Ej: María Fernanda"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormInput
                 name="apellidos"
                 label={requiredLabel("Apellidos")}
                 placeholder="Ej: Pérez Gómez"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormInput
@@ -519,9 +523,10 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="nombreIdentitario"
                 label={requiredLabel("Nombre identitario")}
                 placeholder="Ej: No informa"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormSelectField
@@ -591,9 +596,10 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="grupoEtnico"
                 label={requiredLabel("Grupo étnico")}
                 placeholder="Ej: No informa"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormSelectField
@@ -609,18 +615,20 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="discapacidad"
                 label={requiredLabel("Discapacidad")}
                 placeholder="Ej: No informa"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormInput
                 name="caracterizacionPcd"
                 label={requiredLabel("Caracterización PCD")}
                 placeholder="Ej: No informa"
+                maxLength={150}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(150) }}
               />
 
               <div className="rounded-lg border bg-muted/20 p-3">
@@ -652,13 +660,22 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="telefono"
                 label={optionalLabel("Teléfono")}
                 placeholder="Ej: 3001234567"
+                digitsOnly
+                maxLength={30}
                 register={register}
                 errors={errors}
                 rules={{
-                  validate: (value) =>
-                    String(value || "").trim() ||
-                    String(formValues.correo || "").trim() ||
-                    "Debe registrar al menos un teléfono o un correo electrónico",
+                  ...digitsOnlyRule({ maxLength: 30 }),
+                  validate: {
+                    digitos: (value) =>
+                      !String(value || "").trim() ||
+                      /^\d+$/.test(String(value)) ||
+                      "El teléfono solo puede contener números",
+                    contacto: (value) =>
+                      String(value || "").trim() ||
+                      String(formValues.correo || "").trim() ||
+                      "Debe registrar al menos un teléfono o un correo electrónico",
+                  },
                 }}
               />
 
@@ -667,10 +684,15 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 label={optionalLabel("Correo electrónico")}
                 placeholder="Ej: persona@example.com"
                 type="email"
+                maxLength={120}
                 register={register}
                 errors={errors}
                 rules={{
                   ...optionalEmailRule(),
+                  maxLength: {
+                    value: 120,
+                    message: "El correo no puede superar los 120 caracteres",
+                  },
                   validate: {
                     formato: (value) =>
                       optionalEmailRule().validate(value),
@@ -722,27 +744,30 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="direccion"
                 label={requiredLabel("Dirección")}
                 placeholder="Ej: Calle 10 # 5-20"
+                maxLength={150}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(150) }}
               />
 
               <FormInput
                 name="comuna"
                 label={requiredLabel("Comuna")}
                 placeholder="Ej: No informa"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormInput
                 name="localidad"
                 label={requiredLabel("Localidad")}
                 placeholder="Ej: No informa"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormInput
@@ -765,9 +790,10 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="tipoVivienda"
                 label={requiredLabel("Tipo de vivienda")}
                 placeholder="Ej: Casa"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormSelectField
@@ -783,9 +809,10 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="tenencia"
                 label={requiredLabel("Tenencia de la vivienda")}
                 placeholder="Ej: Arriendo"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormInput
@@ -884,27 +911,31 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="cargo"
                 label={requiredLabel("Cargo")}
                 placeholder="Ej: No informa"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormInput
                 name="direccionEmpresa"
                 label={requiredLabel("Dirección de la empresa")}
                 placeholder="Ej: No informa"
+                maxLength={150}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(150) }}
               />
 
               <FormInput
                 name="telefonoEmpresa"
                 label={requiredLabel("Teléfono de la empresa")}
-                placeholder="Ej: No informa"
+                placeholder="Ej: 6071234567"
+                digitsOnly
+                maxLength={30}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ ...digitsOnlyRule({ required: true, maxLength: 30 }) }}
               />
             </Seccion>
           )}
@@ -922,24 +953,50 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="nombreCompletoAcudiente"
                 label={optionalLabel("Nombre completo")}
                 placeholder="Ej: Ana Pérez"
+                maxLength={150}
                 register={register}
                 errors={errors}
+                rules={{
+                  required: esMenorEdad ? "Si la persona es menor de edad, el nombre del acudiente es obligatorio" : false,
+                  ...maxLengthRule(150),
+                }}
               />
 
               <FormInput
                 name="relacionAcudiente"
                 label={optionalLabel("Relación / parentesco")}
                 placeholder="Ej: Madre"
+                maxLength={100}
                 register={register}
                 errors={errors}
+                rules={{
+                  required: esMenorEdad ? "Si la persona es menor de edad, la relación del acudiente es obligatoria" : false,
+                  ...maxLengthRule(100),
+                }}
               />
 
               <FormInput
                 name="telefonoAcudiente"
                 label={optionalLabel("Teléfono")}
                 placeholder="Ej: 3001234567"
+                digitsOnly
+                maxLength={30}
                 register={register}
                 errors={errors}
+                rules={{
+                  ...digitsOnlyRule({ maxLength: 30 }),
+                  validate: {
+                    digitos: (value) =>
+                      !String(value || "").trim() ||
+                      /^\d+$/.test(String(value)) ||
+                      "El teléfono solo puede contener números",
+                    contactoAcudiente: (value) =>
+                      !esMenorEdad ||
+                      String(value || "").trim() ||
+                      String(formValues.correoAcudiente || "").trim() ||
+                      "Si la persona es menor de edad, debe informar teléfono o correo del acudiente",
+                  },
+                }}
               />
 
               <FormInput
@@ -947,17 +1004,33 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 label={optionalLabel("Correo electrónico")}
                 placeholder="Ej: persona@example.com"
                 type="email"
+                maxLength={120}
                 register={register}
                 errors={errors}
-                rules={optionalEmailRule()}
+                rules={{
+                  maxLength: {
+                    value: 120,
+                    message: "El correo del acudiente no puede superar los 120 caracteres",
+                  },
+                  validate: {
+                    formato: (value) => optionalEmailRule().validate(value),
+                    contactoAcudiente: (value) =>
+                      !esMenorEdad ||
+                      String(value || "").trim() ||
+                      String(formValues.telefonoAcudiente || "").trim() ||
+                      "Si la persona es menor de edad, debe informar teléfono o correo del acudiente",
+                  },
+                }}
               />
 
               <FormInput
                 name="direccionAcudiente"
                 label={optionalLabel("Dirección")}
                 placeholder="Ej: Calle 10 # 5-20"
+                maxLength={150}
                 register={register}
                 errors={errors}
+                rules={{ ...maxLengthRule(150) }}
               />
             </Seccion>
           )}
@@ -971,18 +1044,20 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="comoSeEntero"
                 label={requiredLabel("¿Cómo se enteró de nuestros servicios?")}
                 placeholder="Ej: Universidad"
+                maxLength={150}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(150) }}
               />
 
               <FormInput
                 name="relacionConUniversidad"
                 label={requiredLabel("Relación con la Universidad")}
                 placeholder="Ej: No informa"
+                maxLength={150}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(150) }}
               />
             </Seccion>
           )}

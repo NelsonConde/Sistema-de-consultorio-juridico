@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { API_URL_BASE } from "@/lib/config";
 import { PERMISOS } from "@/lib/permission";
 import { tieneAlgunPermiso, tienePermiso } from "@/lib/authz";
+import { digitsOnlyRule, maxLengthRule, requiredEmailRule } from "@/lib/form-validation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImportarEstudiantesForm } from "../usuarios/ImportarEstudiantesForm";
 
@@ -453,9 +454,10 @@ export function UsuarioSistemaForm() {
                   <FormInput
                     name="nombre"
                     label="Nombre"
+                    maxLength={150}
                     register={register}
                     errors={errors}
-                    rules={{ required: REQUIRED }}
+                    rules={{ required: REQUIRED, ...maxLengthRule(150) }}
                   />
 
                   {renderTipoDocumento()}
@@ -463,41 +465,48 @@ export function UsuarioSistemaForm() {
                   <FormInput
                     name="documento"
                     label="Documento"
+                    maxLength={30}
                     register={register}
                     errors={errors}
-                    rules={{ required: REQUIRED }}
+                    rules={{ required: REQUIRED, ...maxLengthRule(30) }}
                   />
 
                   <FormInput
                     name="email"
                     label="Email"
+                    maxLength={120}
                     register={register}
                     errors={errors}
-                    rules={{ required: REQUIRED }}
+                    rules={{ ...requiredEmailRule(), ...maxLengthRule(120) }}
                   />
 
                   <FormInput
                     name="telefono"
                     label="Teléfono"
+                    digitsOnly
+
+                    maxLength={30}
                     register={register}
                     errors={errors}
-                    rules={{ required: REQUIRED }}
+                    rules={{ ...digitsOnlyRule({ required: true, maxLength: 30 }) }}
                   />
 
                   <FormInput
                     name="usuario"
                     label="Usuario"
+                    maxLength={50}
                     register={register}
                     errors={errors}
-                    rules={{ required: REQUIRED }}
+                    rules={{ required: REQUIRED, ...maxLengthRule(50) }}
                   />
 
                   <FormInput
                     name="codigo"
                     label="Código"
+                    maxLength={30}
                     register={register}
                     errors={errors}
-                    rules={{ required: REQUIRED }}
+                    rules={{ required: REQUIRED, ...maxLengthRule(30) }}
                   />
 
                   {sedes.length > 0 ? (
@@ -546,9 +555,10 @@ export function UsuarioSistemaForm() {
                 <FormInput
                   name="nombre"
                   label="Nombre"
+                  maxLength={150}
                   register={register}
                   errors={errors}
-                  rules={{ required: REQUIRED }}
+                  rules={{ required: REQUIRED, ...maxLengthRule(150) }}
                 />
 
                 {renderTipoDocumento()}
@@ -556,41 +566,47 @@ export function UsuarioSistemaForm() {
                 <FormInput
                   name="documento"
                   label="Documento"
+                  maxLength={30}
                   register={register}
                   errors={errors}
-                  rules={{ required: REQUIRED }}
+                  rules={{ required: REQUIRED, ...maxLengthRule(30) }}
                 />
 
                 <FormInput
                   name="email"
                   label="Email"
+                  maxLength={120}
                   register={register}
                   errors={errors}
-                  rules={{ required: REQUIRED }}
+                  rules={{ ...requiredEmailRule(), ...maxLengthRule(120) }}
                 />
 
                 <FormInput
                   name="telefono"
                   label="Teléfono"
+                  digitsOnly
+                  maxLength={30}
                   register={register}
                   errors={errors}
-                  rules={{ required: REQUIRED }}
+                  rules={{ ...digitsOnlyRule({ required: true, maxLength: 30 }) }}
                 />
 
                 <FormInput
                   name="usuario"
                   label="Usuario"
+                  maxLength={50}
                   register={register}
                   errors={errors}
-                  rules={{ required: REQUIRED }}
+                  rules={{ required: REQUIRED, ...maxLengthRule(50) }}
                 />
 
                 <FormInput
                   name="codigo"
                   label="Código"
+                  maxLength={30}
                   register={register}
                   errors={errors}
-                  rules={{ required: REQUIRED }}
+                  rules={{ required: REQUIRED, ...maxLengthRule(30) }}
                 />
 
                 {sedes.length > 0 ? (

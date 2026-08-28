@@ -269,11 +269,22 @@ export function NuevoProcesoForm() {
   const puedeGestionar = puedeGestionarProcesos(user);
 
   const especialidadesFiltradas = useMemo(() => {
-    if (!form.organoControlId) return especialidades;
+    if (!form.organoControlId) return [];
     return especialidades.filter(
       (e) => Number(e.organoControlId) === Number(form.organoControlId)
     );
   }, [especialidades, form.organoControlId]);
+
+  const consultasOperativas = useMemo(() =>
+    consultas.filter((consulta) => {
+      const estado = String(consulta?.estado || consulta?.estadoConsulta || "")
+        .trim()
+        .toUpperCase();
+      return estado !== "CERRADO" && estado !== "CERRADA"
+        && estado !== "ARCHIVADO" && estado !== "ARCHIVADA";
+    }),
+    [consultas]
+  );
 
   useEffect(() => { verificarYCargar(); }, []);
 
@@ -354,6 +365,17 @@ export function NuevoProcesoForm() {
       return false;
     }
 
+    if (form.especialidadId && form.organoControlId) {
+      const especialidad = especialidades.find(
+        (item) => Number(item.id) === Number(form.especialidadId)
+      );
+
+      if (!especialidad || Number(especialidad.organoControlId) !== Number(form.organoControlId)) {
+        toast.error("La especialidad no pertenece al órgano de control seleccionado");
+        return false;
+      }
+    }
+
     return true;
   }
 
@@ -432,7 +454,7 @@ export function NuevoProcesoForm() {
             <CampoConsulta
               label="Consulta"
               consultaId={form.consultaId}
-              consultas={consultas}
+              consultas={consultasOperativas}
               onSeleccionar={(v) => actualizarCampo("consultaId", v)}
               required
             />
@@ -452,7 +474,7 @@ export function NuevoProcesoForm() {
               label="Especialidad"
               value={form.especialidadId}
               onChange={(v) => actualizarCampo("especialidadId", v)}
-              disabled={especialidadesFiltradas.length === 0}
+              disabled={!form.organoControlId || especialidadesFiltradas.length === 0}
             >
               <option value="">Sin especialidad</option>
               {especialidadesFiltradas.map((e) => (

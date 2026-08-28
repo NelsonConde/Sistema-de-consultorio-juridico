@@ -253,7 +253,7 @@ export function ModalEdicion({
             label="Especialidad"
             value={form.especialidadId}
             onChange={(v) => actualizarCampo("especialidadId", v)}
-            disabled={especialidadesFiltradas.length === 0}
+            disabled={!form.organoControlId || especialidadesFiltradas.length === 0}
           >
             <option value="">Sin especialidad</option>
             {especialidadesFiltradas.map((e) => (

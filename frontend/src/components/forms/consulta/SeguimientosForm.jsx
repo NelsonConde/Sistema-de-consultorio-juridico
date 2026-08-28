@@ -458,6 +458,25 @@ export function SeguimientosForm() {
       return
     }
 
+    if (formTarea.descripcion.trim().length > 200) {
+      toast.error("La descripción del seguimiento no puede superar 200 caracteres")
+      return
+    }
+
+    if (formTarea.fechaEntrega) {
+      const hoy = new Date()
+      const fechaHoy = [
+        hoy.getFullYear(),
+        String(hoy.getMonth() + 1).padStart(2, "0"),
+        String(hoy.getDate()).padStart(2, "0"),
+      ].join("-")
+
+      if (formTarea.fechaEntrega < fechaHoy) {
+        toast.error("La fecha de entrega no puede ser anterior a la fecha actual")
+        return
+      }
+    }
+
     if (formTarea.diasNotificacion !== "" && Number(formTarea.diasNotificacion) < 0) {
       toast.error("Los días de notificación no pueden ser negativos")
       return
@@ -726,6 +745,11 @@ export function SeguimientosForm() {
       return
     }
 
+    if (data.contenido.trim().length > 1000) {
+      toast.error("La respuesta del seguimiento no puede superar 1000 caracteres")
+      return
+    }
+
     try {
       setSubiendoRespuesta(true)
 
@@ -781,8 +805,15 @@ export function SeguimientosForm() {
       return
     }
 
-    if (!formDecision.observacionRevision.trim()) {
-      toast.error("Escribe una observación")
+    const observacionRevision = formDecision.observacionRevision.trim()
+
+    if (formDecision.estado === "RECHAZADA" && !observacionRevision) {
+      toast.error("La observación de revisión es obligatoria al rechazar una respuesta")
+      return
+    }
+
+    if (observacionRevision.length > 500) {
+      toast.error("La observación de revisión no puede superar 500 caracteres")
       return
     }
 
@@ -793,7 +824,7 @@ export function SeguimientosForm() {
         method: "PATCH",
         body: JSON.stringify({
           estado: formDecision.estado,
-          observacionRevision: formDecision.observacionRevision.trim(),
+          observacionRevision,
         }),
       })
 
@@ -1291,6 +1322,7 @@ export function SeguimientosForm() {
                   name="descripcion"
                   value={formTarea.descripcion}
                   onChange={handleTareaChange}
+                  maxLength={200}
                   rows={4}
                   placeholder="Describe la tarea, compromiso o actividad a realizar..."
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -1586,7 +1618,13 @@ export function SeguimientosForm() {
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium">Respuesta</label>
                 <textarea
-                  {...register("contenido")}
+                  {...register("contenido", {
+                    maxLength: {
+                      value: 1000,
+                      message: "La respuesta del seguimiento no puede superar 1000 caracteres",
+                    },
+                  })}
+                  maxLength={1000}
                   rows={4}
                   placeholder="Escribe tu respuesta..."
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -1648,6 +1686,7 @@ export function SeguimientosForm() {
               <label className="text-sm font-medium">Observación</label>
               <textarea
                 value={formDecision.observacionRevision}
+                maxLength={500}
                 onChange={(event) =>
                   setFormDecision((prev) => ({
                     ...prev,

@@ -212,6 +212,31 @@ export function TemaForm() {
       return;
     }
 
+    const nombre = String(data?.nombre || "").trim();
+    const areaId = String(data?.areaId || "");
+    const duplicado = temas.find((tema) =>
+      String(tema?.nombre || "").trim().toLowerCase() === nombre.toLowerCase()
+      && String(tema?.areaId ?? tema?.area?.id ?? "") === areaId
+      && String(tema?.id) !== String(editandoId || "")
+    );
+
+    if (duplicado) {
+      toast.error("Ya existe un tema con ese nombre en el área seleccionada");
+      return;
+    }
+
+    if (editandoId) {
+      const actual = temas.find((tema) => String(tema?.id) === String(editandoId));
+      const sinCambios = actual
+        && String(actual?.nombre || "").trim().toLowerCase() === nombre.toLowerCase()
+        && String(actual?.areaId ?? actual?.area?.id ?? "") === areaId;
+
+      if (sinCambios) {
+        toast.info("No hay cambios para actualizar");
+        return;
+      }
+    }
+
     if (editandoId) {
       const res = await apiClient.request(`${API_URL_BASE}/temas/${editandoId}`, {
         method: "PUT",
@@ -271,7 +296,8 @@ export function TemaForm() {
           label="Nombre"
           register={register}
           errors={errors}
-          rules={{ required: "El nombre es obligatorio" }}
+          rules={{ required: "El nombre es obligatorio", maxLength: { value: 80, message: "El nombre no puede superar los 80 caracteres" } }}
+          maxLength={80}
         />
 
         <FormSelect
