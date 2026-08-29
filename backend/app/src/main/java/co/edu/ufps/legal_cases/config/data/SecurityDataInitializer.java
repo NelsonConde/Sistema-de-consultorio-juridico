@@ -14,9 +14,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 
 import co.edu.ufps.legal_cases.security.constant.PermisoNombre;
+import co.edu.ufps.legal_cases.security.model.access.CodigoRolBase;
 import co.edu.ufps.legal_cases.security.model.access.Permiso;
 import co.edu.ufps.legal_cases.security.model.access.Rol;
-import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
 import co.edu.ufps.legal_cases.security.repository.access.PermisoRepository;
 import co.edu.ufps.legal_cases.security.repository.access.RolRepository;
 
@@ -31,11 +31,13 @@ public class SecurityDataInitializer {
     CommandLineRunner initSecurityData(
             PermisoRepository permisoRepository,
             RolRepository rolRepository) {
+
         return args -> inicializarDatosMinimos(permisoRepository, rolRepository);
     }
 
     /**
-     * Inicializa datos mínimos de seguridad sin sobrescribir la matriz real de permisos.
+     * Inicializa datos mínimos de seguridad sin sobrescribir la matriz real de
+     * permisos.
      *
      * Importante:
      * - No borra permisos.
@@ -68,7 +70,9 @@ public class SecurityDataInitializer {
                     try {
                         return (String) field.get(null);
                     } catch (IllegalAccessException e) {
-                        throw new IllegalStateException("No se pudo leer un permiso declarado en PermisoNombre", e);
+                        throw new IllegalStateException(
+                                "No se pudo leer un permiso declarado en PermisoNombre",
+                                e);
                     }
                 })
                 .distinct()
@@ -95,71 +99,133 @@ public class SecurityDataInitializer {
     }
 
     private void crearRolesBaseSiNoExisten(RolRepository rolRepository) {
-        crearRolSiNoExiste(
+        crearRolBaseSiNoExiste(
                 rolRepository,
+                CodigoRolBase.ADMINISTRADOR,
                 "Administrador",
-                "Rol administrador del sistema",
-                TipoPerfilUsuario.ADMINISTRATIVO);
+                "Rol administrador del sistema");
 
-        crearRolSiNoExiste(
+        crearRolBaseSiNoExiste(
                 rolRepository,
+                CodigoRolBase.ASESOR,
                 "Asesor",
-                "Rol asesor del consultorio juridico",
-                TipoPerfilUsuario.ASESOR);
+                "Rol asesor del consultorio juridico");
 
-        crearRolSiNoExiste(
+        crearRolBaseSiNoExiste(
                 rolRepository,
+                CodigoRolBase.ESTUDIANTE,
                 "Estudiante",
-                "Rol estudiante del consultorio juridico",
-                TipoPerfilUsuario.ESTUDIANTE);
+                "Rol estudiante del consultorio juridico");
 
-        crearRolSiNoExiste(
+        crearRolBaseSiNoExiste(
                 rolRepository,
+                CodigoRolBase.MONITOR,
                 "Monitor",
-                "Rol monitor del consultorio juridico",
-                TipoPerfilUsuario.MONITOR);
+                "Rol monitor del consultorio juridico");
 
-        crearRolSiNoExiste(
+        crearRolBaseSiNoExiste(
                 rolRepository,
+                CodigoRolBase.CONCILIADOR,
                 "Conciliador",
-                "Rol conciliador del consultorio juridico",
-                TipoPerfilUsuario.CONCILIADOR);
+                "Rol conciliador del consultorio juridico");
     }
 
-    private Rol crearRolSiNoExiste(
+    /**
+     * Resuelve los roles base mediante su código estable.
+     *
+     * El nombre solo se utiliza como valor inicial al crear el rol en una base
+     * nueva. Una vez creado, el rol base se identifica únicamente mediante
+     * CodigoRolBase, por lo que puede renombrarse sin perder su identidad.
+     *
+     * Una base existente que todavía no haya adoptado codigo_base no se corrige
+     * automáticamente por nombre. En ese caso se falla de forma explícita para
+     * evitar adoptar o duplicar una fila incorrecta.
+     */
+    private Rol crearRolBaseSiNoExiste(
             RolRepository rolRepository,
+            CodigoRolBase codigoBase,
             String nombre,
-            String descripcion,
-            TipoPerfilUsuario tipoPerfil) {
+            String descripcion) {
 
         String nombreNormalizado = normalizarTexto(nombre);
         String descripcionNormalizada = normalizarTexto(descripcion);
 
-        return rolRepository.findByNombreIgnoreCase(nombreNormalizado)
-                .map(rolExistente -> completarTipoPerfilSiFalta(rolRepository, rolExistente, tipoPerfil))
+        return rolRepository.findByCodigoBase(codigoBase)
+                .map(rolExistente -> validarRolBaseExistente(
+                        rolRepository,
+                        rolExistente,
+                        codigoBase))
                 .orElseGet(() -> {
+
+                    /*
+                     * Si el nombre esperado ya existe pero no tiene el código base,
+                     * la BD requiere la adopción explícita de SEC-10.
+                     *
+                     * No se adopta automáticamente por nombre porque el nombre es
+                     * una etiqueta editable y no una identidad funcional.
+                     */
+                    rolRepository.findByNombreIgnoreCase(nombreNormalizado)
+                            .ifPresent(rolExistente -> {
+                                throw new IllegalStateException(
+                                        "SEC-10: existe el rol '"
+                                                + nombreNormalizado
+                                                + "' pero no está identificado como "
+                                                + codigoBase
+                                                + ". Debe ejecutarse la adopción de roles base "
+                                                + "antes de iniciar la aplicación.");
+                            });
+
                     Rol rol = new Rol();
                     rol.setNombre(nombreNormalizado);
                     rol.setDescripcion(descripcionNormalizada);
-                    rol.setTipoPerfil(tipoPerfil);
+                    rol.setTipoPerfil(codigoBase.getTipoPerfil());
+                    rol.setCodigoBase(codigoBase);
                     rol.setActivo(true);
 
-                    log.info("Creando rol base faltante: {}", nombreNormalizado);
+                    log.info(
+                            "Creando rol base faltante: codigo={}, tipoPerfil={}",
+                            codigoBase,
+                            codigoBase.getTipoPerfil());
+
                     return rolRepository.save(rol);
                 });
     }
 
-    private Rol completarTipoPerfilSiFalta(
+    /**
+     * Verifica que la identidad estable del rol base sea coherente con el
+     * tipo de perfil definido por el sistema.
+     *
+     * No modifica nombre, descripción ni permisos del rol existente.
+     */
+    private Rol validarRolBaseExistente(
             RolRepository rolRepository,
             Rol rol,
-            TipoPerfilUsuario tipoPerfil) {
+            CodigoRolBase codigoBase) {
 
-        if (rol.getTipoPerfil() != null) {
-            return rol;
+        if (rol.getTipoPerfil() != codigoBase.getTipoPerfil()) {
+            throw new IllegalStateException(
+                    "SEC-10: el rol base "
+                            + codigoBase
+                            + " tiene un tipoPerfil incompatible. Esperado: "
+                            + codigoBase.getTipoPerfil()
+                            + ", encontrado: "
+                            + rol.getTipoPerfil());
         }
 
-        rol.setTipoPerfil(tipoPerfil);
-        log.info("Completando tipoPerfil faltante para rol: {}", rol.getNombre());
-        return rolRepository.save(rol);
+        /*
+         * Un rol base forma parte de la configuración mínima requerida
+         * por el sistema y debe permanecer activo.
+         */
+        if (Boolean.FALSE.equals(rol.getActivo())) {
+            rol.setActivo(true);
+
+            log.warn(
+                    "Reactivando rol base requerido por el sistema: {}",
+                    codigoBase);
+
+            return rolRepository.save(rol);
+        }
+
+        return rol;
     }
 }
