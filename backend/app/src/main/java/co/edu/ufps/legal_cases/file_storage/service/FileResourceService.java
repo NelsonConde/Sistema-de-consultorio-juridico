@@ -1,6 +1,8 @@
 package co.edu.ufps.legal_cases.file_storage.service;
 
 import java.time.Duration;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
 import java.util.Objects;
@@ -14,6 +16,7 @@ import co.edu.ufps.legal_cases.file_storage.dto.FileDownloadResponse;
 import co.edu.ufps.legal_cases.file_storage.dto.FileResponse;
 import co.edu.ufps.legal_cases.file_storage.dto.FileUploadRequest;
 import co.edu.ufps.legal_cases.file_storage.dto.FileUploadResponse;
+import co.edu.ufps.legal_cases.file_storage.exception.FileStorageException;
 import co.edu.ufps.legal_cases.file_storage.model.FileAsset;
 import co.edu.ufps.legal_cases.file_storage.model.FileResourceType;
 import co.edu.ufps.legal_cases.security.service.context.UsuarioActualService;
@@ -55,6 +58,9 @@ public class FileResourceService {
             FileUploadRequest request) {
         authorizationService.authorizeUpload(type, resourceId, parentId);
         validationService.validateMetadata(request.fileName(), request.size(), request.contentType());
+        if (type == FileResourceType.CONCILIACION) {
+            validationService.validatePdfMetadata(request.fileName(), request.contentType());
+        }
         validationService.validateChecksum(request.checksum());
 
         FileAsset asset = fileAssetService.startUpload(
@@ -89,7 +95,11 @@ public class FileResourceService {
             Long resourceId,
             Long parentId,
             MultipartFile file) {
-        validationService.validate(file);
+        if (type == FileResourceType.CONCILIACION) {
+            validationService.validatePdf(file);
+        } else {
+            validationService.validate(file);
+        }
         FileAsset asset = fileAssetService.startUpload(
                 type,
                 resourceId,
@@ -132,6 +142,10 @@ public class FileResourceService {
         if (metadata.contentLength() != asset.getSize()) {
             fileAssetService.markUploadFailed(uploadId);
             throw new IllegalArgumentException("El tamaño del archivo no coincide con la carga declarada");
+        }
+
+        if (authorizationService.parseType(asset.getResourceType()) == FileResourceType.CONCILIACION) {
+            validateSignedConciliationPdf(asset, uploadId);
         }
 
         FileAsset ready = fileAssetService.markReady(
@@ -202,5 +216,27 @@ public class FileResourceService {
                 asset.getContentType(),
                 status,
                 asset.getCreatedAt());
+    }
+
+    private void validateSignedConciliationPdf(FileAsset asset, UUID uploadId) {
+        try (InputStream input = storageProvider.load(asset.getObjectKey()).getInputStream()) {
+            validationService.validatePdfContent(asset.getOriginalFileName(), asset.getContentType(), input);
+        } catch (IOException ex) {
+            try {
+                storageProvider.delete(asset.getObjectKey());
+            } catch (RuntimeException cleanup) {
+                ex.addSuppressed(cleanup);
+            }
+            fileAssetService.markUploadFailed(uploadId);
+            throw new FileStorageException("No se pudo validar el PDF de conciliación", ex);
+        } catch (RuntimeException ex) {
+            try {
+                storageProvider.delete(asset.getObjectKey());
+            } catch (RuntimeException cleanup) {
+                ex.addSuppressed(cleanup);
+            }
+            fileAssetService.markUploadFailed(uploadId);
+            throw ex;
+        }
     }
 }

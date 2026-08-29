@@ -1,5 +1,9 @@
 package co.edu.ufps.legal_cases.file_storage.service;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Locale;
+
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -50,6 +54,47 @@ public class FileValidationService {
 
     public long maxFileSize() {
         return MAX_FILE_SIZE;
+    }
+
+    /** Regla de dominio para solicitud y acta de conciliación. */
+    public void validatePdf(MultipartFile file) {
+        validate(file);
+        validatePdfMetadata(file.getOriginalFilename(), file.getContentType());
+        try (InputStream input = file.getInputStream()) {
+            validatePdfSignature(input);
+        } catch (IOException ex) {
+            throw new BusinessException("No se pudo validar el contenido del PDF");
+        }
+    }
+
+    /** Verifica el contenido de un PDF que llegó mediante una URL firmada. */
+    public void validatePdfContent(String fileName, String contentType, InputStream input) {
+        validatePdfMetadata(fileName, contentType);
+        try {
+            validatePdfSignature(input);
+        } catch (IOException ex) {
+            throw new BusinessException("No se pudo validar el contenido del PDF");
+        }
+    }
+
+    public void validatePdfMetadata(String fileName, String contentType) {
+        String normalizedName = fileName == null ? "" : fileName.toLowerCase(Locale.ROOT);
+        if (!normalizedName.endsWith(".pdf") || !"application/pdf".equalsIgnoreCase(contentType)) {
+            throw new BusinessException("La solicitud y el acta de conciliación deben ser archivos PDF");
+        }
+    }
+
+    private static void validatePdfSignature(InputStream input) throws IOException {
+        byte[] header = input.readNBytes(5);
+        byte[] pdfHeader = "%PDF-".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        if (header.length != pdfHeader.length) {
+            throw new BusinessException("El contenido no corresponde a un PDF");
+        }
+        for (int index = 0; index < pdfHeader.length; index++) {
+            if (header[index] != pdfHeader[index]) {
+                throw new BusinessException("El contenido no corresponde a un PDF");
+            }
+        }
     }
 
 }

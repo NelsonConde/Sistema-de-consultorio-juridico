@@ -3,6 +3,8 @@ package co.edu.ufps.legal_cases.file_storage.service;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.nio.charset.StandardCharsets;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -43,5 +45,29 @@ class FileValidationServiceTest {
                 "file", "archivo.txt", "text/plain", new byte[0]);
 
         assertThrows(BusinessException.class, () -> service.validate(file));
+    }
+
+    @Test
+    void aceptaPdfValidoParaConciliacion() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "acta.pdf", "application/pdf", "%PDF-1.7".getBytes(StandardCharsets.US_ASCII));
+
+        assertDoesNotThrow(() -> service.validatePdf(file));
+    }
+
+    @Test
+    void rechazaArchivoNoPdfParaConciliacion() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "acta.txt", "text/plain", "evidencia".getBytes(StandardCharsets.UTF_8));
+
+        assertThrows(BusinessException.class, () -> service.validatePdf(file));
+    }
+
+    @Test
+    void rechazaPdfConFirmaInvalidaParaConciliacion() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "acta.pdf", "application/pdf", "contenido falso".getBytes(StandardCharsets.UTF_8));
+
+        assertThrows(BusinessException.class, () -> service.validatePdf(file));
     }
 }
