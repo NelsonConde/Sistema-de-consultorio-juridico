@@ -1,7 +1,7 @@
 /**
  * Componente de carga de archivos con drag & drop y validación.
  *
- * Valida tipo MIME y tamaño máximo antes de agregar cada archivo.
+ * Valida tamaño máximo antes de agregar cada archivo.
  * Muestra la lista de archivos seleccionados con opción de eliminar individualmente.
  *
  * @module components/forms/parts/FormFileUpload
@@ -11,57 +11,20 @@ import { File as FileIcon, UploadCloud, X } from "lucide-react";
 import React from "react";
 import { toast } from "sonner";
 
-/** Tipos MIME permitidos por defecto. */
-const TIPOS_PERMITIDOS = [
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "text/plain",
-];
-
-const EXTENSIONES_PERMITIDAS = new Set([
-  "pdf",
-  "png",
-  "jpg",
-  "jpeg",
-  "doc",
-  "docx",
-  "xls",
-  "xlsx",
-  "txt",
-]);
-
 /** Tamaño máximo por archivo en bytes (10 MB). */
 const MAX_TAMANO_BYTES = 10 * 1024 * 1024;
 
 /**
- * Valida un archivo según tipo MIME y tamaño máximo.
+ * Valida un archivo según tamaño máximo.
  *
  * @param {File} file - Archivo a validar.
- * @param {string[]} tiposPermitidos - Array de tipos MIME aceptados.
  * @param {number} maxBytes - Tamaño máximo en bytes.
  * @returns {{ valido: boolean, error?: string }} Resultado de la validación.
  */
-function validarArchivo(file, tiposPermitidos, maxBytes) {
-  const extension = String(file.name || "")
-    .split(".")
-    .pop()
-    ?.toLowerCase();
-  const tipoValido =
-    tiposPermitidos.includes(file.type) ||
-    (!file.type && EXTENSIONES_PERMITIDAS.has(extension));
-
-  if (!tipoValido || !EXTENSIONES_PERMITIDAS.has(extension)) {
-    return {
-      valido: false,
-      error: `"${file.name}" tiene un formato no permitido. Use PDF, imágenes o documentos Office.`,
-    };
+function validarArchivo(file, maxBytes) {
+  if (!String(file.name || "").trim()) {
+    return { valido: false, error: "El archivo debe tener un nombre." };
   }
-
   if (file.size > maxBytes) {
     const mb = (maxBytes / 1024 / 1024).toFixed(0);
     return {
@@ -81,7 +44,6 @@ function validarArchivo(file, tiposPermitidos, maxBytes) {
  * @property {function(string, File|File[]): void} setValue - Función para actualizar el valor en el form.
  * @property {File|File[]|null} value - Valor actual del campo.
  * @property {object} [errors] - Objeto de errores de react-hook-form.
- * @property {string[]} [tiposPermitidos] - Tipos MIME aceptados. Por defecto: PDF, imágenes, Office.
  * @property {number} [maxTamanoByte] - Tamaño máximo en bytes. Por defecto: 10 MB.
  */
 
@@ -98,7 +60,6 @@ export function FormFileUpload({
   setValue,
   value,
   errors,
-  tiposPermitidos = TIPOS_PERMITIDOS,
   maxTamanoByte = MAX_TAMANO_BYTES,
   ...props
 }) {
@@ -115,11 +76,7 @@ export function FormFileUpload({
 
     const validos = [];
     files.forEach((file) => {
-      const { valido, error } = validarArchivo(
-        file,
-        tiposPermitidos,
-        maxTamanoByte,
-      );
+      const { valido, error } = validarArchivo(file, maxTamanoByte);
       if (valido) {
         validos.push(file);
       } else {
@@ -197,7 +154,7 @@ export function FormFileUpload({
             arrastra y suelta
           </p>
           <p className="text-xs text-center text-muted-foreground/70">
-            PDF, imágenes, documentos Office o TXT · máx. {mb} MB por archivo
+            Cualquier formato · máx. {mb} MB por archivo
           </p>
         </div>
       </div>

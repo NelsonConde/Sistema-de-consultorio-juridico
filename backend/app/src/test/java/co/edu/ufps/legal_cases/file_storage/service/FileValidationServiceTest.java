@@ -3,8 +3,6 @@ package co.edu.ufps.legal_cases.file_storage.service;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.nio.charset.StandardCharsets;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -15,28 +13,34 @@ class FileValidationServiceTest {
     private final FileValidationService service = new FileValidationService();
 
     @Test
-    void aceptaPdfConFirmaValida() {
+    void aceptaCualquierExtensionCuandoElArchivoEsValido() {
         MockMultipartFile file = new MockMultipartFile(
                 "file",
-                "solicitud.pdf",
-                "application/pdf",
-                "%PDF-1.7\ncontenido".getBytes(StandardCharsets.UTF_8));
+                "evidencia.bin",
+                "application/octet-stream",
+                new byte[] {1, 2, 3});
 
         assertDoesNotThrow(() -> service.validate(file));
     }
 
     @Test
-    void rechazaPdfConExtensionPeroContenidoInvalido() {
+    void aceptaUnArchivoSinExtension() {
         MockMultipartFile file = new MockMultipartFile(
-                "file", "solicitud.pdf", "application/pdf", "texto".getBytes(StandardCharsets.UTF_8));
+                "file", "evidencia", "application/octet-stream", new byte[] {1, 2, 3});
 
-        assertThrows(BusinessException.class, () -> service.validate(file));
+        assertDoesNotThrow(() -> service.validate(file));
     }
 
     @Test
-    void rechazaExtensionNoPermitida() {
+    void aceptaMetadatosDeUnFormatoArbitrarioParaCargaFirmada() {
+        assertDoesNotThrow(() -> service.validateMetadata(
+                "evidencia-forense.zip", 1_024, "application/zip"));
+    }
+
+    @Test
+    void rechazaArchivoVacio() {
         MockMultipartFile file = new MockMultipartFile(
-                "file", "archivo.exe", "application/octet-stream", new byte[] {1, 2, 3});
+                "file", "archivo.txt", "text/plain", new byte[0]);
 
         assertThrows(BusinessException.class, () -> service.validate(file));
     }
