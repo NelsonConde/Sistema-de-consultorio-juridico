@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import co.edu.ufps.legal_cases.security.model.access.CodigoRolBase;
 import co.edu.ufps.legal_cases.security.model.access.Rol;
 
 @Repository
@@ -14,18 +15,21 @@ public interface RolRepository extends JpaRepository<Rol, Long> {
 
     Optional<Rol> findByNombreIgnoreCase(String nombre);
 
-    Optional<Rol> findByNombreIgnoreCaseAndActivoTrue(String nombre);
-
     boolean existsByNombreIgnoreCase(String nombre);
 
     boolean existsByNombreIgnoreCaseAndIdNot(String nombre, Long id);
 
     List<Rol> findByActivoTrue();
 
-    //Trae el rol con sus permisos asociados para evitar el problema de LazyInitializationException
+    // Trae el rol con sus permisos asociados para evitar
+    // problemas por carga perezosa.
     @EntityGraph(attributePaths = "permisos")
     Optional<Rol> findWithPermisosById(Long id);
 
     Optional<Rol> findByIdAndActivoTrue(Long id);
-    
+
+    // Identidad estable de los roles base del sistema.
+    Optional<Rol> findByCodigoBase(CodigoRolBase codigoBase);
+
+    Optional<Rol> findByCodigoBaseAndActivoTrue(CodigoRolBase codigoBase);
 }

@@ -31,6 +31,8 @@ public class RolMapper {
         dto.setNombre(rol.getNombre());
         dto.setDescripcion(rol.getDescripcion());
         dto.setActivo(rol.getActivo());
+        dto.setTipoPerfil(rol.getTipoPerfil());
+        dto.setCodigoBase(rol.getCodigoBase());
 
         Set<Long> permisoIds = rol.getPermisos()
                 .stream()
