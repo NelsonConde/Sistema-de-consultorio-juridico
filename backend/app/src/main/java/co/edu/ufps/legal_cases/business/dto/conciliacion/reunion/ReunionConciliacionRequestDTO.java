@@ -11,6 +11,13 @@ import lombok.Setter;
 @Setter
 public class ReunionConciliacionRequestDTO {
 
+    // Se omite al programar una reunión nueva.
+    // Es obligatoria al reprogramar una reunión existente.
+    private Long version;
+
+    @NotNull(message = "La versión de la conciliación es obligatoria")
+    private Long conciliacionVersion;
+
     @NotNull(message = "La fecha de la reunión es obligatoria")
     private LocalDateTime fechaReunion;
 

@@ -82,4 +82,18 @@ ALTER TABLE "DB_consultorioJuridico".conciliacion
 ALTER TABLE "DB_consultorioJuridico".conciliacion
     ALTER COLUMN version SET NOT NULL;
 
+-- Reunion de conciliacion
+ALTER TABLE "DB_consultorioJuridico".reunion_conciliacion
+    ADD COLUMN IF NOT EXISTS version BIGINT;
+
+UPDATE "DB_consultorioJuridico".reunion_conciliacion
+SET version = 0
+WHERE version IS NULL;
+
+ALTER TABLE "DB_consultorioJuridico".reunion_conciliacion
+    ALTER COLUMN version SET DEFAULT 0;
+
+ALTER TABLE "DB_consultorioJuridico".reunion_conciliacion
+    ALTER COLUMN version SET NOT NULL;
+
 COMMIT;
