@@ -55,6 +55,7 @@ public class ConsultaMapper {
 
         return new ConsultaBusquedaDTO(
                 c.getId(),
+                c.getVersion(),
                 c.getDescripcion(),
                 c.getFecha(),
                 p != null ? p.getNombres() : null,

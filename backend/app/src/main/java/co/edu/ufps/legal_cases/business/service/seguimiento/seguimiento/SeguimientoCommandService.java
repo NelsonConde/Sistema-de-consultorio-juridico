@@ -137,15 +137,15 @@ public class SeguimientoCommandService {
 
         consultaEstadoService.validarPermiteOperacionOperativa(seguimiento.getConsulta());
 
-        // Primero se cancelan pendientes; las enviadas quedan como historial.
-        seguimientoNotificacionService.cancelarNotificacionesPendientes(seguimiento.getId());
-
         // El seguimiento queda inactivo para no perder trazabilidad dentro de la
         // consulta.
         seguimiento.setActivo(false);
 
         seguimientoRepository.save(seguimiento);
         entityManager.flush();
+
+        // Solo se cancelan efectos derivados después de confirmar el UPDATE versionado.
+        seguimientoNotificacionService.cancelarNotificacionesPendientes(seguimiento.getId());
     }
 
     private DatosSeguimiento prepararDatos(SeguimientoRequestDTO dto) {

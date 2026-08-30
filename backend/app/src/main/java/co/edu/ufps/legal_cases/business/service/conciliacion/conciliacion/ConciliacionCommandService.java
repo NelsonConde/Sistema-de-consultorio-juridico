@@ -199,17 +199,23 @@ public class ConciliacionCommandService {
         FileAsset actaAsset = fileResourceService.storeMultipartAfterAuthorization(
                 FileResourceType.CONCILIACION, id, null, acta);
 
-        conciliacion.setEstado(estadoFinal);
-        conciliacion.setActa(actaAsset);
-        conciliacion.setFechaFinalizacion(LocalDateTime.now());
+        Conciliacion guardada;
+        try {
+            conciliacion.setEstado(estadoFinal);
+            conciliacion.setActa(actaAsset);
+            conciliacion.setFechaFinalizacion(LocalDateTime.now());
 
-        Conciliacion guardada = conciliacionRepository.save(conciliacion);
+            guardada = conciliacionRepository.save(conciliacion);
 
-        /*
-         * Confirmamos primero la escritura versionada.
-         * No ejecutamos efectos posteriores si existe un conflicto.
-         */
-        entityManager.flush();
+            /*
+             * Confirmamos primero la escritura versionada.
+             * No ejecutamos efectos posteriores si existe un conflicto.
+             */
+            entityManager.flush();
+        } catch (RuntimeException ex) {
+            compensarArchivoAlmacenado(actaAsset, ex);
+            throw ex;
+        }
 
         // Al finalizar la conciliación ya no deben salir recordatorios de reunión pendientes.
         reunionConciliacionNotificacionService.cancelarPendientesPorConciliacion(id);
@@ -234,11 +240,17 @@ public class ConciliacionCommandService {
 
         FileAsset solicitudAsset = fileResourceService.storeMultipartAfterAuthorization(
                 FileResourceType.CONCILIACION, id, null, solicitud);
-        conciliacion.setDocumentoSolicitud(solicitudAsset);
+        Conciliacion guardada;
+        try {
+            conciliacion.setDocumentoSolicitud(solicitudAsset);
 
-        Conciliacion guardada = conciliacionRepository.save(conciliacion);
+            guardada = conciliacionRepository.save(conciliacion);
 
-        entityManager.flush();
+            entityManager.flush();
+        } catch (RuntimeException ex) {
+            compensarArchivoAlmacenado(solicitudAsset, ex);
+            throw ex;
+        }
 
         return conciliacionMapper.convertirAResponseDTO(guardada);
     }
@@ -280,5 +292,13 @@ public class ConciliacionCommandService {
         return usuarioSistemaRepository.findById(usuarioActualId)
                 .orElseThrow(() -> new BusinessException(
                         "Usuario solicitante no encontrado con id: " + usuarioActualId));
+    }
+
+    private void compensarArchivoAlmacenado(FileAsset asset, RuntimeException causaOriginal) {
+        try {
+            fileResourceService.discardStoredAsset(asset);
+        } catch (RuntimeException cleanup) {
+            causaOriginal.addSuppressed(cleanup);
+        }
     }
 }
