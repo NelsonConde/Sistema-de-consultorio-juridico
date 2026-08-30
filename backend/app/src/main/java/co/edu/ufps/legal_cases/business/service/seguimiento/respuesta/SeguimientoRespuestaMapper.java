@@ -13,6 +13,7 @@ public class SeguimientoRespuestaMapper {
         SeguimientoRespuestaResponseDTO dto = new SeguimientoRespuestaResponseDTO();
 
         dto.setId(respuesta.getId());
+        dto.setVersion(respuesta.getVersion());
 
         dto.setSeguimientoId(
                 respuesta.getSeguimiento() != null

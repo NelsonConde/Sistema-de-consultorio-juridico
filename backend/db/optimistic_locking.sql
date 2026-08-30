@@ -54,4 +54,18 @@ ALTER TABLE "DB_consultorioJuridico".seguimiento
 ALTER TABLE "DB_consultorioJuridico".seguimiento
     ALTER COLUMN version SET NOT NULL;
 
+-- Respuestas de seguimiento
+ALTER TABLE "DB_consultorioJuridico".seguimiento_respuesta
+    ADD COLUMN IF NOT EXISTS version BIGINT;
+
+UPDATE "DB_consultorioJuridico".seguimiento_respuesta
+SET version = 0
+WHERE version IS NULL;
+
+ALTER TABLE "DB_consultorioJuridico".seguimiento_respuesta
+    ALTER COLUMN version SET DEFAULT 0;
+
+ALTER TABLE "DB_consultorioJuridico".seguimiento_respuesta
+    ALTER COLUMN version SET NOT NULL;
+
 COMMIT;
