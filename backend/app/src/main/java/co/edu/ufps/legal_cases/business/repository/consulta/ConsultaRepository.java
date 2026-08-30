@@ -23,7 +23,7 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
     boolean existsByEstudiante_IdAndEstadoIn(Long estudianteId, List<EstadoConsulta> estados);
 
     boolean existsByMonitor_IdAndEstadoIn(Long monitorId, List<EstadoConsulta> estados);
-    
+
     // Hibernate no permite hacer JOIN FETCH de dos colecciones al mismo tiempo.
     // Por eso partes y contrapartes se cargan en consultas separadas.
     @Query("""
@@ -211,24 +211,24 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
 
     List<Consulta> findByEstado(EstadoConsulta estado);
 
-    // Cuenta consultas finalizadas (con resultado) y pendientes (sin resultado)
-    // para un semestre dado, usando last_updated_at como fecha de referencia.
+    // Clasifica por estado y usa la fecha propia de la consulta como referencia.
     // Semestre 1: 1 enero - 30 junio. Semestre 2: 1 julio - 31 diciembre.
     @Query(value = """
                 SELECT
-                    COUNT(*) FILTER (WHERE c.resultado IS NOT NULL) AS finished_consultas,
-                    COUNT(*) FILTER (WHERE c.resultado IS NULL) AS unfinished_consultas
+                    COUNT(*) FILTER (WHERE c.estado = 'CERRADO') AS finished_consultas,
+                    COUNT(*) FILTER (WHERE c.estado <> 'CERRADO' AND c.estado <> 'ARCHIVADO') AS unfinished_consultas
                 FROM "DB_consultorioJuridico".consulta c
-                WHERE c.last_updated_at >=
+                WHERE c.fecha >=
                     CASE
                         WHEN :semester = 1 THEN make_date(:year, 1, 1)
                         ELSE make_date(:year, 7, 1)
                     END
-                AND c.last_updated_at <
+                AND c.fecha <
                     CASE
                         WHEN :semester = 1 THEN make_date(:year, 7, 1)
                         ELSE make_date(:year + 1, 1, 1)
                     END
+                AND c.estado <> 'ARCHIVADO'
                 """, nativeQuery = true)
     List<Object[]> contarFinalizadasYPendientesPorSemestreRaw(
             @Param("year") int year,
@@ -250,10 +250,11 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 SELECT a.id AS area_id, a.nombre AS area_nombre, COUNT(c.id) AS total_consultas
                 FROM "DB_consultorioJuridico".consulta c
                 JOIN "DB_consultorioJuridico".area a ON a.id = c.area_id
-                WHERE c.last_updated_at >=
+                WHERE c.fecha >=
                     CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                AND c.last_updated_at <
+                AND c.fecha <
                     CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                 GROUP BY a.id, a.nombre
                 ORDER BY total_consultas DESC
                 """, nativeQuery = true)
@@ -269,18 +270,20 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 FROM (
                     SELECT c.persona_id
                     FROM "DB_consultorioJuridico".consulta c
-                    WHERE c.last_updated_at >=
+                    WHERE c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                     UNION
                     SELECT cp.persona_id
                     FROM "DB_consultorioJuridico".consulta_parte cp
                     JOIN "DB_consultorioJuridico".consulta c ON c.id = cp.consulta_id
-                    WHERE c.last_updated_at >=
+                    WHERE c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                 ) AS personas_unicas
                 """, nativeQuery = true)
     List<Object[]> contarPersonasAtendidasPorSemestre(
@@ -290,13 +293,14 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
 
     // Consultas finalizadas/pendientes por semestre filtradas por asesor.
     @Query(value = """
-                SELECT COUNT(*) FILTER (WHERE c.resultado IS NOT NULL) AS finished_consultas,
-                       COUNT(*) FILTER (WHERE c.resultado IS NULL) AS unfinished_consultas
+                SELECT COUNT(*) FILTER (WHERE c.estado = 'CERRADO') AS finished_consultas,
+                       COUNT(*) FILTER (WHERE c.estado <> 'CERRADO' AND c.estado <> 'ARCHIVADO') AS unfinished_consultas
                 FROM "DB_consultorioJuridico".consulta c
-                WHERE c.last_updated_at >=
+                WHERE c.fecha >=
                     CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                AND c.last_updated_at <
+                AND c.fecha <
                     CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                 AND c.asesor_id = :asesorId
                 """, nativeQuery = true)
     List<Object[]> contarFinalizadasYPendientesPorSemestreYAsesor(
@@ -306,13 +310,14 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
 
     // Consultas finalizadas/pendientes por semestre filtradas por estudiante.
     @Query(value = """
-                SELECT COUNT(*) FILTER (WHERE c.resultado IS NOT NULL) AS finished_consultas,
-                       COUNT(*) FILTER (WHERE c.resultado IS NULL) AS unfinished_consultas
+                SELECT COUNT(*) FILTER (WHERE c.estado = 'CERRADO') AS finished_consultas,
+                       COUNT(*) FILTER (WHERE c.estado <> 'CERRADO' AND c.estado <> 'ARCHIVADO') AS unfinished_consultas
                 FROM "DB_consultorioJuridico".consulta c
-                WHERE c.last_updated_at >=
+                WHERE c.fecha >=
                     CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                AND c.last_updated_at <
+                AND c.fecha <
                     CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                 AND c.estudiante_id = :estudianteId
                 """, nativeQuery = true)
     List<Object[]> contarFinalizadasYPendientesPorSemestreYEstudiante(
@@ -322,13 +327,14 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
 
     // Consultas finalizadas/pendientes por semestre filtradas por monitor.
     @Query(value = """
-                SELECT COUNT(*) FILTER (WHERE c.resultado IS NOT NULL) AS finished_consultas,
-                       COUNT(*) FILTER (WHERE c.resultado IS NULL) AS unfinished_consultas
+                SELECT COUNT(*) FILTER (WHERE c.estado = 'CERRADO') AS finished_consultas,
+                       COUNT(*) FILTER (WHERE c.estado <> 'CERRADO' AND c.estado <> 'ARCHIVADO') AS unfinished_consultas
                 FROM "DB_consultorioJuridico".consulta c
-                WHERE c.last_updated_at >=
+                WHERE c.fecha >=
                     CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                AND c.last_updated_at <
+                AND c.fecha <
                     CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                 AND c.monitor_id = :monitorId
                 """, nativeQuery = true)
     List<Object[]> contarFinalizadasYPendientesPorSemestreYMonitor(
@@ -340,10 +346,11 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
     @Query(value = """
                 WITH consultas_semestre AS (
                     SELECT c.id FROM "DB_consultorioJuridico".consulta c
-                    WHERE c.last_updated_at >=
+                    WHERE c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                     AND c.asesor_id = :asesorId
                 )
                 SELECT (SELECT COUNT(*) FROM consultas_semestre)
@@ -361,10 +368,11 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 WITH consultas_semestre AS (
                     SELECT c.id FROM "DB_consultorioJuridico".consulta c
                     WHERE c.estudiante_id = :estudianteId
-                    AND c.last_updated_at >=
+                    AND c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                 )
                 SELECT (SELECT COUNT(*) FROM consultas_semestre)
                     + (SELECT COUNT(*) FROM "DB_consultorioJuridico".consulta_parte cp
@@ -380,10 +388,11 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
     @Query(value = """
                 WITH consultas_semestre AS (
                     SELECT c.id FROM "DB_consultorioJuridico".consulta c
-                    WHERE c.last_updated_at >=
+                    WHERE c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                     AND c.monitor_id = :monitorId
                 )
                 SELECT (SELECT COUNT(*) FROM consultas_semestre)
@@ -401,10 +410,11 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
     @Query(value = """
                 SELECT c.estado, COUNT(c.id) AS total
                 FROM "DB_consultorioJuridico".consulta c
-                WHERE c.last_updated_at >=
+                WHERE c.fecha >=
                     CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                AND c.last_updated_at <
+                AND c.fecha <
                     CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                 GROUP BY c.estado ORDER BY total DESC
                 """, nativeQuery = true)
     List<Object[]> contarConsultasPorEstadoPorSemestre(
@@ -414,10 +424,11 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
     @Query(value = """
                 SELECT COALESCE(c.tipo_violencia, 'No aplica') AS tipo, COUNT(c.id) AS total
                 FROM "DB_consultorioJuridico".consulta c
-                WHERE c.last_updated_at >=
+                WHERE c.fecha >=
                     CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                AND c.last_updated_at <
+                AND c.fecha <
                     CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                 GROUP BY tipo ORDER BY total DESC
                 """, nativeQuery = true)
     List<Object[]> contarConsultasPorTipoViolenciaPorSemestre(
@@ -429,17 +440,19 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 FROM "DB_consultorioJuridico".persona p
                 WHERE p.id IN (
                     SELECT c.persona_id FROM "DB_consultorioJuridico".consulta c
-                    WHERE c.last_updated_at >=
+                    WHERE c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                     UNION
                     SELECT cp.persona_id FROM "DB_consultorioJuridico".consulta_parte cp
                     JOIN "DB_consultorioJuridico".consulta c ON c.id = cp.consulta_id
-                    WHERE c.last_updated_at >=
+                    WHERE c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                 )
                 GROUP BY p.genero ORDER BY total DESC
                 """, nativeQuery = true)
@@ -452,17 +465,19 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 FROM "DB_consultorioJuridico".persona p
                 WHERE p.id IN (
                     SELECT c.persona_id FROM "DB_consultorioJuridico".consulta c
-                    WHERE c.last_updated_at >=
+                    WHERE c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                     UNION
                     SELECT cp.persona_id FROM "DB_consultorioJuridico".consulta_parte cp
                     JOIN "DB_consultorioJuridico".consulta c ON c.id = cp.consulta_id
-                    WHERE c.last_updated_at >=
+                    WHERE c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                 )
                 GROUP BY p.estrato ORDER BY p.estrato
                 """, nativeQuery = true)
@@ -475,17 +490,19 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 FROM "DB_consultorioJuridico".persona p
                 WHERE p.id IN (
                     SELECT c.persona_id FROM "DB_consultorioJuridico".consulta c
-                    WHERE c.last_updated_at >=
+                    WHERE c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                     UNION
                     SELECT cp.persona_id FROM "DB_consultorioJuridico".consulta_parte cp
                     JOIN "DB_consultorioJuridico".consulta c ON c.id = cp.consulta_id
-                    WHERE c.last_updated_at >=
+                    WHERE c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                 )
                 GROUP BY p.zona ORDER BY total DESC
                 """, nativeQuery = true)
@@ -498,17 +515,19 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 FROM "DB_consultorioJuridico".persona p
                 WHERE p.id IN (
                     SELECT c.persona_id FROM "DB_consultorioJuridico".consulta c
-                    WHERE c.last_updated_at >=
+                    WHERE c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                     UNION
                     SELECT cp.persona_id FROM "DB_consultorioJuridico".consulta_parte cp
                     JOIN "DB_consultorioJuridico".consulta c ON c.id = cp.consulta_id
-                    WHERE c.last_updated_at >=
+                    WHERE c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                 )
                 GROUP BY p.grupo_etnico ORDER BY total DESC
                 """, nativeQuery = true)
@@ -522,17 +541,19 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 JOIN "DB_consultorioJuridico".municipio m ON m.id = p.municipio_id
                 WHERE p.id IN (
                     SELECT c.persona_id FROM "DB_consultorioJuridico".consulta c
-                    WHERE c.last_updated_at >=
+                    WHERE c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                     UNION
                     SELECT cp.persona_id FROM "DB_consultorioJuridico".consulta_parte cp
                     JOIN "DB_consultorioJuridico".consulta c ON c.id = cp.consulta_id
-                    WHERE c.last_updated_at >=
+                    WHERE c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                 )
                 GROUP BY m.nombre ORDER BY total DESC
                 """, nativeQuery = true)
@@ -546,17 +567,19 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 JOIN "DB_consultorioJuridico".condicion co ON co.id = p.condicion_actual_id
                 WHERE p.id IN (
                     SELECT c.persona_id FROM "DB_consultorioJuridico".consulta c
-                    WHERE c.last_updated_at >=
+                    WHERE c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                     UNION
                     SELECT cp.persona_id FROM "DB_consultorioJuridico".consulta_parte cp
                     JOIN "DB_consultorioJuridico".consulta c ON c.id = cp.consulta_id
-                    WHERE c.last_updated_at >=
+                    WHERE c.fecha >=
                         CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                    AND c.last_updated_at <
+                    AND c.fecha <
                         CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
+                AND c.estado <> 'ARCHIVADO'
                 )
                 GROUP BY co.nombre ORDER BY total DESC
                 """, nativeQuery = true)

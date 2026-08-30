@@ -32,47 +32,130 @@ public interface ProcesoRepository extends JpaRepository<Proceso, Long> {
 
     boolean existsByNumeroRadicadoAndIdNot(String numeroRadicado, Long id);
 
-    boolean existsByConsulta_IdAndActivoTrueAndEstado(Long consultaId, EstadoProceso estado);
-    // Procesos agrupados por estado — todos los tiempos.
-    // El estado es varchar por ahora; se normaliza como catalogo en vacaciones.
+    boolean existsByConsulta_IdAndActivoTrueAndEstado(
+            Long consultaId,
+            EstadoProceso estado);
+
+    // Consulta histórica utilizada por reportes sin periodo semestral.
     @Query(value = """
-                SELECT p.estado, COUNT(p.id) AS total_procesos
-                FROM "DB_consultorioJuridico".proceso p
-                GROUP BY p.estado
-                ORDER BY total_procesos DESC
-                """, nativeQuery = true)
+            SELECT p.estado, COUNT(p.id) AS total_procesos
+            FROM "DB_consultorioJuridico".proceso p
+            GROUP BY p.estado
+            ORDER BY total_procesos DESC
+            """, nativeQuery = true)
     List<Object[]> contarProcesosPorEstado();
 
-
-    // Procesos por estado filtrados por asesor.
+    // Procesos activos asociados a consultas del semestre estadístico.
     @Query(value = """
-                SELECT p.estado, COUNT(p.id) AS total_procesos
-                FROM "DB_consultorioJuridico".proceso p
-                JOIN "DB_consultorioJuridico".consulta c ON c.id = p.consulta_id
-                WHERE c.asesor_id = :asesorId
-                GROUP BY p.estado ORDER BY total_procesos DESC
-                """, nativeQuery = true)
-    List<Object[]> contarProcesosPorEstadoYAsesor(@Param("asesorId") Long asesorId);
+            SELECT p.estado, COUNT(p.id) AS total_procesos
+            FROM "DB_consultorioJuridico".proceso p
+            JOIN "DB_consultorioJuridico".consulta c
+                ON c.id = p.consulta_id
+            WHERE p.activo = true
+            AND c.estado <> 'ARCHIVADO'
+            AND c.fecha >=
+                CASE
+                    WHEN :semester = 1
+                        THEN make_date(:year, 1, 1)
+                    ELSE make_date(:year, 7, 1)
+                END
+            AND c.fecha <
+                CASE
+                    WHEN :semester = 1
+                        THEN make_date(:year, 7, 1)
+                    ELSE make_date(:year + 1, 1, 1)
+                END
+            GROUP BY p.estado
+            ORDER BY total_procesos DESC
+            """, nativeQuery = true)
+    List<Object[]> contarProcesosPorEstadoPorSemestre(
+            @Param("year") int year,
+            @Param("semester") int semester);
 
-    // Procesos por estado filtrados por estudiante.
+    // Procesos por estado y semestre filtrados por asesor.
     @Query(value = """
-                SELECT p.estado, COUNT(p.id) AS total_procesos
-                FROM "DB_consultorioJuridico".proceso p
-                JOIN "DB_consultorioJuridico".consulta c ON c.id = p.consulta_id
-                WHERE c.estudiante_id = :estudianteId
-                GROUP BY p.estado ORDER BY total_procesos DESC
-                """, nativeQuery = true)
-    List<Object[]> contarProcesosPorEstadoYEstudiante(@Param("estudianteId") Long estudianteId);
+            SELECT p.estado, COUNT(p.id) AS total_procesos
+            FROM "DB_consultorioJuridico".proceso p
+            JOIN "DB_consultorioJuridico".consulta c
+                ON c.id = p.consulta_id
+            WHERE p.activo = true
+            AND c.estado <> 'ARCHIVADO'
+            AND c.fecha >=
+                CASE
+                    WHEN :semester = 1
+                        THEN make_date(:year, 1, 1)
+                    ELSE make_date(:year, 7, 1)
+                END
+            AND c.fecha <
+                CASE
+                    WHEN :semester = 1
+                        THEN make_date(:year, 7, 1)
+                    ELSE make_date(:year + 1, 1, 1)
+                END
+            AND c.asesor_id = :asesorId
+            GROUP BY p.estado
+            ORDER BY total_procesos DESC
+            """, nativeQuery = true)
+    List<Object[]> contarProcesosPorEstadoPorSemestreYAsesor(
+            @Param("year") int year,
+            @Param("semester") int semester,
+            @Param("asesorId") Long asesorId);
 
-    // Procesos por estado filtrados por monitor.
+    // Procesos por estado y semestre filtrados por estudiante.
     @Query(value = """
-                SELECT p.estado, COUNT(p.id) AS total_procesos
-                FROM "DB_consultorioJuridico".proceso p
-                JOIN "DB_consultorioJuridico".consulta c ON c.id = p.consulta_id
-                WHERE c.monitor_id = :monitorId
-                GROUP BY p.estado ORDER BY total_procesos DESC
-                """, nativeQuery = true)
-    List<Object[]> contarProcesosPorEstadoYMonitor(@Param("monitorId") Long monitorId);
+            SELECT p.estado, COUNT(p.id) AS total_procesos
+            FROM "DB_consultorioJuridico".proceso p
+            JOIN "DB_consultorioJuridico".consulta c
+                ON c.id = p.consulta_id
+            WHERE p.activo = true
+            AND c.estado <> 'ARCHIVADO'
+            AND c.fecha >=
+                CASE
+                    WHEN :semester = 1
+                        THEN make_date(:year, 1, 1)
+                    ELSE make_date(:year, 7, 1)
+                END
+            AND c.fecha <
+                CASE
+                    WHEN :semester = 1
+                        THEN make_date(:year, 7, 1)
+                    ELSE make_date(:year + 1, 1, 1)
+                END
+            AND c.estudiante_id = :estudianteId
+            GROUP BY p.estado
+            ORDER BY total_procesos DESC
+            """, nativeQuery = true)
+    List<Object[]> contarProcesosPorEstadoPorSemestreYEstudiante(
+            @Param("year") int year,
+            @Param("semester") int semester,
+            @Param("estudianteId") Long estudianteId);
 
-
+    // Procesos por estado y semestre filtrados por monitor.
+    @Query(value = """
+            SELECT p.estado, COUNT(p.id) AS total_procesos
+            FROM "DB_consultorioJuridico".proceso p
+            JOIN "DB_consultorioJuridico".consulta c
+                ON c.id = p.consulta_id
+            WHERE p.activo = true
+            AND c.estado <> 'ARCHIVADO'
+            AND c.fecha >=
+                CASE
+                    WHEN :semester = 1
+                        THEN make_date(:year, 1, 1)
+                    ELSE make_date(:year, 7, 1)
+                END
+            AND c.fecha <
+                CASE
+                    WHEN :semester = 1
+                        THEN make_date(:year, 7, 1)
+                    ELSE make_date(:year + 1, 1, 1)
+                END
+            AND c.monitor_id = :monitorId
+            GROUP BY p.estado
+            ORDER BY total_procesos DESC
+            """, nativeQuery = true)
+    List<Object[]> contarProcesosPorEstadoPorSemestreYMonitor(
+            @Param("year") int year,
+            @Param("semester") int semester,
+            @Param("monitorId") Long monitorId);
 }
