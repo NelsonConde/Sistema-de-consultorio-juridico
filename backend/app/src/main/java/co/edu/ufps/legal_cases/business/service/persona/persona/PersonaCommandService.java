@@ -69,7 +69,7 @@ public class PersonaCommandService {
     }
 
     @Transactional
-    @Auditable(action = "REGISTRAR_PERSONA", entityName = "Persona")
+    @Auditable(action = "REGISTRAR_PERSONA", entityName = "Persona", entityId = "#result.id")
     public PersonaDTO crear(PersonaDTO dto) {
         personaAccessService.validarPuedeCrearPersonas();
         personaValidator.validarCreacion(dto);
@@ -86,7 +86,7 @@ public class PersonaCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ACTUALIZAR_PERSONA", entityName = "Persona")
+    @Auditable(action = "ACTUALIZAR_PERSONA", entityName = "Persona", entityId = "#id")
     public PersonaDTO actualizar(Long id, PersonaDTO dto) {
         personaAccessService.validarPuedeEditarPersonas();
         personaValidator.validarActualizacion(id, dto);
@@ -105,7 +105,7 @@ public class PersonaCommandService {
     }
 
     @Transactional
-    @Auditable(action = "DESACTIVAR_PERSONA", entityName = "Persona")
+    @Auditable(action = "DESACTIVAR_PERSONA", entityName = "Persona", entityId = "#id")
     public void desactivar(Long id) {
         personaAccessService.validarPuedeCambiarEstadoPersonas();
 
@@ -115,7 +115,7 @@ public class PersonaCommandService {
     }
 
     @Transactional
-    @Auditable(action = "REACTIVAR_PERSONA", entityName = "Persona")
+    @Auditable(action = "REACTIVAR_PERSONA", entityName = "Persona", entityId = "#id")
     public void reactivar(Long id) {
         personaAccessService.validarPuedeCambiarEstadoPersonas();
 

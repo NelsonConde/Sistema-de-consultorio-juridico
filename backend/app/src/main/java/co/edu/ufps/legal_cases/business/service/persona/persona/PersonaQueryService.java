@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import co.edu.ufps.legal_cases.audit.aop.log.Auditable;
 import co.edu.ufps.legal_cases.business.dto.persona.PersonaDTO;
 import co.edu.ufps.legal_cases.business.model.persona.Persona;
 import co.edu.ufps.legal_cases.business.repository.persona.PersonaRepository;
@@ -28,6 +29,7 @@ public class PersonaQueryService {
     }
 
     @Transactional(readOnly = true)
+    @Auditable(action = "READ_PERSON_LIST", entityName = "Persona", entityId = "'collection'")
     public List<PersonaDTO> listar() {
         personaAccessService.validarPuedeVerPersonas();
 
@@ -46,6 +48,7 @@ public class PersonaQueryService {
     }
 
     @Transactional(readOnly = true)
+    @Auditable(action = "READ_PERSON", entityName = "Persona", entityId = "#id")
     public PersonaDTO obtenerPorId(Long id) {
         personaAccessService.validarPuedeVerPersonas();
 

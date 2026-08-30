@@ -4,12 +4,14 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 
 import co.edu.ufps.legal_cases.common.exception.dto.ErrorResponseDTO;
+import co.edu.ufps.legal_cases.audit.service.log.AuditSecurityService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import tools.jackson.databind.json.JsonMapper;
@@ -24,9 +26,16 @@ import tools.jackson.databind.json.JsonMapper;
 public class SecurityExceptionHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
 
     private final JsonMapper jsonMapper;
+    private final AuditSecurityService auditSecurityService;
 
     public SecurityExceptionHandler(JsonMapper jsonMapper) {
+        this(jsonMapper, null);
+    }
+
+    @Autowired
+    public SecurityExceptionHandler(JsonMapper jsonMapper, AuditSecurityService auditSecurityService) {
         this.jsonMapper = jsonMapper;
+        this.auditSecurityService = auditSecurityService;
     }
 
     @Override
@@ -34,6 +43,8 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
             HttpServletRequest request,
             HttpServletResponse response,
             org.springframework.security.core.AuthenticationException authException) throws IOException {
+
+        recordDenied(request, "AUTHENTICATION_REQUIRED", "UNAUTHENTICATED");
 
         ErrorResponseDTO error = construirError(
                 HttpStatus.UNAUTHORIZED,
@@ -49,6 +60,8 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
             HttpServletRequest request,
             HttpServletResponse response,
             AccessDeniedException accessDeniedException) throws IOException {
+
+        recordDenied(request, "ACCESS_DENIED", "INSUFFICIENT_AUTHORITY");
 
         ErrorResponseDTO error = construirError(
                 HttpStatus.FORBIDDEN,
@@ -84,5 +97,11 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
         response.setCharacterEncoding("UTF-8");
 
         jsonMapper.writeValue(response.getWriter(), error);
+    }
+
+    private void recordDenied(HttpServletRequest request, String action, String reasonCode) {
+        if (auditSecurityService != null) {
+            auditSecurityService.recordDenied(request, action, reasonCode);
+        }
     }
 }

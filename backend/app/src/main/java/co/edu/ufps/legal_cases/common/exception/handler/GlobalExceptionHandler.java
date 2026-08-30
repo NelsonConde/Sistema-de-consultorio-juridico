@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import co.edu.ufps.legal_cases.common.exception.AdministracionInvariantException;
+import co.edu.ufps.legal_cases.audit.service.log.AuditSecurityService;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.common.exception.dto.ErrorResponseDTO;
 import co.edu.ufps.legal_cases.file_storage.exception.FileStorageException;
@@ -29,6 +31,12 @@ import java.util.UUID;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private AuditSecurityService auditSecurityService;
+
+    @Autowired(required = false)
+    void setAuditSecurityService(AuditSecurityService auditSecurityService) {
+        this.auditSecurityService = auditSecurityService;
+    }
 
     @ExceptionHandler(AdministracionInvariantException.class)
     public ResponseEntity<ErrorResponseDTO>
@@ -174,6 +182,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDTO> manejarAccessDeniedException(
             AccessDeniedException ex,
             HttpServletRequest request) {
+
+        if (auditSecurityService != null) {
+            auditSecurityService.recordDenied(request, "ACCESS_DENIED", "INSUFFICIENT_AUTHORITY");
+        }
 
         ErrorResponseDTO error = construirError(
                 HttpStatus.FORBIDDEN,

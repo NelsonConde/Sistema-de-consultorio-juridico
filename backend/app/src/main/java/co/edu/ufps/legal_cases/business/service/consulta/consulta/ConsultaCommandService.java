@@ -31,7 +31,7 @@ public class ConsultaCommandService {
     private final ConsultaCambioEstructuralValidator consultaCambioEstructuralValidator;
 
     @Transactional
-    @Auditable(action = "CREAR_CONSULTA", entityName = "Consulta")
+    @Auditable(action = "CREAR_CONSULTA", entityName = "Consulta", entityId = "#result.id")
     public ConsultaDTO crear(ConsultaDTO dto) {
         consultaAccessService.validarPuedeCrearConsulta();
         consultaValidator.validarIdNoEnviadoEnCreacion(dto.getId());
@@ -59,7 +59,7 @@ public class ConsultaCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ACTUALIZAR_CONSULTA", entityName = "Consulta")
+    @Auditable(action = "ACTUALIZAR_CONSULTA", entityName = "Consulta", entityId = "#id")
     public ConsultaDTO actualizar(Long id, ConsultaDTO dto) {
         consultaAccessService.validarPuedeEditarConsulta(id);
 
@@ -106,7 +106,12 @@ public class ConsultaCommandService {
     }
 
     @Transactional
-    @Auditable(action = "CAMBIAR_ESTADO_CONSULTA", entityName = "Consulta")
+    @Auditable(
+            action = "CAMBIAR_ESTADO_CONSULTA",
+            entityName = "Consulta",
+            entityId = "#id",
+            trackedFields = "estado",
+            metadata = "requestedState=#estado")
     public ConsultaDTO cambiarEstado(Long id, EstadoConsulta estado) {
         Consulta consulta = consultaRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("Consulta no encontrada con id: " + id));
@@ -124,7 +129,11 @@ public class ConsultaCommandService {
     // Se conserva el nombre eliminar por compatibilidad con el endpoint antiguo.
     // Para evitar pérdida de información, funciona como archivado lógico.
     @Transactional
-    @Auditable(action = "ELIMINAR_CONSULTA", entityName = "Consulta")
+    @Auditable(
+            action = "ELIMINAR_CONSULTA",
+            entityName = "Consulta",
+            entityId = "#id",
+            trackedFields = "estado")
     public void eliminar(Long id) {
         consultaAccessService.validarPuedeArchivarConsulta(id);
 
@@ -139,7 +148,11 @@ public class ConsultaCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ARCHIVAR_CONSULTA", entityName = "Consulta")
+    @Auditable(
+            action = "ARCHIVAR_CONSULTA",
+            entityName = "Consulta",
+            entityId = "#id",
+            trackedFields = "estado")
     public ConsultaDTO archivar(Long id) {
         consultaAccessService.validarPuedeArchivarConsulta(id);
 
@@ -155,7 +168,11 @@ public class ConsultaCommandService {
     }
 
     @Transactional
-    @Auditable(action = "DESARCHIVAR_CONSULTA", entityName = "Consulta")
+    @Auditable(
+            action = "DESARCHIVAR_CONSULTA",
+            entityName = "Consulta",
+            entityId = "#id",
+            trackedFields = "estado")
     public ConsultaDTO desarchivar(Long id) {
         consultaAccessService.validarPuedeDesarchivarConsulta(id);
 

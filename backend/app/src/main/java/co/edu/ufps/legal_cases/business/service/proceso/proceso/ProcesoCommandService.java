@@ -38,7 +38,7 @@ public class ProcesoCommandService {
     // Crea un proceso asociado a una consulta existente.
     // El alcance se valida con la consulta porque Proceso no tiene un alcance independiente.
     @Transactional
-    @Auditable(action = "CREAR_PROCESO", entityName = "Proceso")
+    @Auditable(action = "CREAR_PROCESO", entityName = "Proceso", entityId = "#result.id")
     public ProcesoDTO crear(ProcesoDTO dto) {
         procesoValidator.validarCreacion(dto);
 
@@ -62,7 +62,7 @@ public class ProcesoCommandService {
     // Actualiza datos del proceso sin permitir cambiar la consulta.
     // La consulta define el alcance, por eso mover un proceso a otra consulta sería otro flujo de negocio.
     @Transactional
-    @Auditable(action = "ACTUALIZAR_PROCESO", entityName = "Proceso")
+    @Auditable(action = "ACTUALIZAR_PROCESO", entityName = "Proceso", entityId = "#id")
     public ProcesoDTO actualizar(Long id, ProcesoDTO dto) {
         procesoAccessService.validarPuedeActualizarProceso(id);
         procesoValidator.validarActualizacion(id, dto);
@@ -88,7 +88,12 @@ public class ProcesoCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ACTUALIZAR_FASE_PROCESO", entityName = "Proceso")
+    @Auditable(
+            action = "ACTUALIZAR_FASE_PROCESO",
+            entityName = "Proceso",
+            entityId = "#id",
+            trackedFields = "estado",
+            metadata = "requestedState=#estado")
     public ProcesoDTO cambiarEstadoProceso(Long id, EstadoProceso estado) {
         procesoAccessService.validarPuedeCambiarEstadoProceso(id);
 
@@ -109,7 +114,11 @@ public class ProcesoCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ELIMINAR_PROCESO", entityName = "Proceso")
+    @Auditable(
+            action = "ELIMINAR_PROCESO",
+            entityName = "Proceso",
+            entityId = "#id",
+            trackedFields = "activo")
     public void eliminar(Long id) {
         procesoAccessService.validarPuedeDesactivarProceso(id);
 
@@ -124,7 +133,12 @@ public class ProcesoCommandService {
     }
 
     @Transactional
-    @Auditable(action = "DESACTIVAR/REACTIVAR_PROCESO", entityName = "Proceso")
+    @Auditable(
+            action = "CAMBIAR_ESTADO_ACTIVO_PROCESO",
+            entityName = "Proceso",
+            entityId = "#id",
+            trackedFields = "activo",
+            metadata = "requestedActive=#activo")
     public ProcesoDTO cambiarEstado(Long id, Boolean activo) {
         procesoAccessService.validarPuedeCambiarEstadoProceso(id);
 

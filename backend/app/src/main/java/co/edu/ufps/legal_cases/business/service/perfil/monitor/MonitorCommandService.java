@@ -61,7 +61,7 @@ public class MonitorCommandService {
     }
 
     @Transactional
-    @Auditable(action = "CREAR_PERFIL", entityName = "Monitor")
+    @Auditable(action = "CREAR_PERFIL", entityName = "Monitor", entityId = "#result.id")
     public MonitorDTO crear(MonitorDTO dto) {
         asesorMonitorAccessService.validarPuedeGestionarAsesoresYMonitores();
         monitorValidator.validarIdNoEnviadoEnCreacion(dto.getId());
@@ -91,7 +91,7 @@ public class MonitorCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ACTUALIZAR_PERFIL", entityName = "Monitor")
+    @Auditable(action = "ACTUALIZAR_PERFIL", entityName = "Monitor", entityId = "#id")
     public MonitorDTO actualizar(Long id, MonitorDTO dto) {
         asesorMonitorAccessService.validarPuedeGestionarAsesoresYMonitores();
 
@@ -119,7 +119,12 @@ public class MonitorCommandService {
     }
 
     @Transactional
-    @Auditable(action = "DESACTIVAR/REACTIVAR_PERFIL", entityName = "Monitor")
+    @Auditable(
+            action = "CAMBIAR_ESTADO_PERFIL",
+            entityName = "Monitor",
+            entityId = "#id",
+            trackedFields = "activo",
+            metadata = "requestedActive=#activo")
     public MonitorDTO cambiarEstado(Long id, Boolean activo) {
         asesorMonitorAccessService.validarPuedeGestionarAsesoresYMonitores();
 
@@ -145,7 +150,7 @@ public class MonitorCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ELIMINAR_PERFIL", entityName = "Monitor")
+    @Auditable(action = "ELIMINAR_PERFIL", entityName = "Monitor", entityId = "#id")
     public void eliminar(Long id) {
         asesorMonitorAccessService.validarPuedeGestionarAsesoresYMonitores();
 
