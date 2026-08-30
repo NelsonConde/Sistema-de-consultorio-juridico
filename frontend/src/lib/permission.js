@@ -107,6 +107,7 @@ export const PERMISOS = {
 
   // ── Reportes y estadísticas ──────────────────────────────────────────────
   VER_REPORTES: "Ver reportes",
+  VER_AUDITORIA: "Ver auditoría",
   /** Creado localmente para controlar acceso a la página de estadísticas. */
   ACCEDER_ESTADISTICAS: "Acceder estadísticas",
 
