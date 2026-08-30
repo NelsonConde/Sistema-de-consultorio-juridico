@@ -68,4 +68,18 @@ ALTER TABLE "DB_consultorioJuridico".seguimiento_respuesta
 ALTER TABLE "DB_consultorioJuridico".seguimiento_respuesta
     ALTER COLUMN version SET NOT NULL;
 
+-- Conciliacion
+ALTER TABLE "DB_consultorioJuridico".conciliacion
+    ADD COLUMN IF NOT EXISTS version BIGINT;
+
+UPDATE "DB_consultorioJuridico".conciliacion
+SET version = 0
+WHERE version IS NULL;
+
+ALTER TABLE "DB_consultorioJuridico".conciliacion
+    ALTER COLUMN version SET DEFAULT 0;
+
+ALTER TABLE "DB_consultorioJuridico".conciliacion
+    ALTER COLUMN version SET NOT NULL;
+
 COMMIT;
