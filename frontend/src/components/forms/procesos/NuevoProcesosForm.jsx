@@ -97,7 +97,7 @@ function normalizarPayload(form) {
   };
 }
 
-// ─── Modal de búsqueda de consulta ───────────────────────────────────────────
+// Search behavior.
 function ModalBuscarConsulta({ abierto, consultas, busqueda, setBusqueda, onSeleccionar, onCerrar, consultaIdSeleccionada }) {
   if (!abierto) return null;
 
@@ -160,7 +160,7 @@ function ModalBuscarConsulta({ abierto, consultas, busqueda, setBusqueda, onSele
   );
 }
 
-// ─── Campo de consulta con botón + modal ─────────────────────────────────────
+// Modal behavior.
 function CampoConsulta({ label, consultaId, consultas, onSeleccionar, required }) {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState("");
@@ -252,7 +252,7 @@ function Aviso({ children }) {
   );
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
+// Component implementation detail.
 export function NuevoProcesoForm() {
   const router = useRouter();
 
@@ -450,7 +450,7 @@ export function NuevoProcesoForm() {
               ))}
             </CampoSelect>
 
-            {/* Consulta — modal de búsqueda en lugar de select nativo */}
+            {/* Search behavior.*/}
             <CampoConsulta
               label="Consulta"
               consultaId={form.consultaId}

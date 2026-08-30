@@ -1,18 +1,18 @@
 /**
- * Utilidades de autorización para el sistema de casos jurídicos.
+ * Permission and authorization handling.
  *
- * Provee funciones para verificar permisos y roles del usuario autenticado
- * a partir del objeto devuelto por `/api/auth/me`.
+ * Permission and authorization handling.
+ * Implementation detail.
  *
  * @module lib/authz
  */
 
 /**
- * Normaliza un string para comparaciones insensibles a mayúsculas y tildes.
- * Convierte a mayúsculas y elimina diacríticos.
+ * Implementation detail.
+ * Implementation detail.
  *
- * @param {unknown} value - Valor a normalizar.
- * @returns {string} String normalizado en mayúsculas sin tildes.
+ * @param {unknown} value - Implementation detail.
+ * @returns {string} Result value.
  */
 export function normalizar(value) {
   return String(value || "")
@@ -23,11 +23,11 @@ export function normalizar(value) {
 }
 
 /**
- * Extrae el nombre legible de un permiso, ya sea un string directo
- * o un objeto con alguno de los campos estándar del backend.
+ * Permission and authorization handling.
+ * Implementation detail.
  *
- * @param {string|object} permiso - El permiso como string o como objeto DTO.
- * @returns {string} El nombre del permiso, o string vacío si no se puede extraer.
+ * @param {string|object} permiso - Parameter description.
+ * @returns {string} Result value.
  */
 export function nombrePermiso(permiso) {
   if (typeof permiso === "string") return permiso;
@@ -42,20 +42,20 @@ export function nombrePermiso(permiso) {
 }
 
 /**
- * Obtiene el array de permisos del usuario.
+ * Permission and authorization handling.
  *
- * @param {object|null} user - Objeto de usuario devuelto por `/api/auth/me`.
- * @returns {Array} Array de permisos del usuario, o vacío si no hay ninguno.
+ * @param {object|null} user - Authenticated user object.
+ * @returns {Array} Result value.
  */
 export function obtenerPermisos(user) {
   return Array.isArray(user?.permisos) ? user.permisos : [];
 }
 
 /**
- * Obtiene los nombres de todos los permisos del usuario como strings.
+ * Permission and authorization handling.
  *
- * @param {object|null} user - Objeto de usuario.
- * @returns {string[]} Array de nombres de permisos.
+ * @param {object|null} user - Authenticated user object.
+ * @returns {string[]} Result value.
  */
 export function obtenerNombresPermisos(user) {
   return obtenerPermisos(user)
@@ -64,12 +64,12 @@ export function obtenerNombresPermisos(user) {
 }
 
 /**
- * Verifica si el usuario tiene un permiso específico.
- * La comparación es insensible a mayúsculas y tildes.
+ * Permission and authorization handling.
+ * Implementation detail.
  *
- * @param {object|null} user - Objeto de usuario.
- * @param {string} permiso - Nombre del permiso a verificar (ej. `"Ver consultas"`).
- * @returns {boolean} `true` si el usuario tiene el permiso.
+ * @param {object|null} user - Authenticated user object.
+ * @param {string} permiso - Parameter description.
+ * @returns {boolean} Result value.
  */
 export function tienePermiso(user, permiso) {
   const permisos = obtenerNombresPermisos(user).map(normalizar);
@@ -77,11 +77,11 @@ export function tienePermiso(user, permiso) {
 }
 
 /**
- * Verifica si el usuario tiene al menos uno de los permisos indicados.
+ * Permission and authorization handling.
  *
- * @param {object|null} user - Objeto de usuario.
- * @param {string[]} [permisosRequeridos=[]] - Lista de permisos a verificar.
- * @returns {boolean} `true` si el usuario tiene alguno de los permisos.
+ * @param {object|null} user - Authenticated user object.
+ * @param {string[]} [permisosRequeridos=[]] - Required permission names.
+ * @returns {boolean} Result value.
  */
 export function tieneAlgunPermiso(user, permisosRequeridos = []) {
   const permisos = obtenerNombresPermisos(user).map(normalizar);
@@ -92,11 +92,11 @@ export function tieneAlgunPermiso(user, permisosRequeridos = []) {
 }
 
 /**
- * Verifica si el usuario tiene todos los permisos indicados.
+ * Permission and authorization handling.
  *
- * @param {object|null} user - Objeto de usuario.
- * @param {string[]} [permisosRequeridos=[]] - Lista de permisos a verificar.
- * @returns {boolean} `true` si el usuario tiene todos los permisos.
+ * @param {object|null} user - Authenticated user object.
+ * @param {string[]} [permisosRequeridos=[]] - Required permission names.
+ * @returns {boolean} Result value.
  */
 export function tieneTodosLosPermisos(user, permisosRequeridos = []) {
   const permisos = obtenerNombresPermisos(user).map(normalizar);
@@ -107,63 +107,63 @@ export function tieneTodosLosPermisos(user, permisosRequeridos = []) {
 }
 
 /**
- * Verifica si el tipo de perfil del usuario coincide con el indicado.
- * La comparación es insensible a mayúsculas y tildes.
+ * User flow detail.
+ * Implementation detail.
  *
- * @param {object|null} user - Objeto de usuario.
- * @param {string} perfil - Nombre del perfil a verificar (ej. `"ESTUDIANTE"`).
- * @returns {boolean} `true` si el perfil del usuario coincide.
+ * @param {object|null} user - Authenticated user object.
+ * @param {string} perfil - Parameter description.
+ * @returns {boolean} Result value.
  */
 export function tienePerfil(user, perfil) {
   return normalizar(user?.tipoPerfil) === normalizar(perfil);
 }
 
 /**
- * Verifica si el nombre de rol del usuario coincide con el indicado.
+ * Role handling.
  *
- * @param {object|null} user - Objeto de usuario.
- * @param {string} rol - Nombre del rol a verificar.
- * @returns {boolean} `true` si el rol coincide.
+ * @param {object|null} user - Authenticated user object.
+ * @param {string} rol - Role name to compare.
+ * @returns {boolean} Result value.
  */
 export function tieneRol(user, rol) {
   return normalizar(user?.rolNombre || user?.rol?.nombre) === normalizar(rol);
 }
 
 /**
- * @param {object|null} user - Objeto de usuario.
- * @returns {boolean} `true` si el usuario es administrativo.
+ * @param {object|null} user - Authenticated user object.
+ * @returns {boolean} Result value.
  */
 export function esAdministrativo(user) {
   return tienePerfil(user, "ADMINISTRATIVO");
 }
 
 /**
- * @param {object|null} user - Objeto de usuario.
- * @returns {boolean} `true` si el usuario es asesor.
+ * @param {object|null} user - Authenticated user object.
+ * @returns {boolean} Result value.
  */
 export function esAsesor(user) {
   return tienePerfil(user, "ASESOR");
 }
 
 /**
- * @param {object|null} user - Objeto de usuario.
- * @returns {boolean} `true` si el usuario es estudiante.
+ * @param {object|null} user - Authenticated user object.
+ * @returns {boolean} Result value.
  */
 export function esEstudiante(user) {
   return tienePerfil(user, "ESTUDIANTE");
 }
 
 /**
- * @param {object|null} user - Objeto de usuario.
- * @returns {boolean} `true` si el usuario es monitor.
+ * @param {object|null} user - Authenticated user object.
+ * @returns {boolean} Result value.
  */
 export function esMonitor(user) {
   return tienePerfil(user, "MONITOR");
 }
 
 /**
- * @param {object|null} user - Objeto de usuario.
- * @returns {boolean} `true` si el usuario es conciliador.
+ * @param {object|null} user - Authenticated user object.
+ * @returns {boolean} Result value.
  */
 export function esConciliador(user) {
   return tienePerfil(user, "CONCILIADOR");

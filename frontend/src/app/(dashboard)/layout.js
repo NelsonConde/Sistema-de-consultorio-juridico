@@ -40,7 +40,7 @@ export default function DashboardLayout({ children }) {
   const { setTheme } = useTheme()
   const pathname = usePathname()
 
-  // Default fallback si no hay mapeo
+  // Implementation detail.
   const info = ROUTE_INFO[pathname] || { breadcrumb: "Sistema", title: "Casos Jurídicos" }
 
   return (
@@ -90,7 +90,7 @@ export default function DashboardLayout({ children }) {
             </div>
           </header>
 
-          {/* CONTENIDO DE LA PÁGINA */}
+          {/* Implementation detail.*/}
           <main className="flex-1 overflow-auto">
             {children}
           </main>

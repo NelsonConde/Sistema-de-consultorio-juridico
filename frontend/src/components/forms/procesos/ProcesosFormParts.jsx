@@ -67,7 +67,7 @@ export function ModalBuscarConsulta({ abierto, consultas, busqueda, setBusqueda,
   );
 }
 
-// ─── Campo de consulta con botón + modal ─────────────────────────────────────
+// Modal behavior.
 export function CampoConsulta({ label, consultaId, consultas, onSeleccionar, required, disabled = false }) {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState("");
@@ -164,7 +164,7 @@ export function Aviso({ children }) {
   );
 }
 
-// ─── Modal de edición ─────────────────────────────────────────────────────────
+// Modal behavior.
 export function ModalEdicion({
   form, actualizarCampo, departamentos, consultas,
   organosControl, especialidadesFiltradas, onCerrar, onGuardar, guardando,
@@ -223,7 +223,7 @@ export function ModalEdicion({
             ))}
           </CampoSelect>
 
-          {/* Consulta — modal de búsqueda en lugar de select nativo */}
+          {/* Search behavior.*/}
           <div className="space-y-1">
             <CampoConsulta
               label="Consulta"
@@ -277,7 +277,7 @@ export function ModalEdicion({
 }
 
 
-// ─── Modal de cambio de estado funcional ─────────────────────────────────────
+// Modal behavior.
 export function ModalCambioEstado({ proceso, estadoSeleccionado, setEstadoSeleccionado, onCerrar, onGuardar, guardando }) {
   if (!proceso) return null;
 
@@ -338,4 +338,4 @@ export function ModalCambioEstado({ proceso, estadoSeleccionado, setEstadoSelecc
   );
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
+// Component implementation detail.

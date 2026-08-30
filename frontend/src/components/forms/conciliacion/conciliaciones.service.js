@@ -6,8 +6,8 @@ function resolveConciliacionUrl(path) {
 }
 
 /**
- * Cliente de datos del módulo de conciliaciones.
- * Centraliza transporte, lectura de respuesta y construcción del error HTTP.
+ * Conciliation workflow detail.
+ * Error handling.
  */
 export async function requestConciliacion(
   path,
@@ -25,6 +25,6 @@ export async function requestConciliacion(
     }
   );
 
-  // Conserva la forma previa de las respuestas de texto plano del módulo.
+  // Implementation detail.
   return typeof data === "string" ? { mensaje: data } : data;
 }

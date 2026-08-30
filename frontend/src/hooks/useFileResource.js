@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fileApi } from "@/lib/fileApi";
 
-/** Estado reutilizable para una colección de archivos de un recurso. */
+/** File handling.*/
 export function useFileResource(resource, { load = true } = {}) {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);

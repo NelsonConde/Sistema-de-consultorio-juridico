@@ -20,10 +20,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Calcula el semestre actual basado en la fecha del sistema.
+ * Date handling.
  * Semestre 1: enero-mayo (meses 0-5), Semestre 2: junio-diciembre (meses 6-11)
  * 
- * @returns {Object} Objeto con propiedades {año: number, semestre: 1|2}
+ * @returns {Object} Result value.
  */
 function calcularSemestreActual() {
   const hoy = new Date();
@@ -31,10 +31,10 @@ function calcularSemestreActual() {
 }
 
 /**
- * Convierte un nombre de estado a su etiqueta en español.
+ * State handling.
  * 
- * @param {string} nombre - Nombre del estado (ej: "PENDIENTE", "ACTIVO")
- * @returns {string} Etiqueta en español o el nombre original si no coincide
+ * @param {string} nombre - Parameter description.
+ * @returns {string} Result value.
  */
 function etiquetaEstado(nombre) {
   const mapa = {
@@ -47,10 +47,10 @@ function etiquetaEstado(nombre) {
 }
 
 /**
- * Retorna la fecha de hoy en formato ISO (yyyy-MM-dd).
- * Útil para valores por defecto en seleccionadores de fechas.
+ * Returns today's date in ISO format (yyyy-MM-dd).
+ * Selection behavior.
  * 
- * @returns {string} Fecha hoy en formato ISO
+ * @returns {string} Result value.
  */
 function hoyStr() { return new Date().toISOString().slice(0, 10); }
 
@@ -305,7 +305,7 @@ function DetalleEstudiantes({ stats }) {
   );
 }
 
-// Mapa de categorías
+// Implementation detail.
 const CATEGORIAS = [
   {
     id: "consultas",
@@ -376,10 +376,10 @@ function EstadisticasContenido({ stats }) {
         ))}
       </div>
 
-      {/* Panel de detalle — aparece bajo las tarjetas */}
+      {/* Detail panel displayed below the summary cards. */}
       {catActiva && (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
-          {/* Header del panel de detalle */}
+          {/* Detail panel header. */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
             <div className="flex items-center gap-2">
               <catActiva.icon className="w-3.5 h-3.5 text-primary" />
@@ -541,7 +541,7 @@ export function EstadisticasForm() {
         </Button>
       </div>
 
-      {/* Selector de modo */}
+      {/* Mode selector */}
       <Tabs
         value={modoRango ? "rango" : "semestre"}
         onValueChange={(v) => { setModoRango(v === "rango"); setStats(null); setError(""); }}
@@ -611,10 +611,10 @@ export function EstadisticasForm() {
         </div>
       )}
 
-      {/* Contenido */}
+      {/* Content */}
       {!cargando && stats && <EstadisticasContenido stats={stats} />}
 
-      {/* Sin datos */}
+      {/* Implementation detail.*/}
       {!cargando && !stats && !error && (
         <div className="text-center py-12 text-muted-foreground">
           <FileBarChart2 className="w-10 h-10 mx-auto mb-2 opacity-25" />

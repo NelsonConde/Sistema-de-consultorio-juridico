@@ -2,10 +2,29 @@
 
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import Pagination from "@/components/ui/Pagination";
+
+function PaginationFooter({ pagination }) {
+  if (!pagination) return null;
+
+  return (
+    <div className="border-t pt-2">
+      <Pagination
+        currentPage={pagination.currentPage}
+        totalPages={pagination.totalPages}
+        onPageChange={pagination.onPageChange}
+        pageSize={pagination.pageSize}
+        onPageSizeChange={pagination.onPageSizeChange}
+        pageSizeOptions={pagination.pageSizeOptions || [10, 20, 50]}
+        totalItems={pagination.totalItems}
+      />
+    </div>
+  );
+}
 
 /**
- * Modal reutilizable de selección simple para consultas.
- * Extraído de los formularios para mantener la vista separada de la lógica del módulo.
+ * Modal behavior.
+ * Form handling.
  */
 export function ModalSimple({
   abierto,
@@ -17,6 +36,8 @@ export function ModalSimple({
   onCerrar,
   seleccionado,
   renderItem,
+  loading = false,
+  pagination = null,
 }) {
   if (!abierto) return null;
 
@@ -38,6 +59,7 @@ export function ModalSimple({
           autoFocus
           type="text"
           placeholder="Buscar..."
+          maxLength={100}
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -52,7 +74,11 @@ export function ModalSimple({
             Sin asignar
           </button>
 
-          {items.length === 0 ? (
+          {loading ? (
+            <p className="text-center text-sm text-muted-foreground py-4">
+              Buscando personas...
+            </p>
+          ) : items.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground py-4">
               Sin resultados
             </p>
@@ -69,12 +95,14 @@ export function ModalSimple({
             ))
           )}
         </div>
+
+        <PaginationFooter pagination={pagination} />
       </div>
     </div>
   );
 }
 
-/** Modal reutilizable de selección múltiple. */
+/** Modal behavior.*/
 export function ModalMultiple({
   abierto,
   titulo,
@@ -85,6 +113,8 @@ export function ModalMultiple({
   onCerrar,
   seleccionados,
   renderItem,
+  loading = false,
+  pagination = null,
 }) {
   const [temp, setTemp] = useState([]);
 
@@ -121,13 +151,18 @@ export function ModalMultiple({
           autoFocus
           type="text"
           placeholder="Buscar..."
+          maxLength={100}
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         />
 
         <div className="max-h-64 overflow-y-auto space-y-1">
-          {items.length === 0 ? (
+          {loading ? (
+            <p className="text-center text-sm text-muted-foreground py-4">
+              Buscando personas...
+            </p>
+          ) : items.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground py-4">
               Sin resultados
             </p>
@@ -153,6 +188,8 @@ export function ModalMultiple({
             })
           )}
         </div>
+
+        <PaginationFooter pagination={pagination} />
 
         <div className="flex justify-between items-center pt-2">
           <span className="text-xs text-muted-foreground">

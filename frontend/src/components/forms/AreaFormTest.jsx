@@ -2,15 +2,15 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 
 /**
- * Formulario de prueba para capturar el nombre del área.
- * @returns {JSX.Element} Componente de formulario.
+ * Form handling.
+ * @returns {JSX.Element} Result value.
  */
 export function AreaFormTest() {
   const { register, handleSubmit, formState: { errors }, control } = useForm();
 
   /**
-   * Maneja el envío del formulario.
-   * @param {Object} data - Datos capturados por el formulario.
+   * Form handling.
+   * @param {Object} data - Parameter description.
    * @returns {void}
    */
   const onSubmit = (data) => {

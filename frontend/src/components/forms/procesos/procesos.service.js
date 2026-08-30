@@ -24,8 +24,8 @@ export async function apiGet(url, fallback = "No se pudo consultar la informaci√
 }
 
 /**
- * Realiza una solicitud mutable del m√≥dulo de procesos usando el cliente HTTP
- * centralizado. Conserva los mensajes funcionales que ya utiliza la interfaz.
+ * Process workflow detail.
+ * Error handling.
  */
 export async function apiEnviar(
   url,

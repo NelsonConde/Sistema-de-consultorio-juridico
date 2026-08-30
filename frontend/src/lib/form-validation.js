@@ -1,10 +1,10 @@
 /**
- * Reglas de validación reutilizables para formularios.
+ * Validation rule.
  *
- * Estas reglas reflejan restricciones determinísticas del backend (Bean Validation
- * y validadores de dominio) que pueden comprobarse en el navegador. Las reglas
- * que dependen de estado de base de datos (duplicados, vigencia, autorización,
- * concurrencia, etc.) continúan siendo responsabilidad definitiva del backend.
+ * Validation rule.
+ * Validation rule.
+ * Permission and authorization handling.
+ * Implementation detail.
  *
  * @module lib/form-validation
  */

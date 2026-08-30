@@ -1,4 +1,4 @@
-/** Constantes y opciones del formulario de persona. */
+/** Form handling.*/
 export const REQUIRED_MESSAGE = "El campo es obligatorio";
 export const MAX_ESTRATO = 7;
 export const MAX_PERSONAS_A_CARGO = 10;

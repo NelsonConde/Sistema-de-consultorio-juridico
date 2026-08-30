@@ -1,9 +1,9 @@
 /**
- * Cliente de archivos orientado a recursos del negocio.
+ * File handling.
  *
- * Este módulo es el único lugar que conoce el protocolo de carga, la URL
- * firmada temporal y la descarga desde Storage. Las páginas sólo entregan un
- * recurso y archivos; nunca construyen claves del bucket.
+ * Data loading behavior.
+ * Data loading behavior.
+ * File handling.
  */
 
 import { apiClient } from "@/lib/apiClient";
@@ -89,7 +89,7 @@ export async function upload(resource, file) {
     try {
       await apiClient.delete(`/file-uploads/${uploadSession.uploadId}`);
     } catch {
-      // El reconciliador del backend limpiará una carga huérfana si es necesario.
+      // Data loading behavior.
     }
     throw error;
   }

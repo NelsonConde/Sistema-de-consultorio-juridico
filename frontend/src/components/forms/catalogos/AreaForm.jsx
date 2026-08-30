@@ -1,13 +1,13 @@
 "use client"
 
 /**
- * Formulario de gestión de áreas jurídicas.
+ * Form handling.
  *
- * Permite crear, editar y desactivar áreas. Incluye tabla paginada
- * con las áreas registradas y diálogo de confirmación para desactivar.
+ * Handles list pagination consistently.
+ * Implementation detail.
  *
- * Requiere permiso `GESTIONAR_CATALOGOS`. Si el usuario no tiene sesión
- * válida redirige a `/`; si no tiene permiso suficiente redirige a `/inicio`.
+ * Permission and authorization handling.
+ * Permission and authorization handling.
  *
  * @module components/forms/catalogos/AreaForm
  */
@@ -29,8 +29,8 @@ import Pagination from "@/components/ui/Pagination"
 import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils"
 
 /**
- * Formulario para gestionar áreas de catálogo.
- * @returns {JSX.Element} Componente de formulario de áreas.
+ * Form handling.
+ * @returns {JSX.Element} Result value.
  */
 export function AreaForm() {
   const router = useRouter()
@@ -89,8 +89,8 @@ export function AreaForm() {
   }, [router])
 
   /**
-   * Carga la lista de áreas desde el backend y actualiza el estado.
-   * Redirige a raíz si la sesión expiró (401) o muestra toast si hay error de red.
+   * List and table handling.
+   * Error handling.
    */
   async function cargarAreas() {
     try {
@@ -168,11 +168,11 @@ export function AreaForm() {
   }
 
   /**
-   * Envía el formulario al backend (POST para crear, PUT para editar).
-   * Muestra toast de éxito o error según el resultado.
-   * Recarga la lista de áreas si la operación fue exitosa.
+   * Form handling.
+   * Error handling.
+   * List and table handling.
    *
-   * @param {{ nombre: string }} data - Datos del formulario validados por react-hook-form.
+   * @param {{ nombre: string }} data - Parameter description.
    */
   const onSubmit = async (data) => {
     const nombre = String(data?.nombre || "").trim()

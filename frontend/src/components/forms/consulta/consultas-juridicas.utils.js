@@ -187,8 +187,8 @@ function tieneDuplicados(values = []) {
 }
 
 /**
- * Replica en la UI las invariantes de ConsultaValidator que pueden comprobarse
- * con los catálogos ya cargados. El backend sigue siendo la autoridad final.
+ * Validation rule.
+ * Data loading behavior.
  */
 export function validarCoherenciaConsultaFrontend({
   form,

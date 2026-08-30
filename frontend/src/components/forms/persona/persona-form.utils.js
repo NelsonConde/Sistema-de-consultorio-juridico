@@ -8,9 +8,9 @@ export function toOption(item) {
 }
 
 /**
- * Convierte datos de documento en una opción amigable para el select.
- * @param {Object} item - Datos del documento.
- * @returns {{value:string, label:string}} Opción de documento.
+ * Implementation detail.
+ * @param {Object} item - Item to process.
+ * @returns {{value:string, label:string} Result value.
  */
 export function toDocumentoOption(item) {
   const value = item.codigo || item.abreviatura || item.nombre || item.descripcion || "";
@@ -20,9 +20,9 @@ export function toDocumentoOption(item) {
 }
 
 /**
- * Normaliza los valores iniciales antes de usarlos en el formulario.
+ * Form handling.
  * @param {Object} values - Valores iniciales recibidos.
- * @returns {Object} Valores preparados para el formulario.
+ * @returns {Object} Result value.
  */
 export function toFormValues(values = {}) {
   return {
@@ -50,9 +50,9 @@ export function toFormValues(values = {}) {
 }
 
 /**
- * Convierte un valor numérico vacío en null.
- * @param {unknown} value - Valor de entrada.
- * @returns {number|null} Número o null.
+ * Implementation detail.
+ * @param {unknown} value - Parameter description.
+ * @returns {number|null} Result value.
  */
 export function numberOrNull(value) {
   if (value === null || value === undefined || value === "") {
@@ -64,9 +64,9 @@ export function numberOrNull(value) {
 }
 
 /**
- * Convierte texto vacío en null y elimina espacios innecesarios.
- * @param {unknown} value - Valor de texto recibido.
- * @returns {string|null} Texto limpio o null.
+ * Implementation detail.
+ * @param {unknown} value - Parameter description.
+ * @returns {string|null} Result value.
  */
 export function textOrNull(value) {
   const text = String(value ?? "").trim();
@@ -74,8 +74,8 @@ export function textOrNull(value) {
 }
 
 /**
- * Construye un payload con tipos normalizados para el backend.
- * @param {Object} data - Datos del formulario.
+ * Implementation detail.
+ * @param {Object} data - Parameter description.
  * @returns {Object} Payload normalizado.
  */
 export function construirPayload(data) {
@@ -103,7 +103,7 @@ export function construirPayload(data) {
 }
 
 /**
- * Carga un catálogo desde la API.
- * @param {string} path - Ruta del catálogo relativa.
- * @returns {Promise<Array<any>>} Lista de registros.
+ * Data loading behavior.
+ * @param {string} path - Parameter description.
+ * @returns {Promise<Array<any>>} Result value.
  */

@@ -13,7 +13,7 @@ import {
 import { useFileResource } from "@/hooks/useFileResource";
 import { FormFileUpload } from "./FormFileUpload";
 
-/** Carga archivos para un recurso funcional explícito, sin conocer rutas del bucket. */
+/** File handling.*/
 export default function ArchivoForm({ resource }) {
   const [isUploading, setIsUploading] = useState(false);
   const { upload } = useFileResource(resource, { load: false });

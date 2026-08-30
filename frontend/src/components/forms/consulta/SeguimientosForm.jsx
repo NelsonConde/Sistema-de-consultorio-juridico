@@ -3,11 +3,11 @@
 import { apiClient } from "@/lib/apiClient";
 import { fileApi } from "@/lib/fileApi";
 /**
- * Formulario de gestión de seguimientos (tareas) de consultas jurídicas.
+ * Form handling.
  *
- * Permite crear, editar y responder seguimientos según el rol del usuario.
- * Los estudiantes solo pueden ver y responder; asesores y monitores pueden
- * crear, editar, y calificar respuestas.
+ * Role handling.
+ * Implementation detail.
+ * Implementation detail.
  *
  * @module components/forms/consulta/SeguimientosForm
  */

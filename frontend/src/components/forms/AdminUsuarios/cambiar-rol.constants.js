@@ -1,4 +1,4 @@
-/** Configuración del formulario de cambio de rol. */
+/** Role handling.*/
 export const PERMISO_GESTIONAR_USUARIOS = "Gestionar usuarios";
 
 export const TIPOS_PERFIL = [

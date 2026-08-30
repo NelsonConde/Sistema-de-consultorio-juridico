@@ -1,5 +1,5 @@
 /**
- * Funciones puras y normalizadores del módulo de seguimientos.
+ * Follow-up workflow detail.
  */
 
 import { normalizar } from "@/lib/authz"

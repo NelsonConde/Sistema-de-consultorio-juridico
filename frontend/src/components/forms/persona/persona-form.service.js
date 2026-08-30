@@ -14,7 +14,7 @@ export async function fetchCatalogo(path) {
 }
 
 /**
- * Formulario para crear o editar una persona.
- * @param {{onSubmit:function, initialValues:Object}} props - Props del componente.
- * @returns {JSX.Element} Componente de formulario.
+ * Form handling.
+ * @param {{onSubmit:function, initialValues:Object}} props - Parameter description.
+ * @returns {JSX.Element} Result value.
  */

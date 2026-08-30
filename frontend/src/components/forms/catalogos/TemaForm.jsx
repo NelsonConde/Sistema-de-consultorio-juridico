@@ -2,10 +2,10 @@
 
 import { apiClient } from "@/lib/apiClient";
 /**
- * Formulario de gestión de temas jurídicos.
+ * Form handling.
  *
- * Permite crear, editar y desactivar temas agrupados por área jurídica.
- * Requiere permiso `GESTIONAR_CATALOGOS`.
+ * Implementation detail.
+ * Permission and authorization handling.
  *
  * @module components/forms/catalogos/TemaForm
  */
@@ -29,8 +29,8 @@ import Pagination from "@/components/ui/Pagination";
 import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils";
 
 /**
- * Formulario para gestionar temas de catálogo.
- * @returns {JSX.Element} Componente de formulario de temas.
+ * Form handling.
+ * @returns {JSX.Element} Result value.
  */
 export function TemaForm() {
   const router = useRouter();

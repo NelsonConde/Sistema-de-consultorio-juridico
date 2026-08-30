@@ -2,10 +2,10 @@
 
 import { apiClient } from "@/lib/apiClient";
 /**
- * Formulario de listado de personas registradas en el sistema.
+ * List and table handling.
  *
- * Muestra la lista de personas con búsqueda y paginación.
- * Permite abrir el formulario de registro/edición de persona.
+ * Handles list pagination consistently.
+ * Form handling.
  *
  * @module components/forms/persona/PersonasForm
  */
@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
 import { getApiErrorDescription, getApiErrorTitle } from "@/lib/api";
+import { buscarPersonasActivas, obtenerPersonaDetalle } from "@/lib/personasApi";
 import { DIGITS_PATTERN, EMAIL_PATTERN } from "@/lib/form-validation";
 
 import {
@@ -39,15 +40,10 @@ import {
   calcularEsMenorEdad,
   construirPayload,
   convertirPersonaAForm,
-  labelFromMap,
   nombreCompleto,
-  obtenerPaginasVisibles,
-  optionsMap,
-  ordenarPorIdAscendente,
   textOrNull,
   toDocumentoOption,
   toOption,
-  valorTexto,
 } from "./personas.utils";
 import { Checkbox, Input, Seccion, Select } from "./PersonasFormParts";
 import { fetchCatalogo, leerRespuesta } from "./personas.service";
@@ -56,8 +52,12 @@ export function PersonasForm() {
   const [user, setUser] = useState(null);
   const [personas, setPersonas] = useState([]);
   const [busqueda, setBusqueda] = useState("");
+  const [busquedaAplicada, setBusquedaAplicada] = useState("");
   const [paginaActual, setPaginaActual] = useState(1);
   const [registrosPorPagina, setRegistrosPorPagina] = useState(10);
+  const [totalRegistros, setTotalRegistros] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(0);
+  const [cargandoLista, setCargandoLista] = useState(false);
   const [personaEditando, setPersonaEditando] = useState(null);
   const [personaADesactivar, setPersonaADesactivar] = useState(null);
   const [form, setForm] = useState(FORM_INICIAL);
@@ -78,8 +78,6 @@ export function PersonasForm() {
   const [departamentoOptions, setDepartamentoOptions] = useState([]);
   const [municipioOptions, setMunicipioOptions] = useState([]);
   const [barrioOptions, setBarrioOptions] = useState([]);
-  const [municipioCatalogoOptions, setMunicipioCatalogoOptions] = useState([]);
-  const [barrioCatalogoOptions, setBarrioCatalogoOptions] = useState([]);
 
   const router = useRouter();
 
@@ -94,67 +92,37 @@ export function PersonasForm() {
     PERMISOS.CAMBIAR_ESTADO_PERSONAS
   );
 
-  const tipoPersonaMap = useMemo(
-    () => optionsMap(tipoPersonaOptions),
-    [tipoPersonaOptions]
-  );
-  const municipioMap = useMemo(
-    () => optionsMap(municipioCatalogoOptions),
-    [municipioCatalogoOptions]
-  );
-  const barrioMap = useMemo(
-    () => optionsMap(barrioCatalogoOptions),
-    [barrioCatalogoOptions]
-  );
-
-  const personasFiltradas = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-
-    const base = !q
-      ? personas
-      : personas.filter((persona) =>
-          [
-            persona.id,
-            persona.numeroDocumento,
-            persona.nombres,
-            persona.apellidos,
-            persona.telefono,
-            persona.correo,
-            persona.direccion,
-            labelFromMap(tipoPersonaMap, persona.tipoPersonaId, ""),
-            labelFromMap(municipioMap, persona.municipioId, ""),
-            labelFromMap(barrioMap, persona.barrioId, ""),
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase()
-            .includes(q)
-        );
-
-    return ordenarPorIdAscendente(base);
-  }, [personas, busqueda, tipoPersonaMap, municipioMap, barrioMap]);
-
-  const totalRegistros = personasFiltradas.length;
-  const totalPaginas = Math.max(1, Math.ceil(totalRegistros / registrosPorPagina));
-  const indiceInicial = (paginaActual - 1) * registrosPorPagina;
-  const indiceFinal = Math.min(indiceInicial + registrosPorPagina, totalRegistros);
-  const paginasVisibles = obtenerPaginasVisibles(paginaActual, totalPaginas);
-
-  const personasPaginadas = useMemo(
-    () => personasFiltradas.slice(indiceInicial, indiceInicial + registrosPorPagina),
-    [personasFiltradas, indiceInicial, registrosPorPagina]
-  );
+  const indiceInicial =
+    totalRegistros === 0 ? 0 : (paginaActual - 1) * registrosPorPagina;
+  const indiceFinal =
+    totalRegistros === 0
+      ? 0
+      : Math.min(paginaActual * registrosPorPagina, totalRegistros);
 
   useEffect(() => {
     cargarInicial();
   }, [router]);
 
   useEffect(() => {
-    setPaginaActual(1);
-  }, [busqueda, registrosPorPagina]);
+    const timeoutId = window.setTimeout(() => {
+      setPaginaActual(1);
+      setBusquedaAplicada(busqueda.trim());
+    }, 350);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [busqueda]);
 
   useEffect(() => {
-    if (paginaActual > totalPaginas) {
+    if (!user) return;
+
+    const controller = new AbortController();
+    cargarPersonas({ signal: controller.signal });
+
+    return () => controller.abort();
+  }, [user, busquedaAplicada, paginaActual, registrosPorPagina]);
+
+  useEffect(() => {
+    if (totalPaginas > 0 && paginaActual > totalPaginas) {
       setPaginaActual(totalPaginas);
     }
   }, [paginaActual, totalPaginas]);
@@ -239,7 +207,6 @@ export function PersonasForm() {
       setUser(meData);
 
       await cargarCatalogosBase();
-      await cargarPersonas();
     } catch (err) {
       console.error(err);
       setError(err.message || "Error cargando personas");
@@ -257,8 +224,6 @@ export function PersonasForm() {
       ocupaciones,
       empresas,
       departamentos,
-      municipios,
-      barrios,
     ] = await Promise.all([
       fetchCatalogo("/tipos-documento/activos"),
       fetchCatalogo("/tipos-persona"),
@@ -267,8 +232,6 @@ export function PersonasForm() {
       fetchCatalogo("/ocupaciones"),
       fetchCatalogo("/empresas"),
       fetchCatalogo("/departamentos"),
-      fetchCatalogo("/municipios"),
-      fetchCatalogo("/barrios"),
     ]);
 
     const opcionesDocumento = tiposDocumento
@@ -286,62 +249,102 @@ export function PersonasForm() {
     setOcupacionOptions(ocupaciones.map(toOption));
     setEmpresaOptions(empresas.map(toOption));
     setDepartamentoOptions(departamentos.map(toOption));
-    setMunicipioCatalogoOptions(municipios.map(toOption));
-    setBarrioCatalogoOptions(barrios.map(toOption));
   }
 
-  async function cargarPersonas() {
-    const personasRes = await apiClient.request(`${API_URL_BASE}/personas/activos`, {
-      credentials: "include",
-    });
+  async function cargarPersonas({ signal } = {}) {
+    try {
+      setCargandoLista(true);
+      setError("");
 
-    if (personasRes.status === 401) {
-      router.replace("/");
-      return;
+      const resultado = await buscarPersonasActivas({
+        search: busquedaAplicada,
+        page: paginaActual,
+        size: registrosPorPagina,
+        signal,
+      });
+
+      if (
+        resultado.totalPages > 0 &&
+        paginaActual > resultado.totalPages
+      ) {
+        setPaginaActual(resultado.totalPages);
+        return;
+      }
+
+      setPersonas(resultado.content);
+      setTotalRegistros(resultado.totalElements);
+      setTotalPaginas(resultado.totalPages);
+    } catch (err) {
+      if (err.name === "AbortError") return;
+
+      if (err.status === 401) {
+        router.replace("/");
+        return;
+      }
+
+      if (err.status === 403) {
+        router.replace("/inicio");
+        return;
+      }
+
+      setPersonas([]);
+      setTotalRegistros(0);
+      setTotalPaginas(0);
+      setError(err.message || "No se pudieron cargar las personas");
+    } finally {
+      setCargandoLista(false);
     }
-
-    if (personasRes.status === 403) {
-      router.replace("/inicio");
-      return;
-    }
-
-    if (!personasRes.ok) {
-      throw new Error("No se pudieron cargar las personas");
-    }
-
-    const personasData = await personasRes.json();
-    const personasOrdenadas = ordenarPorIdAscendente(
-      Array.isArray(personasData) ? personasData : []
-    );
-
-    setPersonas(personasOrdenadas);
   }
 
-  async function abrirEdicion(persona) {
+  async function abrirEdicion(personaResumen) {
     if (!puedeEditar) {
       setError("No tienes permisos para editar personas");
       return;
     }
 
-    setMensaje("");
-    setError("");
-    setPersonaEditando(persona);
-    setForm(convertirPersonaAForm(persona));
+    try {
+      setMensaje("");
+      setError("");
 
-    if (persona.departamentoId) {
-      const municipios = await fetchCatalogo(
-        `/municipios/departamento/${persona.departamentoId}`
-      );
-      setMunicipioOptions(municipios.map(toOption));
-    } else {
-      setMunicipioOptions([]);
-    }
+      const persona = await obtenerPersonaDetalle(personaResumen.id);
 
-    if (persona.municipioId) {
-      const barrios = await fetchCatalogo(`/barrios/municipio/${persona.municipioId}`);
-      setBarrioOptions(barrios.map(toOption));
-    } else {
-      setBarrioOptions([]);
+      setPersonaEditando(persona);
+      setForm(convertirPersonaAForm(persona));
+
+      if (persona.departamentoId) {
+        const municipios = await fetchCatalogo(
+          `/municipios/departamento/${persona.departamentoId}`
+        );
+        setMunicipioOptions(municipios.map(toOption));
+      } else {
+        setMunicipioOptions([]);
+      }
+
+      if (persona.municipioId) {
+        const barrios = await fetchCatalogo(
+          `/barrios/municipio/${persona.municipioId}`
+        );
+        setBarrioOptions(barrios.map(toOption));
+      } else {
+        setBarrioOptions([]);
+      }
+    } catch (err) {
+      if (err.status === 401) {
+        router.replace("/");
+        return;
+      }
+
+      if (err.status === 403) {
+        setError("No tienes permisos para consultar esta persona");
+        return;
+      }
+
+      if (err.status === 404) {
+        setError("La persona no está disponible para consulta o edición");
+        return;
+      }
+
+      setError(err.message || "No se pudo abrir la persona");
     }
   }
 
@@ -366,7 +369,6 @@ export function PersonasForm() {
 
   function handleBusquedaChange(event) {
     setBusqueda(event.target.value);
-    setPaginaActual(1);
   }
 
   function handleRegistrosPorPaginaChange(event) {
@@ -725,8 +727,13 @@ export function PersonasForm() {
             </p>
           </div>
 
-          <Button type="button" variant="outline" onClick={cargarInicial}>
-            Actualizar
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => cargarPersonas()}
+            disabled={cargandoLista}
+          >
+            {cargandoLista ? "Actualizando..." : "Actualizar"}
           </Button>
         </div>
 
@@ -735,7 +742,8 @@ export function PersonasForm() {
           <input
             value={busqueda}
             onChange={handleBusquedaChange}
-            placeholder="Buscar por documento, nombre, teléfono, correo o dirección..."
+            placeholder="Buscar por nombre, apellido o documento..."
+            maxLength={100}
             className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
@@ -758,7 +766,7 @@ export function PersonasForm() {
                 <span className="font-semibold text-foreground">
                   {totalRegistros}
                 </span>{" "}
-                personas, ordenadas por ID de menor a mayor.
+                personas.
               </>
             )}
           </div>
@@ -787,25 +795,23 @@ export function PersonasForm() {
                   <th className="px-4 py-3 text-left font-medium">ID</th>
                   <th className="px-4 py-3 text-left font-medium">Persona</th>
                   <th className="px-4 py-3 text-left font-medium">Documento</th>
-                  <th className="px-4 py-3 text-left font-medium">Contacto</th>
-                  <th className="px-4 py-3 text-left font-medium">Ubicación</th>
                   <th className="px-4 py-3 text-left font-medium">Tipo</th>
                   <th className="px-4 py-3 text-right font-medium">Acciones</th>
                 </tr>
               </thead>
 
               <tbody>
-                {personasPaginadas.length === 0 ? (
+                {personas.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={5}
                       className="px-4 py-8 text-center text-muted-foreground"
                     >
                       No hay personas para mostrar.
                     </td>
                   </tr>
                 ) : (
-                  personasPaginadas.map((persona) => (
+                  personas.map((persona) => (
                     <tr
                       key={persona.id}
                       className="border-t border-primary/20 transition hover:bg-primary/10"
@@ -816,45 +822,18 @@ export function PersonasForm() {
                         <div className="font-medium">
                           {nombreCompleto(persona) || "Sin nombre"}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Nacimiento: {valorTexto(persona.fechaNacimiento)}
-                        </div>
                       </td>
 
                       <td className="px-4 py-3">
-                        <div>{valorTexto(persona.tipoDocumento)}</div>
+                        <div>{persona.tipoDocumento || "N/A"}</div>
                         <div className="text-xs text-muted-foreground">
-                          {valorTexto(persona.numeroDocumento)}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <div>{valorTexto(persona.telefono)}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {valorTexto(persona.correo)}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <div>
-                          {labelFromMap(
-                            municipioMap,
-                            persona.municipioId,
-                            persona.municipio || "N/A"
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {valorTexto(persona.direccion)}
+                          {persona.numeroDocumentoEnmascarado || "N/A"}
                         </div>
                       </td>
 
                       <td className="px-4 py-3">
                         <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                          {labelFromMap(
-                            tipoPersonaMap,
-                            persona.tipoPersonaId,
-                            persona.tipoUsuario || "N/A"
-                          )}
+                          {persona.tipoPersona || "N/A"}
                         </span>
                       </td>
 
@@ -899,7 +878,10 @@ export function PersonasForm() {
           totalPages={totalPaginas}
           onPageChange={setPaginaActual}
           pageSize={registrosPorPagina}
-          onPageSizeChange={setRegistrosPorPagina}
+          onPageSizeChange={(size) => {
+            setRegistrosPorPagina(size);
+            setPaginaActual(1);
+          }}
           pageSizeOptions={REGISTROS_POR_PAGINA_OPTIONS}
           totalItems={totalRegistros}
         />

@@ -1,8 +1,8 @@
 /**
- * Reglas de permisos del módulo de seguimientos.
+ * Permission and authorization handling.
  *
- * Este archivo concentra únicamente decisiones de autorización de interfaz.
- * La autorización real sigue siendo responsabilidad del backend.
+ * Permission and authorization handling.
+ * Permission and authorization handling.
  */
 
 import { normalizar, tieneAlgunPermiso, tienePermiso } from "@/lib/authz"

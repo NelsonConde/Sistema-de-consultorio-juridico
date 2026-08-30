@@ -1,8 +1,8 @@
 /**
- * Constantes y valores iniciales del módulo de seguimientos.
+ * Follow-up workflow detail.
  *
- * Mantener estos valores fuera del componente evita mezclar configuración
- * estática con estado y renderizado.
+ * Component implementation detail.
+ * State handling.
  */
 
 export const FORM_TAREA_INICIAL = {

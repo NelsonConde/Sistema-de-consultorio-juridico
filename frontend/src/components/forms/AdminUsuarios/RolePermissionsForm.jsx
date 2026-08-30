@@ -1,16 +1,16 @@
 "use client"
 
 /**
- * Formulario de gestión de permisos por página para roles del sistema.
+ * Permission and authorization handling.
  *
- * Permite seleccionar qué páginas puede ver un rol, asignando y revocando
- * automáticamente los permisos necesarios para acceder a cada página.
+ * Role handling.
+ * Permission and authorization handling.
  *
  * Protecciones implementadas:
- * - No permite quitarle a tu propio rol el acceso a Administración.
- * - Las acciones sin permiso muestran un toast en lugar de redirigir.
- * - El algoritmo de diff solo revoca permisos gestionados por este form,
- *   preservando permisos asignados por otros medios.
+ * Role handling.
+ * Permission and authorization handling.
+ * Permission and authorization handling.
+ * Permission and authorization handling.
  *
  * @module components/forms/AdminUsuarios/RolePermissionsForm
  */
@@ -334,11 +334,11 @@ export function RolePermissionsForm() {
   }
 
   /**
-   * Alterna la selección de una página en el formulario de permisos.
-   * Muestra toast si el usuario no tiene permiso para asignar permisos.
-   * Muestra error en UI si intenta quitarse acceso a Administración.
+   * Permission and authorization handling.
+   * Permission and authorization handling.
+   * Error handling.
    *
-   * @param {string} path - Ruta de la página a togglear.
+   * @param {string} path - Parameter description.
    */
   function togglePagina(path) {
     if (!puedeAsignarPermisos) {

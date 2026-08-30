@@ -2,10 +2,10 @@
 
 import { apiClient } from "@/lib/apiClient";
 /**
- * Formulario de gestión de asesores y monitores.
+ * Form handling.
  *
- * Lista los perfiles activos con opciones de búsqueda y paginación.
- * Requiere permiso `ACCEDER_ASESORES_MONITORES`.
+ * Handles list pagination consistently.
+ * Permission and authorization handling.
  *
  * @module components/forms/usuarios/AsesoresYMonitoresForm
  */
@@ -23,8 +23,8 @@ import { tienePermiso } from "@/lib/authz";
 import { getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils";
 
 /**
- * Formulario para gestionar asesores y monitores.
- * @returns {JSX.Element} Componente de administración de asesores y monitores.
+ * Form handling.
+ * @returns {JSX.Element} Result value.
  */
 export function AsesoresYMonitoresForm() {
   const router = useRouter();

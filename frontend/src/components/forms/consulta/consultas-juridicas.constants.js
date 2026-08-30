@@ -1,4 +1,4 @@
-/** Constantes del módulo de consultas jurídicas. */
+/** Consultation flow detail.*/
 export const ESTADOS_CONSULTA = [
   { value: "ACTIVO", label: "Activo" },
   { value: "EN_PROCESO", label: "En proceso" },

@@ -1,9 +1,9 @@
 /**
- * Campo de entrada de texto reutilizable para formularios.
+ * Form handling.
  *
- * Integra `register` de react-hook-form y muestra el mensaje de error
- * del campo automáticamente si existe. También puede restringir la entrada
- * a dígitos sin cambiar el diseño del componente.
+ * Error handling.
+ * Implementation detail.
+ * Component implementation detail.
  *
  * @module components/forms/parts/FormInput
  */
@@ -31,11 +31,11 @@ function renderLabel(label, required) {
 }
 
 /**
- * Input de formulario que integra react-hook-form y muestra errores.
+ * Error handling.
  *
- * `digitsOnly` sanea el valor en el evento de cambio para impedir que letras,
- * espacios o símbolos lleguen al estado del formulario. Es apropiado para
- * teléfonos, no para documentos que puedan ser alfanuméricos.
+ * Implementation detail.
+ * State handling.
+ * Implementation detail.
  */
 export function FormInput({
   name,

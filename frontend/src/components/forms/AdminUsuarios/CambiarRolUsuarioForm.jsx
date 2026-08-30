@@ -3,9 +3,9 @@
 import { apiClient } from "@/lib/apiClient";
 import { apiResponse, readResponseBody } from "@/lib/api";
 /**
- * Formulario para cambiar el rol de un usuario del sistema.
+ * Role handling.
  *
- * Requiere permiso `ASIGNAR_ROL_USUARIOS`.
+ * Permission and authorization handling.
  *
  * @module components/forms/AdminUsuarios/CambiarRolUsuarioForm
  */

@@ -14,9 +14,9 @@ export function optionalLabel(label) {
 }
 
 /**
- * Convierte un registro de catálogo en una opción para select.
- * @param {Object} item - Registro del catálogo.
- * @returns {{value:string, label:string}} Opción para un campo select.
+ * Implementation detail.
+ * Implementation detail.
+ * @returns {{value:string, label:string} Result value.
  */
 
 export function Seccion({ titulo, descripcion, children }) {

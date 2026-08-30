@@ -54,6 +54,6 @@ export function coincideNombreRol(rol, perfil) {
 }
 
 /**
- * Formulario para cambiar el rol de un usuario del sistema.
- * @returns {JSX.Element} Componente de cambio de rol.
+ * Role handling.
+ * @returns {JSX.Element} Result value.
  */

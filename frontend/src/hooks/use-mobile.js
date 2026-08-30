@@ -1,8 +1,8 @@
 /**
- * Hook para detectar si el viewport es móvil.
+ * Implementation detail.
  *
- * Usa la API `matchMedia` del navegador para escuchar cambios de tamaño
- * en tiempo real. El breakpoint coincide con el de Tailwind CSS (`md`).
+ * Implementation detail.
+ * Uses the Tailwind CSS `md` breakpoint (768 px).
  *
  * @module hooks/use-mobile
  */
@@ -10,25 +10,25 @@
 import * as React from "react";
 
 /**
- * Ancho máximo en píxeles que se considera viewport móvil.
- * Coincide con el breakpoint `md` de Tailwind CSS (768 px).
+ * Implementation detail.
+ * Uses the Tailwind CSS `md` breakpoint (768 px).
  *
  * @type {number}
  */
 const MOBILE_BREAKPOINT = 768;
 
 /**
- * Devuelve `true` si el ancho del viewport es menor que `MOBILE_BREAKPOINT`.
+ * Uses the Tailwind CSS `md` breakpoint (768 px).
  *
- * Se actualiza automáticamente cuando el usuario redimensiona la ventana.
- * Devuelve `false` durante el SSR (antes del montaje del componente).
+ * User flow detail.
+ * Component implementation detail.
  *
- * @returns {boolean} `true` si el viewport es móvil, `false` si es escritorio.
+ * @returns {boolean} Result value.
  *
  * @example
  * function MiComponente() {
  *   const isMobile = useIsMobile();
- *   return <div>{isMobile ? "Móvil" : "Escritorio"}</div>;
+ * Implementation detail.
  * }
  */
 export function useIsMobile() {
