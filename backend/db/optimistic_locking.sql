@@ -26,4 +26,18 @@ ALTER TABLE "DB_consultorioJuridico".persona
 ALTER TABLE "DB_consultorioJuridico".persona
     ALTER COLUMN version SET NOT NULL;
 
+-- Proceso
+ALTER TABLE "DB_consultorioJuridico".proceso
+    ADD COLUMN IF NOT EXISTS version BIGINT;
+
+UPDATE "DB_consultorioJuridico".proceso
+SET version = 0
+WHERE version IS NULL;
+
+ALTER TABLE "DB_consultorioJuridico".proceso
+    ALTER COLUMN version SET DEFAULT 0;
+
+ALTER TABLE "DB_consultorioJuridico".proceso
+    ALTER COLUMN version SET NOT NULL;
+
 COMMIT;
