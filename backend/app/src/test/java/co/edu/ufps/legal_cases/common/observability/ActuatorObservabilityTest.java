@@ -1,5 +1,7 @@
 package co.edu.ufps.legal_cases.common.observability;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -12,21 +14,28 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.FilterChainProxy;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -64,14 +73,20 @@ class ActuatorObservabilityTest {
 
     private final MockMvc mockMvc;
     private final MeterRegistry meterRegistry;
+    private final ApplicationContext applicationContext;
+    private final FilterChainProxy filterChainProxy;
 
     @Autowired
     ActuatorObservabilityTest(
             MockMvc mockMvc,
-            MeterRegistry meterRegistry) {
+            MeterRegistry meterRegistry,
+            ApplicationContext applicationContext,
+            FilterChainProxy filterChainProxy) {
 
         this.mockMvc = mockMvc;
         this.meterRegistry = meterRegistry;
+        this.applicationContext = applicationContext;
+        this.filterChainProxy = filterChainProxy;
     }
 
     @Test
@@ -86,17 +101,29 @@ class ActuatorObservabilityTest {
 
     @Test
     void metricsShouldRequireAuthentication() throws Exception {
-        mockMvc.perform(get("/actuator/metrics"))
+        MvcResult result = mockMvc.perform(get("/actuator/metrics"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(header().exists(CorrelationIdContext.HEADER_NAME));
+                .andExpect(header().exists(CorrelationIdContext.HEADER_NAME))
+                .andReturn();
+
+        String correlationId =
+                result.getResponse().getHeader(CorrelationIdContext.HEADER_NAME);
+
+        assertEquals(correlationId, UUID.fromString(correlationId).toString());
+        assertTrue(result.getResponse().getContentAsString()
+                .contains("\"correlacionId\":\"" + correlationId + "\""));
     }
 
     @Test
     void authenticatedUserShouldAccessMetrics() throws Exception {
+        String incomingCorrelationId =
+                UUID.randomUUID().toString();
+
         mockMvc.perform(get("/actuator/metrics")
+                        .header(CorrelationIdContext.HEADER_NAME, incomingCorrelationId)
                         .header(TestJwtAuthenticationFilter.TEST_USER_HEADER, "auditor"))
                 .andExpect(status().isOk())
-                .andExpect(header().exists(CorrelationIdContext.HEADER_NAME));
+                .andExpect(header().string(CorrelationIdContext.HEADER_NAME, incomingCorrelationId));
     }
 
     @Test
@@ -116,6 +143,45 @@ class ActuatorObservabilityTest {
         assertTrue(properties.contains("management.endpoint.health.show-details=never"));
         assertTrue(properties.contains(
                 "management.metrics.distribution.percentiles.http.server.requests=0.5,0.95"));
+    }
+
+    @Test
+    void correlationIdFilterShouldNotBeRegisteredAsIndependentServletFilter() {
+        Map<String, FilterRegistrationBean> registrations =
+                applicationContext.getBeansOfType(FilterRegistrationBean.class);
+
+        FilterRegistrationBean<?> registration =
+                registrations.get("correlationIdFilterRegistration");
+
+        assertNotNull(registration);
+        assertFalse(registration.isEnabled());
+        assertTrue(registration.getFilter() instanceof CorrelationIdFilter);
+    }
+
+    @Test
+    void correlationIdFilterShouldStayBeforeSecurityContextHolderFilter() {
+        List<jakarta.servlet.Filter> filters =
+                filterChainProxy.getFilters("/actuator/health");
+
+        int correlationIndex = indexOf(filters, CorrelationIdFilter.class);
+        int securityContextHolderIndex = indexOf(filters, SecurityContextHolderFilter.class);
+
+        assertTrue(correlationIndex >= 0);
+        assertTrue(securityContextHolderIndex >= 0);
+        assertTrue(correlationIndex < securityContextHolderIndex);
+    }
+
+    private int indexOf(
+            List<jakarta.servlet.Filter> filters,
+            Class<?> filterType) {
+
+        for (int index = 0; index < filters.size(); index++) {
+            if (filterType.isInstance(filters.get(index))) {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     @SpringBootConfiguration
