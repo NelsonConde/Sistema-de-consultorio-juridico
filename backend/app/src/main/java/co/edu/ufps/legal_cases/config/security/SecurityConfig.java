@@ -75,6 +75,12 @@ public class SecurityConfig {
                         // Permite preflight de CORS.
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
+                        // Health publico para verificaciones de infraestructura.
+                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+
+                        // Metricas operativas protegidas por autenticacion.
+                        .requestMatchers(HttpMethod.GET, "/actuator/metrics", "/actuator/metrics/**").authenticated()
+
                         // Endpoints públicos de autenticación.
                         .requestMatchers(HttpMethod.POST, PUBLIC_POST_ENDPOINTS).permitAll()
 
