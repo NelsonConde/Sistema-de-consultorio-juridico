@@ -77,11 +77,9 @@ public class Consulta {
     @Column(name = "resultado", length = 100)
     private String resultado;
 
-    // Fecha de última actualización del registro.
-    // Se usa para filtrar consultas por semestre en estadísticas.
-    // Se llena automáticamente al crear y actualizar.
+    // Marca de auditoría operativa; no determina el periodo estadístico.
     @Column(name = "last_updated_at", nullable = false)
-    private LocalDate lastUpdatedAt;
+    private LocalDate lastUpdatedAt;;
 
     // Relación simple: persona principal (parte solicitante)
     @ManyToOne(fetch = FetchType.LAZY)
