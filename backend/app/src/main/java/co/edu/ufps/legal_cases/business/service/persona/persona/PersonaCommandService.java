@@ -80,17 +80,30 @@ public class PersonaCommandService {
     @Auditable(action = "REGISTRAR_PERSONA", entityName = "Persona")
     public PersonaDTO crear(PersonaDTO dto) {
         personaAccessService.validarPuedeCrearPersonas();
+
+        concurrenciaOptimistaValidator
+                .validarVersionNoEnviadaEnCreacion(dto.getVersion());
+
         personaValidator.validarCreacion(dto);
 
-        String numeroDocumento = personaValidator.normalizarDocumento(dto.getNumeroDocumento());
+        String numeroDocumento =
+                personaValidator.normalizarDocumento(dto.getNumeroDocumento());
+
         personaValidator.validarDocumentoDisponible(numeroDocumento);
 
         DatosPersona datos = cargarRelaciones(dto);
-        personaValidator.validarBarrioPerteneceAMunicipio(datos.barrio(), datos.municipio());
 
-        Persona persona = personaMapper.crearEntidad(dto, numeroDocumento, datos);
+        personaValidator.validarBarrioPerteneceAMunicipio(
+                datos.barrio(),
+                datos.municipio());
 
-        return personaMapper.convertirADTO(personaRepository.save(persona));
+        Persona persona =
+                personaMapper.crearEntidad(dto, numeroDocumento, datos);
+
+        Persona guardada = personaRepository.save(persona);
+        entityManager.flush();
+
+        return personaMapper.convertirADTO(guardada);
     }
 
     @Transactional
@@ -100,16 +113,34 @@ public class PersonaCommandService {
         personaValidator.validarActualizacion(id, dto);
 
         Persona persona = buscarPorId(id);
-        String numeroDocumentoNuevo = personaValidator.normalizarDocumento(dto.getNumeroDocumento());
+
+        concurrenciaOptimistaValidator.validarVersion(
+                dto.getVersion(),
+                persona.getVersion(),
+                "persona");
+
+        String numeroDocumentoNuevo =
+                personaValidator.normalizarDocumento(dto.getNumeroDocumento());
+
         personaValidator.validarDocumentoDisponibleParaActualizacion(persona, numeroDocumentoNuevo);
 
         DatosPersona datos = cargarRelaciones(dto);
-        personaValidator.validarBarrioPerteneceAMunicipio(datos.barrio(), datos.municipio());
 
-        // Se actualiza sobre la entidad existente para no tocar campos de control como activo.
-        personaMapper.aplicarDatos(persona, dto, numeroDocumentoNuevo, datos);
+        personaValidator.validarBarrioPerteneceAMunicipio(
+                datos.barrio(),
+                datos.municipio());
 
-        return personaMapper.convertirADTO(personaRepository.save(persona));
+        // No modifica activo ni version.
+        personaMapper.aplicarDatos(
+                persona,
+                dto,
+                numeroDocumentoNuevo,
+                datos);
+
+        Persona guardada = personaRepository.save(persona);
+        entityManager.flush();
+
+        return personaMapper.convertirADTO(guardada);
     }
 
     @Transactional

@@ -29,7 +29,11 @@ public class SeguimientoEstadoService {
     private final EntityManager entityManager;
 
     @Transactional
-    public Seguimiento cambiarEstado(Long seguimientoId, EstadoSeguimiento estado, Long versionEsperada) {
+    public Seguimiento cambiarEstado(
+            Long seguimientoId,
+            EstadoSeguimiento estado,
+            Long versionEsperada) {
+
         Seguimiento seguimiento = obtenerSeguimientoActivo(seguimientoId);
 
         concurrenciaOptimistaValidator.validarVersion(
@@ -46,6 +50,7 @@ public class SeguimientoEstadoService {
 
         Seguimiento seguimientoGuardado = seguimientoRepository.save(seguimiento);
 
+        // Confirma el UPDATE versionado antes de ejecutar efectos derivados.
         entityManager.flush();
 
         aplicarEfectosPorEstado(seguimientoGuardado);
@@ -72,6 +77,8 @@ public class SeguimientoEstadoService {
         seguimiento.setEstado(EstadoSeguimiento.COMPLETADO);
 
         Seguimiento seguimientoGuardado = seguimientoRepository.save(seguimiento);
+
+        entityManager.flush();
 
         aplicarEfectosPorEstado(seguimientoGuardado);
 

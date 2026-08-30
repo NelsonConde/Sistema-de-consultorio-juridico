@@ -4,7 +4,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import co.edu.ufps.legal_cases.audit.aop.log.Auditable;
-
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.Consulta;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
@@ -12,6 +11,7 @@ import co.edu.ufps.legal_cases.business.repository.consulta.ConsultaRepository;
 import co.edu.ufps.legal_cases.business.service.acceso.consulta.ConsultaAccessService;
 import co.edu.ufps.legal_cases.common.concurrency.ConcurrenciaOptimistaValidator;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import jakarta.persistence.EntityManager;
 import lombok.AllArgsConstructor;
 
 // Este servicio maneja los cambios de Consulta en la BD
@@ -31,19 +31,29 @@ public class ConsultaCommandService {
     private final ConsultaActividadService consultaActividadService;
     private final ConsultaCambioEstructuralValidator consultaCambioEstructuralValidator;
     private final ConcurrenciaOptimistaValidator concurrenciaOptimistaValidator;
+    private final EntityManager entityManager;
 
     @Transactional
     @Auditable(action = "CREAR_CONSULTA", entityName = "Consulta")
     public ConsultaDTO crear(ConsultaDTO dto) {
         consultaAccessService.validarPuedeCrearConsulta();
+
+        concurrenciaOptimistaValidator
+                .validarVersionNoEnviadaEnCreacion(dto.getVersion());
+
         consultaValidator.validarIdNoEnviadoEnCreacion(dto.getId());
         consultaValidator.validarCamposObligatorios(dto);
         consultaValidator.validarEstadoInicialPendienteSiFueEnviado(dto.getEstado());
 
-        boolean solicitaAsignacionResponsables = consultaValidator.tieneResponsablesEnDto(dto);
-        consultaAccessService.validarPuedeAsignarResponsablesConsultaSiAplica(solicitaAsignacionResponsables);
+        boolean solicitaAsignacionResponsables =
+                consultaValidator.tieneResponsablesEnDto(dto);
 
-        boolean puedeAsignarResponsables = consultaAccessService.usuarioPuedeAsignarResponsables();
+        consultaAccessService
+                .validarPuedeAsignarResponsablesConsultaSiAplica(
+                        solicitaAsignacionResponsables);
+
+        boolean puedeAsignarResponsables =
+                consultaAccessService.usuarioPuedeAsignarResponsables();
 
         Consulta consulta = consultaConstruccionService.aplicarDatos(
                 new Consulta(),
@@ -57,7 +67,13 @@ public class ConsultaCommandService {
         // Ejemplo: tema-área, tipo-tema, asesor-área y personas repetidas.
         consultaValidator.validarCoherenciaDominio(consulta);
 
-        return consultaMapper.convertirADTO(consultaRepository.save(consulta));
+        Consulta guardada = consultaRepository.save(consulta);
+
+        // El flush garantiza que la versión asignada por Hibernate ya esté
+        // disponible antes de construir la respuesta.
+        entityManager.flush();
+
+        return consultaMapper.convertirADTO(guardada);
     }
 
     @Transactional
@@ -66,7 +82,18 @@ public class ConsultaCommandService {
         consultaAccessService.validarPuedeEditarConsulta(id);
 
         Consulta existente = consultaRepository.findByIdConPartes(id)
-                .orElseThrow(() -> new BusinessException("Consulta no encontrada con id: " + id));
+                .orElseThrow(() ->
+                        new BusinessException(
+                                "Consulta no encontrada con id: " + id));
+
+        // El cliente debe actualizar exactamente la versión que consultó.
+        concurrenciaOptimistaValidator.validarVersion(
+                dto.getVersion(),
+                existente.getVersion(),
+                "consulta");
+
+        // Solo vale la pena cargar la segunda colección si la versión recibida
+        // todavía corresponde con la versión persistida.
         consultaRepository.findByIdConContrapartes(id);
 
         consultaValidator.validarNoArchivada(existente);
@@ -75,14 +102,23 @@ public class ConsultaCommandService {
         consultaValidator.validarIdNoCambiado(existente.getId(), dto.getId());
 
         EstadoConsulta estadoActual = existente.getEstado();
-        consultaValidator.validarEstadoNoCambiadoEnActualizacion(estadoActual, dto.getEstado());
 
-        boolean solicitaCambioResponsables = consultaValidator.cambiaResponsablesEnDto(existente, dto);
-        consultaAccessService.validarPuedeAsignarResponsablesConsultaSiAplica(solicitaCambioResponsables);
+        consultaValidator.validarEstadoNoCambiadoEnActualizacion(
+                estadoActual,
+                dto.getEstado());
 
-        boolean puedeAsignarResponsables = consultaAccessService.usuarioPuedeAsignarResponsables();
+        boolean solicitaCambioResponsables =
+                consultaValidator.cambiaResponsablesEnDto(existente, dto);
 
-        boolean tieneActividadAsociada = consultaActividadService.tieneActividadAsociada(id);
+        consultaAccessService
+                .validarPuedeAsignarResponsablesConsultaSiAplica(
+                        solicitaCambioResponsables);
+
+        boolean puedeAsignarResponsables =
+                consultaAccessService.usuarioPuedeAsignarResponsables();
+
+        boolean tieneActividadAsociada =
+                consultaActividadService.tieneActividadAsociada(id);
 
         // Si la consulta ya tiene actividad, solo se permiten cambios narrativos o
         // complementarios. Los datos estructurales requieren un flujo formal aparte.
@@ -104,14 +140,27 @@ public class ConsultaCommandService {
         // Valida relaciones cruzadas después de aplicar los cambios del DTO.
         consultaValidator.validarCoherenciaDominio(existente);
 
-        return consultaMapper.convertirADTO(consultaRepository.save(existente));
+        Consulta guardada = consultaRepository.save(existente);
+
+        /*
+         * Fuerza el UPDATE antes de construir el DTO.
+         *
+         * Además de devolver la nueva versión correctamente, este flush hace que
+         * un conflicto @Version producido entre la lectura y el UPDATE se detecte
+         * dentro de esta operación.
+         */
+        entityManager.flush();
+
+        return consultaMapper.convertirADTO(guardada);
     }
 
     @Transactional
     @Auditable(action = "CAMBIAR_ESTADO_CONSULTA", entityName = "Consulta")
     public ConsultaDTO cambiarEstado(Long id, EstadoConsulta estado, Long versionEsperada) {
         Consulta consulta = consultaRepository.findById(id)
-                .orElseThrow(() -> new BusinessException("Consulta no encontrada con id: " + id));
+                .orElseThrow(() ->
+                        new BusinessException(
+                                "Consulta no encontrada con id: " + id));
 
         concurrenciaOptimistaValidator.validarVersion(
                 versionEsperada,
@@ -121,11 +170,16 @@ public class ConsultaCommandService {
         consultaValidator.validarNoArchivada(consulta);
         consultaValidator.validarCambioEstadoPermitido(consulta, estado);
         consultaEstadoService.validarCambioEstado(consulta, estado);
-        consultaValidator.validarRequisitosParaEstadoOperativo(consulta, estado);
+        consultaValidator.validarRequisitosParaEstadoOperativo(
+                consulta,
+                estado);
 
         consulta.setEstado(estado);
 
-        return consultaMapper.convertirADTO(consultaRepository.save(consulta));
+        Consulta guardada = consultaRepository.save(consulta);
+        entityManager.flush();
+
+        return consultaMapper.convertirADTO(guardada);
     }
 
     // Se conserva el nombre eliminar por compatibilidad con el endpoint antiguo.
@@ -136,7 +190,9 @@ public class ConsultaCommandService {
         consultaAccessService.validarPuedeArchivarConsulta(id);
 
         Consulta consulta = consultaRepository.findById(id)
-                .orElseThrow(() -> new BusinessException("Consulta no encontrada con id: " + id));
+                .orElseThrow(() ->
+                        new BusinessException(
+                                "Consulta no encontrada con id: " + id));
 
         concurrenciaOptimistaValidator.validarVersion(
                 versionEsperada,
@@ -148,6 +204,8 @@ public class ConsultaCommandService {
 
         consulta.setEstado(ESTADO_ARCHIVADO);
         consultaRepository.save(consulta);
+
+        entityManager.flush();
     }
 
     @Transactional
@@ -156,7 +214,9 @@ public class ConsultaCommandService {
         consultaAccessService.validarPuedeArchivarConsulta(id);
 
         Consulta consulta = consultaRepository.findById(id)
-                .orElseThrow(() -> new BusinessException("Consulta no encontrada con id: " + id));
+                .orElseThrow(() ->
+                        new BusinessException(
+                                "Consulta no encontrada con id: " + id));
 
         concurrenciaOptimistaValidator.validarVersion(
                 versionEsperada,
@@ -168,7 +228,10 @@ public class ConsultaCommandService {
 
         consulta.setEstado(ESTADO_ARCHIVADO);
 
-        return consultaMapper.convertirADTO(consultaRepository.save(consulta));
+        Consulta guardada = consultaRepository.save(consulta);
+        entityManager.flush();
+
+        return consultaMapper.convertirADTO(guardada);
     }
 
     @Transactional
@@ -177,7 +240,9 @@ public class ConsultaCommandService {
         consultaAccessService.validarPuedeDesarchivarConsulta(id);
 
         Consulta consulta = consultaRepository.findById(id)
-                .orElseThrow(() -> new BusinessException("Consulta no encontrada con id: " + id));
+                .orElseThrow(() ->
+                        new BusinessException(
+                                "Consulta no encontrada con id: " + id));
 
         concurrenciaOptimistaValidator.validarVersion(
                 versionEsperada,
@@ -190,6 +255,9 @@ public class ConsultaCommandService {
         // Solo la devuelve al estado cerrado para consulta histórica.
         consulta.setEstado(EstadoConsulta.CERRADO);
 
-        return consultaMapper.convertirADTO(consultaRepository.save(consulta));
+        Consulta guardada = consultaRepository.save(consulta);
+        entityManager.flush();
+
+        return consultaMapper.convertirADTO(guardada);
     }
 }

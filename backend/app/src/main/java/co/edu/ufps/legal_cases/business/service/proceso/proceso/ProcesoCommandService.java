@@ -20,6 +20,7 @@ import co.edu.ufps.legal_cases.business.service.acceso.proceso.ProcesoAccessServ
 import co.edu.ufps.legal_cases.business.service.consulta.consulta.ConsultaEstadoService;
 import co.edu.ufps.legal_cases.common.concurrency.ConcurrenciaOptimistaValidator;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import jakarta.persistence.EntityManager;
 import lombok.AllArgsConstructor;
 
 @Service
@@ -36,12 +37,16 @@ public class ProcesoCommandService {
     private final ProcesoMapper procesoMapper;
     private final ConsultaEstadoService consultaEstadoService;
     private final ConcurrenciaOptimistaValidator concurrenciaOptimistaValidator;
+    private final EntityManager entityManager;
 
     // Crea un proceso asociado a una consulta existente.
     // El alcance se valida con la consulta porque Proceso no tiene un alcance independiente.
     @Transactional
     @Auditable(action = "CREAR_PROCESO", entityName = "Proceso")
     public ProcesoDTO crear(ProcesoDTO dto) {
+        concurrenciaOptimistaValidator
+                .validarVersionNoEnviadaEnCreacion(dto.getVersion());
+
         procesoValidator.validarCreacion(dto);
 
         String numeroRadicado = procesoValidator.normalizarNumeroRadicadoParaEstado(
@@ -58,7 +63,10 @@ public class ProcesoCommandService {
         proceso.setEstado(EstadoProceso.PENDIENTE);
         proceso.setActivo(true);
 
-        return procesoMapper.convertirADTO(procesoRepository.save(proceso));
+        Proceso guardado = procesoRepository.save(proceso);
+        entityManager.flush();
+
+        return procesoMapper.convertirADTO(guardado);
     }
 
     // Actualiza datos del proceso sin permitir cambiar la consulta.
@@ -70,6 +78,12 @@ public class ProcesoCommandService {
         procesoValidator.validarActualizacion(id, dto);
 
         Proceso proceso = buscarProcesoActivo(id);
+
+        concurrenciaOptimistaValidator.validarVersion(
+                dto.getVersion(),
+                proceso.getVersion(),
+                "proceso");
+
         procesoValidator.validarNoCambieConsulta(proceso, dto);
 
         String numeroRadicado = procesoValidator.normalizarNumeroRadicadoParaEstado(
@@ -86,7 +100,10 @@ public class ProcesoCommandService {
 
         procesoMapper.aplicarDatos(proceso, datos);
 
-        return procesoMapper.convertirADTO(procesoRepository.save(proceso));
+        Proceso guardado = procesoRepository.save(proceso);
+        entityManager.flush();
+
+        return procesoMapper.convertirADTO(guardado);
     }
 
     @Transactional
@@ -112,7 +129,10 @@ public class ProcesoCommandService {
         proceso.setNumeroRadicado(numeroRadicado);
         proceso.setEstado(estado);
 
-        return procesoMapper.convertirADTO(procesoRepository.save(proceso));
+        Proceso guardado = procesoRepository.save(proceso);
+        entityManager.flush();
+
+        return procesoMapper.convertirADTO(guardado);
     }
 
     @Transactional
@@ -133,6 +153,7 @@ public class ProcesoCommandService {
         proceso.setActivo(false);
 
         procesoRepository.save(proceso);
+        entityManager.flush();
     }
 
     @Transactional
@@ -153,7 +174,10 @@ public class ProcesoCommandService {
 
         proceso.setActivo(activo);
 
-        return procesoMapper.convertirADTO(procesoRepository.save(proceso));
+        Proceso guardado = procesoRepository.save(proceso);
+        entityManager.flush();
+
+        return procesoMapper.convertirADTO(guardado);
     }
 
     private DatosProceso prepararDatos(ProcesoDTO dto, String numeroRadicado) {
