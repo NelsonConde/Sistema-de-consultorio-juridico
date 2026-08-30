@@ -44,9 +44,6 @@ public class SeguimientoCommandService {
     @Transactional
     @Auditable(action = "CREAR_SEGUIMIENTO", entityName = "Seguimiento")
     public SeguimientoResponseDTO crear(SeguimientoRequestDTO dto) {
-        concurrenciaOptimistaValidator
-                .validarVersionNoEnviadaEnCreacion(dto.getVersion());
-
         seguimientoValidator.validarCreacion(dto);
         seguimientoAccessService.validarPuedeCrearSeguimiento(dto.getConsultaId());
 
@@ -64,9 +61,6 @@ public class SeguimientoCommandService {
 
         Seguimiento seguimientoGuardado = seguimientoRepository.save(seguimiento);
 
-        // Fuerza INSERT y deja establecida la versión antes de ejecutar efectos asociados.
-        entityManager.flush();
-
         // Las notificaciones dependen del id del seguimiento, por eso se sincronizan
         // después de guardar.
         seguimientoNotificacionService.sincronizarNotificaciones(seguimientoGuardado.getId());
@@ -80,11 +74,6 @@ public class SeguimientoCommandService {
         seguimientoAccessService.validarPuedeEditarSeguimiento(id);
 
         Seguimiento seguimiento = buscarPorId(id);
-
-        concurrenciaOptimistaValidator.validarVersion(
-                dto.getVersion(),
-                seguimiento.getVersion(),
-                "seguimiento");
 
         consultaEstadoService.validarPermiteOperacionOperativa(seguimiento.getConsulta());
 
@@ -100,10 +89,6 @@ public class SeguimientoCommandService {
 
         Seguimiento seguimientoGuardado = seguimientoRepository.save(seguimiento);
 
-        // El conflicto debe detectarse antes de ejecutar efectos secundarios
-        // como sincronizar o cancelar notificaciones.
-        entityManager.flush();
-
         // Solo los seguimientos pendientes conservan notificaciones activas.
         seguimientoEstadoService.aplicarEfectosPorEstado(seguimientoGuardado);
 
@@ -112,23 +97,32 @@ public class SeguimientoCommandService {
 
     @Transactional
     @Auditable(action = "CAMBIAR_ESTADO_SEGUIMIENTO", entityName = "Seguimiento")
-    public SeguimientoResponseDTO cambiarEstadoSeguimiento(Long id, EstadoSeguimiento estado) {
+    public SeguimientoResponseDTO cambiarEstadoSeguimiento(Long id, EstadoSeguimiento estado, Long versionEsperada) {
         seguimientoAccessService.validarPuedeEditarSeguimiento(id);
 
-        Seguimiento seguimiento = seguimientoEstadoService.cambiarEstado(id, estado);
+        Seguimiento seguimiento = seguimientoEstadoService.cambiarEstado(id, estado, versionEsperada);
 
         return seguimientoMapper.convertirAResponseDTO(seguimiento);
     }
 
     @Transactional
     @Auditable(action = "ELIMINAR_SEGUIMIENTO", entityName = "Seguimiento")
-    public void eliminar(Long id) {
+    public void eliminar(Long id, Long versionEsperada) {
         seguimientoAccessService.validarPuedeEliminarSeguimiento(id);
 
         Seguimiento seguimiento = buscarPorId(id);
 
+        concurrenciaOptimistaValidator.validarVersion(
+                versionEsperada,
+                seguimiento.getVersion(),
+                "seguimiento");
+
         consultaEstadoService.validarPermiteOperacionOperativa(seguimiento.getConsulta());
 
+        /*
+         * La versión ya fue validada antes de ejecutar
+         * efectos asociados a la eliminación.
+         */
         // Primero se cancelan pendientes; las enviadas quedan como historial.
         seguimientoNotificacionService.cancelarNotificacionesPendientes(seguimiento.getId());
 

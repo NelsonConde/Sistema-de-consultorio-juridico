@@ -80,30 +80,17 @@ public class PersonaCommandService {
     @Auditable(action = "REGISTRAR_PERSONA", entityName = "Persona")
     public PersonaDTO crear(PersonaDTO dto) {
         personaAccessService.validarPuedeCrearPersonas();
-
-        concurrenciaOptimistaValidator
-                .validarVersionNoEnviadaEnCreacion(dto.getVersion());
-
         personaValidator.validarCreacion(dto);
 
-        String numeroDocumento =
-                personaValidator.normalizarDocumento(dto.getNumeroDocumento());
-
+        String numeroDocumento = personaValidator.normalizarDocumento(dto.getNumeroDocumento());
         personaValidator.validarDocumentoDisponible(numeroDocumento);
 
         DatosPersona datos = cargarRelaciones(dto);
+        personaValidator.validarBarrioPerteneceAMunicipio(datos.barrio(), datos.municipio());
 
-        personaValidator.validarBarrioPerteneceAMunicipio(
-                datos.barrio(),
-                datos.municipio());
+        Persona persona = personaMapper.crearEntidad(dto, numeroDocumento, datos);
 
-        Persona persona =
-                personaMapper.crearEntidad(dto, numeroDocumento, datos);
-
-        Persona guardada = personaRepository.save(persona);
-        entityManager.flush();
-
-        return personaMapper.convertirADTO(guardada);
+        return personaMapper.convertirADTO(personaRepository.save(persona));
     }
 
     @Transactional
@@ -113,42 +100,30 @@ public class PersonaCommandService {
         personaValidator.validarActualizacion(id, dto);
 
         Persona persona = buscarPorId(id);
-
-        concurrenciaOptimistaValidator.validarVersion(
-                dto.getVersion(),
-                persona.getVersion(),
-                "persona");
-
-        String numeroDocumentoNuevo =
-                personaValidator.normalizarDocumento(dto.getNumeroDocumento());
-
+        String numeroDocumentoNuevo = personaValidator.normalizarDocumento(dto.getNumeroDocumento());
         personaValidator.validarDocumentoDisponibleParaActualizacion(persona, numeroDocumentoNuevo);
 
         DatosPersona datos = cargarRelaciones(dto);
+        personaValidator.validarBarrioPerteneceAMunicipio(datos.barrio(), datos.municipio());
 
-        personaValidator.validarBarrioPerteneceAMunicipio(
-                datos.barrio(),
-                datos.municipio());
+        // Se actualiza sobre la entidad existente para no tocar campos de control como activo.
+        personaMapper.aplicarDatos(persona, dto, numeroDocumentoNuevo, datos);
 
-        // No modifica activo ni version.
-        personaMapper.aplicarDatos(
-                persona,
-                dto,
-                numeroDocumentoNuevo,
-                datos);
-
-        Persona guardada = personaRepository.save(persona);
-        entityManager.flush();
-
-        return personaMapper.convertirADTO(guardada);
+        return personaMapper.convertirADTO(personaRepository.save(persona));
     }
 
     @Transactional
     @Auditable(action = "DESACTIVAR_PERSONA", entityName = "Persona")
-    public void desactivar(Long id) {
+    public void desactivar(Long id, Long versionEsperada) {
         personaAccessService.validarPuedeCambiarEstadoPersonas();
 
         Persona persona = buscarPorId(id);
+
+        concurrenciaOptimistaValidator.validarVersion(
+                versionEsperada,
+                persona.getVersion(),
+                "persona");
+
         persona.setActivo(false);
 
         personaRepository.save(persona);
@@ -157,10 +132,16 @@ public class PersonaCommandService {
 
     @Transactional
     @Auditable(action = "REACTIVAR_PERSONA", entityName = "Persona")
-    public void reactivar(Long id) {
+    public void reactivar(Long id, Long versionEsperada) {
         personaAccessService.validarPuedeCambiarEstadoPersonas();
 
         Persona persona = buscarPorId(id);
+
+        concurrenciaOptimistaValidator.validarVersion(
+                versionEsperada,
+                persona.getVersion(),
+                "persona");
+
         persona.setActivo(true);
 
         personaRepository.save(persona);
