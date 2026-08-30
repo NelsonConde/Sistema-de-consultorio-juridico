@@ -1,27 +1,27 @@
 /**
- * Constantes de permisos del sistema de casos jurídicos.
+ * Permission and authorization handling.
  *
- * Cada clave es el identificador usado en el frontend; el valor es el nombre
- * exacto que el backend almacena en la BD y devuelve en el array `permisos`
- * del objeto de usuario (`/api/auth/me`).
+ * Implementation detail.
+ * Permission and authorization handling.
+ * User flow detail.
  *
- * La comparación de permisos se hace de forma normalizada (sin tildes,
- * sin mayúsculas) en `lib/authz.js`, por lo que el valor aquí debe coincidir
- * con el nombre del backend pero no es sensible a tildes ni a case.
+ * Permission and authorization handling.
+ * Implementation detail.
+ * Implementation detail.
  *
  * @module lib/permission
  *
  * @example
- * import { PERMISOS } from "@/lib/permission";
+ * Permission and authorization handling.
  * import { tienePermiso } from "@/lib/authz";
  *
- * if (tienePermiso(user, PERMISOS.VER_CONSULTAS)) {
- *   // mostrar listado de consultas
+ * Permission and authorization handling.
+ * List and table handling.
  * }
  */
 
 export const PERMISOS = {
-  // ── Navegación — controlan qué páginas aparecen en el menú ──────────────
+  // Role handling.
   ACCEDER_INICIO: "Acceder inicio",
   ACCEDER_RECEPCION: "Acceder recepción",
   ACCEDER_TAREAS: "Acceder tareas",
@@ -36,18 +36,18 @@ export const PERMISOS = {
   ACCEDER_CONCILIACIONES: "Acceder conciliaciones",
   ACCEDER_PROCESOS: "Acceder procesos",
 
-  // ── Catálogos — tipos de documento, áreas, sedes, temas, etc. ───────────
+  // ── Catalogs ───────────
   VER_CATALOGOS: "Ver catálogos",
   GESTIONAR_CATALOGOS: "Gestionar catálogos",
 
-  // ── Personas — personas naturales registradas en el sistema ─────────────
+  // ── People — natural persons registered in the system ──────────────────
   VER_PERSONAS: "Ver personas",
   CREAR_PERSONAS: "Crear personas",
   EDITAR_PERSONAS: "Editar personas",
   CAMBIAR_ESTADO_PERSONAS: "Cambiar estado personas",
   GESTIONAR_PERSONAS: "Gestionar personas",
 
-  // ── Consultas jurídicas ──────────────────────────────────────────────────
+  // ── Consultations ──────────────────────────────────────────────────
   VER_CONSULTAS: "Ver consultas",
   CREAR_CONSULTAS: "Crear consultas",
   EDITAR_CONSULTAS: "Editar consultas",
@@ -55,7 +55,7 @@ export const PERMISOS = {
   ARCHIVAR_CONSULTAS: "Archivar consultas",
   ASIGNAR_RESPONSABLES_CONSULTA: "Asignar responsables consulta",
 
-  // ── Seguimientos / tareas ────────────────────────────────────────────────
+  // ── Follow-ups ────────────────────────────────────────────────
   VER_SEGUIMIENTOS: "Ver seguimientos",
   CREAR_SEGUIMIENTOS: "Crear seguimientos",
   EDITAR_SEGUIMIENTOS: "Editar seguimientos",
@@ -65,14 +65,14 @@ export const PERMISOS = {
   VER_ALERTAS_DISCIPLINARIAS: "Ver alertas disciplinarias",
   GESTIONAR_CATEGORIAS_SEGUIMIENTO: "Gestionar categorías de seguimiento",
 
-  // ── Usuarios del sistema ─────────────────────────────────────────────────
+  // ── Users ─────────────────────────────────────────────────
   VER_USUARIOS: "Ver usuarios",
   CREAR_USUARIOS: "Crear usuarios",
   EDITAR_USUARIOS: "Editar usuarios",
   CAMBIAR_ESTADO_USUARIOS: "Cambiar estado usuarios",
   ASIGNAR_ROL_USUARIOS: "Asignar rol usuarios",
 
-  // ── Roles y permisos ─────────────────────────────────────────────────────
+  // ── Roles and permissions ────────────────────────────────────────────────
   VER_ROLES: "Ver roles",
   CREAR_ROLES: "Crear roles",
   EDITAR_ROLES: "Editar roles",
@@ -88,7 +88,7 @@ export const PERMISOS = {
 
   // ── Administradores ──────────────────────────────────────────────────────
   VER_ADMINISTRADORES: "Ver administradores",
-  /** Solo la directora puede gestionar administradores. */
+  /** Implementation detail.*/
   GESTIONAR_ADMINISTRADORES: "Gestionar administradores",
 
   // ── Perfiles auxiliares (asesores, monitores, estudiantes) ───────────────
@@ -105,9 +105,9 @@ export const PERMISOS = {
   VER_CONCILIADORES: "Ver conciliadores",
   GESTIONAR_CONCILIADORES: "Gestionar conciliadores",
 
-  // ── Reportes y estadísticas ──────────────────────────────────────────────
+  // ── Statistics ──────────────────────────────────────────────
   VER_REPORTES: "Ver reportes",
-  /** Creado localmente para controlar acceso a la página de estadísticas. */
+  /** Role handling.*/
   ACCEDER_ESTADISTICAS: "Acceder estadísticas",
 
   // ── Procesos judiciales ──────────────────────────────────────────────────

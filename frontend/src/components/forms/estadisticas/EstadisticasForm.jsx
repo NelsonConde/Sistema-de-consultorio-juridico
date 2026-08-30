@@ -3,6 +3,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { API_URL_BASE } from "@/lib/config";
+import { apiClient } from "@/lib/apiClient";
+import { apiResponse } from "@/lib/api";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
 import {
@@ -18,10 +20,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Calcula el semestre actual basado en la fecha del sistema.
+ * Date handling.
  * Semestre 1: enero-mayo (meses 0-5), Semestre 2: junio-diciembre (meses 6-11)
  * 
- * @returns {Object} Objeto con propiedades {año: number, semestre: 1|2}
+ * @returns {Object} Result value.
  */
 function calcularSemestreActual() {
   const hoy = new Date();
@@ -29,10 +31,10 @@ function calcularSemestreActual() {
 }
 
 /**
- * Convierte un nombre de estado a su etiqueta en español.
+ * State handling.
  * 
- * @param {string} nombre - Nombre del estado (ej: "PENDIENTE", "ACTIVO")
- * @returns {string} Etiqueta en español o el nombre original si no coincide
+ * @param {string} nombre - Parameter description.
+ * @returns {string} Result value.
  */
 function etiquetaEstado(nombre) {
   const mapa = {
@@ -45,10 +47,10 @@ function etiquetaEstado(nombre) {
 }
 
 /**
- * Retorna la fecha de hoy en formato ISO (yyyy-MM-dd).
- * Útil para valores por defecto en seleccionadores de fechas.
+ * Returns today's date in ISO format (yyyy-MM-dd).
+ * Selection behavior.
  * 
- * @returns {string} Fecha hoy en formato ISO
+ * @returns {string} Result value.
  */
 function hoyStr() { return new Date().toISOString().slice(0, 10); }
 
@@ -303,7 +305,7 @@ function DetalleEstudiantes({ stats }) {
   );
 }
 
-// Mapa de categorías
+// Implementation detail.
 const CATEGORIAS = [
   {
     id: "consultas",
@@ -374,10 +376,10 @@ function EstadisticasContenido({ stats }) {
         ))}
       </div>
 
-      {/* Panel de detalle — aparece bajo las tarjetas */}
+      {/* Detail panel displayed below the summary cards. */}
       {catActiva && (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
-          {/* Header del panel de detalle */}
+          {/* Detail panel header. */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
             <div className="flex items-center gap-2">
               <catActiva.icon className="w-3.5 h-3.5 text-primary" />
@@ -422,14 +424,12 @@ export function EstadisticasForm() {
   useEffect(() => {
     async function init() {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, { credentials: "include" });
+        const { response: res, data: user } = await apiResponse(`${API_URL_BASE}/auth/me`, { method: "GET" });
         if (res.status === 401) { router.replace("/"); return; }
-        const user = await res.json();
         if (!tienePermiso(user, PERMISOS.VER_REPORTES)) { router.replace("/inicio"); return; }
 
-        const resSem = await fetch(`${API_URL_BASE}/estadisticas/semestres`, { credentials: "include" });
+        const { response: resSem, data: lista } = await apiResponse(`${API_URL_BASE}/estadisticas/semestres`, { method: "GET" });
         if (resSem.ok) {
-          const lista = await resSem.json();
           setSemestres(lista);
           const actual = calcularSemestreActual();
           const found  = lista.find((s) => s.año === actual.año && s.semestre === actual.semestre);
@@ -452,13 +452,13 @@ export function EstadisticasForm() {
     if (!sem) return;
     setCargando(true); setError("");
     try {
-      const res = await fetch(
+      const { response: res, data } = await apiResponse(
         `${API_URL_BASE}/estadisticas/${sem.año}/semestre/${sem.semestre}`,
-        { credentials: "include" }
+        { method: "GET" }
       );
       if (res.status === 403) { setError("Sin permiso."); setStats(null); return; }
       if (!res.ok) { setError("Error al cargar estadísticas."); setStats(null); return; }
-      setStats(await res.json());
+      setStats(data);
     } catch { setError("Error de conexión."); }
     finally { setCargando(false); }
   }, [semSel, semestres, modoRango]);
@@ -470,16 +470,16 @@ export function EstadisticasForm() {
     if (fechaInicio > fechaFin)    { setError("La fecha de inicio no puede ser posterior a la de fin."); return; }
     setCargando(true); setError("");
     try {
-      const res = await fetch(
+      const { response: res, data } = await apiResponse(
         `${API_URL_BASE}/estadisticas/reporte?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`,
-        { credentials: "include" }
+        { method: "GET" }
       );
       if (res.status === 403) { setError("Sin permiso."); setStats(null); return; }
       if (!res.ok) {
-        const txt = await res.text();
+        const txt = typeof data === "string" ? data : data?.mensaje || data?.message || "";
         setError(txt || "Error al cargar estadísticas."); setStats(null); return;
       }
-      setStats(await res.json());
+      setStats(data);
     } catch { setError("Error de conexión."); }
     finally { setCargando(false); }
   }, [modoRango, fechaInicio, fechaFin]);
@@ -500,7 +500,7 @@ export function EstadisticasForm() {
         url      = `${API_URL_BASE}/estadisticas/${sem.año}/semestre/${sem.semestre}/pdf`;
         filename = `estadisticas-${sem.año}-s${sem.semestre}.pdf`;
       }
-      const res = await fetch(url, { credentials: "include" });
+      const res = await apiClient.get(url);
       if (!res.ok) { alert("El PDF no está disponible aún."); return; }
       const blob = await res.blob();
       const a    = document.createElement("a");
@@ -541,7 +541,7 @@ export function EstadisticasForm() {
         </Button>
       </div>
 
-      {/* Selector de modo */}
+      {/* Mode selector */}
       <Tabs
         value={modoRango ? "rango" : "semestre"}
         onValueChange={(v) => { setModoRango(v === "rango"); setStats(null); setError(""); }}
@@ -611,10 +611,10 @@ export function EstadisticasForm() {
         </div>
       )}
 
-      {/* Contenido */}
+      {/* Content */}
       {!cargando && stats && <EstadisticasContenido stats={stats} />}
 
-      {/* Sin datos */}
+      {/* Implementation detail.*/}
       {!cargando && !stats && !error && (
         <div className="text-center py-12 text-muted-foreground">
           <FileBarChart2 className="w-10 h-10 mx-auto mb-2 opacity-25" />

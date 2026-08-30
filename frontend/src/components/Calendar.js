@@ -10,15 +10,15 @@ import { toast } from "sonner"
 import { API_URL_BASE } from '@/lib/config'
 
 /**
- * Componente Calendar
+ * Calendar component.
  *
- * Muestra los seguimientos del usuario autenticado según su rol:
- * - Administrador: ve todos los seguimientos.
- * - Asesor/Monitor: ve los seguimientos de consultas dentro de su alcance.
- * - Estudiante: ve solo los seguimientos marcados como notificarEstudiante = true.
- * - Conciliador: por ahora no ve ninguno hasta que el módulo esté implementado.
+ * Role handling.
+ * Follow-up workflow detail.
+ * Consultation flow detail.
+ * Follow-up workflow detail.
+ * Conciliation workflow detail.
  *
- * Cada seguimiento aparece en el día de su fechaEntrega.
+ * Follow-up workflow detail.
  */
 export default function Calendar({ onEventClick }) {
   const router = useRouter()
@@ -38,7 +38,7 @@ export default function Calendar({ onEventClick }) {
 
         const seguimientos = await response.json()
 
-        // Solo se muestran seguimientos que tienen fechaEntrega definida
+        // Follow-up workflow detail.
         const mappedEvents = seguimientos
           .filter(seg => seg.fechaEntrega)
           .map(seg => ({
@@ -109,7 +109,7 @@ export default function Calendar({ onEventClick }) {
             dayMaxEvents={true}
             eventDisplay="block"
             eventClick={(info) => {
-              // Extraer el ID de la consulta o proceso para redirigir
+              // Consultation flow detail.
               const consultaId = info.event.extendedProps.consultaId;
               
               if (onEventClick) {
@@ -117,8 +117,8 @@ export default function Calendar({ onEventClick }) {
               }
 
               if (consultaId) {
-                // Redirigimos a la página de tareas/seguimientos
-                // Enviamos el parámetro de búsqueda para que se autocompleta el campo
+                // Follow-up workflow detail.
+                // Search behavior.
                 router.push(`/tareas?search=${consultaId}`); 
               } else {
                 router.push('/tareas');

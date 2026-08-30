@@ -52,6 +52,26 @@ public class SeguimientoRespuestaAccessService {
     }
 
     @Transactional(readOnly = true)
+    public void validarPuedeSubirArchivoRespuesta(Long seguimientoId, Long respuestaId) {
+        validarPuedeResponderSeguimiento(seguimientoId);
+
+        SeguimientoRespuesta respuesta = obtenerRespuestaDeSeguimiento(respuestaId, seguimientoId);
+        if (!esRespuestaDelEstudianteActual(respuesta)) {
+            throw new AccessDeniedException("No tiene permisos para cargar archivos en esta respuesta");
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public void validarPuedeLeerArchivoRespuesta(Long seguimientoId, Long respuestaId) {
+        validarPuedeListarRespuestasDeSeguimiento(seguimientoId);
+
+        SeguimientoRespuesta respuesta = obtenerRespuestaDeSeguimiento(respuestaId, seguimientoId);
+        if (!puedeVerRespuesta(respuesta)) {
+            throw new AccessDeniedException("No tiene permisos para leer archivos de esta respuesta");
+        }
+    }
+
+    @Transactional(readOnly = true)
     public void validarPuedeEditarRespuesta(Long respuestaId) {
         validarTienePermiso(RESPONDER_SEGUIMIENTOS);
 
@@ -207,6 +227,15 @@ public class SeguimientoRespuestaAccessService {
 
         return seguimientoRespuestaRepository.findByIdAndActivoTrue(respuestaId)
                 .orElseThrow(() -> new BusinessException("Respuesta de seguimiento no encontrada con id: " + respuestaId));
+    }
+
+    private SeguimientoRespuesta obtenerRespuestaDeSeguimiento(Long respuestaId, Long seguimientoId) {
+        if (respuestaId == null || seguimientoId == null) {
+            throw new BusinessException("La respuesta y el seguimiento son obligatorios");
+        }
+
+        return seguimientoRespuestaRepository.findByIdAndSeguimiento_IdAndActivoTrue(respuestaId, seguimientoId)
+                .orElseThrow(() -> new AccessDeniedException("La respuesta no pertenece al seguimiento indicado"));
     }
 
     private void validarTienePermiso(String permiso) {

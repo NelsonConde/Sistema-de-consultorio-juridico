@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { RefreshCw, LayoutDashboard, FileText, ClipboardList, MessageSquare, ChevronRight, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { API_URL_BASE } from "@/lib/config"
+import { apiResponse } from "@/lib/api"
 import { PERMISOS } from "@/lib/permission"
 import {
   tienePermiso, esAdministrativo, esAsesor, esMonitor, esEstudiante,
@@ -12,10 +13,10 @@ import {
 
 
 /**
- * Calcula el semestre actual basado en la fecha del sistema.
+ * Date handling.
  * Semestre 1: enero-mayo (meses 0-5), Semestre 2: junio-diciembre (meses 6-11)
  * 
- * @returns {Object} Objeto con propiedades {año: number, semestre: 1|2}
+ * @returns {Object} Result value.
  */
 function calcularSemestreActual() {
   const hoy = new Date()
@@ -23,10 +24,10 @@ function calcularSemestreActual() {
 }
 
 /**
- * Convierte un nombre de estado a su etiqueta en español.
+ * State handling.
  * 
- * @param {string} nombre - Nombre del estado en mayúsculas (ej: "PENDIENTE", "ACTIVO")
- * @returns {string} Etiqueta en español o el nombre original si no coincide
+ * @param {string} nombre - Parameter description.
+ * @returns {string} Result value.
  */
 function etiquetaEstado(nombre) {
   const mapa = {
@@ -37,10 +38,10 @@ function etiquetaEstado(nombre) {
 }
 
 /**
- * Formatea una fecha a formato localizado de Colombia (dd/mes/yyyy)
+ * Date handling.
  * 
- * @param {string|Date} str - Fecha a formatear (string ISO o Date)
- * @returns {string} Fecha formateada o "—" si es inválida
+ * @param {string|Date} str - Value to format.
+ * @returns {string} Result value.
  */
 function formatFecha(str) {
   if (!str) return "—"
@@ -50,11 +51,11 @@ function formatFecha(str) {
 }
 
 /**
- * Extrae un array del payload de respuesta API, buscando en propiedades comunes.
- * Útil para normalizar diferentes estructuras de respuesta del backend.
+ * Implementation detail.
+ * Implementation detail.
  * 
- * @param {*} payload - Respuesta del backend (puede ser array, objeto, etc)
- * @returns {Array} Array extraído o array vacío si no se encuentra
+ * @param {*} payload - Parameter description.
+ * @returns {Array} Result value.
  */
 function obtenerArrayDesdeRespuesta(payload) {
   if (Array.isArray(payload)) return payload
@@ -78,15 +79,15 @@ const METRIC_CARDS = [
 
 
 /**
- * Tarjeta de métrica individual que muestra un número con etiqueta.
- * Se utiliza en el panel de estadísticas para mostrar KPIs.
+ * Implementation detail.
+ * Implementation detail.
  * 
  * @component
- * @param {Object} props - Propiedades
- * @param {string} props.label - Etiqueta descriptiva
- * @param {number|string} props.value - Valor a mostrar
- * @param {string} props.cls - Clases Tailwind para el estilo (color de fondo)
- * @returns {JSX.Element} Tarjeta estilizada con métrica
+ * @param {Object} props - Component properties.
+ * @param {string} props.label - Descriptive label.
+ * @param {number|string} props.value - Parameter description.
+ * @param {string} props.cls - Parameter description.
+ * @returns {JSX.Element} Result value.
  */
 function MetricCard({ label, value, cls }) {
   return (
@@ -98,14 +99,14 @@ function MetricCard({ label, value, cls }) {
 }
 
 /**
- * Gráfico de donut SVG que muestra consultas finalizadas vs pendientes.
- * Incluye porcentaje y leyenda de colores.
+ * Consultation flow detail.
+ * Implementation detail.
  * 
  * @component
- * @param {Object} props - Propiedades
- * @param {number} props.finalizadas - Cantidad de consultas finalizadas
- * @param {number} props.pendientes - Cantidad de consultas pendientes
- * @returns {JSX.Element} Gráfico de donut con leyenda
+ * @param {Object} props - Component properties.
+ * @param {number} props.finalizadas - Number of completed consultations.
+ * @param {number} props.pendientes - Number of pending consultations.
+ * @returns {JSX.Element} Result value.
  */
 function DonutChart({ finalizadas, pendientes }) {
   const total = finalizadas + pendientes
@@ -153,13 +154,13 @@ function DonutChart({ finalizadas, pendientes }) {
 }
 
 /**
- * Gráfico de barras SVG que muestra cantidad de consultas por área.
- * Incluye escala y etiquetas truncadas para áreas con nombre largo.
+ * Consultation flow detail.
+ * Implementation detail.
  * 
  * @component
- * @param {Object} props - Propiedades
- * @param {Array<{nombre: string, cantidad: number}>} props.areas - Array de áreas con cantidad
- * @returns {JSX.Element} Gráfico SVG responsivo de barras
+ * @param {Object} props - Component properties.
+ * @param {Array<{nombre: string, cantidad: number}>} props.areas - Parameter description.
+ * @returns {JSX.Element} Result value.
  */
 function BarChartAreas({ areas }) {
   if (!areas || areas.length === 0)
@@ -214,17 +215,17 @@ function BarChartAreas({ areas }) {
 }
 
 /**
- * Panel contenedor con encabezado, icono, contador y contenido flexible.
- * Se utiliza como contenedor genérico para secciones del dashboard.
+ * Implementation detail.
+ * Implementation detail.
  * 
  * @component
- * @param {Object} props - Propiedades
- * @param {string} props.title - Título del panel
- * @param {Function} props.icon - Componente de icono de Lucide React
- * @param {number} [props.count] - Número opcional a mostrar en la esquina
- * @param {JSX.Element} props.children - Contenido del panel
- * @param {string} [props.className] - Clases Tailwind adicionales
- * @returns {JSX.Element} Panel estilizado
+ * @param {Object} props - Component properties.
+ * @param {string} props.title - Panel title.
+ * @param {Function} props.icon - Parameter description.
+ * @param {number} [props.count] - Parameter description.
+ * @param {JSX.Element} props.children - Child content.
+ * @param {string} [props.className] - Additional Tailwind classes.
+ * @returns {JSX.Element} Result value.
  */
 function Panel({ title, icon: Icon, count, children, className = "" }) {
   return (
@@ -246,13 +247,13 @@ function Panel({ title, icon: Icon, count, children, className = "" }) {
 }
 
 /**
- * Componente de esqueleto (skeleton loader) para mostrar mientras se carga contenido.
- * Ayuda a mejorar la experiencia de usuario mostrando un placeholder animado.
+ * Data loading behavior.
+ * User flow detail.
  * 
  * @component
- * @param {Object} props - Propiedades
- * @param {string} [props.className] - Clases Tailwind para el tamaño (ej: "h-20")
- * @returns {JSX.Element} Elemento con animación de carga
+ * @param {Object} props - Component properties.
+ * @param {string} [props.className] - Additional CSS classes.
+ * @returns {JSX.Element} Result value.
  */
 function Skeleton({ className = "h-20" }) {
   return <div className={`rounded-xl bg-muted animate-pulse ${className}`} />
@@ -260,14 +261,14 @@ function Skeleton({ className = "h-20" }) {
 
 
 /**
- * Lista de consultas pendientes con estado y persona asociada.
- * Muestra máximo 10 consultas con estados no finalizados (PENDIENTE, URGENTE, EN_PROCESO, ACTIVO).
+ * List and table handling.
+ * State handling.
  * 
  * @component
- * @param {Object} props - Propiedades
- * @param {Array<Object>} props.items - Array de consultas a mostrar
- * @param {boolean} props.cargando - Si true, muestra skeleton loaders
- * @returns {JSX.Element} Lista con items o mensaje vacío
+ * @param {Object} props - Component properties.
+ * @param {Array<Object>} props.items - Item to process.
+ * @param {boolean} props.cargando - Whether data is loading.
+ * @returns {JSX.Element} Result value.
  */
 function ConsultasPendientesLista({ items, cargando }) {
   if (cargando) return <div className="space-y-1.5">{[1,2,3].map(i => <Skeleton key={i} className="h-10" />)}</div>
@@ -310,14 +311,14 @@ function ConsultasPendientesLista({ items, cargando }) {
 }
 
 /**
- * Lista de tareas pendientes (seguimientos) por consulta.
- * Filtra tareas con estado PENDIENTE solamente.
+ * List and table handling.
+ * State handling.
  * 
  * @component
- * @param {Object} props - Propiedades
- * @param {Array<Object>} props.items - Array de tareas/seguimientos a mostrar
- * @param {boolean} props.cargando - Si true, muestra skeleton loaders
- * @returns {JSX.Element} Lista con items o mensaje vacío
+ * @param {Object} props - Component properties.
+ * @param {Array<Object>} props.items - Item to process.
+ * @param {boolean} props.cargando - Whether data is loading.
+ * @returns {JSX.Element} Result value.
  */
 function TareasPendientesLista({ items, cargando }) {
   if (cargando) return <div className="space-y-1.5">{[1,2,3].map(i => <Skeleton key={i} className="h-10" />)}</div>
@@ -361,14 +362,14 @@ function TareasPendientesLista({ items, cargando }) {
 }
 
 /**
- * Lista de respuestas de estudiantes pendientes de calificación.
- * Indica si la respuesta está fuera del plazo establecido.
+ * List and table handling.
+ * Implementation detail.
  * 
  * @component
- * @param {Object} props - Propiedades
- * @param {Array<Object>} props.items - Array de respuestas a mostrar
- * @param {boolean} props.cargando - Si true, muestra skeleton loaders
- * @returns {JSX.Element} Lista con items o mensaje vacío
+ * @param {Object} props - Component properties.
+ * @param {Array<Object>} props.items - Item to process.
+ * @param {boolean} props.cargando - Whether data is loading.
+ * @returns {JSX.Element} Result value.
  */
 function RespuestasPendientesLista({ items, cargando }) {
   if (cargando) return <div className="space-y-1.5">{[1,2,3].map(i => <Skeleton key={i} className="h-10" />)}</div>
@@ -412,19 +413,19 @@ function RespuestasPendientesLista({ items, cargando }) {
 
 
 /**
- * Página de inicio / dashboard del sistema.
- * Muestra estadísticas del semestre actual, consultas pendientes, tareas y respuestas por calificar.
- * Los datos mostrados varían según el rol del usuario (admin, asesor, monitor, estudiante).
+ * Implementation detail.
+ * Consultation flow detail.
+ * Role handling.
  * 
  * @component
- * @returns {JSX.Element} Dashboard con métricas, gráficos y listas de tareas pendientes
+ * @returns {JSX.Element} Result value.
  * 
  * @description
- * - Carga estadísticas usando endpoint específico por rol
- * - Muestra gráfico de donut con consultas finalizadas vs pendientes
- * - Muestra gráfico de barras con consultas por área
- * - Lista consultas, tareas y respuestas pendientes (máximo 10, 5 y 5 respectivamente)
- * - Botón de recarga para actualizar datos manualmente
+ * Role handling.
+ * Consultation flow detail.
+ * Consultation flow detail.
+ * List and table handling.
+ * Data loading behavior.
  */
 export function InicioForm() {
   const router = useRouter()
@@ -458,9 +459,9 @@ export function InicioForm() {
         else if (esEstudiante(u)) url = `${API_URL_BASE}/estadisticas/${año}/semestre/${semestre}/estudiante/${pid}`
       }
       if (!url) { setStats(null); return }
-      const res = await fetch(url, { credentials: "include" })
+      const { response: res, data } = await apiResponse(url, { method: "GET" })
       if (!res.ok) { setStats(null); return }
-      setStats(await res.json())
+      setStats(data)
     } catch (err) {
       console.error(err); setError("No se pudieron cargar las estadísticas.")
     } finally {
@@ -472,9 +473,8 @@ export function InicioForm() {
   const cargarConsultasPendientes = React.useCallback(async () => {
     setCargandoConsultas(true)
     try {
-      const res = await fetch(`${API_URL_BASE}/consultas`, { credentials: "include" })
+      const { response: res, data: payload } = await apiResponse(`${API_URL_BASE}/consultas`, { method: "GET" })
       if (!res.ok) return
-      const payload = await res.json()
       const lista = obtenerArrayDesdeRespuesta(payload)
       const pendientes = lista
         .filter((c) => {
@@ -494,19 +494,18 @@ export function InicioForm() {
   const cargarTareasPendientes = React.useCallback(async () => {
     setCargandoTareas(true)
     try {
-      const resConsultas = await fetch(`${API_URL_BASE}/consultas`, { credentials: "include" })
+      const { response: resConsultas, data: payload } = await apiResponse(`${API_URL_BASE}/consultas`, { method: "GET" })
       if (!resConsultas.ok) { setTareasPendientes([]); return }
 
-      const payload = await resConsultas.json()
       const consultas = obtenerArrayDesdeRespuesta(payload).slice(0, 5)
 
       const resultados = await Promise.allSettled(
         consultas.map((c) => {
           const cid = c.id || c.consultaId
-          return fetch(
+          return apiResponse(
             `${API_URL_BASE}/seguimientos/consulta/${cid}/visibles-estudiante`,
-            { credentials: "include" }
-          ).then((r) => r.ok ? r.json() : [])
+            { method: "GET" }
+          ).then(({ response, data }) => response.ok ? data : [])
         })
       )
 
@@ -531,9 +530,8 @@ export function InicioForm() {
   const cargarRespuestasPendientes = React.useCallback(async () => {
     setCargandoRespuestas(true)
     try {
-      const res = await fetch(`${API_URL_BASE}/seguimientos/respuestas/pendientes`, { credentials: "include" })
+      const { response: res, data: payload } = await apiResponse(`${API_URL_BASE}/seguimientos/respuestas/pendientes`, { method: "GET" })
       if (!res.ok) return
-      const payload = await res.json()
       const lista = obtenerArrayDesdeRespuesta(payload)
       setRespuestasPendientes(lista.slice(0, 10))
     } catch (err) {
@@ -547,18 +545,17 @@ export function InicioForm() {
   React.useEffect(() => {
     async function init() {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, { credentials: "include" })
+        const { response: res, data: u } = await apiResponse(`${API_URL_BASE}/auth/me`, { method: "GET" })
         if (res.status === 401) { router.replace("/"); return }
         if (!res.ok) { setCargandoStats(false); return }
-        const u = await res.json()
         setUser(u)
 
         await Promise.allSettled([
           cargarStats(u),
           cargarConsultasPendientes(),
-          // tareas solo para estudiantes
+          // Follow-up workflow detail.
           esEstudiante(u) ? cargarTareasPendientes() : Promise.resolve(),
-          // respuestas por calificar para asesor, monitor y admin
+          // Implementation detail.
           (esAsesor(u) || esMonitor(u) || esAdministrativo(u) || tienePermiso(u, PERMISOS.VER_REPORTES))
             ? cargarRespuestasPendientes()
             : Promise.resolve(),
@@ -622,7 +619,7 @@ export function InicioForm() {
         </div>
       )}
 
-      {/* ── Fila 1: tarjetas de métricas ── */}
+      {/* Implementation detail.*/}
       {cargandoStats ? (
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
           {[1,2,3,4].map((i) => <Skeleton key={i} className="h-16" />)}
@@ -635,7 +632,7 @@ export function InicioForm() {
         </div>
       ) : null}
 
-      {/* ── Fila 2: gráficos (solo cuando hay stats) ── */}
+      {/* Implementation detail.*/}
       {!cargandoStats && stats && (
         esAdmin && stats.consultasPorArea && stats.consultasPorArea.length > 0 ? (
           <div className="grid lg:grid-cols-3 gap-3">
@@ -655,7 +652,7 @@ export function InicioForm() {
               count={`${Math.round((stats.consultasFinalizadas / (stats.totalConsultas || 1)) * 100)}% completado`}>
               <DonutChart finalizadas={stats.consultasFinalizadas} pendientes={stats.consultasPendientes} />
             </Panel>
-            {/* Procesos por estado compacto */}
+            {/* State handling.*/}
             {stats.procesosPorEstado && stats.procesosPorEstado.length > 0 && (
               <Panel title="Procesos por estado">
                 <div className="space-y-2.5">
@@ -686,7 +683,7 @@ export function InicioForm() {
       {/* ── Fila 3: listas operativas ── */}
       <div className={`grid gap-3 ${mostrarTareas || mostrarRespuestas ? "lg:grid-cols-2" : "grid-cols-1"}`}>
 
-        {/* Consultas pendientes — siempre visible */}
+        {/* Consultation flow detail.*/}
         <Panel
           title="Consultas pendientes"
           icon={FileText}
@@ -695,7 +692,7 @@ export function InicioForm() {
           <ConsultasPendientesLista items={consultasPendientes} cargando={cargandoConsultas} />
         </Panel>
 
-        {/* Tareas pendientes — solo estudiante */}
+        {/* Follow-up workflow detail.*/}
         {mostrarTareas && (
           <Panel
             title="Mis tareas pendientes"
@@ -706,7 +703,7 @@ export function InicioForm() {
           </Panel>
         )}
 
-        {/* Respuestas por calificar — asesor / monitor / admin */}
+        {/* Implementation detail.*/}
         {mostrarRespuestas && (
           <Panel
             title="Respuestas por calificar"

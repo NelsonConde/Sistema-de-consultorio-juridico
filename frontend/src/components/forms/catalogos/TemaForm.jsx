@@ -1,10 +1,11 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
 /**
- * Formulario de gestión de temas jurídicos.
+ * Form handling.
  *
- * Permite crear, editar y desactivar temas agrupados por área jurídica.
- * Requiere permiso `GESTIONAR_CATALOGOS`.
+ * Implementation detail.
+ * Permission and authorization handling.
  *
  * @module components/forms/catalogos/TemaForm
  */
@@ -28,8 +29,8 @@ import Pagination from "@/components/ui/Pagination";
 import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils";
 
 /**
- * Formulario para gestionar temas de catálogo.
- * @returns {JSX.Element} Componente de formulario de temas.
+ * Form handling.
+ * @returns {JSX.Element} Result value.
  */
 export function TemaForm() {
   const router = useRouter();
@@ -60,7 +61,7 @@ export function TemaForm() {
   useEffect(() => {
   const verificar = async () => {
     try {
-      const res = await fetch(`${API_URL_BASE}/auth/me`, {
+      const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
         method: "GET",
         credentials: "include",
       });
@@ -89,7 +90,7 @@ export function TemaForm() {
         return;
       }
 
-      const response = await fetch(`${API_URL_BASE}/areas`, {
+      const response = await apiClient.request(`${API_URL_BASE}/areas`, {
         credentials: "include",
       });
 
@@ -127,7 +128,7 @@ export function TemaForm() {
 }, [router]);
 
   async function cargarTemas() {
-    const res = await fetch(`${API_URL_BASE}/temas`, {
+    const res = await apiClient.request(`${API_URL_BASE}/temas`, {
       credentials: "include",
     });
 
@@ -179,7 +180,7 @@ export function TemaForm() {
     try {
       setDesactivando(true);
 
-      const res = await fetch(
+      const res = await apiClient.request(
         `${API_URL_BASE}/temas/${temaADesactivar.id}/activo?activo=false`,
         {
           method: "PATCH",
@@ -211,8 +212,33 @@ export function TemaForm() {
       return;
     }
 
+    const nombre = String(data?.nombre || "").trim();
+    const areaId = String(data?.areaId || "");
+    const duplicado = temas.find((tema) =>
+      String(tema?.nombre || "").trim().toLowerCase() === nombre.toLowerCase()
+      && String(tema?.areaId ?? tema?.area?.id ?? "") === areaId
+      && String(tema?.id) !== String(editandoId || "")
+    );
+
+    if (duplicado) {
+      toast.error("Ya existe un tema con ese nombre en el área seleccionada");
+      return;
+    }
+
     if (editandoId) {
-      const res = await fetch(`${API_URL_BASE}/temas/${editandoId}`, {
+      const actual = temas.find((tema) => String(tema?.id) === String(editandoId));
+      const sinCambios = actual
+        && String(actual?.nombre || "").trim().toLowerCase() === nombre.toLowerCase()
+        && String(actual?.areaId ?? actual?.area?.id ?? "") === areaId;
+
+      if (sinCambios) {
+        toast.info("No hay cambios para actualizar");
+        return;
+      }
+    }
+
+    if (editandoId) {
+      const res = await apiClient.request(`${API_URL_BASE}/temas/${editandoId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -270,7 +296,8 @@ export function TemaForm() {
           label="Nombre"
           register={register}
           errors={errors}
-          rules={{ required: "El nombre es obligatorio" }}
+          rules={{ required: "El nombre es obligatorio", maxLength: { value: 80, message: "El nombre no puede superar los 80 caracteres" } }}
+          maxLength={80}
         />
 
         <FormSelect

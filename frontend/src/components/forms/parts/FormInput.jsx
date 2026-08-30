@@ -1,29 +1,20 @@
 /**
- * Campo de entrada de texto reutilizable para formularios.
+ * Form handling.
  *
- * Integra `register` de react-hook-form y muestra el mensaje de error
- * del campo automáticamente si existe.
+ * Error handling.
+ * Implementation detail.
+ * Component implementation detail.
  *
  * @module components/forms/parts/FormInput
  */
 import React from "react";
 import { Input } from "@/components/ui/input";
+import { sanitizeDigits } from "@/lib/form-validation";
 
-/**
- * Comprueba si las reglas de validación incluyen un campo obligatorio.
- * @param {Object} rules - Reglas de validación de react-hook-form.
- * @returns {boolean} True si el campo es requerido.
- */
 function hasRequiredRule(rules) {
   return Boolean(rules?.required);
 }
 
-/**
- * Renderiza la etiqueta del campo con un asterisco si es requerido.
- * @param {string|React.ReactNode} label - Texto o elemento de etiqueta.
- * @param {boolean} required - Indica si el campo es obligatorio.
- * @returns {React.ReactNode} Etiqueta renderizada.
- */
 function renderLabel(label, required) {
   if (!label) return null;
 
@@ -40,13 +31,42 @@ function renderLabel(label, required) {
 }
 
 /**
- * Input de formulario que integra react-hook-form y muestra errores.
- * @param {{name:string, label:string, type?:string, register:function, errors:Object, rules?:Object}} props - Propiedades del componente.
- * @returns {JSX.Element} Campo de formulario.
+ * Error handling.
+ *
+ * Implementation detail.
+ * State handling.
+ * Implementation detail.
  */
-export function FormInput({ name, label, type = "text", register, errors, rules, ...props }) {
+export function FormInput({
+  name,
+  label,
+  type = "text",
+  register,
+  errors,
+  rules,
+  digitsOnly = false,
+  ...props
+}) {
   const error = errors?.[name];
   const required = hasRequiredRule(rules);
+  const registration = register(name, rules);
+  const externalOnChange = props.onChange;
+  const maxLength = props.maxLength;
+
+  const handleChange = (event) => {
+    if (digitsOnly) {
+      event.target.value = sanitizeDigits(event.target.value, maxLength);
+    }
+
+    registration.onChange(event);
+
+    if (typeof externalOnChange === "function") {
+      externalOnChange(event);
+    }
+  };
+
+  const inputProps = { ...props };
+  delete inputProps.onChange;
 
   return (
     <div className="flex flex-col gap-1.5 w-full">
@@ -61,9 +81,12 @@ export function FormInput({ name, label, type = "text", register, errors, rules,
         type={type}
         aria-invalid={error ? "true" : "false"}
         aria-required={required ? "true" : "false"}
-        {...register(name, rules)}
-        {...props}
-        className={`${props.className || ""} ${error ? "border-red-500" : ""}`.trim()}
+        {...registration}
+        {...inputProps}
+        inputMode={digitsOnly ? "numeric" : inputProps.inputMode}
+        pattern={digitsOnly ? "[0-9]*" : inputProps.pattern}
+        onChange={handleChange}
+        className={`${inputProps.className || ""} ${error ? "border-red-500" : ""}`.trim()}
       />
 
       {error && (

@@ -1,16 +1,18 @@
+"use client"
+
 /**
- * Formulario de gestión de estudiantes.
+ * Form handling.
  *
- * Lista los estudiantes registrados con paginación, permite filtrar por búsqueda
- * y desactivar estudiantes mediante un diálogo de confirmación.
+ * Handles list pagination consistently.
+ * Implementation detail.
  *
- * Las acciones sin permiso muestran un toast en lugar de redirigir,
- * para que el usuario no pierda el contexto de la pantalla.
+ * Permission and authorization handling.
+ * User flow detail.
  *
  * @module components/forms/usuarios/EstudiantesForm
  */
-"use client";
 
+import { apiClient } from "@/lib/apiClient";
 import React, { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -23,8 +25,8 @@ import { tienePermiso } from "@/lib/authz";
 import { getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils";
 
 /**
- * Formulario para listar y administrar estudiantes.
- * @returns {JSX.Element} Componente de lista de estudiantes.
+ * List and table handling.
+ * @returns {JSX.Element} Result value.
  */
 export function EstudiantesForm() {
   const router = useRouter();
@@ -44,7 +46,7 @@ export function EstudiantesForm() {
   useEffect(() => {
     const verificarYCargar = async () => {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, {
+        const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
           method: "GET",
           credentials: "include",
         });
@@ -80,7 +82,7 @@ export function EstudiantesForm() {
           url = `${API_URL_BASE}/estudiantes/activos/asesor/${usuario.perfilId}`;
         }
 
-        const estudiantesRes = await fetch(url, {
+        const estudiantesRes = await apiClient.request(url, {
           credentials: "include",
         });
 
@@ -124,11 +126,11 @@ export function EstudiantesForm() {
   }, [router]);
 
   /**
-   * Abre el diálogo de confirmación para desactivar un estudiante.
-   * Muestra un toast de error si el usuario no tiene el permiso requerido,
-   * sin redirigirlo para que no pierda el contexto.
+   * Implementation detail.
+   * Permission and authorization handling.
+   * Implementation detail.
    *
-   * @param {object} estudiante - El estudiante a desactivar.
+   * @param {object} estudiante - Student data.
    */
   function abrirConfirmacionDesactivar(estudiante) {
     if (!puedeCambiarEstado) {
@@ -152,7 +154,7 @@ export function EstudiantesForm() {
     try {
       setConfirmLoading(true);
 
-      const res = await fetch(
+      const res = await apiClient.request(
         `${API_URL_BASE}/estudiantes/${confirmDialog.id}/activo?activo=false`,
         {
           method: "PATCH",

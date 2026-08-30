@@ -9,11 +9,18 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
+import lombok.AllArgsConstructor;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 import co.edu.ufps.legal_cases.security.filter.jwt.JwtAuthenticationFilter;
 
 @Configuration
+@EnableWebSecurity // Activa la seguridad en las peticiones HTTP.
 @EnableMethodSecurity // Habilita @PreAuthorize en controllers y services.
+@EnableConfigurationProperties(AuthCookieProperties.class) // Habilita la inyeccion de propiedades de configuracion en AuthCookieProperties.
+@AllArgsConstructor
 public class SecurityConfig {
 
     private static final String[] PUBLIC_POST_ENDPOINTS = {
@@ -24,20 +31,15 @@ public class SecurityConfig {
     };
 
     private static final String[] PUBLIC_GET_ENDPOINTS = {
-            "/v3/api-docs/**",
-            "/swagger-ui/**",
-            "/swagger-ui.html"
-    };
+        "/api/auth/csrf",
+        "/v3/api-docs/**",
+        "/swagger-ui/**",
+        "/swagger-ui.html"
+};
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final SecurityExceptionHandler securityExceptionHandler;
-
-    public SecurityConfig(
-            JwtAuthenticationFilter jwtAuthenticationFilter,
-            SecurityExceptionHandler securityExceptionHandler) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-        this.securityExceptionHandler = securityExceptionHandler;
-    }
+    private final CsrfTokenRepository csrfTokenRepository;      // Interfaz para almacenar y recuperar tokens CSRF de la cookie.
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -45,9 +47,10 @@ public class SecurityConfig {
                 // Usa el CorsConfigurationSource definido en config/cors.
                 .cors(Customizer.withDefaults())
 
-                // Se deshabilita CSRF porque la API no usa sesión de servidor,
-                // sino autenticación stateless por JWT.
-                .csrf(csrf -> csrf.disable())
+                // Protege operaciones que modifican estado mediante token CSRF.
+                // El token esperado se almacena en cookie y el cliente lo envía en header.
+                .csrf(csrf -> csrf
+                .csrfTokenRepository(csrfTokenRepository))
 
                 // Cada petición debe autenticarse con el token.
                 // No se crea ni se conserva sesión HTTP en el servidor.

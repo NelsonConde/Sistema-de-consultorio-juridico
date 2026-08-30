@@ -1,47 +1,30 @@
 /**
- * Componente de carga de archivos con drag & drop y validación.
+ * File handling.
  *
- * Valida tipo MIME y tamaño máximo antes de agregar cada archivo.
- * Muestra la lista de archivos seleccionados con opción de eliminar individualmente.
+ * File handling.
+ * List and table handling.
  *
  * @module components/forms/parts/FormFileUpload
  */
 
+import { File as FileIcon, UploadCloud, X } from "lucide-react";
 import React from "react";
-import { UploadCloud, X, File as FileIcon } from "lucide-react";
 import { toast } from "sonner";
 
-/** Tipos MIME permitidos por defecto. */
-const TIPOS_PERMITIDOS = [
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-];
-
-/** Tamaño máximo por archivo en bytes (10 MB). */
+/** File handling.*/
 const MAX_TAMANO_BYTES = 10 * 1024 * 1024;
 
 /**
- * Valida un archivo según tipo MIME y tamaño máximo.
+ * File handling.
  *
- * @param {File} file - Archivo a validar.
- * @param {string[]} tiposPermitidos - Array de tipos MIME aceptados.
- * @param {number} maxBytes - Tamaño máximo en bytes.
- * @returns {{ valido: boolean, error?: string }} Resultado de la validación.
+ * @param {File} file - Parameter description.
+ * @param {number} maxBytes - Implementation detail.
+ * @returns {{ valido: boolean, error?: string } Result value.
  */
-function validarArchivo(file, tiposPermitidos, maxBytes) {
-  if (!tiposPermitidos.includes(file.type)) {
-    return {
-      valido: false,
-      error: `"${file.name}" tiene un formato no permitido. Use PDF, imágenes o documentos Office.`,
-    };
+function validarArchivo(file, maxBytes) {
+  if (!String(file.name || "").trim()) {
+    return { valido: false, error: "El archivo debe tener un nombre." };
   }
-
   if (file.size > maxBytes) {
     const mb = (maxBytes / 1024 / 1024).toFixed(0);
     return {
@@ -55,18 +38,17 @@ function validarArchivo(file, tiposPermitidos, maxBytes) {
 
 /**
  * @typedef {Object} FormFileUploadProps
- * @property {string} name - Nombre del campo, usado como `id` del input.
- * @property {string} [label] - Etiqueta visible sobre el área de carga.
- * @property {boolean} [multiple=false] - Si se permiten múltiples archivos.
- * @property {function(string, File|File[]): void} setValue - Función para actualizar el valor en el form.
- * @property {File|File[]|null} value - Valor actual del campo.
- * @property {object} [errors] - Objeto de errores de react-hook-form.
- * @property {string[]} [tiposPermitidos] - Tipos MIME aceptados. Por defecto: PDF, imágenes, Office.
- * @property {number} [maxTamanoByte] - Tamaño máximo en bytes. Por defecto: 10 MB.
+ * @property {string} name - Parameter description.
+ * @property {string} [label] - Parameter description.
+ * @property {boolean} [multiple=false] - Parameter description.
+ * @property {function(string, File|File[]): void} setValue - Parameter description.
+ * @property {File|File[]|null} value - Parameter description.
+ * @property {object} [errors] - Parameter description.
+ * @property {number} [maxTamanoByte] - Parameter description.
  */
 
 /**
- * Campo de carga de archivos con validación de tipo y tamaño.
+ * File handling.
  *
  * @param {FormFileUploadProps} props
  * @returns {JSX.Element}
@@ -78,14 +60,13 @@ export function FormFileUpload({
   setValue,
   value,
   errors,
-  tiposPermitidos = TIPOS_PERMITIDOS,
   maxTamanoByte = MAX_TAMANO_BYTES,
   ...props
 }) {
   const selectedFiles = Array.isArray(value) ? value : value ? [value] : [];
 
   /**
-   * Maneja la selección de archivos, validando cada uno antes de agregarlo.
+   * File handling.
    *
    * @param {React.ChangeEvent<HTMLInputElement>} event
    */
@@ -95,7 +76,7 @@ export function FormFileUpload({
 
     const validos = [];
     files.forEach((file) => {
-      const { valido, error } = validarArchivo(file, tiposPermitidos, maxTamanoByte);
+      const { valido, error } = validarArchivo(file, maxTamanoByte);
       if (valido) {
         validos.push(file);
       } else {
@@ -108,9 +89,7 @@ export function FormFileUpload({
       return;
     }
 
-    const nuevos = multiple
-      ? [...selectedFiles, ...validos]
-      : [validos[0]];
+    const nuevos = multiple ? [...selectedFiles, ...validos] : [validos[0]];
 
     if (setValue) {
       setValue(name, multiple ? nuevos : nuevos[0], {
@@ -123,18 +102,17 @@ export function FormFileUpload({
   }
 
   /**
-   * Elimina un archivo de la lista por nombre.
+   * List and table handling.
    *
-   * @param {string} nombreArchivo - Nombre del archivo a eliminar.
+   * @param {string} nombreArchivo - Parameter description.
    */
   function removeFile(nombreArchivo) {
     const restantes = selectedFiles.filter((f) => f.name !== nombreArchivo);
     if (setValue) {
-      setValue(
-        name,
-        multiple ? restantes : restantes[0] ?? null,
-        { shouldValidate: true, shouldDirty: true }
-      );
+      setValue(name, multiple ? restantes : (restantes[0] ?? null), {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
     }
   }
 
@@ -153,9 +131,10 @@ export function FormFileUpload({
           relative flex flex-col items-center justify-center w-full h-32
           border-2 border-dashed rounded-lg cursor-pointer
           transition-colors hover:bg-muted/50
-          ${errors?.[name]
-            ? "border-destructive bg-destructive/5"
-            : "border-muted-foreground/25 bg-background"
+          ${
+            errors?.[name]
+              ? "border-destructive bg-destructive/5"
+              : "border-muted-foreground/25 bg-background"
           }
         `}
       >
@@ -171,10 +150,11 @@ export function FormFileUpload({
         <div className="flex flex-col items-center justify-center pt-5 pb-6 text-muted-foreground pointer-events-none">
           <UploadCloud className="w-8 h-8 mb-2" />
           <p className="mb-1 text-sm text-center">
-            <span className="font-semibold">Haz clic para seleccionar</span> o arrastra y suelta
+            <span className="font-semibold">Haz clic para seleccionar</span> o
+            arrastra y suelta
           </p>
           <p className="text-xs text-center text-muted-foreground/70">
-            PDF, imágenes o documentos Office · máx. {mb} MB por archivo
+            Cualquier formato · máx. {mb} MB por archivo
           </p>
         </div>
       </div>

@@ -1,267 +1,42 @@
+"use client"
+
 /**
- * Formulario de creación de consultas jurídicas.
+ * Form handling.
  *
- * Valida que todos los campos obligatorios estén completos antes de enviar,
- * incluyendo la parte principal (validación explícita antes del fetch).
- * Los IDs de personas y catálogos se convierten de forma segura con `numberOrNull()`
- * para evitar enviar `NaN` al backend.
+ * Validation rule.
+ * Validation rule.
+ * People workflow detail.
+ * Implementation detail.
  *
- * Soporta subida de archivos adjuntos después de crear la consulta.
- * Los campos de texto libre tienen límite de caracteres (maxLength).
+ * File handling.
+ * Implementation detail.
  *
  * @module components/forms/consulta/NuevaConsultaForm
  */
-"use client";
 
+import { apiClient } from "@/lib/apiClient";
+import { fileApi } from "@/lib/fileApi";
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 
-import { API_URL_BASE, FILE_STORAGE_API_URL_BASE } from "@/lib/config";
+import { API_URL_BASE } from "@/lib/config";
 import ArchivosConsultaForm from "../parts/ArchivosConsultaForm";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
 import { getApiErrorDescription, getApiErrorTitle, readResponseBody } from "@/lib/api";
+import { buscarPersonasActivas } from "@/lib/personasApi";
 
-const VACIOS = {
-  fecha: "",
-  descripcion: "",
-  hechos: "",
-  pretensiones: "",
-  conceptoJuridico: "",
-  tramite: "",
-  observaciones: "",
-  tipoViolencia: "",
-  estado: "",
-  resultado: "",
-  personaId: "",
-  sedeId: "",
-  areaId: "",
-  temaId: "",
-  tipoId: "",
-  asesorId: "",
-  monitorId: "",
-  estudianteId: "",
-  partesIds: [],
-  contrapartesIds: [],
-};
-
-function ModalSimple({
-  abierto,
-  titulo,
-  items,
-  busqueda,
-  setBusqueda,
-  onSeleccionar,
-  onCerrar,
-  seleccionado,
-  renderItem,
-}) {
-  if (!abierto) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-background rounded-xl border shadow-lg w-full max-w-md mx-4 p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">{titulo}</h3>
-          <button
-            type="button"
-            onClick={onCerrar}
-            className="text-muted-foreground hover:text-foreground text-xl"
-          >
-            ✕
-          </button>
-        </div>
-
-        <input
-          autoFocus
-          type="text"
-          placeholder="Buscar..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        />
-
-        <div className="max-h-72 overflow-y-auto space-y-1">
-          <button
-            type="button"
-            onClick={() => onSeleccionar(null)}
-            className={`w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted transition-colors ${!seleccionado ? "bg-primary/10 text-primary font-medium" : ""
-              }`}
-          >
-            Sin asignar
-          </button>
-
-          {items.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-4">
-              Sin resultados
-            </p>
-          ) : (
-            items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onSeleccionar(item)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted transition-colors ${seleccionado?.id === item.id
-                    ? "bg-primary/10 text-primary font-medium"
-                    : ""
-                  }`}
-              >
-                {renderItem(item)}
-              </button>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ModalMultiple({
-  abierto,
-  titulo,
-  items,
-  busqueda,
-  setBusqueda,
-  onConfirmar,
-  onCerrar,
-  seleccionados,
-  renderItem,
-}) {
-  const [temp, setTemp] = useState([]);
-
-  useEffect(() => {
-    if (abierto) setTemp(seleccionados || []);
-  }, [abierto, seleccionados]);
-
-  if (!abierto) return null;
-
-  function toggleItem(id) {
-    const numId = Number(id);
-
-    setTemp((prev) =>
-      prev.includes(numId)
-        ? prev.filter((item) => item !== numId)
-        : [...prev, numId]
-    );
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-background rounded-xl border shadow-lg w-full max-w-md mx-4 p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">{titulo}</h3>
-          <button
-            type="button"
-            onClick={onCerrar}
-            className="text-muted-foreground hover:text-foreground text-xl"
-          >
-            ✕
-          </button>
-        </div>
-
-        <input
-          autoFocus
-          type="text"
-          placeholder="Buscar..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        />
-
-        <div className="max-h-64 overflow-y-auto space-y-1">
-          {items.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-4">
-              Sin resultados
-            </p>
-          ) : (
-            items.map((item) => {
-              const numId = Number(item.id);
-              const marcado = temp.includes(numId);
-
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => toggleItem(item.id)}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted transition-colors flex items-center gap-3 ${marcado ? "bg-primary/10" : ""
-                    }`}
-                >
-                  <span
-                    className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${marcado ? "bg-primary border-primary" : "border-gray-400"
-                      }`}
-                  >
-                    {marcado && <span className="text-white text-xs">✓</span>}
-                  </span>
-
-                  <span>{renderItem(item)}</span>
-                </button>
-              );
-            })
-          )}
-        </div>
-
-        <div className="flex justify-between items-center pt-2">
-          <span className="text-xs text-muted-foreground">
-            {temp.length} seleccionado(s)
-          </span>
-
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setTemp([])}
-            >
-              Limpiar
-            </Button>
-
-            <Button type="button" size="sm" onClick={() => onConfirmar(temp)}>
-              Confirmar
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-async function leerRespuesta(res) {
-  const text = await res.text();
-
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { mensaje: text };
-  }
-}
-
-function textOrNull(value) {
-  const text = String(value ?? "").trim();
-  return text === "" ? null : text;
-}
-
-function numberOrNull(value) {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-
-  const number = Number(value);
-  return Number.isNaN(number) ? null : number;
-}
-
-function numberArray(values) {
-  if (!Array.isArray(values)) {
-    return [];
-  }
-
-  return values
-    .map((value) => Number(value))
-    .filter((value) => !Number.isNaN(value));
-}
+import { VACIOS } from "./nueva-consulta.constants";
+import { leerRespuesta, numberArray, numberOrNull, textOrNull } from "./nueva-consulta.utils";
+import {
+  idNormalizado,
+  obtenerAreaIdAsesor,
+  obtenerAsesorIdEstudiante,
+  validarCoherenciaConsultaFrontend,
+} from "./consultas-juridicas.utils";
+import { ModalMultiple, ModalSimple } from "./ConsultaSelectionModals";
 
 export function NuevaConsultaForm() {
   const router = useRouter();
@@ -273,7 +48,14 @@ export function NuevaConsultaForm() {
   const [puedeAsignarResponsables, setPuedeAsignarResponsables] =
     useState(false);
 
-  const [personas, setPersonas] = useState([]);
+  const [personasResultado, setPersonasResultado] = useState([]);
+  const [personasBusquedaAplicada, setPersonasBusquedaAplicada] = useState("");
+  const [personasPagina, setPersonasPagina] = useState(1);
+  const [personasTamano, setPersonasTamano] = useState(10);
+  const [personasTotalPaginas, setPersonasTotalPaginas] = useState(0);
+  const [personasTotalElementos, setPersonasTotalElementos] = useState(0);
+  const [personasLoading, setPersonasLoading] = useState(false);
+  const [personasCache, setPersonasCache] = useState({});
   const [sedes, setSedes] = useState([]);
   const [areas, setAreas] = useState([]);
   const [temas, setTemas] = useState([]);
@@ -312,6 +94,28 @@ export function NuevaConsultaForm() {
     busqueda: "",
   });
 
+  const areaSeleccionadaId = useMemo(
+    () => idNormalizado(form.areaId),
+    [form.areaId]
+  );
+
+  const asesoresDisponiblesPorArea = useMemo(() => {
+    if (!areaSeleccionadaId) return [];
+
+    return asesores.filter(
+      (asesor) => obtenerAreaIdAsesor(asesor) === areaSeleccionadaId
+    );
+  }, [asesores, areaSeleccionadaId]);
+
+  const estudiantesDisponiblesPorAsesor = useMemo(() => {
+    if (!form.asesorId) return [];
+
+    const asesorId = idNormalizado(form.asesorId);
+    return estudiantes.filter(
+      (estudiante) => obtenerAsesorIdEstudiante(estudiante) === asesorId
+    );
+  }, [estudiantes, form.asesorId]);
+
   const asesorSeleccionado = useMemo(
     () => asesores.find((a) => String(a.id) === String(form.asesorId)) || null,
     [asesores, form.asesorId]
@@ -331,72 +135,74 @@ export function NuevaConsultaForm() {
   );
 
   const parteSeleccionada = useMemo(
-    () => personas.find((p) => Number(p.id) === Number(form.personaId)) || null,
-    [personas, form.personaId]
+    () =>
+      form.personaId
+        ? personasCache[String(form.personaId)] || null
+        : null,
+    [personasCache, form.personaId]
   );
 
   const partesAdicionalesSeleccionadas = useMemo(
     () =>
-      personas.filter((p) => (form.partesIds || []).includes(Number(p.id))),
-    [personas, form.partesIds]
+      (form.partesIds || [])
+        .map((id) => personasCache[String(id)] || null)
+        .filter(Boolean),
+    [personasCache, form.partesIds]
   );
 
   const contrapartesSeleccionadas = useMemo(
     () =>
-      personas.filter((p) =>
-        (form.contrapartesIds || []).includes(Number(p.id))
-      ),
-    [personas, form.contrapartesIds]
+      (form.contrapartesIds || [])
+        .map((id) => personasCache[String(id)] || null)
+        .filter(Boolean),
+    [personasCache, form.contrapartesIds]
   );
 
   const personasParaPrincipal = useMemo(
     () =>
-      personas.filter((p) => {
+      personasResultado.filter((p) => {
         const id = Number(p.id);
-
         return (
           !(form.partesIds || []).includes(id) &&
           !(form.contrapartesIds || []).includes(id)
         );
       }),
-    [personas, form.partesIds, form.contrapartesIds]
+    [personasResultado, form.partesIds, form.contrapartesIds]
   );
 
   const personasParaAdicionales = useMemo(
     () =>
-      personas.filter((p) => {
+      personasResultado.filter((p) => {
         const id = Number(p.id);
-
         return (
           id !== Number(form.personaId) &&
           !(form.contrapartesIds || []).includes(id)
         );
       }),
-    [personas, form.personaId, form.contrapartesIds]
+    [personasResultado, form.personaId, form.contrapartesIds]
   );
 
   const personasParaContrapartes = useMemo(
     () =>
-      personas.filter((p) => {
+      personasResultado.filter((p) => {
         const id = Number(p.id);
-
         return (
           id !== Number(form.personaId) &&
           !(form.partesIds || []).includes(id)
         );
       }),
-    [personas, form.personaId, form.partesIds]
+    [personasResultado, form.personaId, form.partesIds]
   );
 
   const asesoresFiltrados = useMemo(() => {
     const t = modalAsesor.busqueda.toLowerCase();
 
     return t
-      ? asesores.filter((a) =>
+      ? asesoresDisponiblesPorArea.filter((a) =>
         `${a.nombre} ${a.documento}`.toLowerCase().includes(t)
       )
-      : asesores;
-  }, [asesores, modalAsesor.busqueda]);
+      : asesoresDisponiblesPorArea;
+  }, [asesoresDisponiblesPorArea, modalAsesor.busqueda]);
 
   const monitoresFiltrados = useMemo(() => {
     const t = modalMonitor.busqueda.toLowerCase();
@@ -412,52 +218,110 @@ export function NuevaConsultaForm() {
     const t = modalEstudiante.busqueda.toLowerCase();
 
     return t
-      ? estudiantes.filter((e) =>
+      ? estudiantesDisponiblesPorAsesor.filter((e) =>
         `${e.nombre} ${e.documento} ${e.codigo}`.toLowerCase().includes(t)
       )
-      : estudiantes;
-  }, [estudiantes, modalEstudiante.busqueda]);
+      : estudiantesDisponiblesPorAsesor;
+  }, [estudiantesDisponiblesPorAsesor, modalEstudiante.busqueda]);
 
-  const parteFiltrada = useMemo(() => {
-    const t = modalParte.busqueda.toLowerCase();
+  const parteFiltrada = personasParaPrincipal;
+  const partesAdicionalesFiltradas = personasParaAdicionales;
+  const contrapartesFiltradas = personasParaContrapartes;
 
-    return t
-      ? personasParaPrincipal.filter((p) =>
-        `${p.nombres} ${p.apellidos} ${p.numeroDocumento}`
-          .toLowerCase()
-          .includes(t)
-      )
-      : personasParaPrincipal;
-  }, [personasParaPrincipal, modalParte.busqueda]);
+  const modalPersonasAbierto =
+    modalParte.abierto ||
+    modalPartesAdicionales.abierto ||
+    modalContrapartes.abierto;
 
-  const partesAdicionalesFiltradas = useMemo(() => {
-    const t = modalPartesAdicionales.busqueda.toLowerCase();
+  const busquedaPersonasActual = modalParte.abierto
+    ? modalParte.busqueda
+    : modalPartesAdicionales.abierto
+      ? modalPartesAdicionales.busqueda
+      : modalContrapartes.abierto
+        ? modalContrapartes.busqueda
+        : "";
 
-    return t
-      ? personasParaAdicionales.filter((p) =>
-        `${p.nombres} ${p.apellidos} ${p.numeroDocumento}`
-          .toLowerCase()
-          .includes(t)
-      )
-      : personasParaAdicionales;
-  }, [personasParaAdicionales, modalPartesAdicionales.busqueda]);
+  useEffect(() => {
+    if (!modalPersonasAbierto) return;
 
-  const contrapartesFiltradas = useMemo(() => {
-    const t = modalContrapartes.busqueda.toLowerCase();
+    const timeoutId = window.setTimeout(() => {
+      setPersonasPagina(1);
+      setPersonasBusquedaAplicada(busquedaPersonasActual.trim());
+    }, 350);
 
-    return t
-      ? personasParaContrapartes.filter((p) =>
-        `${p.nombres} ${p.apellidos} ${p.numeroDocumento}`
-          .toLowerCase()
-          .includes(t)
-      )
-      : personasParaContrapartes;
-  }, [personasParaContrapartes, modalContrapartes.busqueda]);
+    return () => window.clearTimeout(timeoutId);
+  }, [modalPersonasAbierto, busquedaPersonasActual]);
+
+  useEffect(() => {
+    if (!modalPersonasAbierto) return;
+
+    const controller = new AbortController();
+
+    async function cargarPaginaPersonas() {
+      try {
+        setPersonasLoading(true);
+
+        const resultado = await buscarPersonasActivas({
+          search: personasBusquedaAplicada,
+          page: personasPagina,
+          size: personasTamano,
+          signal: controller.signal,
+        });
+
+        setPersonasResultado(resultado.content);
+        setPersonasTotalPaginas(resultado.totalPages);
+        setPersonasTotalElementos(resultado.totalElements);
+        setPersonasCache((prev) => {
+          const next = { ...prev };
+          for (const persona of resultado.content) {
+            if (persona?.id != null) {
+              next[String(persona.id)] = persona;
+            }
+          }
+          return next;
+        });
+      } catch (error) {
+        if (error.name === "AbortError") return;
+
+        if (error.status === 401) {
+          router.replace("/");
+          return;
+        }
+
+        if (error.status === 403) {
+          router.replace("/inicio");
+          return;
+        }
+
+        setPersonasResultado([]);
+        setPersonasTotalPaginas(0);
+        setPersonasTotalElementos(0);
+        toast.error(error.message || "No se pudieron buscar personas");
+      } finally {
+        setPersonasLoading(false);
+      }
+    }
+
+    cargarPaginaPersonas();
+    return () => controller.abort();
+  }, [
+    modalPersonasAbierto,
+    personasBusquedaAplicada,
+    personasPagina,
+    personasTamano,
+    router,
+  ]);
+
+  function abrirModalPersona(setModal) {
+    setPersonasPagina(1);
+    setPersonasBusquedaAplicada("");
+    setModal({ abierto: true, busqueda: "" });
+  }
 
   useEffect(() => {
     async function verificar() {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, {
+        const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
           method: "GET",
           credentials: "include",
         });
@@ -504,7 +368,7 @@ export function NuevaConsultaForm() {
 
   useEffect(() => {
     if (form.areaId) {
-      fetch(`${API_URL_BASE}/temas/area/${form.areaId}`, {
+      apiClient.request(`${API_URL_BASE}/temas/area/${form.areaId}`, {
         credentials: "include",
       })
         .then((r) => {
@@ -533,7 +397,7 @@ export function NuevaConsultaForm() {
 
   useEffect(() => {
     if (form.temaId) {
-      fetch(`${API_URL_BASE}/tipos/tema/${form.temaId}`, {
+      apiClient.request(`${API_URL_BASE}/tipos/tema/${form.temaId}`, {
         credentials: "include",
       })
         .then((r) => {
@@ -563,7 +427,7 @@ export function NuevaConsultaForm() {
   async function cargarCatalogos(puedeAsignar = false) {
     try {
       async function fetchLista(url) {
-        const res = await fetch(url, {
+        const res = await apiClient.request(url, {
           credentials: "include",
         });
 
@@ -585,13 +449,11 @@ export function NuevaConsultaForm() {
         return Array.isArray(data) ? data : [];
       }
 
-      const [pR, sR, aR] = await Promise.all([
-        fetchLista(`${API_URL_BASE}/personas/activos`),
+      const [sR, aR] = await Promise.all([
         fetchLista(`${API_URL_BASE}/sedes`),
         fetchLista(`${API_URL_BASE}/areas`),
       ]);
 
-      setPersonas(pR);
       setSedes(sR);
       setAreas(aR);
 
@@ -628,6 +490,8 @@ export function NuevaConsultaForm() {
       if (name === "areaId") {
         next.temaId = "";
         next.tipoId = "";
+        next.asesorId = "";
+        next.estudianteId = "";
       }
 
       if (name === "temaId") {
@@ -643,32 +507,23 @@ export function NuevaConsultaForm() {
       return true;
     }
 
-    const formData = new FormData();
-
-    archivos.forEach((file) => {
-      formData.append("files", file);
-    });
-
-    formData.append("path", String(consultaId));
-
     try {
-      const uploadRes = await fetch(
-        `${FILE_STORAGE_API_URL_BASE}/files/upload-multiple`,
-        {
-          method: "POST",
-          credentials: "include",
-          body: formData,
-        }
+      const results = await fileApi.uploadMany(
+        { type: "consulta", id: consultaId },
+        archivos
       );
+      const failed = results.filter((result) => !result.ok);
 
-      if (uploadRes.ok) {
+      if (failed.length === 0) {
         toast.success("Archivos subidos correctamente");
         return true;
       }
 
-      const errorText = await uploadRes.text();
-      console.error("Error subiendo archivos:", errorText);
-      toast.warning("La consulta se creó, pero no se pudieron subir los archivos");
+      toast.warning(
+        failed.length === archivos.length
+          ? "La consulta se creó, pero no se pudieron subir los archivos"
+          : `La consulta se creó; ${failed.length} archivo(s) no pudieron subirse`
+      );
       return false;
     } catch (error) {
       console.error("Error subiendo archivos:", error);
@@ -693,6 +548,42 @@ export function NuevaConsultaForm() {
     if (!form.conceptoJuridico?.trim()) faltantes.push("concepto jurídico");
 
     if (faltantes.length === 0) {
+      const errorCoherencia = validarCoherenciaConsultaFrontend({
+        form,
+        temas,
+        tipos,
+        asesores,
+        monitores,
+        estudiantes,
+      });
+
+      if (errorCoherencia) {
+        toast.error("Asignación o relación inválida", {
+          description: errorCoherencia,
+        });
+        return false;
+      }
+
+      if (String(form.descripcion || "").trim().length > 500) {
+        toast.error("La descripción no puede superar los 500 caracteres");
+        return false;
+      }
+
+      if (String(form.tramite || "").trim().length > 100) {
+        toast.error("El trámite no puede superar los 100 caracteres");
+        return false;
+      }
+
+      if (String(form.tipoViolencia || "").trim().length > 100) {
+        toast.error("El tipo de violencia no puede superar los 100 caracteres");
+        return false;
+      }
+
+      if (String(form.resultado || "").trim().length > 100) {
+        toast.error("El resultado no puede superar los 100 caracteres");
+        return false;
+      }
+
       return true;
     }
 
@@ -744,7 +635,7 @@ export function NuevaConsultaForm() {
     };
 
     try {
-      const res = await fetch(`${API_URL_BASE}/consultas`, {
+      const res = await apiClient.request(`${API_URL_BASE}/consultas`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -797,7 +688,9 @@ export function NuevaConsultaForm() {
         <div className="font-medium">
           {p.nombres} {p.apellidos}
         </div>
-        <div className="text-xs text-muted-foreground">{p.numeroDocumento}</div>
+        <div className="text-xs text-muted-foreground">
+          {p.tipoDocumento} {p.numeroDocumentoEnmascarado || ""}
+        </div>
       </>
     );
   }
@@ -828,6 +721,7 @@ export function NuevaConsultaForm() {
               onChange={handleChange}
               required
               placeholder="Ej: Conciliación"
+              maxLength={100}
               className={ic}
             />
           </C>
@@ -912,6 +806,7 @@ export function NuevaConsultaForm() {
               value={form.tipoViolencia}
               onChange={handleChange}
               placeholder="Opcional"
+              maxLength={100}
               className={ic}
             />
           </C>
@@ -922,6 +817,7 @@ export function NuevaConsultaForm() {
               value={form.resultado}
               onChange={handleChange}
               placeholder="Opcional"
+              maxLength={100}
               className={ic}
             />
           </C>
@@ -931,6 +827,7 @@ export function NuevaConsultaForm() {
               <C label="Asesor">
                 <button
                   type="button"
+                  disabled={!form.areaId}
                   onClick={() =>
                     setModalAsesor((prev) => ({
                       ...prev,
@@ -989,6 +886,7 @@ export function NuevaConsultaForm() {
               <C label="Estudiante">
                 <button
                   type="button"
+                  disabled={!form.asesorId}
                   onClick={() =>
                     setModalEstudiante((prev) => ({
                       ...prev,
@@ -1022,10 +920,7 @@ export function NuevaConsultaForm() {
           <button
             type="button"
             onClick={() =>
-              setModalParte((prev) => ({
-                ...prev,
-                abierto: true,
-              }))
+              abrirModalPersona(setModalParte)
             }
             className="flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors"
           >
@@ -1035,7 +930,7 @@ export function NuevaConsultaForm() {
               }
             >
               {parteSeleccionada
-                ? `${parteSeleccionada.nombres} ${parteSeleccionada.apellidos} - ${parteSeleccionada.numeroDocumento}`
+                ? `${parteSeleccionada.nombres} ${parteSeleccionada.apellidos} - ${parteSeleccionada.numeroDocumentoEnmascarado || ""}`
                 : "Buscar parte principal..."}
             </span>
             <span className="text-muted-foreground">▼</span>
@@ -1046,10 +941,7 @@ export function NuevaConsultaForm() {
           <button
             type="button"
             onClick={() =>
-              setModalPartesAdicionales((prev) => ({
-                ...prev,
-                abierto: true,
-              }))
+              abrirModalPersona(setModalPartesAdicionales)
             }
             className="flex min-h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors"
           >
@@ -1074,10 +966,7 @@ export function NuevaConsultaForm() {
           <button
             type="button"
             onClick={() =>
-              setModalContrapartes((prev) => ({
-                ...prev,
-                abierto: true,
-              }))
+              abrirModalPersona(setModalContrapartes)
             }
             className="flex min-h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors"
           >
@@ -1103,7 +992,7 @@ export function NuevaConsultaForm() {
             name="descripcion"
             value={form.descripcion}
             onChange={handleChange}
-            maxLength={2000}
+            maxLength={500}
             required
             rows={3}
             placeholder="Resumen de la consulta"
@@ -1197,6 +1086,7 @@ export function NuevaConsultaForm() {
               setForm((prev) => ({
                 ...prev,
                 asesorId: item ? String(item.id) : "",
+                estudianteId: "",
               }));
               setModalAsesor({ abierto: false, busqueda: "" });
             }}
@@ -1295,6 +1185,19 @@ export function NuevaConsultaForm() {
           setModalParte({ abierto: false, busqueda: "" });
         }}
         onCerrar={() => setModalParte({ abierto: false, busqueda: "" })}
+        loading={personasLoading}
+        pagination={{
+          currentPage: personasPagina,
+          totalPages: personasTotalPaginas,
+          onPageChange: setPersonasPagina,
+          pageSize: personasTamano,
+          onPageSizeChange: (size) => {
+            setPersonasTamano(size);
+            setPersonasPagina(1);
+          },
+          pageSizeOptions: [10, 20, 50],
+          totalItems: personasTotalElementos,
+        }}
         seleccionado={parteSeleccionada}
         renderItem={renderPersona}
       />
@@ -1320,6 +1223,19 @@ export function NuevaConsultaForm() {
         onCerrar={() =>
           setModalPartesAdicionales({ abierto: false, busqueda: "" })
         }
+        loading={personasLoading}
+        pagination={{
+          currentPage: personasPagina,
+          totalPages: personasTotalPaginas,
+          onPageChange: setPersonasPagina,
+          pageSize: personasTamano,
+          onPageSizeChange: (size) => {
+            setPersonasTamano(size);
+            setPersonasPagina(1);
+          },
+          pageSizeOptions: [10, 20, 50],
+          totalItems: personasTotalElementos,
+        }}
         seleccionados={form.partesIds}
         renderItem={renderPersona}
       />
@@ -1343,6 +1259,19 @@ export function NuevaConsultaForm() {
           setModalContrapartes({ abierto: false, busqueda: "" });
         }}
         onCerrar={() => setModalContrapartes({ abierto: false, busqueda: "" })}
+        loading={personasLoading}
+        pagination={{
+          currentPage: personasPagina,
+          totalPages: personasTotalPaginas,
+          onPageChange: setPersonasPagina,
+          pageSize: personasTamano,
+          onPageSizeChange: (size) => {
+            setPersonasTamano(size);
+            setPersonasPagina(1);
+          },
+          pageSizeOptions: [10, 20, 50],
+          totalItems: personasTotalElementos,
+        }}
         seleccionados={form.contrapartesIds}
         renderItem={renderPersona}
       />

@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import co.edu.ufps.legal_cases.business.model.consulta.Consulta;
 import co.edu.ufps.legal_cases.business.model.perfil.Conciliador;
 import co.edu.ufps.legal_cases.business.model.perfil.Estudiante;
+import co.edu.ufps.legal_cases.file_storage.model.FileAsset;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -14,6 +15,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -57,15 +59,14 @@ public class Conciliacion {
     @Column(name = "fecha_conciliacion")
     private LocalDateTime fechaConciliacion;
 
-    // Ruta del documento de solicitud.
-    // Ejemplo: conciliacion/1/solicitud.pdf
-    @Column(name = "documento_solicitud_path", length = 255)
-    private String documentoSolicitudPath;
+    // Referencias internas al registro documental. Nunca se expone la clave del bucket.
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "documento_solicitud_file_id")
+    private FileAsset documentoSolicitud;
 
-    // Ruta del acta de conciliación.
-    // Ejemplo: conciliacion/1/acta.pdf
-    @Column(name = "acta_path", length = 255)
-    private String actaPath;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "acta_file_id")
+    private FileAsset acta;
 
     // Usuario del sistema que generó la conciliación.
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

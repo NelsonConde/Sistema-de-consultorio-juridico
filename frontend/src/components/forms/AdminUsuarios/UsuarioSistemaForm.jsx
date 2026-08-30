@@ -1,13 +1,15 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
+import { apiResponse, readResponseBody } from "@/lib/api";
 /**
- * Formulario de creación de usuarios del sistema jurídico.
+ * Form handling.
  *
- * Permite crear asesores, monitores, estudiantes, conciliadores y administrativos.
- * Cuando el tipo seleccionado es "Estudiante", muestra un Tabs con dos modos:
- * creación individual y cargue masivo desde Excel.
+ * Conciliation workflow detail.
+ * Selection behavior.
+ * Data loading behavior.
  *
- * Requiere permiso `CREAR_USUARIOS` o `GESTIONAR_ADMINISTRADORES`.
+ * Permission and authorization handling.
  *
  * @module components/forms/AdminUsuarios/UsuarioSistemaForm
  */
@@ -24,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { API_URL_BASE } from "@/lib/config";
 import { PERMISOS } from "@/lib/permission";
 import { tieneAlgunPermiso, tienePermiso } from "@/lib/authz";
+import { digitsOnlyRule, maxLengthRule, requiredEmailRule } from "@/lib/form-validation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImportarEstudiantesForm } from "../usuarios/ImportarEstudiantesForm";
 
@@ -76,8 +79,8 @@ function puedeVerCatalogosUsuario(usuario) {
 }
 
 /**
- * Formulario para gestionar usuarios del sistema.
- * @returns {JSX.Element} Componente de administración de usuarios.
+ * Form handling.
+ * @returns {JSX.Element} Result value.
  */
 export function UsuarioSistemaForm() {
   const router = useRouter();
@@ -140,19 +143,12 @@ export function UsuarioSistemaForm() {
   }, []);
 
   async function leerRespuesta(response) {
-    const text = await response.text();
-
-    if (!text) return null;
-
-    try {
-      return JSON.parse(text);
-    } catch {
-      return { mensaje: text };
-    }
+    const data = await readResponseBody(response);
+    return typeof data === "string" ? { mensaje: data } : data;
   }
 
   async function fetchLista(url, mensaje403) {
-    const res = await fetch(url, { credentials: "include" });
+    const { response: res, data } = await apiResponse(url, { method: "GET" });
 
     if (res.status === 401) {
       router.push("/");
@@ -168,13 +164,12 @@ export function UsuarioSistemaForm() {
       return [];
     }
 
-    const data = await res.json();
     return extraerLista(data);
   }
 
   async function verificarYCargar() {
     try {
-      const res = await fetch(`${API_URL_BASE}/auth/me`, {
+      const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
         credentials: "include",
       });
 
@@ -306,7 +301,7 @@ export function UsuarioSistemaForm() {
     try {
       setGuardando(true);
 
-      const res = await fetch(`${API_URL_BASE}/${rol}`, {
+      const res = await apiClient.request(`${API_URL_BASE}/${rol}`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -459,9 +454,10 @@ export function UsuarioSistemaForm() {
                   <FormInput
                     name="nombre"
                     label="Nombre"
+                    maxLength={150}
                     register={register}
                     errors={errors}
-                    rules={{ required: REQUIRED }}
+                    rules={{ required: REQUIRED, ...maxLengthRule(150) }}
                   />
 
                   {renderTipoDocumento()}
@@ -469,41 +465,48 @@ export function UsuarioSistemaForm() {
                   <FormInput
                     name="documento"
                     label="Documento"
+                    maxLength={30}
                     register={register}
                     errors={errors}
-                    rules={{ required: REQUIRED }}
+                    rules={{ required: REQUIRED, ...maxLengthRule(30) }}
                   />
 
                   <FormInput
                     name="email"
                     label="Email"
+                    maxLength={120}
                     register={register}
                     errors={errors}
-                    rules={{ required: REQUIRED }}
+                    rules={{ ...requiredEmailRule(), ...maxLengthRule(120) }}
                   />
 
                   <FormInput
                     name="telefono"
                     label="Teléfono"
+                    digitsOnly
+
+                    maxLength={30}
                     register={register}
                     errors={errors}
-                    rules={{ required: REQUIRED }}
+                    rules={{ ...digitsOnlyRule({ required: true, maxLength: 30 }) }}
                   />
 
                   <FormInput
                     name="usuario"
                     label="Usuario"
+                    maxLength={50}
                     register={register}
                     errors={errors}
-                    rules={{ required: REQUIRED }}
+                    rules={{ required: REQUIRED, ...maxLengthRule(50) }}
                   />
 
                   <FormInput
                     name="codigo"
                     label="Código"
+                    maxLength={30}
                     register={register}
                     errors={errors}
-                    rules={{ required: REQUIRED }}
+                    rules={{ required: REQUIRED, ...maxLengthRule(30) }}
                   />
 
                   {sedes.length > 0 ? (
@@ -552,9 +555,10 @@ export function UsuarioSistemaForm() {
                 <FormInput
                   name="nombre"
                   label="Nombre"
+                  maxLength={150}
                   register={register}
                   errors={errors}
-                  rules={{ required: REQUIRED }}
+                  rules={{ required: REQUIRED, ...maxLengthRule(150) }}
                 />
 
                 {renderTipoDocumento()}
@@ -562,41 +566,47 @@ export function UsuarioSistemaForm() {
                 <FormInput
                   name="documento"
                   label="Documento"
+                  maxLength={30}
                   register={register}
                   errors={errors}
-                  rules={{ required: REQUIRED }}
+                  rules={{ required: REQUIRED, ...maxLengthRule(30) }}
                 />
 
                 <FormInput
                   name="email"
                   label="Email"
+                  maxLength={120}
                   register={register}
                   errors={errors}
-                  rules={{ required: REQUIRED }}
+                  rules={{ ...requiredEmailRule(), ...maxLengthRule(120) }}
                 />
 
                 <FormInput
                   name="telefono"
                   label="Teléfono"
+                  digitsOnly
+                  maxLength={30}
                   register={register}
                   errors={errors}
-                  rules={{ required: REQUIRED }}
+                  rules={{ ...digitsOnlyRule({ required: true, maxLength: 30 }) }}
                 />
 
                 <FormInput
                   name="usuario"
                   label="Usuario"
+                  maxLength={50}
                   register={register}
                   errors={errors}
-                  rules={{ required: REQUIRED }}
+                  rules={{ required: REQUIRED, ...maxLengthRule(50) }}
                 />
 
                 <FormInput
                   name="codigo"
                   label="Código"
+                  maxLength={30}
                   register={register}
                   errors={errors}
-                  rules={{ required: REQUIRED }}
+                  rules={{ required: REQUIRED, ...maxLengthRule(30) }}
                 />
 
                 {sedes.length > 0 ? (

@@ -1,22 +1,22 @@
 /**
- * Utilidades para ordenamiento y paginación de listas en el frontend.
+ * Handles numeric identifiers consistently for list ordering.
  *
- * Usadas por tablas y listados de consultas, seguimientos, personas y otros recursos
- * para mantener consistencia en la presentación de datos paginados.
+ * List and table handling.
+ * Pagination handling.
  *
  * @module lib/list-utils
  */
 
-/** Opciones de tamaño de página disponibles en los selectores de paginación. */
+/** Pagination handling.*/
 export const DEFAULT_PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 
 /**
- * Obtiene el ID numérico de un item, buscando en los campos estándar del backend.
- * Devuelve `fallback` si no se encuentra un ID numérico válido.
+ * Data loading behavior.
+ * Implementation detail.
  *
- * @param {object} item - El item del que obtener el ID.
- * @param {number} [fallback=Number.MAX_SAFE_INTEGER] - Valor por defecto si no hay ID.
- * @returns {number} El ID numérico del item.
+ * @param {object} item - Item to process.
+ * @param {number} [fallback=Number.MAX_SAFE_INTEGER] - Fallback value.
+ * @returns {number} Result value.
  */
 export function getNumericId(item, fallback = Number.MAX_SAFE_INTEGER) {
   const rawId = item?.id ?? item?.consultaId ?? item?.seguimientoId ?? item?.idSeguimiento;
@@ -26,12 +26,12 @@ export function getNumericId(item, fallback = Number.MAX_SAFE_INTEGER) {
 }
 
 /**
- * Ordena un array de items por ID de forma ascendente.
- * En caso de empate por ID, ordena alfabéticamente por nombre/username/descripción.
+ * Handles numeric identifiers consistently for list ordering.
+ * Handles numeric identifiers consistently for list ordering.
  *
- * @param {object[]} items - Array de items a ordenar.
- * @param {function(object): number} [getId=getNumericId] - Función para obtener el ID de un item.
- * @returns {object[]} Nuevo array ordenado (el original no se modifica).
+ * @param {object[]} items - Item to process.
+ * @param {function(object): number} [getId=getNumericId] - Parameter description.
+ * @returns {object[]} Result value.
  */
 export function sortByIdAsc(items, getId = getNumericId) {
   if (!Array.isArray(items)) return [];
@@ -51,11 +51,11 @@ export function sortByIdAsc(items, getId = getNumericId) {
 }
 
 /**
- * Calcula el número total de páginas para una lista paginada.
+ * Handles list pagination consistently.
  *
- * @param {number} totalItems - Cantidad total de items en la lista completa.
- * @param {number} pageSize - Cantidad de items por página.
- * @returns {number} Total de páginas, mínimo 1.
+ * @param {number} totalItems - Item to process.
+ * @param {number} pageSize - Parameter description.
+ * @returns {number} Result value.
  */
 export function getTotalPages(totalItems, pageSize) {
   const size = Number(pageSize) > 0 ? Number(pageSize) : DEFAULT_PAGE_SIZE_OPTIONS[1];
@@ -64,12 +64,12 @@ export function getTotalPages(totalItems, pageSize) {
 }
 
 /**
- * Extrae el subconjunto de items correspondiente a una página específica.
+ * Implementation detail.
  *
- * @param {object[]} items - Array completo de items.
- * @param {number} currentPage - Número de página actual (base 1).
- * @param {number} pageSize - Cantidad de items por página.
- * @returns {object[]} Subarray con los items de la página solicitada.
+ * @param {object[]} items - Item to process.
+ * @param {number} currentPage - Parameter description.
+ * @param {number} pageSize - Parameter description.
+ * @returns {object[]} Result value.
  */
 export function paginateItems(items, currentPage, pageSize) {
   const page = Math.max(1, Number(currentPage) || 1);

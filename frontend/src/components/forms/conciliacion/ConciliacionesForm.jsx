@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { apiClient } from "@/lib/apiClient";
+import { fileApi } from "@/lib/fileApi";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -18,414 +20,32 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Pagination from "@/components/ui/Pagination";
-import { API_URL_BASE, FILE_STORAGE_API_URL_BASE } from "@/lib/config";
+import { API_URL_BASE } from "@/lib/config";
 import { PERMISOS } from "@/lib/permission";
 import {
-  esAdministrativo,
   esConciliador,
   esEstudiante,
   tieneAlgunPermiso,
   tienePermiso,
-  tieneRol,
 } from "@/lib/authz";
 
-const ESTADOS_NO_FINALES = [
-  { value: "ESPERANDO_REUNION", label: "Esperando reunión" },
-];
-
-const ESTADOS_FINALES = [
-  { value: "COMPLETO_CONCILIADO", label: "Completo - conciliado" },
-  { value: "COMPLETO_NO_CONCILIADO", label: "Completo - no conciliado" },
-];
-
-const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
-
-function normalizarTexto(value) {
-  return String(value || "")
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase();
-}
-
-function extraerLista(data) {
-  if (Array.isArray(data)) return data;
-  if (!data || typeof data !== "object") return [];
-
-  const claves = [
-    "content",
-    "data",
-    "items",
-    "rows",
-    "consultas",
-    "conciliaciones",
-    "estudiantes",
-    "conciliadores",
-    "resultado",
-    "payload",
-  ];
-
-  for (const clave of claves) {
-    const valor = data[clave];
-    if (Array.isArray(valor)) return valor;
-    if (valor && typeof valor === "object") {
-      const interno = extraerLista(valor);
-      if (interno.length > 0) return interno;
-    }
-  }
-
-  return [];
-}
-
-async function leerRespuesta(response) {
-  if (response.status === 204) return null;
-
-  const text = await response.text();
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { mensaje: text };
-  }
-}
-
-function obtenerMensajeError(data, fallback = "Ocurrió un error") {
-  if (!data) return fallback;
-  if (typeof data === "string") return data || fallback;
-
-  if (data.detalles && typeof data.detalles === "object") {
-    const detalle = Object.values(data.detalles).filter(Boolean).join(". ");
-    if (detalle) return detalle;
-  }
-
-  if (Array.isArray(data.detalles)) {
-    const detalle = data.detalles.filter(Boolean).join(". ");
-    if (detalle) return detalle;
-  }
-
-  return data.mensaje || data.message || data.error || fallback;
-}
-
-function encodePath(path) {
-  return String(path || "")
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-}
-
-function archivoEsPdf(file) {
-  if (!file) return false;
-  const nombre = String(file.name || "").toLowerCase();
-  return file.type === "application/pdf" || nombre.endsWith(".pdf");
-}
-
-function valor(...opciones) {
-  return opciones.find((item) => item !== undefined && item !== null && item !== "") ?? "";
-}
-
-function nombrePersona(item) {
-  const directo = valor(
-    item?.nombre,
-    item?.nombreCompleto,
-    item?.nombre_completo,
-    item?.personaNombre,
-    item?.displayName
-  );
-
-  if (directo) return directo;
-
-  const nombres = valor(item?.nombres, item?.primerNombre);
-  const apellidos = valor(item?.apellidos, item?.apellido);
-  const compuesto = `${nombres} ${apellidos}`.trim();
-
-  return compuesto || "Sin nombre";
-}
-
-function nombreConsulta(item) {
-  const id = valor(item?.id, item?.consultaId, item?.idConsulta);
-  return valor(
-    item?.descripcion,
-    item?.descripcionConsulta,
-    item?.consulta,
-    item?.hechos,
-    item?.titulo,
-    id ? `Consulta #${id}` : "Consulta"
-  );
-}
-
-function idConsulta(item) {
-  return valor(item?.id, item?.consultaId, item?.idConsulta);
-}
-
-function ordenarPorIdAsc(items) {
-  return [...items].sort((a, b) => {
-    const idA = Number(a?.id ?? Number.MAX_SAFE_INTEGER);
-    const idB = Number(b?.id ?? Number.MAX_SAFE_INTEGER);
-    return idA - idB;
-  });
-}
-
-function formatearFecha(value) {
-  if (!value) return "No registra";
-  const fecha = new Date(value);
-  if (Number.isNaN(fecha.getTime())) return String(value);
-
-  return new Intl.DateTimeFormat("es-CO", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(fecha);
-}
-
-function etiquetaEstado(codigo, nombre) {
-  if (nombre) return nombre;
-
-  const estado = normalizarTexto(codigo).replace(/_/g, " ");
-  if (!estado) return "Sin estado";
-
-  return estado.charAt(0) + estado.slice(1).toLowerCase();
-}
-
-function badgeEstadoClass(codigo) {
-  const estado = normalizarTexto(codigo);
-
-  if (estado.includes("COMPLETO")) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-
-  if (estado === "EN_ESPERA") {
-    return "border-amber-200 bg-amber-50 text-amber-700";
-  }
-
-  if (estado === "REUNION_PROGRAMADA") {
-    return "border-blue-200 bg-blue-50 text-blue-700";
-  }
-
-  return "border-slate-200 bg-slate-50 text-slate-700";
-}
-
-function personaResumen(persona) {
-  if (!persona) return "No registra";
-  const nombre = nombrePersona(persona);
-  const documento = valor(persona?.numeroDocumento, persona?.documento, persona?.cedula);
-  return documento ? `${nombre} - ${documento}` : nombre;
-}
-
-function esRolAdministrador(usuario) {
-  return (
-    esAdministrativo(usuario) ||
-    tieneRol(usuario, "Administrador") ||
-    tieneRol(usuario, "Administrativo") ||
-    tieneRol(usuario, "Director")
-  );
-}
-
-
-function obtenerDetalleConsulta(item) {
-  const persona = item?.persona || item?.consultante || item?.partePrincipal || {};
-  const nombreParte = valor(
-    item?.personaNombre,
-    item?.consultanteNombre,
-    item?.nombrePersona,
-    item?.nombre,
-    persona?.nombre,
-    persona?.nombreCompleto,
-    persona?.nombre_completo
-  );
-  const apellidoParte = valor(item?.personaApellido, item?.apellido, persona?.apellido, persona?.apellidos);
-  const documentoParte = valor(
-    item?.cedula,
-    item?.documento,
-    item?.numeroDocumento,
-    persona?.documento,
-    persona?.numeroDocumento
-  );
-  const responsable = valor(item?.estudianteNombre, item?.asesorNombre, item?.monitorNombre);
-
-  return {
-    id: idConsulta(item),
-    titulo: nombreConsulta(item),
-    parte: [nombreParte, apellidoParte].filter(Boolean).join(" "),
-    documentoParte,
-    estado: valor(item?.estado, item?.estadoNombre, item?.estadoConsulta),
-    area: valor(item?.areaNombre, item?.area, item?.nombreArea),
-    tema: valor(item?.temaNombre, item?.tema, item?.nombreTema),
-    tipo: valor(item?.tipoNombre, item?.tipo, item?.nombreTipo),
-    responsable,
-  };
-}
-
-function labelConsultaBusqueda(item) {
-  const detalle = obtenerDetalleConsulta(item);
-  return [
-    detalle.id,
-    detalle.titulo,
-    detalle.parte,
-    detalle.documentoParte,
-    detalle.estado,
-    detalle.area,
-    detalle.tema,
-    detalle.tipo,
-    detalle.responsable,
-  ]
-    .map(normalizarTexto)
-    .join(" ");
-}
-
-function ModalBuscarConsulta({ abierto, consultas, busqueda, setBusqueda, onSeleccionar, onCerrar, consultaIdSeleccionada }) {
-  if (!abierto) return null;
-
-  const texto = normalizarTexto(busqueda);
-  const consultasFiltradas = texto
-    ? consultas.filter((consulta) => labelConsultaBusqueda(consulta).includes(texto))
-    : consultas;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-2xl rounded-xl border bg-background p-6 shadow-lg">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-semibold">Seleccionar consulta</h3>
-            <p className="text-sm text-muted-foreground">
-              Busca por ID, descripción, parte, documento, estado, área, tema o tipo.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onCerrar}
-            className="rounded-full px-2 py-1 text-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-            aria-label="Cerrar selector de consultas"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="relative mb-4">
-          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <input
-            autoFocus
-            type="text"
-            value={busqueda}
-            onChange={(event) => setBusqueda(event.target.value)}
-            placeholder="Buscar consulta..."
-            className="h-10 w-full rounded-lg border bg-background pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-          />
-        </div>
-
-        <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
-          {consultasFiltradas.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-              No se encontraron consultas con ese criterio.
-            </div>
-          ) : (
-            consultasFiltradas.map((consulta) => {
-              const detalle = obtenerDetalleConsulta(consulta);
-              const seleccionado = String(consultaIdSeleccionada) === String(detalle.id);
-
-              return (
-                <button
-                  key={detalle.id}
-                  type="button"
-                  onClick={() => onSeleccionar(consulta)}
-                  className={`w-full rounded-lg border px-4 py-3 text-left text-sm transition-colors hover:bg-muted/60 ${
-                    seleccionado ? "border-primary bg-primary/10 text-primary" : "bg-background"
-                  }`}
-                >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="font-medium">
-                        #{detalle.id} — {detalle.titulo}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {detalle.parte || "Parte sin registrar"}
-                        {detalle.documentoParte ? ` · ${detalle.documentoParte}` : ""}
-                      </div>
-                    </div>
-
-                    {detalle.estado && (
-                      <span className="w-fit rounded-full border bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground">
-                        {detalle.estado}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                    {detalle.area && <span>Área: {detalle.area}</span>}
-                    {detalle.tema && <span>Tema: {detalle.tema}</span>}
-                    {detalle.tipo && <span>Tipo: {detalle.tipo}</span>}
-                    {detalle.responsable && <span>Responsable: {detalle.responsable}</span>}
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CampoConsulta({ label, consultaId, consultas, onSeleccionar, required = false }) {
-  const [modalAbierto, setModalAbierto] = useState(false);
-  const [busqueda, setBusqueda] = useState("");
-
-  const consultaSeleccionada = useMemo(
-    () => consultas.find((consulta) => String(idConsulta(consulta)) === String(consultaId)) || null,
-    [consultas, consultaId]
-  );
-
-  const detalle = consultaSeleccionada ? obtenerDetalleConsulta(consultaSeleccionada) : null;
-
-  function cerrarModal() {
-    setModalAbierto(false);
-    setBusqueda("");
-  }
-
-  return (
-    <div className="space-y-1.5">
-      <label className="text-sm font-medium">
-        {label}{required ? " *" : ""}
-      </label>
-
-      <button
-        type="button"
-        onClick={() => setModalAbierto(true)}
-        className={`min-h-10 w-full rounded-md border bg-background px-3 py-2 text-left text-sm transition-colors hover:bg-muted/50 ${
-          !detalle ? "text-muted-foreground" : ""
-        }`}
-      >
-        {detalle ? (
-          <span className="block">
-            <span className="block truncate font-medium text-foreground">
-              #{detalle.id} — {detalle.titulo}
-            </span>
-            <span className="block truncate text-xs text-muted-foreground">
-              {[detalle.parte, detalle.documentoParte].filter(Boolean).join(" · ") || "Consulta seleccionada"}
-            </span>
-          </span>
-        ) : (
-          <span className="flex items-center justify-between gap-2">
-            Buscar y seleccionar consulta...
-            <Search className="h-4 w-4" />
-          </span>
-        )}
-      </button>
-
-      <ModalBuscarConsulta
-        abierto={modalAbierto}
-        consultas={consultas}
-        busqueda={busqueda}
-        setBusqueda={setBusqueda}
-        consultaIdSeleccionada={consultaId}
-        onSeleccionar={(consulta) => {
-          onSeleccionar(String(idConsulta(consulta)));
-          cerrarModal();
-        }}
-        onCerrar={cerrarModal}
-      />
-    </div>
-  );
-}
+import { ESTADOS_FINALES, ESTADOS_NO_FINALES, PAGE_SIZE_OPTIONS } from "./conciliaciones.constants";
+import {
+  archivoEsPdf,
+  badgeEstadoClass,
+  etiquetaEstado,
+  extraerLista,
+  formatearFecha,
+  leerRespuesta,
+  idConsulta,
+  nombreConsulta,
+  nombrePersona,
+  normalizarTexto,
+  ordenarPorIdAsc,
+} from "./conciliaciones.utils";
+import { esRolAdministrador } from "./conciliaciones.permissions";
+import { ActionCard, CampoConsulta, InfoCard, PersonasCard } from "./ConciliacionesFormParts";
+import { requestConciliacion } from "./conciliaciones.service";
 
 export function ConciliacionesForm() {
   const router = useRouter();
@@ -481,6 +101,39 @@ export function ConciliacionesForm() {
     puedeReemplazarSolicitud ||
     puedeDesactivar;
 
+  const conciliacionesActivasNoFinalizadasPorConsulta = useMemo(() => {
+    const ids = new Set();
+
+    conciliaciones.forEach((item) => {
+      const estado = normalizarTexto(item?.estadoCodigo || item?.estadoNombre);
+      const activa = item?.activo !== false;
+      const finalizada = estado === "COMPLETO_CONCILIADO" || estado === "COMPLETO_NO_CONCILIADO";
+
+      if (activa && !finalizada && item?.consultaId) {
+        ids.add(String(item.consultaId));
+      }
+    });
+
+    return ids;
+  }, [conciliaciones]);
+
+  const consultasDisponiblesParaConciliacion = useMemo(() => {
+    return consultas.filter((consulta) => {
+      const estado = normalizarTexto(consulta?.estado || consulta?.estadoConsulta || consulta?.estadoNombre);
+      const consultaId = String(idConsulta(consulta) || "");
+      const cerradaOArchivada = ["CERRADO", "CERRADA", "ARCHIVADO", "ARCHIVADA"].includes(estado);
+
+      return Boolean(consultaId)
+        && !cerradaOArchivada
+        && !conciliacionesActivasNoFinalizadasPorConsulta.has(consultaId);
+    });
+  }, [consultas, conciliacionesActivasNoFinalizadasPorConsulta]);
+
+  const detalleFinalizado = useMemo(() => {
+    const estado = normalizarTexto(detalle?.estadoCodigo || detalle?.estadoNombre);
+    return estado === "COMPLETO_CONCILIADO" || estado === "COMPLETO_NO_CONCILIADO";
+  }, [detalle]);
+
   useEffect(() => {
     cargarInicial();
   }, []);
@@ -490,28 +143,14 @@ export function ConciliacionesForm() {
   }, [search, conciliaciones.length, pageSize]);
 
   async function apiFetch(path, options = {}, fallback = "No se pudo completar la operación") {
-    const response = await fetch(`${API_URL_BASE}${path}`, {
-      credentials: "include",
-      ...options,
-      headers: options.body instanceof FormData
-        ? options.headers
-        : {
-            ...(options.headers || {}),
-          },
-    });
-
-    const data = await leerRespuesta(response);
-
-    if (response.status === 401) {
-      router.replace("/");
-      throw new Error("Sesión vencida. Inicia sesión nuevamente.");
+    try {
+      return await requestConciliacion(path, options, fallback);
+    } catch (error) {
+      if (error?.status === 401) {
+        router.replace("/");
+      }
+      throw error;
     }
-
-    if (!response.ok) {
-      throw new Error(obtenerMensajeError(data, fallback));
-    }
-
-    return data;
   }
 
   async function cargarInicial() {
@@ -520,7 +159,7 @@ export function ConciliacionesForm() {
       setError("");
       setMensaje("");
 
-      const meResponse = await fetch(`${API_URL_BASE}/auth/me`, {
+      const meResponse = await apiClient.request(`${API_URL_BASE}/auth/me`, {
         method: "GET",
         credentials: "include",
       });
@@ -658,6 +297,23 @@ export function ConciliacionesForm() {
       return;
     }
 
+    const consultaSeleccionada = consultas.find(
+      (consulta) => String(idConsulta(consulta)) === String(crearConsultaId)
+    );
+    const estadoConsulta = normalizarTexto(
+      consultaSeleccionada?.estado || consultaSeleccionada?.estadoConsulta || consultaSeleccionada?.estadoNombre
+    );
+
+    if (["CERRADO", "CERRADA", "ARCHIVADO", "ARCHIVADA"].includes(estadoConsulta)) {
+      setError("No se puede crear una conciliación sobre una consulta cerrada o archivada.");
+      return;
+    }
+
+    if (conciliacionesActivasNoFinalizadasPorConsulta.has(String(crearConsultaId))) {
+      setError("La consulta ya tiene una conciliación activa no finalizada.");
+      return;
+    }
+
     if (!archivoEsPdf(archivoSolicitud)) {
       setError("La solicitud es obligatoria y debe ser un archivo PDF.");
       return;
@@ -696,6 +352,10 @@ export function ConciliacionesForm() {
 
   async function asignarEstudiante() {
     if (!detalle?.id) return;
+    if (detalleFinalizado) {
+      setError("No se puede modificar una conciliación finalizada.");
+      return;
+    }
     if (!estudianteId) {
       setError("Selecciona un estudiante habilitado para conciliación.");
       return;
@@ -713,6 +373,10 @@ export function ConciliacionesForm() {
 
   async function asignarConciliador() {
     if (!detalle?.id) return;
+    if (detalleFinalizado) {
+      setError("No se puede modificar una conciliación finalizada.");
+      return;
+    }
     if (!conciliadorId) {
       setError("Selecciona un conciliador activo.");
       return;
@@ -730,8 +394,17 @@ export function ConciliacionesForm() {
 
   async function cambiarEstado() {
     if (!detalle?.id) return;
+    if (detalleFinalizado) {
+      setError("No se puede modificar una conciliación finalizada.");
+      return;
+    }
     if (!estadoNoFinal) {
       setError("Selecciona un estado válido.");
+      return;
+    }
+
+    if (estadoNoFinal === "ESPERANDO_REUNION" && (!detalle.estudianteId || !detalle.conciliadorId)) {
+      setError("Para pasar a esperando reunión debe asignar estudiante y conciliador.");
       return;
     }
 
@@ -748,6 +421,16 @@ export function ConciliacionesForm() {
   async function finalizarConciliacion(event) {
     event.preventDefault();
     if (!detalle?.id) return;
+
+    if (detalleFinalizado) {
+      setError("La conciliación ya se encuentra finalizada.");
+      return;
+    }
+
+    if (!detalle.estudianteId || !detalle.conciliadorId) {
+      setError("Para finalizar la conciliación debe asignar estudiante y conciliador.");
+      return;
+    }
 
     if (!estadoFinal) {
       setError("Selecciona el estado final.");
@@ -839,33 +522,14 @@ export function ConciliacionesForm() {
     }
   }
 
-  async function descargarDocumento(path) {
-    if (!path) return;
+  async function descargarDocumento(fileId, conciliacionId) {
+    if (!fileId || !conciliacionId) return;
 
     try {
-      const response = await fetch(
-        `${FILE_STORAGE_API_URL_BASE}/files/download/${encodePath(path)}`,
-        { method: "GET", credentials: "include" }
-      );
-
-      if (response.status === 401) {
-        router.replace("/");
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("No se pudo descargar el documento");
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = String(path).split("/").pop() || "documento.pdf";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      const files = await fileApi.list({ type: "conciliacion", id: conciliacionId });
+      const file = files.find((item) => Number(item.id) === Number(fileId));
+      if (!file) throw new Error("El documento ya no está disponible");
+      await fileApi.download(file, { type: "conciliacion", id: conciliacionId });
     } catch (err) {
       console.error(err);
       setError(err.message || "No se pudo descargar el documento");
@@ -970,7 +634,7 @@ export function ConciliacionesForm() {
             <CampoConsulta
               label="Consulta"
               consultaId={crearConsultaId}
-              consultas={consultas}
+              consultas={consultasDisponiblesParaConciliacion}
               onSeleccionar={setCrearConsultaId}
               required
             />
@@ -1048,8 +712,8 @@ export function ConciliacionesForm() {
                           type="button"
                           size="sm"
                           variant="outline"
-                          disabled={!item.documentoSolicitudPath}
-                          onClick={() => descargarDocumento(item.documentoSolicitudPath)}
+                          disabled={!item.documentoSolicitudFileId}
+                          onClick={() => descargarDocumento(item.documentoSolicitudFileId, item.id)}
                         >
                           Solicitud
                         </Button>
@@ -1057,8 +721,8 @@ export function ConciliacionesForm() {
                           type="button"
                           size="sm"
                           variant="outline"
-                          disabled={!item.actaPath}
-                          onClick={() => descargarDocumento(item.actaPath)}
+                          disabled={!item.actaFileId}
+                          onClick={() => descargarDocumento(item.actaFileId, item.id)}
                         >
                           Acta
                         </Button>
@@ -1138,8 +802,8 @@ export function ConciliacionesForm() {
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={!detalle.documentoSolicitudPath}
-                    onClick={() => descargarDocumento(detalle.documentoSolicitudPath)}
+                    disabled={!detalle.documentoSolicitudFileId}
+                    onClick={() => descargarDocumento(detalle.documentoSolicitudFileId, detalle.id)}
                   >
                     <Download className="mr-2 h-4 w-4" />
                     Descargar solicitud
@@ -1147,8 +811,8 @@ export function ConciliacionesForm() {
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={!detalle.actaPath}
-                    onClick={() => descargarDocumento(detalle.actaPath)}
+                    disabled={!detalle.actaFileId}
+                    onClick={() => descargarDocumento(detalle.actaFileId, detalle.id)}
                   >
                     <Download className="mr-2 h-4 w-4" />
                     Descargar acta
@@ -1158,7 +822,7 @@ export function ConciliacionesForm() {
 
               {mostrarPanelGestion ? (
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                  {puedeAsignarEstudiante && (
+                  {puedeAsignarEstudiante && !detalleFinalizado && (
                     <ActionCard title="Asignar estudiante">
                       <div className="flex flex-col gap-2 sm:flex-row">
                         <select
@@ -1180,7 +844,7 @@ export function ConciliacionesForm() {
                     </ActionCard>
                   )}
 
-                  {puedeAsignarConciliador && (
+                  {puedeAsignarConciliador && !detalleFinalizado && (
                     <ActionCard title="Asignar conciliador">
                       <div className="flex flex-col gap-2 sm:flex-row">
                         <select
@@ -1202,7 +866,7 @@ export function ConciliacionesForm() {
                     </ActionCard>
                   )}
 
-                  {puedeCambiarEstado && (
+                  {puedeCambiarEstado && !detalleFinalizado && (
                     <ActionCard title="Cambiar estado no final">
                       <div className="flex flex-col gap-2 sm:flex-row">
                         <select
@@ -1223,7 +887,7 @@ export function ConciliacionesForm() {
                     </ActionCard>
                   )}
 
-                  {puedeFinalizar && (
+                  {puedeFinalizar && !detalleFinalizado && (
                     <ActionCard title="Finalizar con acta">
                       <form onSubmit={finalizarConciliacion} className="space-y-3">
                         <select
@@ -1251,7 +915,7 @@ export function ConciliacionesForm() {
                     </ActionCard>
                   )}
 
-                  {puedeReemplazarSolicitud && (
+                  {puedeReemplazarSolicitud && !detalleFinalizado && (
                     <ActionCard title="Reemplazar solicitud">
                       <form onSubmit={reemplazarSolicitud} className="space-y-3">
                         <input
@@ -1268,7 +932,7 @@ export function ConciliacionesForm() {
                     </ActionCard>
                   )}
 
-                  {puedeDesactivar && (
+                  {puedeDesactivar && !detalleFinalizado && (
                     <ActionCard title="Desactivar conciliación">
                       <Button type="button" variant="destructive" onClick={desactivarConciliacion} disabled={saving}>
                         <Trash2 className="mr-2 h-4 w-4" />
@@ -1286,47 +950,6 @@ export function ConciliacionesForm() {
           )}
         </section>
       )}
-    </div>
-  );
-}
-
-function InfoCard({ title, value, icon }) {
-  return (
-    <div className="rounded-xl border bg-background p-4">
-      <div className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-        {icon}
-        {title}
-      </div>
-      <p className="font-semibold">{value}</p>
-    </div>
-  );
-}
-
-function PersonasCard({ title, items }) {
-  return (
-    <div className="rounded-xl border bg-background p-4">
-      <h4 className="mb-3 font-semibold">{title}</h4>
-      {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No registra.</p>
-      ) : (
-        <ul className="space-y-2 text-sm">
-          {items.map((item, index) => (
-            <li key={item?.id || index} className="rounded-lg bg-muted/30 px-3 py-2">
-              {personaResumen(item)}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function ActionCard({ title, description, children }) {
-  return (
-    <div className="rounded-xl border bg-background p-4">
-      <h4 className="font-semibold">{title}</h4>
-      <p className="mb-3 mt-1 text-sm text-muted-foreground">{description}</p>
-      {children}
     </div>
   );
 }

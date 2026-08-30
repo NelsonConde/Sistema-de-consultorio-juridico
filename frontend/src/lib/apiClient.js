@@ -1,112 +1,277 @@
 /**
- * Cliente HTTP centralizado para el sistema de casos jurídicos.
+ * Implementation detail.
  *
- * Envuelve `fetch` con comportamiento uniforme para todas las peticiones al backend:
- * - Base URL resuelta desde `API_URL_BASE`
- * - Cookie de sesión incluida automáticamente (`credentials: "include"`)
- * - `Content-Type: application/json` en peticiones con cuerpo
- * - Manejo consistente de sesión expirada (401 → redirige a `/`)
+ * Responsabilidades:
+ * Implementation detail.
+ * - Serializar JSON.
+ * Keep the CSRF token synchronized with the browser cookie and backend session.
+ * - Send CSRF on POST, PUT, PATCH, and DELETE requests.
+ * Keep the CSRF token synchronized with the browser cookie and backend session.
  *
- * @module apiClient
+ * Implementation detail.
+ * Implementation detail.
+ * Implementation detail.
  */
 
 import { API_URL_BASE } from "@/lib/config";
 
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+let csrfToken = null;
+let csrfRequest = null;
+
+function resolveUrl(path) {
+  return path.startsWith("http")
+    ? path
+    : `${API_URL_BASE}${path}`;
+}
+
+function isCsrfRotationEndpoint(url) {
+  const pathname = new URL(url).pathname;
+
+  return (
+    pathname.endsWith("/auth/login") ||
+    pathname.endsWith("/auth/logout")
+  );
+}
+
+function clearCsrfToken() {
+  csrfToken = null;
+}
+
 /**
- * Realiza una petición HTTP al backend.
+ * Keep the CSRF token synchronized with the browser cookie and backend session.
  *
- * @param {string} path - Ruta relativa a `API_URL_BASE`, ej. `"/auth/me"`.
- * @param {RequestInit & { json?: unknown }} [options={}] - Opciones de fetch más
- *   el campo `json`, que serializa automáticamente el cuerpo y agrega el header
- *   `Content-Type: application/json`.
- * @returns {Promise<Response>} La respuesta cruda de fetch.
- *
- * @example
- * // GET autenticado
- * const res = await apiClient.get("/auth/me");
- * const user = await res.json();
- *
- * @example
- * // POST con cuerpo JSON
- * const res = await apiClient.request("/auth/login", {
- *   method: "POST",
- *   json: { username, password },
- * });
+ * Consultation flow detail.
+ * Implementation detail.
+ * Implementation detail.
  */
-async function request(path, options = {}) {
-  const { json, headers: extraHeaders, ...rest } = options;
+async function getCsrfToken({ force = false } = {}) {
+  if (csrfRequest) {
+    return csrfRequest;
+  }
 
-  const headers = {
-    ...(json !== undefined ? { "Content-Type": "application/json" } : {}),
-    ...extraHeaders,
-  };
+  if (force) {
+    clearCsrfToken();
+  }
 
-  const url = path.startsWith("http") ? path : `${API_URL_BASE}${path}`;
+  if (csrfToken) {
+    return csrfToken;
+  }
 
-  return fetch(url, {
-    credentials: "include",
-    headers,
-    body: json !== undefined ? JSON.stringify(json) : undefined,
-    ...rest,
+  csrfRequest = (async () => {
+    const response = await fetch(
+      `${API_URL_BASE}/auth/csrf`,
+      {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `No fue posible obtener el token CSRF (${response.status})`
+      );
+    }
+
+    const data = await response.json();
+
+    if (!data?.headerName || !data?.token) {
+      throw new Error(
+        "Respuesta CSRF inválida"
+      );
+    }
+
+    csrfToken = {
+      headerName: data.headerName,
+      token: data.token,
+    };
+
+    return csrfToken;
+  })();
+
+  try {
+    return await csrfRequest;
+  } finally {
+    csrfRequest = null;
+  }
+}
+
+/**
+ * Keep the CSRF token synchronized with the browser cookie and backend session.
+ */
+async function refreshCsrfToken() {
+  return getCsrfToken({
+    force: true,
   });
 }
 
 /**
- * Realiza una petición GET autenticada.
+ * Implementation detail.
  *
- * @param {string} path - Ruta relativa al backend.
- * @param {RequestInit} [options={}] - Opciones adicionales de fetch.
- * @returns {Promise<Response>}
+ * Implementation detail.
+ *
+ * Data loading behavior.
+ * Implementation detail.
  */
-function get(path, options = {}) {
-  return request(path, { method: "GET", ...options });
+async function request(
+  path,
+  options = {}
+) {
+  const {
+    json,
+    headers: extraHeaders,
+    method: requestedMethod = "GET",
+    body,
+    ...rest
+  } = options;
+
+  const method =
+    String(
+      requestedMethod
+    ).toUpperCase();
+
+  const headers =
+    new Headers(
+      extraHeaders || {}
+    );
+
+  const url =
+    resolveUrl(path);
+
+  if (
+    json !== undefined &&
+    !headers.has(
+      "Content-Type"
+    )
+  ) {
+    headers.set(
+      "Content-Type",
+      "application/json"
+    );
+  }
+
+  /*
+   * Implementation detail.
+   * Implementation detail.
+   *
+   * Implementation detail.
+   * Implementation detail.
+   */
+  if (
+    !SAFE_METHODS.has(
+      method
+    )
+  ) {
+    const csrf =
+      await getCsrfToken({
+        force: true,
+      });
+
+    headers.set(
+      csrf.headerName,
+      csrf.token
+    );
+  }
+
+  const response =
+    await fetch(url, {
+      ...rest,
+      method,
+      credentials:
+        "include",
+      headers,
+      body:
+        json !== undefined
+          ? JSON.stringify(
+              json
+            )
+          : body,
+    });
+
+  /*
+   * Login and logout invalidate the CSRF token used by the backend.
+   * Implementation detail.
+   *
+   * Implementation detail.
+   * Implementation detail.
+   */
+  if (
+    response.ok &&
+    isCsrfRotationEndpoint(
+      url
+    )
+  ) {
+    clearCsrfToken();
+  }
+
+  return response;
 }
 
-/**
- * Realiza una petición POST con cuerpo JSON autenticada.
- *
- * @param {string} path - Ruta relativa al backend.
- * @param {unknown} data - Cuerpo de la petición, serializado como JSON.
- * @param {RequestInit} [options={}] - Opciones adicionales de fetch.
- * @returns {Promise<Response>}
- */
-function post(path, data, options = {}) {
-  return request(path, { method: "POST", json: data, ...options });
+function get(
+  path,
+  options = {}
+) {
+  return request(path, {
+    method: "GET",
+    ...options,
+  });
 }
 
-/**
- * Realiza una petición PUT con cuerpo JSON autenticada.
- *
- * @param {string} path - Ruta relativa al backend.
- * @param {unknown} data - Cuerpo de la petición, serializado como JSON.
- * @param {RequestInit} [options={}] - Opciones adicionales de fetch.
- * @returns {Promise<Response>}
- */
-function put(path, data, options = {}) {
-  return request(path, { method: "PUT", json: data, ...options });
+function post(
+  path,
+  data,
+  options = {}
+) {
+  return request(path, {
+    method: "POST",
+    json: data,
+    ...options,
+  });
 }
 
-/**
- * Realiza una petición PATCH con cuerpo JSON autenticada.
- *
- * @param {string} path - Ruta relativa al backend.
- * @param {unknown} [data] - Cuerpo de la petición, serializado como JSON.
- * @param {RequestInit} [options={}] - Opciones adicionales de fetch.
- * @returns {Promise<Response>}
- */
-function patch(path, data, options = {}) {
-  return request(path, { method: "PATCH", json: data, ...options });
+function put(
+  path,
+  data,
+  options = {}
+) {
+  return request(path, {
+    method: "PUT",
+    json: data,
+    ...options,
+  });
 }
 
-/**
- * Realiza una petición DELETE autenticada.
- *
- * @param {string} path - Ruta relativa al backend.
- * @param {RequestInit} [options={}] - Opciones adicionales de fetch.
- * @returns {Promise<Response>}
- */
-function del(path, options = {}) {
-  return request(path, { method: "DELETE", ...options });
+function patch(
+  path,
+  data,
+  options = {}
+) {
+  return request(path, {
+    method: "PATCH",
+    json: data,
+    ...options,
+  });
 }
 
-export const apiClient = { request, get, post, put, patch, delete: del };
+function del(
+  path,
+  options = {}
+) {
+  return request(path, {
+    method: "DELETE",
+    ...options,
+  });
+}
+
+export const apiClient = {
+  request,
+  get,
+  post,
+  put,
+  patch,
+  delete: del,
+  getCsrfToken,
+  refreshCsrfToken,
+};

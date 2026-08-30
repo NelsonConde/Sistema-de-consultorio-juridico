@@ -21,11 +21,10 @@ public class CorsConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        validarConfiguracion();
 
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOriginPatterns(corsProperties.getAllowedOriginPatterns());
+        configuration.setAllowedOrigins(corsProperties.getAllowedOrigins());
         configuration.setAllowedMethods(corsProperties.getAllowedMethods());
         configuration.setAllowedHeaders(corsProperties.getAllowedHeaders());
         configuration.setAllowCredentials(corsProperties.getAllowCredentials());
@@ -37,22 +36,5 @@ public class CorsConfig {
         source.registerCorsConfiguration("/**", configuration);
 
         return source;
-    }
-
-    private void validarConfiguracion() {
-        if (corsProperties.getAllowedOriginPatterns() == null
-                || corsProperties.getAllowedOriginPatterns().isEmpty()) {
-            throw new IllegalStateException("Debe configurar al menos un origen permitido para CORS");
-        }
-
-        if (corsProperties.getAllowedMethods() == null
-                || corsProperties.getAllowedMethods().isEmpty()) {
-            throw new IllegalStateException("Debe configurar al menos un método permitido para CORS");
-        }
-
-        if (corsProperties.getAllowedHeaders() == null
-                || corsProperties.getAllowedHeaders().isEmpty()) {
-            throw new IllegalStateException("Debe configurar al menos un header permitido para CORS");
-        }
     }
 }

@@ -41,9 +41,9 @@ public class ConciliacionDetalleResponseDTO {
 
     private List<ConciliacionPersonaDTO> contrapartes = new ArrayList<>();
 
-    private String documentoSolicitudPath;
+    private Long documentoSolicitudFileId;
 
-    private String actaPath;
+    private Long actaFileId;
 
     private Long solicitadoPorId;
 

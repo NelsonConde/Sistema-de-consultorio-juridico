@@ -15,6 +15,8 @@ public interface SeguimientoRespuestaRepository extends JpaRepository<Seguimient
 
         Optional<SeguimientoRespuesta> findByIdAndActivoTrue(Long id);
 
+        Optional<SeguimientoRespuesta> findByIdAndSeguimiento_IdAndActivoTrue(Long respuestaId, Long seguimientoId);
+
         Optional<SeguimientoRespuesta> findByIdAndActivoTrueAndSeguimiento_ActivoTrueAndSeguimiento_Consulta_EstadoNot(
                         Long id,
                         EstadoConsulta estado);

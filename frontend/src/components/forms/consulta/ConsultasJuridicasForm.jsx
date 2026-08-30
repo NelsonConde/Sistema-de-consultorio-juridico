@@ -1,13 +1,15 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
+import { fileApi } from "@/lib/fileApi";
   /**
-   * Formulario de listado y gestión de consultas jurídicas.
+   * List and table handling.
    *
-   * Muestra las consultas filtradas por permisos del usuario:
-   * - Admin/asesor/monitor: todas las consultas de su alcance.
-   * - Estudiante: solo las consultas asignadas a él.
+   * Permission and authorization handling.
+   * Consultation flow detail.
+   * Consultation flow detail.
    *
-   * Soporta búsqueda, filtrado por estado y área, y paginación.
+   * Pagination handling.
    *
    * @module components/forms/consulta/ConsultasJuridicasForm
    */
@@ -20,306 +22,34 @@ import { useRouter } from "next/navigation";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
 
-import { API_URL_BASE, FILE_STORAGE_API_URL_BASE } from "@/lib/config";
+import { API_URL_BASE } from "@/lib/config";
+import {
+  buscarPersonasActivas,
+  obtenerPersonaDetalle,
+} from "@/lib/personasApi";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import Pagination from "@/components/ui/Pagination";
-import { getApiErrorMessages, getApiErrorTitle } from "@/lib/api";
 import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems } from "@/lib/list-utils";
 
-const ESTADOS_CONSULTA = [
-  { value: "ACTIVO", label: "Activo" },
-  { value: "EN_PROCESO", label: "En proceso" },
-  { value: "PENDIENTE", label: "Pendiente" },
-  { value: "URGENTE", label: "Urgente" },
-  { value: "CERRADO", label: "Cerrado" },
-  { value: "ARCHIVADO", label: "Archivado" },
-];
-
-const VACIOS = {
-  fecha: "", descripcion: "", hechos: "", pretensiones: "",
-  conceptoJuridico: "", tramite: "", observaciones: "",
-  tipoViolencia: "", estado: "", resultado: "",
-  personaId: "", sedeId: "", areaId: "", temaId: "",
-  tipoId: "", asesorId: "", monitorId: "", estudianteId: "",
-  partesIds: [], contrapartesIds: [],
-};
-
-
-function construirUrlConsultas(search = "") {
-  const params = new URLSearchParams();
-  const texto = String(search || "").trim();
-
-  if (texto) {
-    params.set("search", texto);
-  }
-
-  const query = params.toString();
-
-  return `${API_URL_BASE}/consultas${query ? `?${query}` : ""}`;
-}
-
-function ordenarConsultasPorIdAscendente(items) {
-  return [...items].sort((a, b) => {
-    const idA = Number(a?.id ?? Number.MAX_SAFE_INTEGER);
-    const idB = Number(b?.id ?? Number.MAX_SAFE_INTEGER);
-
-    return idA - idB;
-  });
-}
-
-async function leerJsonSeguro(res) {
-  if (res.status === 204) return null;
-
-  const text = await res.text();
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
-}
-
-function obtenerArrayDesdeRespuesta(payload) {
-  if (Array.isArray(payload)) return payload;
-  if (!payload || typeof payload !== "object") return [];
-
-  const posiblesClaves = [
-    "content",
-    "data",
-    "items",
-    "rows",
-    "consultas",
-    "resultado",
-    "result",
-    "payload",
-  ];
-
-  for (const clave of posiblesClaves) {
-    const valor = payload[clave];
-    if (Array.isArray(valor)) return valor;
-    if (valor && typeof valor === "object") {
-      const interno = obtenerArrayDesdeRespuesta(valor);
-      if (interno.length > 0) return interno;
-    }
-  }
-
-  return [];
-}
-
-function valorDefinido(...valores) {
-  return valores.find((valor) => valor !== undefined && valor !== null && valor !== "") ?? "";
-}
-
-function idNormalizado(valor) {
-  if (valor === undefined || valor === null || valor === "") {
-    return "";
-  }
-
-  return String(valor);
-}
-
-function obtenerAreaIdAsesor(asesor) {
-  return idNormalizado(asesor?.areaId ?? asesor?.area?.id);
-}
-
-function obtenerAsesorIdEstudiante(estudiante) {
-  return idNormalizado(estudiante?.asesorId ?? estudiante?.asesor?.id);
-}
-
-function normalizarEstadoConsulta(estado) {
-  const texto = String(estado || "")
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-    .replace(/\s+/g, "_");
-
-  const equivalencias = {
-    ACTIVO: "ACTIVO",
-    ACTIVA: "ACTIVO",
-    EN_PROCESO: "EN_PROCESO",
-    PENDIENTE: "PENDIENTE",
-    URGENTE: "URGENTE",
-    CERRADO: "CERRADO",
-    CERRADA: "CERRADO",
-    ARCHIVADO: "ARCHIVADO",
-    ARCHIVADA: "ARCHIVADO",
-  };
-
-  return equivalencias[texto] || texto || "";
-}
-
-function textoVacio(valor) {
-  return !String(valor || "").trim();
-}
-
-function textoNormalizado(valor) {
-  return String(valor || "").trim();
-}
-
-function labelEstadoConsulta(estado) {
-  const estadoNormalizado = normalizarEstadoConsulta(estado);
-  return (
-    ESTADOS_CONSULTA.find((item) => item.value === estadoNormalizado)?.label ||
-    estado ||
-    "Sin estado"
-  );
-}
-
-function normalizarConsultaFila(row) {
-  const persona = row?.persona || row?.consultante || row?.partePrincipal || {};
-  const id = valorDefinido(row?.id, row?.consultaId, row?.idConsulta);
-
-  return {
-    ...row,
-    id,
-    consulta: valorDefinido(
-      row?.consulta,
-      row?.descripcion,
-      row?.descripcionConsulta,
-      row?.hechos,
-      id ? `Consulta #${id}` : "Consulta"
-    ),
-    fecha: valorDefinido(row?.fecha, row?.fechaConsulta, row?.createdAt, row?.fechaCreacion),
-    nombre: valorDefinido(
-      row?.nombre,
-      row?.nombres,
-      row?.personaNombre,
-      row?.nombrePersona,
-      persona?.nombre,
-      persona?.nombres
-    ),
-    apellido: valorDefinido(
-      row?.apellido,
-      row?.apellidos,
-      row?.personaApellido,
-      row?.apellidoPersona,
-      persona?.apellido,
-      persona?.apellidos
-    ),
-    cedula: valorDefinido(
-      row?.cedula,
-      row?.documento,
-      row?.numeroDocumento,
-      row?.personaDocumento,
-      persona?.documento,
-      persona?.numeroDocumento
-    ),
-    estado: normalizarEstadoConsulta(valorDefinido(row?.estado, row?.estadoConsulta, "")),
-  };
-}
-
-function mensajeErrorDesdeRespuesta(payload, defecto) {
-  const detalles = getApiErrorMessages(payload);
-
-  if (detalles.length > 0) {
-    return detalles.join("\n");
-  }
-
-  return getApiErrorTitle(payload, defecto);
-}
-
-function accionPermitidaPorRegistro(row, claves = [], fallback = false) {
-  const acciones = row?.accionesPermitidas;
-  if (!acciones || typeof acciones !== "object") return fallback;
-
-  for (const clave of claves) {
-    if (Object.prototype.hasOwnProperty.call(acciones, clave)) {
-      return Boolean(acciones[clave]);
-    }
-  }
-
-  return fallback;
-}
-
-// Modal selección simple
-function ModalSimple({ abierto, titulo, items, busqueda, setBusqueda, onSeleccionar, onCerrar, seleccionado, renderItem }) {
-  if (!abierto) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-background rounded-xl border shadow-lg w-full max-w-md mx-4 p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">{titulo}</h3>
-          <button type="button" onClick={onCerrar} className="text-muted-foreground hover:text-foreground text-xl">✕</button>
-        </div>
-        <input autoFocus type="text" placeholder="Buscar..."
-          value={busqueda} onChange={e => setBusqueda(e.target.value)}
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        />
-        <div className="max-h-72 overflow-y-auto space-y-1">
-          <button type="button" onClick={() => onSeleccionar(null)}
-            className={`w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted transition-colors ${!seleccionado ? "bg-primary/10 text-primary font-medium" : ""}`}>
-            Sin asignar
-          </button>
-          {items.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-4">Sin resultados</p>
-          ) : items.map(item => (
-            <button key={item.id} type="button" onClick={() => onSeleccionar(item)}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted transition-colors ${seleccionado?.id === item.id ? "bg-primary/10 text-primary font-medium" : ""}`}>
-              {renderItem(item)}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Modal selección múltiple con checkboxes
-function ModalMultiple({ abierto, titulo, items, busqueda, setBusqueda, onConfirmar, onCerrar, seleccionados, renderItem }) {
-  const [temp, setTemp] = useState([]);
-
-  useEffect(() => {
-    if (abierto) setTemp(seleccionados || []);
-  }, [abierto, seleccionados]);
-
-  if (!abierto) return null;
-
-  function toggleItem(id) {
-    const numId = Number(id);
-    setTemp(prev => prev.includes(numId) ? prev.filter(x => x !== numId) : [...prev, numId]);
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-background rounded-xl border shadow-lg w-full max-w-md mx-4 p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">{titulo}</h3>
-          <button type="button" onClick={onCerrar} className="text-muted-foreground hover:text-foreground text-xl">✕</button>
-        </div>
-        <input autoFocus type="text" placeholder="Buscar..."
-          value={busqueda} onChange={e => setBusqueda(e.target.value)}
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        />
-        <div className="max-h-64 overflow-y-auto space-y-1">
-          {items.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-4">Sin resultados</p>
-          ) : items.map(item => {
-            const numId = Number(item.id);
-            const marcado = temp.includes(numId);
-            return (
-              <button key={item.id} type="button" onClick={() => toggleItem(item.id)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted transition-colors flex items-center gap-3 ${marcado ? "bg-primary/10" : ""}`}>
-                <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${marcado ? "bg-primary border-primary" : "border-gray-400"}`}>
-                  {marcado && <span className="text-white text-xs">✓</span>}
-                </span>
-                <span>{renderItem(item)}</span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex justify-between items-center pt-2">
-          <span className="text-xs text-muted-foreground">{temp.length} seleccionado(s)</span>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setTemp([])}>Limpiar</Button>
-            <Button type="button" size="sm" onClick={() => onConfirmar(temp)}>Confirmar</Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { ESTADOS_CONSULTA, VACIOS } from "./consultas-juridicas.constants";
+import {
+  accionPermitidaPorRegistro,
+  construirUrlConsultas,
+  idNormalizado,
+  labelEstadoConsulta,
+  leerJsonSeguro,
+  mensajeErrorDesdeRespuesta,
+  normalizarConsultaFila,
+  normalizarEstadoConsulta,
+  obtenerAreaIdAsesor,
+  obtenerArrayDesdeRespuesta,
+  obtenerAsesorIdEstudiante,
+  ordenarConsultasPorIdAscendente,
+  textoNormalizado,
+  textoVacio,
+  validarCoherenciaConsultaFrontend,
+} from "./consultas-juridicas.utils";
+import { ModalMultiple, ModalSimple } from "./ConsultaSelectionModals";
 
 export function ConsultasJuridicasForm() {
   const router = useRouter();
@@ -336,7 +66,14 @@ export function ConsultasJuridicasForm() {
   const [guardando, setGuardando] = useState(false);
   const [resultadoGuardado, setResultadoGuardado] = useState("");
 
-  const [personas, setPersonas] = useState([]);
+  const [personasResultado, setPersonasResultado] = useState([]);
+  const [personasBusquedaAplicada, setPersonasBusquedaAplicada] = useState("");
+  const [personasPagina, setPersonasPagina] = useState(1);
+  const [personasTamano, setPersonasTamano] = useState(10);
+  const [personasTotalPaginas, setPersonasTotalPaginas] = useState(0);
+  const [personasTotalElementos, setPersonasTotalElementos] = useState(0);
+  const [personasLoading, setPersonasLoading] = useState(false);
+  const [personasCache, setPersonasCache] = useState({});
   const [sedes, setSedes] = useState([]);
   const [areas, setAreas] = useState([]);
   const [temas, setTemas] = useState([]);
@@ -350,7 +87,7 @@ export function ConsultasJuridicasForm() {
   const [checkingPermisos, setCheckingPermisos] = useState(true);
   const [confirmArchivar, setConfirmArchivar] = useState({ abierto: false, id: null, loading: false });
 
-  // Estados modales edición
+  // Modal behavior.
   const [modalAsesor, setModalAsesor] = useState({ abierto: false, busqueda: "" });
   const [modalMonitor, setModalMonitor] = useState({ abierto: false, busqueda: "" });
   const [modalEstudiante, setModalEstudiante] = useState({ abierto: false, busqueda: "" });
@@ -378,29 +115,69 @@ export function ConsultasJuridicasForm() {
     () => estudiantes.find((e) => idNormalizado(e.id) === idNormalizado(form.estudianteId)) || null,
     [estudiantes, form.estudianteId]
   );
-  const parteSeleccionada = useMemo(() => personas.find(p => Number(p.id) === Number(form.personaId)) || null, [personas, form.personaId]);
-  const partesAdicionalesSeleccionadas = useMemo(() => personas.filter(p => (form.partesIds || []).includes(Number(p.id))), [personas, form.partesIds]);
-  const contrapartesSeleccionadas = useMemo(() => personas.filter(p => (form.contrapartesIds || []).includes(Number(p.id))), [personas, form.contrapartesIds]);
+  const parteSeleccionada = useMemo(
+    () =>
+      form.personaId
+        ? personasCache[String(form.personaId)] || null
+        : null,
+    [personasCache, form.personaId]
+  );
 
-  // Filtros con regla de duplicados
-  const personasParaPrincipal = useMemo(() => personas.filter(p => {
-    const id = Number(p.id);
-    return !(form.partesIds || []).includes(id) && !(form.contrapartesIds || []).includes(id);
-  }), [personas, form.partesIds, form.contrapartesIds]);
+  const partesAdicionalesSeleccionadas = useMemo(
+    () =>
+      (form.partesIds || [])
+        .map((id) => personasCache[String(id)] || null)
+        .filter(Boolean),
+    [personasCache, form.partesIds]
+  );
 
-  const personasParaAdicionales = useMemo(() => personas.filter(p => {
-    const id = Number(p.id);
-    return id !== Number(form.personaId) && !(form.contrapartesIds || []).includes(id);
-  }), [personas, form.personaId, form.contrapartesIds]);
+  const contrapartesSeleccionadas = useMemo(
+    () =>
+      (form.contrapartesIds || [])
+        .map((id) => personasCache[String(id)] || null)
+        .filter(Boolean),
+    [personasCache, form.contrapartesIds]
+  );
 
-  const personasParaContrapartes = useMemo(() => personas.filter(p => {
-    const id = Number(p.id);
-    return id !== Number(form.personaId) && !(form.partesIds || []).includes(id);
-  }), [personas, form.personaId, form.partesIds]);
+  const personasParaPrincipal = useMemo(
+    () =>
+      personasResultado.filter((p) => {
+        const id = Number(p.id);
+        return (
+          !(form.partesIds || []).includes(id) &&
+          !(form.contrapartesIds || []).includes(id)
+        );
+      }),
+    [personasResultado, form.partesIds, form.contrapartesIds]
+  );
 
-  // Filtros por búsqueda
-  // Filtros por búsqueda y coherencia funcional de responsables.
-  // El backend valida estas reglas; aquí solo evitamos que la UI proponga combinaciones inválidas.
+  const personasParaAdicionales = useMemo(
+    () =>
+      personasResultado.filter((p) => {
+        const id = Number(p.id);
+        return (
+          id !== Number(form.personaId) &&
+          !(form.contrapartesIds || []).includes(id)
+        );
+      }),
+    [personasResultado, form.personaId, form.contrapartesIds]
+  );
+
+  const personasParaContrapartes = useMemo(
+    () =>
+      personasResultado.filter((p) => {
+        const id = Number(p.id);
+        return (
+          id !== Number(form.personaId) &&
+          !(form.partesIds || []).includes(id)
+        );
+      }),
+    [personasResultado, form.personaId, form.partesIds]
+  );
+
+  // Search behavior.
+  // Search behavior.
+  // Validation rule.
   const asesoresDisponiblesPorArea = useMemo(() => {
     if (!areaSeleccionadaId) {
       return [];
@@ -452,21 +229,146 @@ export function ConsultasJuridicasForm() {
       )
       : estudiantesDisponiblesPorAsesor;
   }, [estudiantesDisponiblesPorAsesor, modalEstudiante.busqueda]);
-  const parteFiltrada = useMemo(() => {
-    const t = modalParte.busqueda.toLowerCase();
-    return t ? personasParaPrincipal.filter(p => `${p.nombres} ${p.apellidos} ${p.numeroDocumento}`.toLowerCase().includes(t)) : personasParaPrincipal;
-  }, [personasParaPrincipal, modalParte.busqueda]);
+  const parteFiltrada = personasParaPrincipal;
+  const partesAdicionalesFiltradas = personasParaAdicionales;
+  const contrapartesFiltradas = personasParaContrapartes;
 
-  const partesAdicionalesFiltradas = useMemo(() => {
-    const t = modalPartesAdicionales.busqueda.toLowerCase();
-    return t ? personasParaAdicionales.filter(p => `${p.nombres} ${p.apellidos} ${p.numeroDocumento}`.toLowerCase().includes(t)) : personasParaAdicionales;
-  }, [personasParaAdicionales, modalPartesAdicionales.busqueda]);
 
-  const contrapartesFiltradas = useMemo(() => {
-    const t = modalContrapartes.busqueda.toLowerCase();
-    return t ? personasParaContrapartes.filter(p => `${p.nombres} ${p.apellidos} ${p.numeroDocumento}`.toLowerCase().includes(t)) : personasParaContrapartes;
-  }, [personasParaContrapartes, modalContrapartes.busqueda]);
+  const modalPersonasAbierto =
+    modalParte.abierto ||
+    modalPartesAdicionales.abierto ||
+    modalContrapartes.abierto;
 
+  const busquedaPersonasActual = modalParte.abierto
+    ? modalParte.busqueda
+    : modalPartesAdicionales.abierto
+      ? modalPartesAdicionales.busqueda
+      : modalContrapartes.abierto
+        ? modalContrapartes.busqueda
+        : "";
+
+  useEffect(() => {
+    if (!modalPersonasAbierto) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setPersonasPagina(1);
+      setPersonasBusquedaAplicada(busquedaPersonasActual.trim());
+    }, 350);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [modalPersonasAbierto, busquedaPersonasActual]);
+
+  useEffect(() => {
+    if (!modalPersonasAbierto) return;
+
+    const controller = new AbortController();
+
+    async function cargarPaginaPersonas() {
+      try {
+        setPersonasLoading(true);
+
+        const resultado = await buscarPersonasActivas({
+          search: personasBusquedaAplicada,
+          page: personasPagina,
+          size: personasTamano,
+          signal: controller.signal,
+        });
+
+        setPersonasResultado(resultado.content);
+        setPersonasTotalPaginas(resultado.totalPages);
+        setPersonasTotalElementos(resultado.totalElements);
+        setPersonasCache((prev) => {
+          const next = { ...prev };
+          for (const persona of resultado.content) {
+            if (persona?.id != null) {
+              next[String(persona.id)] = persona;
+            }
+          }
+          return next;
+        });
+      } catch (error) {
+        if (error.name === "AbortError") return;
+
+        if (error.status === 401) {
+          router.replace("/");
+          return;
+        }
+
+        if (error.status === 403) {
+          router.replace("/inicio");
+          return;
+        }
+
+        setPersonasResultado([]);
+        setPersonasTotalPaginas(0);
+        setPersonasTotalElementos(0);
+        toast.error(error.message || "No se pudieron buscar personas");
+      } finally {
+        setPersonasLoading(false);
+      }
+    }
+
+    cargarPaginaPersonas();
+    return () => controller.abort();
+  }, [
+    modalPersonasAbierto,
+    personasBusquedaAplicada,
+    personasPagina,
+    personasTamano,
+    router,
+  ]);
+
+  function abrirModalPersona(setModal) {
+    setPersonasPagina(1);
+    setPersonasBusquedaAplicada("");
+    setModal({ abierto: true, busqueda: "" });
+  }
+
+  async function hidratarPersonasSeleccionadas(data) {
+    const ids = [
+      data?.personaId ?? data?.persona?.id,
+      ...(Array.isArray(data?.partesIds) ? data.partesIds : []),
+      ...(Array.isArray(data?.contrapartesIds) ? data.contrapartesIds : []),
+    ]
+      .filter(Boolean)
+      .map(Number)
+      .filter((id, index, all) => all.indexOf(id) === index);
+
+    if (ids.length === 0) return;
+
+    const resueltas = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const detalle = await obtenerPersonaDetalle(id);
+          return {
+            id: detalle.id,
+            nombres: detalle.nombres || "",
+            apellidos: detalle.apellidos || "",
+            activo: detalle.activo,
+          };
+        } catch (error) {
+          if (error.status === 401) {
+            router.replace("/");
+          }
+
+          return {
+            id,
+            nombres: `Persona #${id}`,
+            apellidos: "",
+            numeroDocumentoEnmascarado: null,
+          };
+        }
+      })
+    );
+
+    setPersonasCache((prev) => {
+      const next = { ...prev };
+      for (const persona of resueltas) {
+        next[String(persona.id)] = persona;
+      }
+      return next;
+    });
+  }
 
   const puedeEditarConsultas = useMemo(
     () => tienePermiso(user, PERMISOS.EDITAR_CONSULTAS),
@@ -538,7 +440,7 @@ export function ConsultasJuridicasForm() {
       try {
         setCheckingPermisos(true);
 
-        const res = await fetch(`${API_URL_BASE}/auth/me`, {
+        const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
           method: "GET",
           credentials: "include",
         });
@@ -583,7 +485,7 @@ export function ConsultasJuridicasForm() {
     if (prevAreaId.current === form.areaId) return;
     prevAreaId.current = form.areaId;
     if (form.areaId) {
-      fetch(`${API_URL_BASE}/temas/area/${form.areaId}`, { credentials: "include" })
+      apiClient.request(`${API_URL_BASE}/temas/area/${form.areaId}`, { credentials: "include" })
         .then(r => r.json()).then(d => setTemas(Array.isArray(d) ? d : [])).catch(() => setTemas([]));
     } else { setTemas([]); setTipos([]); }
   }, [form.areaId]);
@@ -593,7 +495,7 @@ export function ConsultasJuridicasForm() {
     if (prevTemaId.current === form.temaId) return;
     prevTemaId.current = form.temaId;
     if (form.temaId) {
-      fetch(`${API_URL_BASE}/tipos/tema/${form.temaId}`, { credentials: "include" })
+      apiClient.request(`${API_URL_BASE}/tipos/tema/${form.temaId}`, { credentials: "include" })
         .then(r => r.json()).then(d => setTipos(Array.isArray(d) ? d : [])).catch(() => setTipos([]));
     } else { setTipos([]); }
   }, [form.temaId]);
@@ -606,7 +508,7 @@ export function ConsultasJuridicasForm() {
     try {
       console.log("[CONSULTAS] Consultando:", url);
 
-      const res = await fetch(url, {
+      const res = await apiClient.request(url, {
         method: "GET",
         credentials: "include",
       });
@@ -674,7 +576,7 @@ export function ConsultasJuridicasForm() {
   async function cargarCatalogos() {
     try {
       const fetchCatalogo = async (url) => {
-        const res = await fetch(url, {
+        const res = await apiClient.request(url, {
           credentials: "include",
         });
 
@@ -698,8 +600,7 @@ export function ConsultasJuridicasForm() {
         return obtenerArrayDesdeRespuesta(payload);
       };
 
-      const [pR, sR, aR, asR, moR, esR] = await Promise.all([
-        fetchCatalogo(`${API_URL_BASE}/personas/activos`),
+      const [sR, aR, asR, moR, esR] = await Promise.all([
         fetchCatalogo(`${API_URL_BASE}/sedes`),
         fetchCatalogo(`${API_URL_BASE}/areas`),
         fetchCatalogo(`${API_URL_BASE}/asesores/activos`),
@@ -707,7 +608,6 @@ export function ConsultasJuridicasForm() {
         fetchCatalogo(`${API_URL_BASE}/estudiantes/activos`),
       ]);
 
-      setPersonas(pR);
       setSedes(sR);
       setAreas(aR);
       setAsesores(asR);
@@ -750,7 +650,7 @@ export function ConsultasJuridicasForm() {
 
   async function abrirEditar(id) {
     try {
-      const res = await fetch(`${API_URL_BASE}/consultas/${id}`, { credentials: "include" });
+      const res = await apiClient.request(`${API_URL_BASE}/consultas/${id}`, { credentials: "include" });
       const payload = await leerJsonSeguro(res);
 
       if (res.status === 401) {
@@ -771,15 +671,17 @@ export function ConsultasJuridicasForm() {
       const data = payload?.data || payload?.consulta || payload;
 
       if (data.areaId) {
-        const temasRes = await fetch(`${API_URL_BASE}/temas/area/${data.areaId}`, { credentials: "include" });
+        const temasRes = await apiClient.request(`${API_URL_BASE}/temas/area/${data.areaId}`, { credentials: "include" });
         const temasData = await leerJsonSeguro(temasRes);
         setTemas(temasRes.ok ? obtenerArrayDesdeRespuesta(temasData) : []);
       }
       if (data.temaId) {
-        const tiposRes = await fetch(`${API_URL_BASE}/tipos/tema/${data.temaId}`, { credentials: "include" });
+        const tiposRes = await apiClient.request(`${API_URL_BASE}/tipos/tema/${data.temaId}`, { credentials: "include" });
         const tiposData = await leerJsonSeguro(tiposRes);
         setTipos(tiposRes.ok ? obtenerArrayDesdeRespuesta(tiposData) : []);
       }
+
+      await hidratarPersonasSeleccionadas(data);
 
       setForm({
         fecha: data.fecha ?? "",
@@ -818,25 +720,21 @@ export function ConsultasJuridicasForm() {
   async function cargarArchivosCaso(consultaId) {
     setCargandoArchivos(true);
     try {
-      const res = await fetch(`${FILE_STORAGE_API_URL_BASE}/files/list/${consultaId}`, { credentials: "include" });
-      if (!res.ok) { setArchivosCaso([]); return; }
-      const data = await res.json();
-      setArchivosCaso(Array.isArray(data) ? data : []);
-    } catch { setArchivosCaso([]); }
-    finally { setCargandoArchivos(false); }
+      setArchivosCaso(await fileApi.list({ type: "consulta", id: consultaId }));
+    } catch (error) {
+      console.error(error);
+      setArchivosCaso([]);
+    } finally {
+      setCargandoArchivos(false);
+    }
   }
 
-  const descargarArchivo = async (fileName) => {
+  const descargarArchivo = async (file) => {
     try {
-      const response = await fetch(`${FILE_STORAGE_API_URL_BASE}/files/download/${idEditando}/${encodeURIComponent(fileName)}`, { method: 'GET', credentials: 'include' });
-      if (!response.ok) throw new Error('Error descargando archivo');
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = fileName;
-      document.body.appendChild(a); a.click(); a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) { console.error(error); }
+      await fileApi.download(file, { type: "consulta", id: idEditando });
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   async function handleGuardar(e) {
@@ -844,6 +742,22 @@ export function ConsultasJuridicasForm() {
 
     if (!puedeEditarConsultas) {
       toast.error("No tienes permisos para editar consultas.");
+      return;
+    }
+
+    const errorCoherencia = validarCoherenciaConsultaFrontend({
+      form,
+      temas,
+      tipos,
+      asesores,
+      monitores,
+      estudiantes,
+    });
+
+    if (errorCoherencia) {
+      toast.error("Asignación o relación inválida", {
+        description: errorCoherencia,
+      });
       return;
     }
 
@@ -878,7 +792,7 @@ export function ConsultasJuridicasForm() {
     }
 
     try {
-      const res = await fetch(`${API_URL_BASE}/consultas/${idEditando}`, {
+      const res = await apiClient.request(`${API_URL_BASE}/consultas/${idEditando}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -941,7 +855,7 @@ export function ConsultasJuridicasForm() {
     }
 
     try {
-      const res = await fetch(
+      const res = await apiClient.request(
         `${API_URL_BASE}/consultas/${id}/estado?estado=${encodeURIComponent(estadoNormalizado)}`,
         {
           method: "PATCH",
@@ -990,7 +904,7 @@ export function ConsultasJuridicasForm() {
     setConfirmArchivar((s) => ({ ...s, loading: true }));
 
     try {
-      const res = await fetch(`${API_URL_BASE}/consultas/${id}/archivar`, {
+      const res = await apiClient.request(`${API_URL_BASE}/consultas/${id}/archivar`, {
         method: "PATCH",
         credentials: "include",
       });
@@ -1043,7 +957,9 @@ export function ConsultasJuridicasForm() {
     return (
       <>
         <div className="font-medium">{p.nombres} {p.apellidos}</div>
-        <div className="text-xs text-muted-foreground">{p.numeroDocumento}</div>
+        <div className="text-xs text-muted-foreground">
+          {p.tipoDocumento} {p.numeroDocumentoEnmascarado || ""}
+        </div>
       </>
     );
   }
@@ -1055,7 +971,7 @@ export function ConsultasJuridicasForm() {
   return (
     <>
       <div className="space-y-6">
-        {/* BUSCADOR */}
+        {/* SEARCH */}
         <div className="flex gap-3 items-end">
           <div className="flex-1 space-y-1">
             <label className="text-sm font-medium">Buscar consulta</label>
@@ -1075,7 +991,7 @@ export function ConsultasJuridicasForm() {
           </Button>
         </div>
 
-        {/* FORMULARIO DE EDICIÓN INLINE */}
+        {/* Form handling.*/}
         {mostrarFormEdicion && (
           <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
             <h2 className="text-lg font-semibold">Editar consulta #{idEditando}</h2>
@@ -1142,7 +1058,7 @@ export function ConsultasJuridicasForm() {
 
                 {puedeAsignarResponsablesConsulta ? (
                   <>
-                    {/* ASESOR */}
+                    {/* ADVISOR */}
                     <C label="Asesor">
                       <button
                         type="button"
@@ -1172,7 +1088,7 @@ export function ConsultasJuridicasForm() {
                       </button>
                     </C>
 
-                    {/* ESTUDIANTE */}
+                    {/* STUDENT */}
                     <C label="Estudiante">
                       <button
                         type="button"
@@ -1198,20 +1114,20 @@ export function ConsultasJuridicasForm() {
                 )}
               </div>
 
-              {/* PARTE PRINCIPAL */}
+              {/* PRIMARY PARTY */}
               <C label="Parte principal *">
-                <button type="button" onClick={() => setModalParte(p => ({ ...p, abierto: true }))}
+                <button type="button" onClick={() => abrirModalPersona(setModalParte)}
                   className="flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors">
                   <span className={parteSeleccionada ? "text-foreground" : "text-muted-foreground"}>
-                    {parteSeleccionada ? `${parteSeleccionada.nombres} ${parteSeleccionada.apellidos} - ${parteSeleccionada.numeroDocumento}` : "Buscar parte principal..."}
+                    {parteSeleccionada ? `${parteSeleccionada.nombres} ${parteSeleccionada.apellidos} - ${parteSeleccionada.numeroDocumentoEnmascarado || ""}` : "Buscar parte principal..."}
                   </span>
                   <span className="text-muted-foreground">▼</span>
                 </button>
               </C>
 
-              {/* PARTES ADICIONALES */}
+              {/* ADDITIONAL PARTIES */}
               <C label="Partes adicionales">
-                <button type="button" onClick={() => setModalPartesAdicionales(p => ({ ...p, abierto: true }))}
+                <button type="button" onClick={() => abrirModalPersona(setModalPartesAdicionales)}
                   className="flex min-h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors">
                   <span className={partesAdicionalesSeleccionadas.length > 0 ? "text-foreground" : "text-muted-foreground"}>
                     {partesAdicionalesSeleccionadas.length > 0
@@ -1222,9 +1138,9 @@ export function ConsultasJuridicasForm() {
                 </button>
               </C>
 
-              {/* CONTRAPARTES */}
+              {/* COUNTERPARTIES */}
               <C label="Contrapartes">
-                <button type="button" onClick={() => setModalContrapartes(p => ({ ...p, abierto: true }))}
+                <button type="button" onClick={() => abrirModalPersona(setModalContrapartes)}
                   className="flex min-h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors">
                   <span className={contrapartesSeleccionadas.length > 0 ? "text-foreground" : "text-muted-foreground"}>
                     {contrapartesSeleccionadas.length > 0
@@ -1249,10 +1165,10 @@ export function ConsultasJuridicasForm() {
                   <p className="text-sm text-muted-foreground">No hay archivos adjuntos.</p>
                 ) : (
                   <ul className="space-y-2">
-                    {archivosCaso.map(fileName => (
-                      <li key={fileName} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                        <span className="truncate">{fileName}</span>
-                        <button type="button" onClick={() => descargarArchivo(fileName)} className="text-primary hover:underline">Descargar</button>
+                    {archivosCaso.map((file) => (
+                      <li key={file.id ?? file.fileName} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                        <span className="truncate">{file.fileName ?? file.nombre ?? "Archivo"}</span>
+                        <button type="button" onClick={() => descargarArchivo(file)} className="text-primary hover:underline">Descargar</button>
                       </li>
                     ))}
                   </ul>
@@ -1267,7 +1183,7 @@ export function ConsultasJuridicasForm() {
           </div>
         )}
 
-        {/* TABLA DE RESULTADOS */}
+        {/* List and table handling.*/}
         <div className="overflow-hidden rounded-lg border bg-card">
           <table className="min-w-full">
             <thead className="bg-muted">
@@ -1341,7 +1257,7 @@ export function ConsultasJuridicasForm() {
         />
       </div>
 
-      {/* MODAL ASESOR */}
+      {/* MODAL ADVISOR */}
       <ModalSimple
         abierto={modalAsesor.abierto}
         titulo="Seleccionar Asesor"
@@ -1379,7 +1295,7 @@ export function ConsultasJuridicasForm() {
         renderItem={m => (<><div className="font-medium">{m.nombre}</div><div className="text-xs text-muted-foreground">{m.documento}</div></>)}
       />
 
-      {/* MODAL ESTUDIANTE */}
+      {/* MODAL STUDENT */}
       <ModalSimple
         abierto={modalEstudiante.abierto}
         titulo="Seleccionar Estudiante"
@@ -1405,35 +1321,74 @@ export function ConsultasJuridicasForm() {
         )}
       />
 
-      {/* MODAL PARTE PRINCIPAL */}
+      {/* MODAL PRIMARY PARTY */}
       <ModalSimple
         abierto={modalParte.abierto} titulo="Seleccionar Parte Principal"
         items={parteFiltrada} busqueda={modalParte.busqueda}
         setBusqueda={v => setModalParte(p => ({ ...p, busqueda: v }))}
         onSeleccionar={item => { setForm(prev => ({ ...prev, personaId: item ? String(item.id) : "" })); setModalParte({ abierto: false, busqueda: "" }); }}
         onCerrar={() => setModalParte({ abierto: false, busqueda: "" })}
+        loading={personasLoading}
+        pagination={{
+          currentPage: personasPagina,
+          totalPages: personasTotalPaginas,
+          onPageChange: setPersonasPagina,
+          pageSize: personasTamano,
+          onPageSizeChange: (size) => {
+            setPersonasTamano(size);
+            setPersonasPagina(1);
+          },
+          pageSizeOptions: [10, 20, 50],
+          totalItems: personasTotalElementos,
+        }}
         seleccionado={parteSeleccionada}
         renderItem={renderPersona}
       />
 
-      {/* MODAL PARTES ADICIONALES */}
+      {/* MODAL ADDITIONAL PARTIES */}
       <ModalMultiple
         abierto={modalPartesAdicionales.abierto} titulo="Seleccionar Partes Adicionales"
         items={partesAdicionalesFiltradas} busqueda={modalPartesAdicionales.busqueda}
         setBusqueda={v => setModalPartesAdicionales(p => ({ ...p, busqueda: v }))}
         onConfirmar={ids => { setForm(prev => ({ ...prev, partesIds: ids })); setModalPartesAdicionales({ abierto: false, busqueda: "" }); }}
         onCerrar={() => setModalPartesAdicionales({ abierto: false, busqueda: "" })}
+        loading={personasLoading}
+        pagination={{
+          currentPage: personasPagina,
+          totalPages: personasTotalPaginas,
+          onPageChange: setPersonasPagina,
+          pageSize: personasTamano,
+          onPageSizeChange: (size) => {
+            setPersonasTamano(size);
+            setPersonasPagina(1);
+          },
+          pageSizeOptions: [10, 20, 50],
+          totalItems: personasTotalElementos,
+        }}
         seleccionados={form.partesIds}
         renderItem={renderPersona}
       />
 
-      {/* MODAL CONTRAPARTES */}
+      {/* MODAL COUNTERPARTIES */}
       <ModalMultiple
         abierto={modalContrapartes.abierto} titulo="Seleccionar Contrapartes"
         items={contrapartesFiltradas} busqueda={modalContrapartes.busqueda}
         setBusqueda={v => setModalContrapartes(p => ({ ...p, busqueda: v }))}
         onConfirmar={ids => { setForm(prev => ({ ...prev, contrapartesIds: ids })); setModalContrapartes({ abierto: false, busqueda: "" }); }}
         onCerrar={() => setModalContrapartes({ abierto: false, busqueda: "" })}
+        loading={personasLoading}
+        pagination={{
+          currentPage: personasPagina,
+          totalPages: personasTotalPaginas,
+          onPageChange: setPersonasPagina,
+          pageSize: personasTamano,
+          onPageSizeChange: (size) => {
+            setPersonasTamano(size);
+            setPersonasPagina(1);
+          },
+          pageSizeOptions: [10, 20, 50],
+          totalItems: personasTotalElementos,
+        }}
         seleccionados={form.contrapartesIds}
         renderItem={renderPersona}
       />

@@ -1,9 +1,11 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
+import { apiResponse, readResponseBody } from "@/lib/api";
 /**
- * Formulario para cambiar el rol de un usuario del sistema.
+ * Role handling.
  *
- * Requiere permiso `ASIGNAR_ROL_USUARIOS`.
+ * Permission and authorization handling.
  *
  * @module components/forms/AdminUsuarios/CambiarRolUsuarioForm
  */
@@ -20,128 +22,22 @@ import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { PERMISOS } from "@/lib/permission";
 import { normalizar, tieneAlgunPermiso, tienePermiso } from "@/lib/authz";
+import { digitsOnlyRule, maxLengthRule } from "@/lib/form-validation";
 import Pagination from "@/components/ui/Pagination";
 import { sortByIdAsc } from "@/lib/list-utils";
 
-const PERMISO_GESTIONAR_USUARIOS = "Gestionar usuarios";
+import { PERMISO_GESTIONAR_USUARIOS, TIPOS_PERFIL, VALORES_INICIALES } from "./cambiar-rol.constants";
+import {
+  buscarPerfil,
+  coincideNombreRol,
+  extraerLista,
+  filtrarActivos,
+  mapOption,
+  normalizarTexto,
+  toNumberOrNull,
+  usuarioActivo,
+} from "./cambiar-rol.utils";
 
-const TIPOS_PERFIL = [
-  {
-    value: "ADMINISTRATIVO",
-    label: "Administrativo",
-    endpoint: "administrativo",
-    endpointActual: "administrativos",
-    rolIdFallback: 1,
-    nombresRol: ["Administrador", "Administrativo"],
-  },
-  {
-    value: "ASESOR",
-    label: "Asesor",
-    endpoint: "asesor",
-    endpointActual: "asesores",
-    rolIdFallback: 2,
-    nombresRol: ["Asesor"],
-  },
-  {
-    value: "ESTUDIANTE",
-    label: "Estudiante",
-    endpoint: "estudiante",
-    endpointActual: "estudiantes",
-    rolIdFallback: 3,
-    nombresRol: ["Estudiante"],
-  },
-  {
-    value: "MONITOR",
-    label: "Monitor",
-    endpoint: "monitor",
-    endpointActual: "monitores",
-    rolIdFallback: 4,
-    nombresRol: ["Monitor"],
-  },
-  {
-    value: "CONCILIADOR",
-    label: "Conciliador",
-    endpoint: "conciliador",
-    endpointActual: "conciliadores",
-    rolIdFallback: 5,
-    nombresRol: ["Conciliador"],
-  },
-];
-
-const VALORES_INICIALES = {
-  usuarioSistemaId: "",
-  destino: "",
-  motivo: "",
-  nombre: "",
-  tipoDocumentoId: "",
-  documento: "",
-  telefono: "",
-  usuario: "",
-  codigo: "",
-  sedeId: "",
-  asesorId: "",
-  areaId: "",
-  conciliacion: false,
-  directora: false,
-  tipoConciliador: "",
-};
-
-function usuarioActivo(usuario) {
-  return (
-    usuario?.activo !== false &&
-    String(usuario?.estado || "").toUpperCase() !== "INACTIVO"
-  );
-}
-
-function filtrarActivos(lista) {
-  return Array.isArray(lista) ? lista.filter(usuarioActivo) : [];
-}
-
-function extraerLista(data) {
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.content)) return data.content;
-  if (Array.isArray(data?.data)) return data.data;
-  if (Array.isArray(data?.items)) return data.items;
-  if (Array.isArray(data?.rows)) return data.rows;
-  return [];
-}
-
-function mapOption(item) {
-  return {
-    value: item.id,
-    label:
-      item.displayName ||
-      item.nombre ||
-      item.descripcion ||
-      item.codigo ||
-      String(item.id),
-  };
-}
-
-function normalizarTexto(value) {
-  const text = String(value || "").trim();
-  return text === "" ? null : text;
-}
-
-function toNumberOrNull(value) {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = Number(value);
-  return Number.isNaN(parsed) ? null : parsed;
-}
-
-function buscarPerfil(value) {
-  return TIPOS_PERFIL.find((perfil) => perfil.value === value);
-}
-
-function coincideNombreRol(rol, perfil) {
-  const nombre = normalizar(rol?.nombre);
-  return perfil.nombresRol.some((nombreRol) => normalizar(nombreRol) === nombre);
-}
-
-/**
- * Formulario para cambiar el rol de un usuario del sistema.
- * @returns {JSX.Element} Componente de cambio de rol.
- */
 export function CambiarRolUsuarioForm() {
   const router = useRouter();
 
@@ -266,19 +162,12 @@ export function CambiarRolUsuarioForm() {
   }, [perfilDestino]);
 
   async function leerRespuesta(response) {
-    const text = await response.text();
-
-    if (!text) return null;
-
-    try {
-      return JSON.parse(text);
-    } catch {
-      return { mensaje: text };
-    }
+    const data = await readResponseBody(response);
+    return typeof data === "string" ? { mensaje: data } : data;
   }
 
   async function fetchJson(url) {
-    const response = await fetch(url, { credentials: "include" });
+    const { response, data } = await apiResponse(url, { method: "GET" });
 
     if (response.status === 401) {
       router.replace("/");
@@ -289,7 +178,6 @@ export function CambiarRolUsuarioForm() {
       return [];
     }
 
-    const data = await response.json();
     return extraerLista(data);
   }
 
@@ -297,7 +185,7 @@ export function CambiarRolUsuarioForm() {
     try {
       setLoading(true);
 
-      const meRes = await fetch(`${API_URL_BASE}/auth/me`, {
+      const meRes = await apiClient.request(`${API_URL_BASE}/auth/me`, {
         method: "GET",
         credentials: "include",
       });
@@ -361,7 +249,7 @@ export function CambiarRolUsuarioForm() {
     }
 
     try {
-      const res = await fetch(
+      const res = await apiClient.request(
         `${API_URL_BASE}/${perfilActual.endpointActual}/${usuario.perfilId}`,
         { credentials: "include" }
       );
@@ -487,7 +375,7 @@ export function CambiarRolUsuarioForm() {
     try {
       setGuardando(true);
 
-      const response = await fetch(
+      const response = await apiClient.request(
         `${API_URL_BASE}/usuarios-sistema/${usuarioSeleccionado.id}/perfil/${perfilDestino.endpoint}`,
         {
           method: "PATCH",
@@ -566,17 +454,19 @@ export function CambiarRolUsuarioForm() {
         <FormInput
           name="motivo"
           label="Motivo del cambio"
+          maxLength={255}
           register={register}
           errors={errors}
-          rules={{ required: REQUIRED }}
+          rules={{ required: REQUIRED, ...maxLengthRule(255) }}
         />
 
         <FormInput
           name="nombre"
           label="Nombre completo"
+          maxLength={120}
           register={register}
           errors={errors}
-          rules={{ required: REQUIRED }}
+          rules={{ required: REQUIRED, ...maxLengthRule(120) }}
         />
 
         {tiposDocumento.length > 0 && (
@@ -599,6 +489,7 @@ export function CambiarRolUsuarioForm() {
         <FormInput
           name="documento"
           label="Documento"
+          maxLength={30}
           register={register}
           errors={errors}
           rules={{
@@ -608,31 +499,36 @@ export function CambiarRolUsuarioForm() {
               destino === "CONCILIADOR"
                 ? REQUIRED
                 : false,
+            ...maxLengthRule(30),
           }}
         />
 
         <FormInput
           name="telefono"
           label="Teléfono"
+          digitsOnly
+          maxLength={30}
           register={register}
           errors={errors}
-          rules={{ required: REQUIRED }}
+          rules={{ ...digitsOnlyRule({ required: true, maxLength: 30 }) }}
         />
 
         <FormInput
           name="usuario"
           label="Usuario"
+          maxLength={100}
           register={register}
           errors={errors}
-          rules={{ required: REQUIRED }}
+          rules={{ required: REQUIRED, ...maxLengthRule(100) }}
         />
 
         <FormInput
           name="codigo"
           label="Código"
+          maxLength={30}
           register={register}
           errors={errors}
-          rules={{ required: REQUIRED }}
+          rules={{ required: REQUIRED, ...maxLengthRule(30) }}
         />
 
         {sedes.length > 0 && (

@@ -1,10 +1,10 @@
 "use client"
 
 /**
- * Tabla de logs de auditoría del sistema.
+ * List and table handling.
  *
- * Muestra el historial de acciones realizadas por los usuarios.
- * Solo visible para administradores con acceso a la sección de administración.
+ * User flow detail.
+ * Implementation detail.
  *
  * @module components/forms/AdminUsuarios/AuditLogsTable
  */
@@ -24,12 +24,12 @@ import {
 import { Input } from "@/components/ui/input";
 import Pagination from "@/components/ui/Pagination";
 import { API_URL_BASE } from "@/lib/config";
-import { getApiErrorDescription, readResponseBody } from "@/lib/api";
+import { apiResponse, getApiErrorDescription } from "@/lib/api";
 import { toast } from "sonner";
 
 /**
- * Tabla que muestra los registros de auditoría.
- * @returns {JSX.Element} Componente de registros de auditoría.
+ * List and table handling.
+ * @returns {JSX.Element} Result value.
  */
 export function AuditLogsTable() {
   const [logs, setLogs] = useState([])
@@ -58,11 +58,9 @@ export function AuditLogsTable() {
         url.searchParams.append("username", search.trim())
       }
 
-      const response = await fetch(url.toString(), {
-        credentials: "include"
+      const { response, data } = await apiResponse(url.toString(), {
+        method: "GET",
       })
-
-      const data = await readResponseBody(response)
 
       if (!response.ok) {
         throw new Error(getApiErrorDescription(data, "Error cargando los registros de auditoría"))
@@ -86,7 +84,7 @@ export function AuditLogsTable() {
   const handleSearch = (e) => {
     e.preventDefault()
     setSearch(searchInputValue)
-    setPage(1) // Reset a página 1 al buscar
+    setPage(1) // Implementation detail.
   }
 
   const handleClearSearch = () => {

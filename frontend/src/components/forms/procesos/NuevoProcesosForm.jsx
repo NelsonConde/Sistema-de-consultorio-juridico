@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { API_URL_BASE } from "@/lib/config";
 import { PERMISOS } from "@/lib/permission";
 import { tieneAlgunPermiso } from "@/lib/authz";
+import { apiEnviar, apiGet } from "./procesos.service";
 
 const PERMISOS_PROCESOS = {
   VER_PROCESOS: PERMISOS.VER_PROCESOS || "Ver procesos",
@@ -41,41 +42,6 @@ function extraerLista(data) {
   }
 
   return [];
-}
-
-async function leerRespuesta(response) {
-  if (response.status === 204) return null;
-  const text = await response.text();
-  if (!text) return null;
-  try { return JSON.parse(text); } catch { return { mensaje: text }; }
-}
-
-function mensajeError(payload, defecto) {
-  if (!payload) return defecto;
-  if (typeof payload === "string") return payload || defecto;
-  return payload.mensaje || payload.message || payload.error || defecto;
-}
-
-async function apiGet(url) {
-  const response = await fetch(url, { credentials: "include" });
-  const payload = await leerRespuesta(response);
-  if (response.status === 401) { const e = new Error("Sesión vencida. Inicia sesión nuevamente."); e.status = 401; throw e; }
-  if (response.status === 403) { const e = new Error("No tienes permisos para consultar esta información."); e.status = 403; throw e; }
-  if (!response.ok) throw new Error(mensajeError(payload, "No se pudo consultar la información."));
-  return payload;
-}
-
-async function apiEnviar(url, options) {
-  const response = await fetch(url, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...(options?.headers || {}) },
-    ...options,
-  });
-  const payload = await leerRespuesta(response);
-  if (response.status === 401) { const e = new Error("Sesión vencida. Inicia sesión nuevamente."); e.status = 401; throw e; }
-  if (response.status === 403) { const e = new Error("No tienes permisos para realizar esta acción."); e.status = 403; throw e; }
-  if (!response.ok) throw new Error(mensajeError(payload, "No se pudo guardar el proceso."));
-  return payload;
 }
 
 function puedeAccederProcesos(user) {
@@ -131,7 +97,7 @@ function normalizarPayload(form) {
   };
 }
 
-// ─── Modal de búsqueda de consulta ───────────────────────────────────────────
+// Search behavior.
 function ModalBuscarConsulta({ abierto, consultas, busqueda, setBusqueda, onSeleccionar, onCerrar, consultaIdSeleccionada }) {
   if (!abierto) return null;
 
@@ -194,7 +160,7 @@ function ModalBuscarConsulta({ abierto, consultas, busqueda, setBusqueda, onSele
   );
 }
 
-// ─── Campo de consulta con botón + modal ─────────────────────────────────────
+// Modal behavior.
 function CampoConsulta({ label, consultaId, consultas, onSeleccionar, required }) {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState("");
@@ -286,7 +252,7 @@ function Aviso({ children }) {
   );
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
+// Component implementation detail.
 export function NuevoProcesoForm() {
   const router = useRouter();
 
@@ -303,11 +269,22 @@ export function NuevoProcesoForm() {
   const puedeGestionar = puedeGestionarProcesos(user);
 
   const especialidadesFiltradas = useMemo(() => {
-    if (!form.organoControlId) return especialidades;
+    if (!form.organoControlId) return [];
     return especialidades.filter(
       (e) => Number(e.organoControlId) === Number(form.organoControlId)
     );
   }, [especialidades, form.organoControlId]);
+
+  const consultasOperativas = useMemo(() =>
+    consultas.filter((consulta) => {
+      const estado = String(consulta?.estado || consulta?.estadoConsulta || "")
+        .trim()
+        .toUpperCase();
+      return estado !== "CERRADO" && estado !== "CERRADA"
+        && estado !== "ARCHIVADO" && estado !== "ARCHIVADA";
+    }),
+    [consultas]
+  );
 
   useEffect(() => { verificarYCargar(); }, []);
 
@@ -388,6 +365,17 @@ export function NuevoProcesoForm() {
       return false;
     }
 
+    if (form.especialidadId && form.organoControlId) {
+      const especialidad = especialidades.find(
+        (item) => Number(item.id) === Number(form.especialidadId)
+      );
+
+      if (!especialidad || Number(especialidad.organoControlId) !== Number(form.organoControlId)) {
+        toast.error("La especialidad no pertenece al órgano de control seleccionado");
+        return false;
+      }
+    }
+
     return true;
   }
 
@@ -397,10 +385,14 @@ export function NuevoProcesoForm() {
     if (!validarAntesDeGuardar()) return;
     try {
       setGuardando(true);
-      await apiEnviar(`${API_URL_BASE}/procesos`, {
-        method: "POST",
-        body: JSON.stringify(normalizarPayload(form)),
-      });
+      await apiEnviar(
+        `${API_URL_BASE}/procesos`,
+        {
+          method: "POST",
+          body: JSON.stringify(normalizarPayload(form)),
+        },
+        "No se pudo guardar el proceso."
+      );
       toast.success("Proceso creado correctamente");
       router.push("/procesos");
     } catch (error) {
@@ -458,11 +450,11 @@ export function NuevoProcesoForm() {
               ))}
             </CampoSelect>
 
-            {/* Consulta — modal de búsqueda en lugar de select nativo */}
+            {/* Search behavior.*/}
             <CampoConsulta
               label="Consulta"
               consultaId={form.consultaId}
-              consultas={consultas}
+              consultas={consultasOperativas}
               onSeleccionar={(v) => actualizarCampo("consultaId", v)}
               required
             />
@@ -482,7 +474,7 @@ export function NuevoProcesoForm() {
               label="Especialidad"
               value={form.especialidadId}
               onChange={(v) => actualizarCampo("especialidadId", v)}
-              disabled={especialidadesFiltradas.length === 0}
+              disabled={!form.organoControlId || especialidadesFiltradas.length === 0}
             >
               <option value="">Sin especialidad</option>
               {especialidadesFiltradas.map((e) => (

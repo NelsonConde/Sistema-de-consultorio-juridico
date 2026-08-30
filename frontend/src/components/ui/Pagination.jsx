@@ -4,9 +4,9 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 
 /**
- * Componente de paginación para listas de datos.
- * @param {{currentPage:number, totalPages:number, onPageChange:function, pageSize:number, onPageSizeChange:function, pageSizeOptions?:Array<number>, totalItems?:number}} props - Propiedades de paginación.
- * @returns {JSX.Element|null} Control de paginación.
+ * Handles list pagination consistently.
+ * @param {{currentPage:number, totalPages:number, onPageChange:function, pageSize:number, onPageSizeChange:function, pageSizeOptions?:Array<number>, totalItems?:number}} props - Parameter description.
+ * @returns {JSX.Element|null} Result value.
  */
 export function Pagination({
   currentPage,

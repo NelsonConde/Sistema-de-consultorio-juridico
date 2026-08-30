@@ -11,6 +11,7 @@ import co.edu.ufps.legal_cases.security.model.access.Permiso;
 import co.edu.ufps.legal_cases.security.repository.access.PermisoRepository;
 import co.edu.ufps.legal_cases.security.service.access.permiso.PermisoMapper;
 import co.edu.ufps.legal_cases.security.service.access.permiso.PermisoValidator;
+import co.edu.ufps.legal_cases.security.service.invariant.administracion.AdministracionInvariantService;
 
 @Service
 public class PermisoService {
@@ -18,14 +19,17 @@ public class PermisoService {
     private final PermisoRepository permisoRepository;
     private final PermisoMapper permisoMapper;
     private final PermisoValidator permisoValidator;
+    private final AdministracionInvariantService administracionInvariantService;
 
     public PermisoService(
             PermisoRepository permisoRepository,
             PermisoMapper permisoMapper,
-            PermisoValidator permisoValidator) {
+            PermisoValidator permisoValidator,
+            AdministracionInvariantService administracionInvariantService) {
         this.permisoRepository = permisoRepository;
         this.permisoMapper = permisoMapper;
         this.permisoValidator = permisoValidator;
+        this.administracionInvariantService = administracionInvariantService;
     }
 
     @Transactional(readOnly = true)
@@ -69,12 +73,19 @@ public class PermisoService {
 
     @Transactional
     public PermisoDTO actualizar(Long id, PermisoDTO dto) {
-        Permiso permiso = buscarPorId(id);
-
-        permisoValidator.validarActualizacion(permiso, dto);
+        permisoValidator.validarSolicitudActualizacion(id, dto);
 
         String nombreNuevo = permisoValidator.normalizarNombre(dto.getNombre());
         String descripcionNueva = permisoValidator.normalizarDescripcion(dto.getDescripcion());
+
+        administracionInvariantService.validarActualizacionPermiso(
+                id,
+                nombreNuevo,
+                dto.getActivo());
+
+        Permiso permiso = buscarPorId(id);
+
+        permisoValidator.validarActualizacion(permiso, dto);
         Boolean activoNuevo = dto.getActivo() != null ? dto.getActivo() : permiso.getActivo();
 
         validarNombreDisponibleParaActualizar(nombreNuevo, permiso.getId());
@@ -87,6 +98,11 @@ public class PermisoService {
 
     @Transactional
     public PermisoDTO cambiarEstado(Long id, Boolean activo) {
+        permisoValidator.validarIdObligatorio(id);
+        permisoValidator.validarEstadoObligatorio(activo);
+
+        administracionInvariantService.validarCambioEstadoPermiso(id, activo);
+
         Permiso permiso = buscarPorId(id);
 
         permisoValidator.validarCambioEstado(permiso, activo);

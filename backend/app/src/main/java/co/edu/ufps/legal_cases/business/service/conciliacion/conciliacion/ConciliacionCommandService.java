@@ -18,6 +18,9 @@ import co.edu.ufps.legal_cases.business.repository.conciliacion.ConciliacionRepo
 import co.edu.ufps.legal_cases.business.service.acceso.conciliacion.ConciliacionAccessService;
 import co.edu.ufps.legal_cases.business.service.conciliacion.reunion.notificacion.ReunionConciliacionNotificacionService;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import co.edu.ufps.legal_cases.file_storage.model.FileAsset;
+import co.edu.ufps.legal_cases.file_storage.model.FileResourceType;
+import co.edu.ufps.legal_cases.file_storage.service.FileResourceService;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
 import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaRepository;
 import lombok.AllArgsConstructor;
@@ -32,7 +35,7 @@ public class ConciliacionCommandService {
     private final ConciliacionAccessService conciliacionAccessService;
     private final ConciliacionRelacionService conciliacionRelacionService;
     private final ConciliacionAsignacionService conciliacionAsignacionService;
-    private final ConciliacionDocumentoService conciliacionDocumentoService;
+    private final FileResourceService fileResourceService;
     private final ConciliacionValidator conciliacionValidator;
     private final ConciliacionMapper conciliacionMapper;
     private final ReunionConciliacionNotificacionService reunionConciliacionNotificacionService;
@@ -68,13 +71,12 @@ public class ConciliacionCommandService {
 
         Conciliacion conciliacionGuardada = conciliacionRepository.save(conciliacion);
 
-        // Se guarda después del primer save porque la ruta depende del id:
-        // conciliacion/{id}/solicitud.pdf
-        String solicitudPath = conciliacionDocumentoService.guardarSolicitud(
+        FileAsset solicitudAsset = fileResourceService.storeMultipartAfterAuthorization(
+                FileResourceType.CONCILIACION,
                 conciliacionGuardada.getId(),
+                null,
                 solicitud);
-
-        conciliacionGuardada.setDocumentoSolicitudPath(solicitudPath);
+        conciliacionGuardada.setDocumentoSolicitud(solicitudAsset);
 
         return conciliacionMapper.convertirAResponseDTO(
                 conciliacionRepository.save(conciliacionGuardada));
@@ -152,10 +154,11 @@ public class ConciliacionCommandService {
 
         // El acta es soporte obligatorio de cierre.
         // Se guarda antes de cambiar estado para no finalizar sin documento.
-        String actaPath = conciliacionDocumentoService.guardarActa(id, acta);
+        FileAsset actaAsset = fileResourceService.storeMultipartAfterAuthorization(
+                FileResourceType.CONCILIACION, id, null, acta);
 
         conciliacion.setEstado(estadoFinal);
-        conciliacion.setActaPath(actaPath);
+        conciliacion.setActa(actaAsset);
         conciliacion.setFechaFinalizacion(LocalDateTime.now());
 
         // Al finalizar la conciliación ya no deben salir recordatorios de reunión pendientes.
@@ -174,8 +177,9 @@ public class ConciliacionCommandService {
         conciliacionValidator.validarConciliacionNoFinalizada(conciliacion);
         conciliacionValidator.validarConsultaPermiteOperacionConciliacion(conciliacion.getConsulta());
 
-        String solicitudPath = conciliacionDocumentoService.guardarSolicitud(id, solicitud);
-        conciliacion.setDocumentoSolicitudPath(solicitudPath);
+        FileAsset solicitudAsset = fileResourceService.storeMultipartAfterAuthorization(
+                FileResourceType.CONCILIACION, id, null, solicitud);
+        conciliacion.setDocumentoSolicitud(solicitudAsset);
 
         return conciliacionMapper.convertirAResponseDTO(
                 conciliacionRepository.save(conciliacion));

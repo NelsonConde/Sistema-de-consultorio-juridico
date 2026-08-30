@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import { API_URL_BASE } from "@/lib/config";
+import { apiResponse } from "@/lib/api";
 import { PERMISOS } from "@/lib/permission";
 import {
   tieneAlgunPermiso,
@@ -124,12 +125,12 @@ const SIDEBAR_PAGES = [
 ];
 
 /**
- * Determina si un usuario puede ver una página específica.
- * Verifica los permisos requeridos según la lógica de match (any/all).
+ * User flow detail.
+ * Permission and authorization handling.
  * 
- * @param {Object} page - Objeto de página con requiredPermissions y match
- * @param {Object} user - Objeto del usuario
- * @returns {boolean} True si el usuario tiene acceso a la página
+ * @param {Object} page - Parameter description.
+ * @param {Object} user - Authenticated user object.
+ * @returns {boolean} Result value.
  */
 function puedeVerPagina(page, user) {
   if (!user) return false;
@@ -150,12 +151,12 @@ function puedeVerPagina(page, user) {
 }
 
 /**
- * Filtra una lista de páginas según los permisos del usuario.
- * Solo retorna las páginas a las que el usuario tiene acceso.
+ * List and table handling.
+ * User flow detail.
  * 
- * @param {Array<Object>} pages - Array de páginas disponibles
- * @param {Object} user - Objeto del usuario
- * @returns {Array<Object>} Array de páginas filtradas
+ * @param {Array<Object>} pages - Parameter description.
+ * @param {Object} user - Authenticated user object.
+ * @returns {Array<Object>} Result value.
  */
 function filtrarPaginasPorPermisos(pages, user) {
   return pages.filter((page) => puedeVerPagina(page, user));
@@ -170,9 +171,8 @@ export function PermissionSidebar() {
   React.useEffect(() => {
     const cargarUsuario = async () => {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, {
+        const { response: res, data } = await apiResponse(`${API_URL_BASE}/auth/me`, {
           method: "GET",
-          credentials: "include",
         });
 
         if (res.status === 401) {
@@ -185,7 +185,6 @@ export function PermissionSidebar() {
           return;
         }
 
-        const data = await res.json();
         setUser(data);
       } catch (error) {
         console.error("Error cargando permisos del usuario", error);

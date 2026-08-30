@@ -1,26 +1,25 @@
 /**
- * Configuración de URLs de la aplicación.
+ * Implementation detail.
  *
- * Las URLs se resuelven desde variables de entorno `NEXT_PUBLIC_*`.
- * Si no se definen, se usa `http://localhost:8080/api` como valor por defecto
- * para facilitar el desarrollo local.
+ * Implementation detail.
+ * Normalize the URL scheme and API path before using the configured endpoint.
+ * Role handling.
  *
- * Variables de entorno soportadas (en orden de prioridad):
+ * Handles numeric identifiers consistently for list ordering.
  * - `NEXT_PUBLIC_API_URL_BASE`
  * - `NEXT_PUBLIC_API_URL`
- * - `NEXT_PUBLIC_FILE_STORAGE_API_URL_BASE`
  *
  * @module lib/config
  */
 
 /**
- * Normaliza una URL de API asegurándose de que:
- * - Tenga esquema `http://` o `https://` (agrega `https://` si falta).
- * - No termine en `/`.
+ * API routes are built from the configured base URL and a relative path.
+ * Normalize the URL scheme and API path before using the configured endpoint.
+ * Implementation detail.
  * - Termine en `/api`.
  *
- * @param {string|undefined} url - URL cruda desde la variable de entorno.
- * @returns {string} URL normalizada lista para usar con `fetch`.
+ * @param {string|undefined} url - Parameter description.
+ * @returns {string} Result value.
  */
 function normalizarApiUrl(url) {
   let apiUrl = url || "http://localhost:8080/api";
@@ -41,29 +40,16 @@ function normalizarApiUrl(url) {
 }
 
 /**
- * URL base del backend principal del sistema jurídico.
- * Todas las rutas de la API se construyen concatenando esta URL con la ruta relativa.
+ * Implementation detail.
+ * API routes are built from the configured base URL and a relative path.
  *
  * @type {string}
  * @example
- * // Resultado típico en desarrollo: "http://localhost:8080/api"
- * fetch(`${API_URL_BASE}/auth/me`)
+ * Normalize the URL scheme and API path before using the configured endpoint.
+ * apiClient.get(`${API_URL_BASE}/auth/me`)
  */
 export const API_URL_BASE = normalizarApiUrl(
   process.env.NEXT_PUBLIC_API_URL_BASE ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    "http://localhost:8080/api"
-);
-
-/**
- * URL base del servicio de almacenamiento de archivos.
- * Por defecto apunta al mismo backend que `API_URL_BASE`.
- *
- * @type {string}
- */
-export const FILE_STORAGE_API_URL_BASE = normalizarApiUrl(
-  process.env.NEXT_PUBLIC_FILE_STORAGE_API_URL_BASE ||
-    process.env.NEXT_PUBLIC_API_URL_BASE ||
     process.env.NEXT_PUBLIC_API_URL ||
     "http://localhost:8080/api"
 );

@@ -4,7 +4,7 @@
 
 ## 1. Propósito
 
-El backend incluye un módulo de almacenamiento para cargar, listar y descargar archivos. Este módulo es genérico y sirve como soporte documental para consultas, seguimientos y conciliaciones.
+El backend incluye un módulo de almacenamiento para cargar, listar y descargar archivos. La fachada conserva el contrato existente, pero el proveedor de producción utiliza el bucket privado `legal-documents` de Supabase Storage mediante su API S3 compatible.
 
 ---
 
@@ -13,7 +13,13 @@ El backend incluye un módulo de almacenamiento para cargar, listar y descargar 
 | Componente | Responsabilidad |
 |---|---|
 | `FileUploadController` | Expone endpoints bajo `/api/files`. |
-| `FileStorageService` | Guarda, carga, lista archivos y directorios. |
+| `FileStorageService` | Fachada compatible con la API que delega en el proveedor de objetos. |
+| `StorageProvider` | Contrato interno para desacoplar la aplicación del proveedor físico. |
+| `SupabaseStorageProvider` | Implementación S3 para Supabase Storage. |
+| `FileAsset` | Metadatos de cada objeto y asociación con su recurso funcional. |
+| `FileAssetService` | Gestiona estados PENDING, ACTIVE, FAILED y DELETE_PENDING. |
+| `FileAssetReconciliationService` | Reintenta limpiar objetos de operaciones incompletas. |
+| `FileValidationService` | Aplica tamaño, extensión y firmas básicas de contenido. |
 | `FileStorageException` | Excepción de almacenamiento. |
 | `FileNotFoundException` | Excepción de archivo o directorio no encontrado. |
 | `ConciliacionDocumentoService` | Usa almacenamiento para solicitud y acta PDF de conciliación. |
@@ -22,13 +28,19 @@ El backend incluye un módulo de almacenamiento para cargar, listar y descargar 
 
 ## 3. Configuración
 
-El directorio raíz se configura mediante:
+La conexión a Supabase Storage se configura mediante:
 
 ```properties
-file.upload-dir
+supabase.storage.endpoint=${SUPABASE_STORAGE_ENDPOINT}
+supabase.storage.region=${SUPABASE_STORAGE_REGION}
+supabase.storage.access-key=${SUPABASE_STORAGE_ACCESS_KEY}
+supabase.storage.secret-key=${SUPABASE_STORAGE_SECRET_KEY}
+supabase.storage.bucket=${SUPABASE_STORAGE_BUCKET:legal-documents}
 ```
 
-Al iniciar, `FileStorageService` normaliza la ruta, crea el directorio si no existe y lo usa como raíz de almacenamiento.
+Las credenciales son obligatorias y deben inyectarse en Railway. No se deben guardar claves reales en el repositorio.
+
+Cada carga inicia un `FileAsset` en estado `PENDING`, pasa a `ACTIVE` cuando el objeto se confirma en Storage y se marca como `FAILED` o `DELETE_PENDING` si la compensación requiere reintento. El reconciliador revisa operaciones antiguas periódicamente. Cada registro conserva bucket, clave, recurso, usuario, tamaño, tipo MIME y checksum SHA-256.
 
 ---
 
@@ -48,7 +60,7 @@ POST /api/files/upload-multiple
 
 Ambos endpoints reciben `MultipartFile` y un `path` opcional. Si se envía `path`, el archivo se almacena bajo ese subdirectorio relativo.
 
-La carga múltiple registra un resultado por archivo y permite respuestas mixtas de éxito y error dentro de la misma lista.
+La carga múltiple registra un resultado por archivo y permite respuestas mixtas de éxito y error dentro de la misma lista. La petición multipart continúa siendo compatible con el frontend actual.
 
 ---
 
@@ -73,9 +85,9 @@ La descarga retorna un `Resource`. El listado de archivos retorna nombres de arc
 
 - limpia nombres de archivo con `StringUtils.cleanPath`;
 - rechaza nombres de archivo que contengan `..`;
-- rechaza subdirectorios que contengan `..`;
-- normaliza rutas antes de almacenar o cargar;
-- crea directorios si son necesarios.
+- rechaza rutas absolutas;
+- normaliza claves antes de almacenarlas o cargarlas;
+- delega la escritura y lectura en `SupabaseStorageProvider`.
 
 El contrato funcional espera rutas relativas bajo la raíz configurada de almacenamiento.
 
@@ -83,7 +95,7 @@ El contrato funcional espera rutas relativas bajo la raíz configurada de almace
 
 ## 7. Validación de tipo documental
 
-El almacenamiento genérico no valida extensión o MIME type de forma funcional. Es decir, `/api/files/upload` y `/api/files/upload-multiple` guardan el archivo recibido si supera las validaciones de ruta.
+El almacenamiento genérico todavía no valida el contenido real del archivo. En este bloque se establece un límite multipart de 10 MB, coherente con el bucket `legal-documents`; la validación de tipos y contenido se implementará en el bloque de seguridad.
 
 Las reglas de tipo documental se aplican en el módulo que usa el archivo. Por ejemplo, `ConciliacionDocumentoService` exige PDF para solicitud y acta.
 

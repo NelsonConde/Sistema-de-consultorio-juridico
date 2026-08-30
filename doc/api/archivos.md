@@ -16,6 +16,8 @@ Todos los endpoints requieren usuario autenticado mediante la anotación del con
 
 El controller opera con autenticación general para este grupo de rutas.
 
+Además, cada operación debe identificar un recurso funcional autorizado. Se admiten prefijos de consulta, tarea, respuesta de seguimiento y conciliación. Las operaciones sin contexto, como listar todos los directorios, responden `403 Forbidden`.
+
 ---
 
 ## 2. Carga individual
@@ -49,13 +51,16 @@ Parámetros:
 
 Cuando se envía `path`, `fileName` puede incluir el subdirectorio relativo junto al nombre del archivo.
 
-### Respuesta `500 Internal Server Error`
+### Fallos de almacenamiento
 
-Si ocurre una excepción durante el almacenamiento, el controller responde con un objeto propio de la operación:
+Los detalles internos del proveedor no se exponen. El manejador global responde con un identificador de correlación y un mensaje genérico de almacenamiento.
 
 ```json
 {
-  "error": "No se pudo cargar el archivo: <detalle>"
+  "estado": 503,
+  "error": "Almacenamiento no disponible",
+  "mensaje": "No se pudo completar la operación de archivos",
+  "correlacionId": "..."
 }
 ```
 
@@ -92,7 +97,8 @@ El endpoint recorre los archivos recibidos y retorna una lista de resultados. Ca
     "message": "Cargado exitosamente"
   },
   {
-    "error": "Error al cargar: <detalle>"
+    "errorCode": "STORAGE_UPLOAD_FAILED",
+    "message": "No se pudo cargar el archivo"
   }
 ]
 ```
@@ -121,6 +127,7 @@ La ruta se decodifica y se consulta en el almacenamiento.
 |---|---|---|
 | `200 OK` | `Resource` | Retorna el archivo con `Content-Disposition: attachment`. |
 | `404 Not Found` | Sin cuerpo | El archivo solicitado no fue localizado. |
+| `403 Forbidden` | Error estándar | El usuario no tiene permiso o alcance sobre el recurso documental. |
 | `500 Internal Server Error` | Sin cuerpo | Ocurrió una excepción durante la consulta o construcción de la descarga. |
 
 Cuando no se puede determinar el tipo de contenido del archivo, la respuesta usa:
@@ -183,11 +190,13 @@ GET /api/files/directories
 
 Estos contratos son interpretables por las utilidades frontend que leen JSON o cuerpo vacío, según la operación consumida.
 
+Los errores de almacenamiento no exponen mensajes del proveedor. Las cargas individuales usan el error estándar de la API; las cargas múltiples devuelven códigos seguros como `FILE_VALIDATION_FAILED`, `STORAGE_UPLOAD_FAILED` o `FILE_UPLOAD_FAILED`.
+
 ---
 
 ## 8. Validación de rutas
 
-`FileStorageService` limpia nombres de archivo, normaliza rutas y rechaza nombres o subdirectorios que contengan secuencias `..`. El contrato funcional espera rutas relativas bajo la raíz configurada de almacenamiento.
+`FileStorageService` limpia nombres de archivo, normaliza claves y rechaza rutas absolutas o secuencias `..`. Antes de cargar, listar o descargar, `FileAccessService` resuelve la clave contra el recurso funcional y delega la autorización en el `AccessService` correspondiente. No se permite listar el almacenamiento sin un recurso asociado.
 
 ---
 

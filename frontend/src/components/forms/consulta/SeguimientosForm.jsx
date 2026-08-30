@@ -1,11 +1,13 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
+import { fileApi } from "@/lib/fileApi";
 /**
- * Formulario de gestión de seguimientos (tareas) de consultas jurídicas.
+ * Form handling.
  *
- * Permite crear, editar y responder seguimientos según el rol del usuario.
- * Los estudiantes solo pueden ver y responder; asesores y monitores pueden
- * crear, editar, y calificar respuestas.
+ * Role handling.
+ * Implementation detail.
+ * Implementation detail.
  *
  * @module components/forms/consulta/SeguimientosForm
  */
@@ -14,354 +16,59 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { API_URL_BASE, FILE_STORAGE_API_URL_BASE } from "@/lib/config"
-import { PERMISOS } from "@/lib/permission"
-import { tieneAlgunPermiso, tienePermiso } from "@/lib/authz"
+import { API_URL_BASE } from "@/lib/config"
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog"
 import Pagination from "@/components/ui/Pagination"
 import { FormFileUpload } from "@/components/forms/parts/FormFileUpload"
 import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils"
+import { normalizar } from "@/lib/authz"
+import { apiRequestData } from "@/lib/api"
 
-const FORM_TAREA_INICIAL = {
-  categoriaId: "",
-  descripcion: "",
-  fechaEntrega: "",
-  diasNotificacion: "",
-  notificarPartes: false,
-  alertaDisciplinaria: false,
-  notificarEstudiante: true,
-}
-
-const FORM_RESPUESTA_INICIAL = {
-  contenido: "",
-  archivos: [],
-}
-
-const FORM_DECISION_INICIAL = {
-  estado: "APROBADA",
-  observacionRevision: "",
-}
-
-const FORM_ESTADO_SEGUIMIENTO_INICIAL = {
-  estado: "COMPLETADO",
-}
-
-const ESTADOS_SEGUIMIENTO = [
-  { value: "PENDIENTE", label: "Pendiente" },
-  { value: "COMPLETADO", label: "Completado" },
-  { value: "CANCELADO", label: "Cancelado" },
-]
-
-const PERMISOS_LEGACY = {
-  GESTIONAR_CONSULTAS: "Gestionar consultas",
-  GESTIONAR_SEGUIMIENTOS: "Gestionar seguimientos",
-}
-
-function normalizar(value) {
-  return String(value || "")
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-}
-
-function tienePerfil(user, perfil) {
-  return normalizar(user?.tipoPerfil || user?.rolNombre) === normalizar(perfil)
-}
-
-function esEstudiante(user) {
-  return tienePerfil(user, "ESTUDIANTE")
-}
-
-function extraerLista(data) {
-  if (Array.isArray(data)) return data
-  if (!data || typeof data !== "object") return []
-
-  const claves = [
-    "content",
-    "data",
-    "items",
-    "rows",
-    "consultas",
-    "seguimientos",
-    "tareas",
-    "categorias",
-    "respuestas",
-    "pendientes",
-    "resultado",
-    "payload",
-  ]
-
-  for (const clave of claves) {
-    const valor = data[clave]
-
-    if (Array.isArray(valor)) return valor
-
-    if (valor && typeof valor === "object") {
-      const interno = extraerLista(valor)
-      if (interno.length > 0) return interno
-    }
-  }
-
-  return []
-}
-
-function puedeAccederTareasUsuario(user) {
-  return (
-    tienePermiso(user, PERMISOS.ACCEDER_TAREAS) &&
-    tieneAlgunPermiso(user, [
-      PERMISOS.VER_SEGUIMIENTOS,
-      PERMISOS_LEGACY.GESTIONAR_SEGUIMIENTOS,
-    ])
-  )
-}
-
-function puedeVerConsultasUsuario(user) {
-  return tieneAlgunPermiso(user, [
-    PERMISOS.VER_CONSULTAS,
-    PERMISOS_LEGACY.GESTIONAR_CONSULTAS,
-  ])
-}
-
-function puedeCargarCategoriasUsuario(user) {
-  return tieneAlgunPermiso(user, [
-    PERMISOS.VER_SEGUIMIENTOS,
-    PERMISOS.CREAR_SEGUIMIENTOS,
-    PERMISOS.EDITAR_SEGUIMIENTOS,
-    PERMISOS.GESTIONAR_CATEGORIAS_SEGUIMIENTO,
-    PERMISOS_LEGACY.GESTIONAR_SEGUIMIENTOS,
-  ])
-}
-
-function puedeCrearTarea(user) {
-  return tieneAlgunPermiso(user, [
-    PERMISOS.CREAR_SEGUIMIENTOS,
-    PERMISOS_LEGACY.GESTIONAR_SEGUIMIENTOS,
-  ])
-}
-
-function puedeEditarTarea(user) {
-  return tieneAlgunPermiso(user, [
-    PERMISOS.EDITAR_SEGUIMIENTOS,
-    PERMISOS_LEGACY.GESTIONAR_SEGUIMIENTOS,
-  ])
-}
-
-function puedeEliminarTarea(user) {
-  return tieneAlgunPermiso(user, [
-    PERMISOS.ELIMINAR_SEGUIMIENTOS,
-    PERMISOS_LEGACY.GESTIONAR_SEGUIMIENTOS,
-  ])
-}
-
-function puedeResponderTarea(user) {
-  return tienePermiso(user, PERMISOS.RESPONDER_SEGUIMIENTOS)
-}
-
-function puedeRevisarRespuestas(user) {
-  return tienePermiso(user, PERMISOS.APROBAR_RESPUESTAS_SEGUIMIENTO)
-}
-
-function puedeVerAlertasDisciplinarias(user) {
-  return tienePermiso(user, PERMISOS.VER_ALERTAS_DISCIPLINARIAS)
-}
-
-function accionPermitidaPorRegistro(item, accion, permisoGlobal) {
-  const acciones = item?.accionesPermitidas
-
-  if (acciones && typeof acciones[accion] === "boolean") {
-    return acciones[accion]
-  }
-
-  return permisoGlobal
-}
-
-function labelConsulta(consulta) {
-  return [
-    `#${consulta.id || consulta.consultaId}`,
-    consulta.consulta || consulta.descripcion || consulta.hechos || consulta.asunto,
-    consulta.nombre || consulta.apellido
-      ? `${consulta.nombre || ""} ${consulta.apellido || ""}`.trim()
-      : "",
-    consulta.cedula || consulta.documento,
-  ]
-    .filter(Boolean)
-    .join(" - ")
-}
-
-function obtenerTextoTarea(item) {
-  return (
-    item.descripcion ||
-    item.observacion ||
-    item.detalle ||
-    item.comentario ||
-    "Sin descripción"
-  )
-}
-
-function obtenerCategoriaTarea(item) {
-  return (
-    item.categoriaNombre ||
-    item.categoriaSeguimientoNombre ||
-    item.categoria?.nombre ||
-    item.categoriaSeguimiento?.nombre ||
-    item.categoria ||
-    "Sin categoría"
-  )
-}
-
-function obtenerCategoriaIdTarea(item) {
-  return (
-    item.categoriaSeguimientoId ||
-    item.categoriaId ||
-    item.categoria?.id ||
-    item.categoriaSeguimiento?.id ||
-    ""
-  )
-}
-
-function obtenerAutorTarea(item) {
-  return (
-    item.autorNombre ||
-    item.autorUsername ||
-    item.autor ||
-    item.username ||
-    "Sin autor"
-  )
-}
-
-function obtenerFechaTarea(item) {
-  return (
-    item.fechaCreacion ||
-    item.fechaRegistro ||
-    item.createdAt ||
-    item.fecha ||
-    ""
-  )
-}
-
-function obtenerIdTarea(item) {
-  return item?.id || item?.seguimientoId
-}
-
-function ordenarPorFechaDesc(lista) {
-  return [...lista].sort((a, b) => {
-    const fechaA = new Date(a.fechaActualizacion || a.fechaCreacion || a.fechaDecision || 0)
-    const fechaB = new Date(b.fechaActualizacion || b.fechaCreacion || b.fechaDecision || 0)
-    return fechaB.getTime() - fechaA.getTime()
-  })
-}
-
-function ultimaRespuesta(lista = []) {
-  const respuestas = ordenarPorFechaDesc(lista)
-  return respuestas[0] || null
-}
-
-function getAccionRespuesta(ultima, puedeResponder) {
-  if (!puedeResponder) return "NINGUNA"
-  if (!ultima) return "RESPONDER"
-
-  switch (normalizar(ultima.estado)) {
-    case "PENDIENTE":
-      return "EDITAR"
-    case "RECHAZADA":
-      return "RESPONDER_NUEVAMENTE"
-    case "APROBADA":
-      return "SOLO_LECTURA"
-    default:
-      return "NINGUNA"
-  }
-}
-
-function textoAccionRespuesta(accion) {
-  switch (accion) {
-    case "RESPONDER":
-      return "Responder"
-    case "EDITAR":
-      return "Editar respuesta"
-    case "RESPONDER_NUEVAMENTE":
-      return "Responder nuevamente"
-    default:
-      return "Ver respuesta"
-  }
-}
-
-function estadoBadgeClass(estado) {
-  switch (normalizar(estado)) {
-    case "APROBADA":
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
-    case "RECHAZADA":
-      return "border-destructive/30 bg-destructive/10 text-destructive"
-    case "PENDIENTE":
-      return "border-yellow-500/30 bg-yellow-500/10 text-yellow-700"
-    default:
-      return "border-muted bg-muted text-muted-foreground"
-  }
-}
-
-function estadoSeguimientoBadgeClass(estado) {
-  switch (normalizar(estado)) {
-    case "COMPLETADO":
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
-    case "CANCELADO":
-      return "border-destructive/30 bg-destructive/10 text-destructive"
-    case "PENDIENTE":
-      return "border-yellow-500/30 bg-yellow-500/10 text-yellow-700"
-    default:
-      return "border-muted bg-muted text-muted-foreground"
-  }
-}
-
-function textoEstadoSeguimiento(estado) {
-  const encontrado = ESTADOS_SEGUIMIENTO.find((item) => item.value === normalizar(estado))
-  return encontrado?.label || estado || "Sin estado"
-}
-
-function consultaPermiteOperaciones(consulta) {
-  const estado = normalizar(consulta?.estado)
-  return estado !== "CERRADO" && estado !== "ARCHIVADO"
-}
-
-function seguimientoPermiteOperaciones(tarea) {
-  return normalizar(tarea?.estado || "PENDIENTE") === "PENDIENTE"
-}
-
-function seguimientoEstaVencido(tarea) {
-  if (!tarea?.fechaEntrega || !seguimientoPermiteOperaciones(tarea)) return false
-
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
-
-  const fechaEntrega = new Date(`${tarea.fechaEntrega}T00:00:00`)
-  return fechaEntrega.getTime() < hoy.getTime()
-}
-
-function pathRespuesta(seguimientoId, respuestaId) {
-  return `tareas-${seguimientoId}-respuestas-${respuestaId}`
-}
-
-async function leerRespuesta(response) {
-  const text = await response.text()
-
-  if (!text) return null
-
-  try {
-    return JSON.parse(text)
-  } catch {
-    return { mensaje: text }
-  }
-}
-
-function mensajeError(data, defecto) {
-  return data?.mensaje || data?.message || data?.error || defecto
-}
+import {
+  ESTADOS_SEGUIMIENTO,
+  FORM_DECISION_INICIAL,
+  FORM_ESTADO_SEGUIMIENTO_INICIAL,
+  FORM_RESPUESTA_INICIAL,
+  FORM_TAREA_INICIAL,
+} from "./seguimientos.constants"
+import {
+  accionPermitidaPorRegistro,
+  esEstudiante,
+  puedeAccederTareasUsuario,
+  puedeCargarCategoriasUsuario,
+  puedeCrearTarea,
+  puedeEditarTarea,
+  puedeEliminarTarea,
+  puedeResponderTarea,
+  puedeRevisarRespuestas,
+  puedeVerAlertasDisciplinarias,
+  puedeVerConsultasUsuario,
+} from "./seguimientos.permissions"
+import {
+  consultaPermiteOperaciones,
+  estadoBadgeClass,
+  estadoSeguimientoBadgeClass,
+  extraerLista,
+  getAccionRespuesta,
+  labelConsulta,
+  obtenerAutorTarea,
+  obtenerCategoriaIdTarea,
+  obtenerCategoriaTarea,
+  obtenerFechaTarea,
+  obtenerIdTarea,
+  obtenerTextoTarea,
+  ordenarPorFechaDesc,
+  seguimientoEstaVencido,
+  seguimientoPermiteOperaciones,
+  textoAccionRespuesta,
+  textoEstadoSeguimiento,
+  ultimaRespuesta,
+} from "./seguimientos.utils"
 
 export function SeguimientosForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const searchQuery = searchParams.get('search') || ""
-  const FILES_API = FILE_STORAGE_API_URL_BASE || API_URL_BASE
-
   const [user, setUser] = useState(null)
   const [consultas, setConsultas] = useState([])
   const [categorias, setCategorias] = useState([])
@@ -457,53 +164,53 @@ export function SeguimientosForm() {
   }, [])
 
   async function apiRequest(url, options = {}) {
-    const res = await fetch(url, {
-      credentials: "include",
-      headers:
-        options.body instanceof FormData
-          ? options.headers || {}
-          : { "Content-Type": "application/json", ...(options.headers || {}) },
-      ...options,
-    })
+    try {
+      const data = await apiRequestData(
+        url,
+        {
+          headers:
+            options.body instanceof FormData
+              ? options.headers || {}
+              : { "Content-Type": "application/json", ...(options.headers || {}) },
+          ...options,
+        },
+        {
+          fallback: "No se pudo procesar la solicitud",
+          statusMessages: {
+            401: "Sesión vencida",
+            403: "No tienes permisos para realizar esta acción",
+          },
+        }
+      )
 
-    const data = await leerRespuesta(res)
-
-    if (res.status === 401) {
-      router.push("/")
-      throw new Error("Sesión vencida")
+      return typeof data === "string" ? { mensaje: data } : data
+    } catch (error) {
+      if (error?.status === 401) {
+        router.push("/")
+      }
+      throw error
     }
-
-    if (res.status === 403) {
-      throw new Error("No tienes permisos para realizar esta acción")
-    }
-
-    if (!res.ok) {
-      throw new Error(mensajeError(data, "No se pudo procesar la solicitud"))
-    }
-
-    return data
   }
 
   async function fetchLista(url, mensaje403) {
     try {
-      const res = await fetch(url, { credentials: "include" })
-      const data = await leerRespuesta(res)
+      const data = await apiRequestData(
+        url,
+        { method: "GET" },
+        {
+          fallback: "No se pudo cargar la información solicitada",
+          statusMessages: {
+            403: mensaje403 || "No tienes permisos para consultar esta información",
+          },
+        }
+      )
 
-      if (res.status === 401) {
+      return extraerLista(typeof data === "string" ? { mensaje: data } : data)
+    } catch (error) {
+      if (error?.status === 401) {
         router.push("/")
         return []
       }
-
-      if (res.status === 403) {
-        throw new Error(mensaje403 || "No tienes permisos para consultar esta información")
-      }
-
-      if (!res.ok) {
-        throw new Error(mensajeError(data, "No se pudo cargar la información solicitada"))
-      }
-
-      return extraerLista(data)
-    } catch (error) {
       throw error
     }
   }
@@ -512,7 +219,7 @@ export function SeguimientosForm() {
     try {
       setLoading(true)
 
-      const meRes = await fetch(`${API_URL_BASE}/auth/me`, {
+      const meRes = await apiClient.request(`${API_URL_BASE}/auth/me`, {
         credentials: "include",
       })
 
@@ -751,6 +458,25 @@ export function SeguimientosForm() {
       return
     }
 
+    if (formTarea.descripcion.trim().length > 200) {
+      toast.error("La descripción del seguimiento no puede superar 200 caracteres")
+      return
+    }
+
+    if (formTarea.fechaEntrega) {
+      const hoy = new Date()
+      const fechaHoy = [
+        hoy.getFullYear(),
+        String(hoy.getMonth() + 1).padStart(2, "0"),
+        String(hoy.getDate()).padStart(2, "0"),
+      ].join("-")
+
+      if (formTarea.fechaEntrega < fechaHoy) {
+        toast.error("La fecha de entrega no puede ser anterior a la fecha actual")
+        return
+      }
+    }
+
     if (formTarea.diasNotificacion !== "" && Number(formTarea.diasNotificacion) < 0) {
       toast.error("Los días de notificación no pueden ser negativos")
       return
@@ -884,28 +610,15 @@ export function SeguimientosForm() {
     reset(FORM_RESPUESTA_INICIAL)
   }
 
-  function pathTarea(seguimientoId) {
-    return `tareas-${seguimientoId}-documentos`
-  }
-
   async function subirDocumentosTarea(seguimientoId, archivos) {
     if (!archivos || archivos.length === 0) return
 
-    const formData = new FormData()
-
-    archivos.forEach((file) => {
-      formData.append("files", file)
-    })
-
-    formData.append("path", pathTarea(seguimientoId))
-
-    const res = await fetch(`${FILES_API}/files/upload-multiple`, {
-      method: "POST",
-      credentials: "include",
-      body: formData,
-    })
-
-    if (!res.ok) {
+    const results = await fileApi.uploadMany(
+      { type: "seguimiento", id: seguimientoId },
+      archivos
+    )
+    const failed = results.filter((result) => !result.ok)
+    if (failed.length > 0) {
       throw new Error("La tarea se guardó, pero ocurrió un error subiendo los documentos")
     }
   }
@@ -913,34 +626,16 @@ export function SeguimientosForm() {
   async function cargarArchivosTarea(seguimientoId) {
     if (!seguimientoId) return
 
-    const path = pathTarea(seguimientoId)
-
     try {
       setCargandoArchivosTarea((prev) => ({
         ...prev,
         [seguimientoId]: true,
       }))
 
-      const res = await fetch(
-        `${FILES_API}/files/list/${encodeURIComponent(path)}`,
-        {
-          credentials: "include",
-        }
-      )
-
-      if (!res.ok) {
-        setArchivosPorTarea((prev) => ({
-          ...prev,
-          [seguimientoId]: [],
-        }))
-        return
-      }
-
-      const data = await res.json()
-
+      const data = await fileApi.list({ type: "seguimiento", id: seguimientoId })
       setArchivosPorTarea((prev) => ({
         ...prev,
-        [seguimientoId]: Array.isArray(data) ? data : extraerLista(data),
+        [seguimientoId]: data,
       }))
     } catch (error) {
       console.error("Error cargando archivos de tarea:", error)
@@ -957,33 +652,9 @@ export function SeguimientosForm() {
     }
   }
 
-  async function descargarArchivoTarea(seguimientoId, fileName) {
-    const path = pathTarea(seguimientoId)
-
+  async function descargarArchivoTarea(seguimientoId, file) {
     try {
-      const res = await fetch(
-        `${FILES_API}/files/download/${encodeURIComponent(path)}/${encodeURIComponent(fileName)}`,
-        {
-          method: "GET",
-          credentials: "include",
-        }
-      )
-
-      if (!res.ok) {
-        throw new Error("No se pudo descargar el archivo")
-      }
-
-      const blob = await res.blob()
-      const url = window.URL.createObjectURL(blob)
-
-      const a = document.createElement("a")
-      a.href = url
-      a.download = fileName
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-
-      window.URL.revokeObjectURL(url)
+      await fileApi.download(file, { type: "seguimiento", id: seguimientoId })
     } catch (error) {
       console.error("Error descargando archivo:", error)
       toast.error(error.message || "Error descargando archivo")
@@ -993,21 +664,11 @@ export function SeguimientosForm() {
   async function subirDocumentosRespuesta(seguimientoId, respuestaId, archivos) {
     if (!archivos || archivos.length === 0) return
 
-    const formData = new FormData()
-
-    archivos.forEach((file) => {
-      formData.append("files", file)
-    })
-
-    formData.append("path", pathRespuesta(seguimientoId, respuestaId))
-
-    const res = await fetch(`${FILES_API}/files/upload-multiple`, {
-      method: "POST",
-      credentials: "include",
-      body: formData,
-    })
-
-    if (!res.ok) {
+    const results = await fileApi.uploadMany(
+      { type: "respuesta", id: respuestaId, parentId: seguimientoId },
+      archivos
+    )
+    if (results.some((result) => !result.ok)) {
       throw new Error("La respuesta se guardó, pero ocurrió un error subiendo los documentos")
     }
   }
@@ -1015,34 +676,20 @@ export function SeguimientosForm() {
   async function cargarArchivosRespuesta(seguimientoId, respuestaId) {
     if (!seguimientoId || !respuestaId) return
 
-    const path = pathRespuesta(seguimientoId, respuestaId)
-
     try {
       setCargandoArchivosRespuesta((prev) => ({
         ...prev,
         [respuestaId]: true,
       }))
 
-      const res = await fetch(
-        `${FILES_API}/files/list/${encodeURIComponent(path)}`,
-        {
-          credentials: "include",
-        }
-      )
-
-      if (!res.ok) {
-        setArchivosPorRespuesta((prev) => ({
-          ...prev,
-          [respuestaId]: [],
-        }))
-        return
-      }
-
-      const data = await res.json()
-
+      const data = await fileApi.list({
+        type: "respuesta",
+        id: respuestaId,
+        parentId: seguimientoId,
+      })
       setArchivosPorRespuesta((prev) => ({
         ...prev,
-        [respuestaId]: Array.isArray(data) ? data : extraerLista(data),
+        [respuestaId]: data,
       }))
     } catch (error) {
       console.error("Error cargando archivos de respuesta:", error)
@@ -1059,33 +706,13 @@ export function SeguimientosForm() {
     }
   }
 
-  async function descargarArchivoRespuesta(seguimientoId, respuestaId, fileName) {
-    const path = pathRespuesta(seguimientoId, respuestaId)
-
+  async function descargarArchivoRespuesta(seguimientoId, respuestaId, file) {
     try {
-      const res = await fetch(
-        `${FILES_API}/files/download/${encodeURIComponent(path)}/${encodeURIComponent(fileName)}`,
-        {
-          method: "GET",
-          credentials: "include",
-        }
-      )
-
-      if (!res.ok) {
-        throw new Error("No se pudo descargar el archivo")
-      }
-
-      const blob = await res.blob()
-      const url = window.URL.createObjectURL(blob)
-
-      const a = document.createElement("a")
-      a.href = url
-      a.download = fileName
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-
-      window.URL.revokeObjectURL(url)
+      await fileApi.download(file, {
+        type: "respuesta",
+        id: respuestaId,
+        parentId: seguimientoId,
+      })
     } catch (error) {
       console.error("Error descargando archivo:", error)
       toast.error(error.message || "Error descargando archivo")
@@ -1115,6 +742,11 @@ export function SeguimientosForm() {
 
     if (!data.contenido?.trim()) {
       toast.error("Escribe la respuesta")
+      return
+    }
+
+    if (data.contenido.trim().length > 1000) {
+      toast.error("La respuesta del seguimiento no puede superar 1000 caracteres")
       return
     }
 
@@ -1173,8 +805,15 @@ export function SeguimientosForm() {
       return
     }
 
-    if (!formDecision.observacionRevision.trim()) {
-      toast.error("Escribe una observación")
+    const observacionRevision = formDecision.observacionRevision.trim()
+
+    if (formDecision.estado === "RECHAZADA" && !observacionRevision) {
+      toast.error("La observación de revisión es obligatoria al rechazar una respuesta")
+      return
+    }
+
+    if (observacionRevision.length > 500) {
+      toast.error("La observación de revisión no puede superar 500 caracteres")
       return
     }
 
@@ -1185,7 +824,7 @@ export function SeguimientosForm() {
         method: "PATCH",
         body: JSON.stringify({
           estado: formDecision.estado,
-          observacionRevision: formDecision.observacionRevision.trim(),
+          observacionRevision,
         }),
       })
 
@@ -1300,18 +939,18 @@ export function SeguimientosForm() {
           <p className="text-sm text-muted-foreground">Cargando archivos...</p>
         ) : archivos.length > 0 ? (
           <ul className="space-y-2">
-            {archivos.map((fileName) => (
+            {archivos.map((file) => (
               <li
-                key={fileName}
+                key={file.id}
                 className="flex items-center justify-between gap-3 rounded-md border bg-background px-3 py-2 text-sm"
               >
-                <span className="truncate">{fileName}</span>
+                <span className="truncate">{file.fileName}</span>
 
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => descargarArchivoRespuesta(seguimientoId, respuesta.id, fileName)}
+                  onClick={() => descargarArchivoRespuesta(seguimientoId, respuesta.id, file)}
                 >
                   Descargar
                 </Button>
@@ -1352,18 +991,18 @@ export function SeguimientosForm() {
           <p className="text-sm text-muted-foreground">Cargando archivos...</p>
         ) : archivos.length > 0 ? (
           <ul className="space-y-2">
-            {archivos.map((fileName) => (
+            {archivos.map((file) => (
               <li
-                key={fileName}
+                key={file.id}
                 className="flex items-center justify-between gap-3 rounded-md border bg-background px-3 py-2 text-sm"
               >
-                <span className="truncate">{fileName}</span>
+                <span className="truncate">{file.fileName}</span>
 
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => descargarArchivoTarea(seguimientoId, fileName)}
+                  onClick={() => descargarArchivoTarea(seguimientoId, file)}
                 >
                   Descargar
                 </Button>
@@ -1683,6 +1322,7 @@ export function SeguimientosForm() {
                   name="descripcion"
                   value={formTarea.descripcion}
                   onChange={handleTareaChange}
+                  maxLength={200}
                   rows={4}
                   placeholder="Describe la tarea, compromiso o actividad a realizar..."
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -1978,7 +1618,13 @@ export function SeguimientosForm() {
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium">Respuesta</label>
                 <textarea
-                  {...register("contenido")}
+                  {...register("contenido", {
+                    maxLength: {
+                      value: 1000,
+                      message: "La respuesta del seguimiento no puede superar 1000 caracteres",
+                    },
+                  })}
+                  maxLength={1000}
                   rows={4}
                   placeholder="Escribe tu respuesta..."
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -2040,6 +1686,7 @@ export function SeguimientosForm() {
               <label className="text-sm font-medium">Observación</label>
               <textarea
                 value={formDecision.observacionRevision}
+                maxLength={500}
                 onChange={(event) =>
                   setFormDecision((prev) => ({
                     ...prev,

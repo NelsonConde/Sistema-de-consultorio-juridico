@@ -1,5 +1,6 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
 import * as React from "react"
 import {
   Sidebar,
@@ -17,19 +18,19 @@ import { useRouter, usePathname } from "next/navigation"
 import { API_URL_BASE } from "@/lib/config"
 
 /**
- * Componente de barra lateral principal de la aplicación.
- * Muestra menú de navegación, información del usuario y controles de sesión.
+ * Component implementation detail.
+ * Role handling.
  * 
  * @component
- * @param {Object} props - Las propiedades del componente
- * @param {Array} props.mainItems - Array de items del menú principal. Cada item debe tener {title, path}
- * @param {Array} props.footerItems - Array de items del menú del pie de página
- * @returns {JSX.Element} Barra lateral con navegación y controles de usuario
+ * @param {Object} props - Parameter description.
+ * @param {Array} props.mainItems - Item to process.
+ * @param {Array} props.footerItems - Item to process.
+ * @returns {JSX.Element} Result value.
  * 
  * @example
  * <AppSidebar 
  *   mainItems={[{title: "Inicio", path: "/inicio"}]}
- *   footerItems={[{title: "Configuración", path: "/config"}]}
+ * Implementation detail.
  * />
  */
 export function AppSidebar({ mainItems = [], footerItems = [] }) {
@@ -39,18 +40,18 @@ export function AppSidebar({ mainItems = [], footerItems = [] }) {
   const pathname = usePathname()
 
   /**
-   * Efecto para cargar información del usuario autenticado desde el backend.
-   * Se ejecuta una sola vez al montar el componente.
+   * Data loading behavior.
+   * Component implementation detail.
    */
   React.useEffect(() => {
     /**
-     * Obtiene los datos del usuario desde el endpoint /auth/me
-     * Guarda el email y nombre en el estado del componente
+     * Data loading behavior.
+     * State handling.
      * @async
      */
     const cargarUsuario = async () => {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, {
+        const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
           method: "GET",
           credentials: "include",
         })
@@ -71,24 +72,24 @@ export function AppSidebar({ mainItems = [], footerItems = [] }) {
   }, [])
 
   /**
-   * Convierte un texto a una ruta normalizada en minúsculas sin espacios.
-   * Ejemplo: "Mi Página" → "/mipágina"
+   * Implementation detail.
+   * Implementation detail.
    * 
-   * @param {string} text - Texto a normalizar
-   * @returns {string} Ruta normalizada con / inicial
+   * @param {string} text - Text to normalize.
+   * @returns {string} Result value.
    */
   function normalizePath(text) {
     return `/${String(text).toLowerCase().replace(/\s+/g, "")}`
   }
 
   /**
-   * Obtiene la ruta de un item del menú.
-   * Si el item tiene propiedad 'path', la utiliza; si no, genera una desde el título.
+   * Data loading behavior.
+   * Implementation detail.
    * 
-   * @param {Object} item - Objeto con propiedades {title, path}
-   * @param {string} item.title - Título del item
-   * @param {string} [item.path] - Ruta personalizada (opcional)
-   * @returns {string} Ruta del item
+   * @param {Object} item - Item to process.
+   * @param {string} item.title - Item to process.
+   * @param {string} [item.path] - Item to process.
+   * @returns {string} Result value.
    */
   function getItemPath(item) {
     if (item.path) {
@@ -99,11 +100,11 @@ export function AppSidebar({ mainItems = [], footerItems = [] }) {
   }
 
   /**
-   * Navega hacia el item del menú seleccionado.
-   * Valida que la ruta sea válida antes de navegar.
+   * Selection behavior.
+   * Validation rule.
    * 
-   * @param {Object} item - Objeto del menú a navegar
-   * @param {string} item.path - Ruta del item
+   * Implementation detail.
+   * @param {string} item.path - Item to process.
    */
   function handleSubmit(item) {
     const path = getItemPath(item)
@@ -114,23 +115,26 @@ export function AppSidebar({ mainItems = [], footerItems = [] }) {
   }
 
   /**
-   * Cierra la sesión del usuario.
-   * Realiza logout en el backend y redirige a la página de login.
+   * User flow detail.
+   * Implementation detail.
    * 
    * @async
    * @returns {Promise<void>}
    */
   const handleLogout = async () => {
     try {
-      await fetch(`${API_URL_BASE}/auth/logout`, {
+      const response = await apiClient.request(`${API_URL_BASE}/auth/logout`, {
         method: "POST",
-        credentials: "include",
       })
+
+      if (!response.ok) {
+        throw new Error("No fue posible cerrar la sesión")
+      }
+
+      router.replace("/")
     } catch (error) {
       console.error("Error cerrando sesión", error)
     }
-
-    router.replace("/") // tu login está en /
   }
 
   return (
@@ -202,7 +206,7 @@ export function AppSidebar({ mainItems = [], footerItems = [] }) {
               </SidebarMenuItem>
             ))}
 
-            {/* USUARIO */}
+            {/* USER */}
             <SidebarMenuItem className="mt-6">
               <div className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-sidebar-accent/70">
 

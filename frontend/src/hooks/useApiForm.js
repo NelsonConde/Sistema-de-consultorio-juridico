@@ -1,9 +1,9 @@
 /**
- * Hook para manejar envíos de formularios al backend.
+ * Form handling.
  *
- * Centraliza la lógica común de todos los formularios: estado de carga,
- * manejo de errores HTTP, toasts de éxito/error, y redirección en caso
- * de sesión expirada (401).
+ * State handling.
+ * Error handling.
+ * Handles expired-session responses consistently.
  *
  * @module hooks/useApiForm
  */
@@ -12,39 +12,39 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  apiResponse,
   getApiErrorDescription,
   getApiErrorTitle,
-  readResponseBody,
 } from "@/lib/api";
 
 /**
  * @typedef {Object} UseApiFormOptions
- * @property {string} endpoint - URL completa del endpoint del backend.
- * @property {"GET"|"POST"|"PUT"|"PATCH"|"DELETE"} [method="POST"] - Método HTTP.
- * @property {string} [successMessage="Registro exitoso"] - Mensaje del toast de éxito.
+ * @property {string} endpoint - Parameter description.
+ * @property {"GET"|"POST"|"PUT"|"PATCH"|"DELETE"} [method="POST"] - Implementation detail.
+ * @property {string} [successMessage="Registro exitoso"] - Parameter description.
  */
 
 /**
  * @typedef {Object} UseApiFormResult
  * @property {function(object): Promise<{success: boolean, data?: unknown, error?: unknown}>} submit
- *   Función que ejecuta la petición. Recibe el payload y devuelve el resultado.
- * @property {boolean} isSubmitting - `true` mientras la petición está en curso.
+ * Implementation detail.
+ * @property {boolean} isSubmitting - True while the request is in progress.
  */
 
 /**
- * Hook para enviar formularios al backend con manejo automático de errores y toasts.
+ * Error handling.
  *
- * Soporta cualquier método HTTP a través del parámetro `method`.
- * Ante un 401 redirige automáticamente al login (`/`).
+ * Supports any HTTP method through the `method` parameter.
+ * Implementation detail.
  *
- * @param {UseApiFormOptions} options - Configuración del hook.
- * @returns {UseApiFormResult} Función `submit` y estado `isSubmitting`.
+ * @param {UseApiFormOptions} options - Parameter description.
+ * @returns {UseApiFormResult} Result value.
  *
  * @example
  * const { submit, isSubmitting } = useApiForm({
  *   endpoint: `${API_URL_BASE}/areas`,
  *   method: "POST",
- *   successMessage: "Área creada correctamente",
+ * Implementation detail.
  * });
  *
  * const handleSubmit = async (data) => {
@@ -57,25 +57,22 @@ export function useApiForm({ endpoint, method = "POST", successMessage = "Regist
   const router = useRouter();
 
   /**
-   * Ejecuta la petición HTTP al backend con el payload recibido.
+   * Implementation detail.
    *
-   * @param {object} data - Datos del formulario a enviar como JSON.
+   * @param {object} data - Parameter description.
    * @returns {Promise<{success: boolean, data?: unknown, error?: unknown}>}
    */
   const submit = async (data) => {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(endpoint, {
+      const { response, data: payload } = await apiResponse(endpoint, {
         method,
-        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(data),
       });
-
-      const payload = await readResponseBody(response);
 
       if (response.status === 401) {
         toast.error("Sesión expirada", {

@@ -1,7 +1,7 @@
 /**
- * Campo de selección reutilizable para formularios.
+ * Selection behavior.
  *
- * Integra `register` de react-hook-form con lista de opciones `{ value, label }`.
+ * List and table handling.
  *
  * @module components/forms/parts/FormSelect
  */
@@ -10,10 +10,10 @@ function hasRequiredRule(rules) {
 }
 
 /**
- * Renderiza la etiqueta del campo y agrega el marcador obligatorio.
- * @param {string|React.ReactNode} label - Etiqueta a renderizar.
- * @param {boolean} required - Indica si el campo es obligatorio.
- * @returns {React.ReactNode|null} Elemento de etiqueta.
+ * Implementation detail.
+ * @param {string|React.ReactNode} label - Label to render.
+ * @param {boolean} required - Parameter description.
+ * @returns {React.ReactNode|null} Result value.
  */
 function renderLabel(label, required) {
   if (!label) return null;
@@ -31,16 +31,16 @@ function renderLabel(label, required) {
 }
 
 /**
- * Campo de selección compatible con react-hook-form.
- * @param {Object} props - Propiedades del componente.
- * @param {string} props.name - Nombre del campo.
- * @param {string|React.ReactNode} props.label - Texto de la etiqueta.
- * @param {Array<{value:string,label:string}>} props.options - Opciones del select.
- * @param {function} props.register - Registro de react-hook-form.
- * @param {Object} props.errors - Errores de validación.
- * @param {Object} [props.rules] - Reglas de validación.
- * @param {string} [props.placeholder] - Texto de ayuda para el select.
- * @returns {JSX.Element} Campo select con validación.
+ * Selection behavior.
+ * @param {Object} props - Parameter description.
+ * @param {string} props.name - Parameter description.
+ * @param {string|React.ReactNode} props.label - Parameter description.
+ * Implementation detail.
+ * @param {function} props.register - react-hook-form register function.
+ * @param {Object} props.errors - Parameter description.
+ * @param {Object} [props.rules] - Parameter description.
+ * @param {string} [props.placeholder] - Parameter description.
+ * @returns {JSX.Element} Result value.
  */
 export function FormSelect({
   name,

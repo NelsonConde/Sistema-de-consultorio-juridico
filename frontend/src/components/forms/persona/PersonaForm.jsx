@@ -1,14 +1,14 @@
 /**
- * Formulario de registro y edición de personas en el sistema jurídico.
+ * Form handling.
  *
- * Implementa un formulario por pasos (wizard) con 6-7 secciones según si la
- * persona es menor de edad (agrega paso "Acudiente"). Valida campos obligatorios
- * por paso antes de avanzar usando `trigger()` de react-hook-form.
+ * Form handling.
+ * Validation rule.
+ * Implementation detail.
  *
  * Validaciones destacadas:
- * - Al avanzar desde "Identificación" valida los campos del paso actual.
- * - Al guardar verifica que exista al menos teléfono o correo (validación cruzada).
- * - Campos numéricos (estrato, personas a cargo) validados en react-hook-form y en HTML.
+ * Validation rule.
+ * Validation rule.
+ * Validation rule.
  *
  * @module components/forms/persona/PersonaForm
  */
@@ -23,276 +23,31 @@ import { FormInput } from "../parts/FormInput";
 import { FormCheckbox } from "../parts/FormCheckbox";
 import { Button } from "@/components/ui/button";
 import { API_URL_BASE } from "@/lib/config";
+import { apiResponse } from "@/lib/api";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
 import { toast } from "sonner";
-import { maxNumberRule, nonNegativeNumberRule, optionalEmailRule } from "@/lib/form-validation";
+import { digitsOnlyRule, maxLengthRule, maxNumberRule, nonNegativeNumberRule, optionalEmailRule } from "@/lib/form-validation";
 
-const REQUIRED_MESSAGE = "El campo es obligatorio";
-const MAX_ESTRATO = 7;
-const MAX_PERSONAS_A_CARGO = 10;
+import {
+  FORM_DEFAULTS,
+  MAX_ESTRATO,
+  MAX_PERSONAS_A_CARGO,
+  OPCIONES_VACIAS,
+  REQUIRED_MESSAGE,
+  estadoCivilOptions,
+  escolaridadOptions,
+  fallbackTipoDocumentoOptions,
+  generoOptions,
+  orientacionSexualOptions,
+  pronombreOptions,
+  sexoOptions,
+  zonaOptions,
+} from "./persona-form.constants";
+import { construirPayload, toDocumentoOption, toFormValues, toOption } from "./persona-form.utils";
+import { fetchCatalogo } from "./persona-form.service";
+import { FormSelectField, Seccion, optionalLabel, requiredLabel } from "./PersonaFormParts";
 
-const OPCIONES_VACIAS = [];
-
-const FORM_DEFAULTS = {
-  tipoPersonaId: "",
-  tipoDocumento: "",
-  numeroDocumento: "",
-  fechaExpedicion: "",
-  ciudadExpedicion: "",
-  nombres: "",
-  apellidos: "",
-  nombreIdentitario: "",
-  pronombre: "",
-  sexo: "",
-  genero: "",
-  orientacionSexual: "",
-  fechaNacimiento: "",
-  telefono: "",
-  correo: "",
-  nacionalidadId: "",
-  estadoCivil: "",
-  escolaridad: "",
-  grupoEtnico: "",
-  condicionActualId: "",
-  sabeLeerEscribir: true,
-  discapacidad: "",
-  caracterizacionPcd: "",
-  necesitaAjustePcd: false,
-  departamentoId: "",
-  municipioId: "",
-  barrioId: "",
-  direccion: "",
-  comuna: "",
-  localidad: "",
-  estrato: "",
-  tipoVivienda: "",
-  zona: "",
-  tenencia: "",
-  numeroPersonasACargo: "",
-  ingresosAdicionales: false,
-  energiaElectrica: false,
-  acueducto: false,
-  alcantarillado: false,
-  ocupacionId: "",
-  empresaId: "",
-  salario: "",
-  cargo: "",
-  direccionEmpresa: "",
-  telefonoEmpresa: "",
-  nombreCompletoAcudiente: "",
-  relacionAcudiente: "",
-  telefonoAcudiente: "",
-  correoAcudiente: "",
-  direccionAcudiente: "",
-  comoSeEntero: "",
-  relacionConUniversidad: "",
-};
-
-const fallbackTipoDocumentoOptions = [
-  { value: "CC", label: "Cédula de Ciudadanía" },
-  { value: "TI", label: "Tarjeta de Identidad" },
-  { value: "CE", label: "Cédula de Extranjería" },
-  { value: "PA", label: "Pasaporte" },
-];
-
-const pronombreOptions = [
-  { value: "Él", label: "Él" },
-  { value: "Ella", label: "Ella" },
-  { value: "Elle", label: "Elle" },
-  { value: "Otro", label: "Otro" },
-];
-
-const sexoOptions = [
-  { value: "Hombre", label: "Hombre" },
-  { value: "Mujer", label: "Mujer" },
-  { value: "Intersexual", label: "Intersexual" },
-];
-
-const generoOptions = [
-  { value: "Masculino", label: "Masculino" },
-  { value: "Femenino", label: "Femenino" },
-  { value: "No binario", label: "No binario" },
-  { value: "Transgénero", label: "Transgénero" },
-  { value: "Otro", label: "Otro" },
-];
-
-const orientacionSexualOptions = [
-  { value: "Heterosexual", label: "Heterosexual" },
-  { value: "Homosexual", label: "Homosexual" },
-  { value: "Bisexual", label: "Bisexual" },
-  { value: "Pansexual", label: "Pansexual" },
-  { value: "Asexual", label: "Asexual" },
-  { value: "Otro", label: "Otro" },
-];
-
-const estadoCivilOptions = [
-  { value: "Soltero/a", label: "Soltero/a" },
-  { value: "Casado/a", label: "Casado/a" },
-  { value: "Unión libre", label: "Unión libre" },
-  { value: "Divorciado/a", label: "Divorciado/a" },
-  { value: "Viudo/a", label: "Viudo/a" },
-];
-
-const escolaridadOptions = [
-  { value: "Ninguna", label: "Ninguna" },
-  { value: "Primaria", label: "Primaria" },
-  { value: "Secundaria", label: "Secundaria" },
-  { value: "Técnico", label: "Técnico" },
-  { value: "Tecnólogo", label: "Tecnólogo" },
-  { value: "Universitario", label: "Universitario" },
-  { value: "Postgrado", label: "Postgrado" },
-];
-
-const zonaOptions = [
-  { value: "Urbana", label: "Urbana" },
-  { value: "Rural", label: "Rural" },
-];
-
-function requiredLabel(label) {
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      <span>{label}</span>
-      <span className="text-red-500">*</span>
-    </span>
-  );
-}
-
-function optionalLabel(label) {
-  return <span>{label}</span>;
-}
-
-/**
- * Convierte un registro de catálogo en una opción para select.
- * @param {Object} item - Registro del catálogo.
- * @returns {{value:string, label:string}} Opción para un campo select.
- */
-function toOption(item) {
-  return {
-    value: String(item.id),
-    label: item.nombre || item.descripcion || `Registro ${item.id}`,
-  };
-}
-
-/**
- * Convierte datos de documento en una opción amigable para el select.
- * @param {Object} item - Datos del documento.
- * @returns {{value:string, label:string}} Opción de documento.
- */
-function toDocumentoOption(item) {
-  const value = item.codigo || item.abreviatura || item.nombre || item.descripcion || "";
-  const label = item.nombre || item.descripcion || item.codigo || item.abreviatura || value;
-
-  return { value, label };
-}
-
-/**
- * Normaliza los valores iniciales antes de usarlos en el formulario.
- * @param {Object} values - Valores iniciales recibidos.
- * @returns {Object} Valores preparados para el formulario.
- */
-function toFormValues(values = {}) {
-  return {
-    ...FORM_DEFAULTS,
-    ...values,
-    tipoPersonaId: values.tipoPersonaId != null ? String(values.tipoPersonaId) : "",
-    nacionalidadId: values.nacionalidadId != null ? String(values.nacionalidadId) : "",
-    condicionActualId:
-      values.condicionActualId != null ? String(values.condicionActualId) : "",
-    departamentoId: values.departamentoId != null ? String(values.departamentoId) : "",
-    municipioId: values.municipioId != null ? String(values.municipioId) : "",
-    barrioId: values.barrioId != null ? String(values.barrioId) : "",
-    ocupacionId: values.ocupacionId != null ? String(values.ocupacionId) : "",
-    empresaId: values.empresaId != null ? String(values.empresaId) : "",
-    sabeLeerEscribir: values.sabeLeerEscribir ?? true,
-    necesitaAjustePcd: Boolean(values.necesitaAjustePcd),
-    ingresosAdicionales: Boolean(values.ingresosAdicionales),
-    energiaElectrica: Boolean(values.energiaElectrica),
-    acueducto: Boolean(values.acueducto),
-    alcantarillado: Boolean(values.alcantarillado),
-    estrato: values.estrato ?? "",
-    numeroPersonasACargo: values.numeroPersonasACargo ?? "",
-    salario: values.salario ?? "",
-  };
-}
-
-/**
- * Convierte un valor numérico vacío en null.
- * @param {unknown} value - Valor de entrada.
- * @returns {number|null} Número o null.
- */
-function numberOrNull(value) {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-
-  const number = Number(value);
-  return Number.isNaN(number) ? null : number;
-}
-
-/**
- * Convierte texto vacío en null y elimina espacios innecesarios.
- * @param {unknown} value - Valor de texto recibido.
- * @returns {string|null} Texto limpio o null.
- */
-function textOrNull(value) {
-  const text = String(value ?? "").trim();
-  return text === "" ? null : text;
-}
-
-/**
- * Construye un payload con tipos normalizados para el backend.
- * @param {Object} data - Datos del formulario.
- * @returns {Object} Payload normalizado.
- */
-function construirPayload(data) {
-  return {
-    ...data,
-    id: data.id ?? undefined,
-    tipoPersonaId: numberOrNull(data.tipoPersonaId),
-    nacionalidadId: numberOrNull(data.nacionalidadId),
-    condicionActualId: numberOrNull(data.condicionActualId),
-    departamentoId: numberOrNull(data.departamentoId),
-    municipioId: numberOrNull(data.municipioId),
-    barrioId: numberOrNull(data.barrioId),
-    ocupacionId: numberOrNull(data.ocupacionId),
-    empresaId: numberOrNull(data.empresaId),
-    estrato: Number(data.estrato || 0),
-    numeroPersonasACargo: Number(data.numeroPersonasACargo || 0),
-    salario: Number(data.salario || 0),
-    correo: textOrNull(data.correo),
-    correoAcudiente: textOrNull(data.correoAcudiente),
-    nombreCompletoAcudiente: textOrNull(data.nombreCompletoAcudiente),
-    relacionAcudiente: textOrNull(data.relacionAcudiente),
-    telefonoAcudiente: textOrNull(data.telefonoAcudiente),
-    direccionAcudiente: textOrNull(data.direccionAcudiente),
-  };
-}
-
-/**
- * Carga un catálogo desde la API.
- * @param {string} path - Ruta del catálogo relativa.
- * @returns {Promise<Array<any>>} Lista de registros.
- */
-async function fetchCatalogo(path) {
-  const res = await fetch(`${API_URL_BASE}${path}`, {
-    method: "GET",
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    return [];
-  }
-
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
-}
-
-/**
- * Formulario para crear o editar una persona.
- * @param {{onSubmit:function, initialValues:Object}} props - Props del componente.
- * @returns {JSX.Element} Componente de formulario.
- */
 export function PersonaForm({ onSubmit, initialValues }) {
   const router = useRouter();
 
@@ -456,9 +211,8 @@ export function PersonaForm({ onSubmit, initialValues }) {
 
   async function verificarSesion() {
     try {
-      const res = await fetch(`${API_URL_BASE}/auth/me`, {
+      const { response: res, data } = await apiResponse(`${API_URL_BASE}/auth/me`, {
         method: "GET",
-        credentials: "include",
       });
 
       if (res.status === 401) {
@@ -471,7 +225,7 @@ export function PersonaForm({ onSubmit, initialValues }) {
         return;
       }
 
-      const user = await res.json();
+      const user = data;
 
       const puedeEntrarRecepcion = tienePermiso(
         user,
@@ -552,15 +306,15 @@ export function PersonaForm({ onSubmit, initialValues }) {
   }
 
   /**
-   * Normaliza los datos del formulario, valida la regla cruzada de contacto
-   * (debe haber al menos teléfono o correo) y envía al backend.
-   * Solo ejecuta el callback `onSubmit` si el backend respondió con éxito.
+   * Validation rule.
+   * Implementation detail.
+   * Implementation detail.
    *
-   * @param {object} data - Datos del formulario validados por react-hook-form.
+   * @param {object} data - Parameter description.
    * @returns {Promise<void>}
    */
   async function handleSubmitForm(data) {
-    // Validación cruzada: debe existir al menos teléfono o correo
+    // Validation rule.
     const telefono = String(data.telefono ?? "").trim();
     const correo   = String(data.correo ?? "").trim();
 
@@ -601,13 +355,13 @@ export function PersonaForm({ onSubmit, initialValues }) {
   }
 
   /**
-   * Valida los campos del paso actual con react-hook-form `trigger()`
-   * y avanza al siguiente paso solo si todos son válidos.
+   * Validation rule.
+   * Implementation detail.
    *
    * @returns {Promise<void>}
    */
   async function irSiguiente() {
-    // Campos obligatorios agrupados por paso
+    // Implementation detail.
     const camposPorPaso = {
       "Identificación": [
         "tipoPersonaId", "tipoDocumento", "numeroDocumento",
@@ -615,7 +369,7 @@ export function PersonaForm({ onSubmit, initialValues }) {
         "apellidos", "fechaNacimiento",
       ],
       "Identidad": [],
-      "Contacto": [],   // validación cruzada en handleSubmitForm
+      "Contacto": [],   // Validation rule.
       "Vivienda": [],
       "Economía": [],
       "Acudiente": [],
@@ -702,9 +456,10 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="numeroDocumento"
                 label={requiredLabel("Número de documento")}
                 placeholder="Ej: 1090123456"
+                maxLength={30}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(30, "El número de documento no puede superar los 30 caracteres") }}
               />
 
               <FormInput
@@ -721,27 +476,30 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="ciudadExpedicion"
                 label={requiredLabel("Ciudad de expedición")}
                 placeholder="Ej: Cúcuta"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormInput
                 name="nombres"
                 label={requiredLabel("Nombres")}
                 placeholder="Ej: María Fernanda"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormInput
                 name="apellidos"
                 label={requiredLabel("Apellidos")}
                 placeholder="Ej: Pérez Gómez"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormInput
@@ -765,9 +523,10 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="nombreIdentitario"
                 label={requiredLabel("Nombre identitario")}
                 placeholder="Ej: No informa"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormSelectField
@@ -837,9 +596,10 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="grupoEtnico"
                 label={requiredLabel("Grupo étnico")}
                 placeholder="Ej: No informa"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormSelectField
@@ -855,18 +615,20 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="discapacidad"
                 label={requiredLabel("Discapacidad")}
                 placeholder="Ej: No informa"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormInput
                 name="caracterizacionPcd"
                 label={requiredLabel("Caracterización PCD")}
                 placeholder="Ej: No informa"
+                maxLength={150}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(150) }}
               />
 
               <div className="rounded-lg border bg-muted/20 p-3">
@@ -898,13 +660,22 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="telefono"
                 label={optionalLabel("Teléfono")}
                 placeholder="Ej: 3001234567"
+                digitsOnly
+                maxLength={30}
                 register={register}
                 errors={errors}
                 rules={{
-                  validate: (value) =>
-                    String(value || "").trim() ||
-                    String(formValues.correo || "").trim() ||
-                    "Debe registrar al menos un teléfono o un correo electrónico",
+                  ...digitsOnlyRule({ maxLength: 30 }),
+                  validate: {
+                    digitos: (value) =>
+                      !String(value || "").trim() ||
+                      /^\d+$/.test(String(value)) ||
+                      "El teléfono solo puede contener números",
+                    contacto: (value) =>
+                      String(value || "").trim() ||
+                      String(formValues.correo || "").trim() ||
+                      "Debe registrar al menos un teléfono o un correo electrónico",
+                  },
                 }}
               />
 
@@ -913,10 +684,15 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 label={optionalLabel("Correo electrónico")}
                 placeholder="Ej: persona@example.com"
                 type="email"
+                maxLength={120}
                 register={register}
                 errors={errors}
                 rules={{
                   ...optionalEmailRule(),
+                  maxLength: {
+                    value: 120,
+                    message: "El correo no puede superar los 120 caracteres",
+                  },
                   validate: {
                     formato: (value) =>
                       optionalEmailRule().validate(value),
@@ -968,27 +744,30 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="direccion"
                 label={requiredLabel("Dirección")}
                 placeholder="Ej: Calle 10 # 5-20"
+                maxLength={150}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(150) }}
               />
 
               <FormInput
                 name="comuna"
                 label={requiredLabel("Comuna")}
                 placeholder="Ej: No informa"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormInput
                 name="localidad"
                 label={requiredLabel("Localidad")}
                 placeholder="Ej: No informa"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormInput
@@ -1011,9 +790,10 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="tipoVivienda"
                 label={requiredLabel("Tipo de vivienda")}
                 placeholder="Ej: Casa"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormSelectField
@@ -1029,9 +809,10 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="tenencia"
                 label={requiredLabel("Tenencia de la vivienda")}
                 placeholder="Ej: Arriendo"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormInput
@@ -1130,27 +911,31 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="cargo"
                 label={requiredLabel("Cargo")}
                 placeholder="Ej: No informa"
+                maxLength={100}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(100) }}
               />
 
               <FormInput
                 name="direccionEmpresa"
                 label={requiredLabel("Dirección de la empresa")}
                 placeholder="Ej: No informa"
+                maxLength={150}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(150) }}
               />
 
               <FormInput
                 name="telefonoEmpresa"
                 label={requiredLabel("Teléfono de la empresa")}
-                placeholder="Ej: No informa"
+                placeholder="Ej: 6071234567"
+                digitsOnly
+                maxLength={30}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ ...digitsOnlyRule({ required: true, maxLength: 30 }) }}
               />
             </Seccion>
           )}
@@ -1168,24 +953,50 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="nombreCompletoAcudiente"
                 label={optionalLabel("Nombre completo")}
                 placeholder="Ej: Ana Pérez"
+                maxLength={150}
                 register={register}
                 errors={errors}
+                rules={{
+                  required: esMenorEdad ? "Si la persona es menor de edad, el nombre del acudiente es obligatorio" : false,
+                  ...maxLengthRule(150),
+                }}
               />
 
               <FormInput
                 name="relacionAcudiente"
                 label={optionalLabel("Relación / parentesco")}
                 placeholder="Ej: Madre"
+                maxLength={100}
                 register={register}
                 errors={errors}
+                rules={{
+                  required: esMenorEdad ? "Si la persona es menor de edad, la relación del acudiente es obligatoria" : false,
+                  ...maxLengthRule(100),
+                }}
               />
 
               <FormInput
                 name="telefonoAcudiente"
                 label={optionalLabel("Teléfono")}
                 placeholder="Ej: 3001234567"
+                digitsOnly
+                maxLength={30}
                 register={register}
                 errors={errors}
+                rules={{
+                  ...digitsOnlyRule({ maxLength: 30 }),
+                  validate: {
+                    digitos: (value) =>
+                      !String(value || "").trim() ||
+                      /^\d+$/.test(String(value)) ||
+                      "El teléfono solo puede contener números",
+                    contactoAcudiente: (value) =>
+                      !esMenorEdad ||
+                      String(value || "").trim() ||
+                      String(formValues.correoAcudiente || "").trim() ||
+                      "Si la persona es menor de edad, debe informar teléfono o correo del acudiente",
+                  },
+                }}
               />
 
               <FormInput
@@ -1193,17 +1004,33 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 label={optionalLabel("Correo electrónico")}
                 placeholder="Ej: persona@example.com"
                 type="email"
+                maxLength={120}
                 register={register}
                 errors={errors}
-                rules={optionalEmailRule()}
+                rules={{
+                  maxLength: {
+                    value: 120,
+                    message: "El correo del acudiente no puede superar los 120 caracteres",
+                  },
+                  validate: {
+                    formato: (value) => optionalEmailRule().validate(value),
+                    contactoAcudiente: (value) =>
+                      !esMenorEdad ||
+                      String(value || "").trim() ||
+                      String(formValues.telefonoAcudiente || "").trim() ||
+                      "Si la persona es menor de edad, debe informar teléfono o correo del acudiente",
+                  },
+                }}
               />
 
               <FormInput
                 name="direccionAcudiente"
                 label={optionalLabel("Dirección")}
                 placeholder="Ej: Calle 10 # 5-20"
+                maxLength={150}
                 register={register}
                 errors={errors}
+                rules={{ ...maxLengthRule(150) }}
               />
             </Seccion>
           )}
@@ -1217,18 +1044,20 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 name="comoSeEntero"
                 label={requiredLabel("¿Cómo se enteró de nuestros servicios?")}
                 placeholder="Ej: Universidad"
+                maxLength={150}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(150) }}
               />
 
               <FormInput
                 name="relacionConUniversidad"
                 label={requiredLabel("Relación con la Universidad")}
                 placeholder="Ej: No informa"
+                maxLength={150}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE }}
+                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(150) }}
               />
             </Seccion>
           )}
@@ -1273,63 +1102,6 @@ export function PersonaForm({ onSubmit, initialValues }) {
           </div>
         </div>
       </form>
-    </div>
-  );
-}
-
-function Seccion({ titulo, descripcion, children }) {
-  return (
-    <section className="space-y-4">
-      <div>
-        <h3 className="text-lg font-semibold border-b pb-2">{titulo}</h3>
-        {descripcion && (
-          <p className="mt-2 text-sm text-muted-foreground">{descripcion}</p>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {children}
-      </div>
-    </section>
-  );
-}
-
-function FormSelectField({
-  name,
-  label,
-  options,
-  register,
-  errors,
-  rules,
-  disabled = false,
-}) {
-  return (
-    <div className="flex flex-col gap-1.5 w-full">
-      <label htmlFor={name} className="text-sm font-medium leading-none">
-        {label}
-      </label>
-
-      <select
-        id={name}
-        defaultValue=""
-        disabled={disabled}
-        {...register(name, rules)}
-        className={`flex h-9 w-full rounded-lg border bg-background px-2.5 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-60 ${
-          errors?.[name] ? "border-red-500" : ""
-        }`}
-      >
-        <option value="">Seleccione una opción</option>
-
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-
-      {errors?.[name] && (
-        <p className="text-xs text-red-500">{errors[name]?.message}</p>
-      )}
     </div>
   );
 }

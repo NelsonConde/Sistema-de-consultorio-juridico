@@ -1,10 +1,11 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
 /**
- * Formulario de listado de personas registradas en el sistema.
+ * List and table handling.
  *
- * Muestra la lista de personas con búsqueda y paginación.
- * Permite abrir el formulario de registro/edición de persona.
+ * Handles list pagination consistently.
+ * Form handling.
  *
  * @module components/forms/persona/PersonasForm
  */
@@ -20,296 +21,43 @@ import { useRouter } from "next/navigation";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
 import { getApiErrorDescription, getApiErrorTitle } from "@/lib/api";
-import { EMAIL_PATTERN } from "@/lib/form-validation";
+import { buscarPersonasActivas, obtenerPersonaDetalle } from "@/lib/personasApi";
+import { DIGITS_PATTERN, EMAIL_PATTERN } from "@/lib/form-validation";
 
-const FORM_INICIAL = {
-  tipoPersonaId: "",
-  tipoDocumento: "",
-  numeroDocumento: "",
-  fechaExpedicion: "",
-  ciudadExpedicion: "",
-  nombres: "",
-  apellidos: "",
-  nombreIdentitario: "",
-  pronombre: "",
-  sexo: "",
-  genero: "",
-  orientacionSexual: "",
-  fechaNacimiento: "",
-  telefono: "",
-  correo: "",
-  nacionalidadId: "",
-  estadoCivil: "",
-  escolaridad: "",
-  grupoEtnico: "",
-  condicionActualId: "",
-  sabeLeerEscribir: false,
-  discapacidad: "",
-  caracterizacionPcd: "",
-  necesitaAjustePcd: false,
-  departamentoId: "",
-  municipioId: "",
-  barrioId: "",
-  direccion: "",
-  comuna: "",
-  localidad: "",
-  estrato: 0,
-  tipoVivienda: "",
-  zona: "",
-  tenencia: "",
-  numeroPersonasACargo: 0,
-  ingresosAdicionales: false,
-  energiaElectrica: false,
-  acueducto: false,
-  alcantarillado: false,
-  ocupacionId: "",
-  empresaId: "",
-  salario: 0,
-  cargo: "",
-  direccionEmpresa: "",
-  telefonoEmpresa: "",
-  nombreCompletoAcudiente: "",
-  relacionAcudiente: "",
-  telefonoAcudiente: "",
-  correoAcudiente: "",
-  direccionAcudiente: "",
-  comoSeEntero: "",
-  relacionConUniversidad: "",
-};
-
-const FALLBACK_TIPO_DOCUMENTO_OPTIONS = [
-  { value: "CC", label: "Cédula de Ciudadanía" },
-  { value: "TI", label: "Tarjeta de Identidad" },
-  { value: "CE", label: "Cédula de Extranjería" },
-  { value: "PA", label: "Pasaporte" },
-];
-
-const PRONOMBRE_OPTIONS = [
-  { value: "Él", label: "Él" },
-  { value: "Ella", label: "Ella" },
-  { value: "Elle", label: "Elle" },
-  { value: "Otro", label: "Otro" },
-];
-
-const SEXO_OPTIONS = [
-  { value: "Hombre", label: "Hombre" },
-  { value: "Mujer", label: "Mujer" },
-  { value: "Intersexual", label: "Intersexual" },
-];
-
-const GENERO_OPTIONS = [
-  { value: "Masculino", label: "Masculino" },
-  { value: "Femenino", label: "Femenino" },
-  { value: "No binario", label: "No binario" },
-  { value: "Transgénero", label: "Transgénero" },
-  { value: "Otro", label: "Otro" },
-];
-
-const ORIENTACION_OPTIONS = [
-  { value: "Heterosexual", label: "Heterosexual" },
-  { value: "Homosexual", label: "Homosexual" },
-  { value: "Bisexual", label: "Bisexual" },
-  { value: "Pansexual", label: "Pansexual" },
-  { value: "Asexual", label: "Asexual" },
-  { value: "Otro", label: "Otro" },
-];
-
-const ESTADO_CIVIL_OPTIONS = [
-  { value: "Soltero/a", label: "Soltero/a" },
-  { value: "Casado/a", label: "Casado/a" },
-  { value: "Unión libre", label: "Unión libre" },
-  { value: "Divorciado/a", label: "Divorciado/a" },
-  { value: "Viudo/a", label: "Viudo/a" },
-];
-
-const ESCOLARIDAD_OPTIONS = [
-  { value: "Ninguna", label: "Ninguna" },
-  { value: "Primaria", label: "Primaria" },
-  { value: "Secundaria", label: "Secundaria" },
-  { value: "Técnico", label: "Técnico" },
-  { value: "Tecnólogo", label: "Tecnólogo" },
-  { value: "Universitario", label: "Universitario" },
-  { value: "Postgrado", label: "Postgrado" },
-];
-
-const ZONA_OPTIONS = [
-  { value: "Urbana", label: "Urbana" },
-  { value: "Rural", label: "Rural" },
-];
-
-const REGISTROS_POR_PAGINA_OPTIONS = [5, 10, 20, 50];
-
-async function leerRespuesta(res) {
-  const text = await res.text();
-
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { mensaje: text };
-  }
-}
-
-async function fetchCatalogo(path) {
-  const res = await fetch(`${API_URL_BASE}${path}`, {
-    method: "GET",
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    return [];
-  }
-
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
-}
-
-function toOption(item) {
-  return {
-    value: String(item.id),
-    label: item.nombre || item.descripcion || `Registro ${item.id}`,
-  };
-}
-
-function toDocumentoOption(item) {
-  const value = item.codigo || item.abreviatura || item.nombre || item.descripcion || "";
-  const label = item.nombre || item.descripcion || item.codigo || item.abreviatura || value;
-
-  return { value, label };
-}
-
-function optionsMap(options) {
-  return new Map(options.map((option) => [String(option.value), option.label]));
-}
-
-function labelFromMap(map, value, fallback = "N/A") {
-  if (value === null || value === undefined || value === "") {
-    return fallback;
-  }
-
-  return map.get(String(value)) || fallback;
-}
-
-function nombreCompleto(persona) {
-  return [persona?.nombres, persona?.apellidos].filter(Boolean).join(" ");
-}
-
-function valorTexto(value) {
-  return value || "N/A";
-}
-
-function numberOrNull(value) {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-
-  const number = Number(value);
-  return Number.isNaN(number) ? null : number;
-}
-
-function textOrNull(value) {
-  const text = String(value ?? "").trim();
-  return text === "" ? null : text;
-}
-
-function calcularEsMenorEdad(fechaNacimiento) {
-  if (!fechaNacimiento) return false;
-
-  const nacimiento = new Date(fechaNacimiento);
-  if (Number.isNaN(nacimiento.getTime())) return false;
-
-  const hoy = new Date();
-  let edad = hoy.getFullYear() - nacimiento.getFullYear();
-  const mes = hoy.getMonth() - nacimiento.getMonth();
-
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {
-    edad -= 1;
-  }
-
-  return edad < 18;
-}
-
-function ordenarPorIdAscendente(items) {
-  return [...items].sort((a, b) => {
-    const idA = Number(a?.id ?? Number.MAX_SAFE_INTEGER);
-    const idB = Number(b?.id ?? Number.MAX_SAFE_INTEGER);
-
-    return idA - idB;
-  });
-}
-
-function obtenerPaginasVisibles(paginaActual, totalPaginas) {
-  const paginas = new Set([
-    1,
-    totalPaginas,
-    paginaActual - 1,
-    paginaActual,
-    paginaActual + 1,
-  ]);
-
-  return Array.from(paginas)
-    .filter((pagina) => pagina >= 1 && pagina <= totalPaginas)
-    .sort((a, b) => a - b);
-}
-
-function convertirPersonaAForm(persona) {
-  return {
-    ...FORM_INICIAL,
-    ...persona,
-    tipoPersonaId: persona.tipoPersonaId != null ? String(persona.tipoPersonaId) : "",
-    nacionalidadId: persona.nacionalidadId != null ? String(persona.nacionalidadId) : "",
-    condicionActualId:
-      persona.condicionActualId != null ? String(persona.condicionActualId) : "",
-    departamentoId: persona.departamentoId != null ? String(persona.departamentoId) : "",
-    municipioId: persona.municipioId != null ? String(persona.municipioId) : "",
-    barrioId: persona.barrioId != null ? String(persona.barrioId) : "",
-    ocupacionId: persona.ocupacionId != null ? String(persona.ocupacionId) : "",
-    empresaId: persona.empresaId != null ? String(persona.empresaId) : "",
-    sabeLeerEscribir: Boolean(persona.sabeLeerEscribir),
-    necesitaAjustePcd: Boolean(persona.necesitaAjustePcd),
-    ingresosAdicionales: Boolean(persona.ingresosAdicionales),
-    energiaElectrica: Boolean(persona.energiaElectrica),
-    acueducto: Boolean(persona.acueducto),
-    alcantarillado: Boolean(persona.alcantarillado),
-    estrato: persona.estrato ?? 0,
-    numeroPersonasACargo: persona.numeroPersonasACargo ?? 0,
-    salario: persona.salario ?? 0,
-  };
-}
-
-function construirPayload(form, id) {
-  const esMenorEdad = calcularEsMenorEdad(form.fechaNacimiento);
-
-  return {
-    ...form,
-    id,
-    tipoPersonaId: numberOrNull(form.tipoPersonaId),
-    nacionalidadId: numberOrNull(form.nacionalidadId),
-    condicionActualId: numberOrNull(form.condicionActualId),
-    departamentoId: numberOrNull(form.departamentoId),
-    municipioId: numberOrNull(form.municipioId),
-    barrioId: numberOrNull(form.barrioId),
-    ocupacionId: numberOrNull(form.ocupacionId),
-    empresaId: numberOrNull(form.empresaId),
-    estrato: Number(form.estrato || 0),
-    numeroPersonasACargo: Number(form.numeroPersonasACargo || 0),
-    salario: Number(form.salario || 0),
-    correo: textOrNull(form.correo),
-    correoAcudiente: esMenorEdad ? textOrNull(form.correoAcudiente) : null,
-    nombreCompletoAcudiente: esMenorEdad ? textOrNull(form.nombreCompletoAcudiente) : null,
-    relacionAcudiente: esMenorEdad ? textOrNull(form.relacionAcudiente) : null,
-    telefonoAcudiente: esMenorEdad ? textOrNull(form.telefonoAcudiente) : null,
-    direccionAcudiente: esMenorEdad ? textOrNull(form.direccionAcudiente) : null,
-  };
-}
+import {
+  ESCOLARIDAD_OPTIONS,
+  ESTADO_CIVIL_OPTIONS,
+  FALLBACK_TIPO_DOCUMENTO_OPTIONS,
+  FORM_INICIAL,
+  GENERO_OPTIONS,
+  ORIENTACION_OPTIONS,
+  PRONOMBRE_OPTIONS,
+  REGISTROS_POR_PAGINA_OPTIONS,
+  SEXO_OPTIONS,
+  ZONA_OPTIONS,
+} from "./personas.constants";
+import {
+  calcularEsMenorEdad,
+  construirPayload,
+  convertirPersonaAForm,
+  nombreCompleto,
+  textOrNull,
+  toDocumentoOption,
+  toOption,
+} from "./personas.utils";
+import { Checkbox, Input, Seccion, Select } from "./PersonasFormParts";
+import { fetchCatalogo, leerRespuesta } from "./personas.service";
 
 export function PersonasForm() {
   const [user, setUser] = useState(null);
   const [personas, setPersonas] = useState([]);
   const [busqueda, setBusqueda] = useState("");
+  const [busquedaAplicada, setBusquedaAplicada] = useState("");
   const [paginaActual, setPaginaActual] = useState(1);
   const [registrosPorPagina, setRegistrosPorPagina] = useState(10);
+  const [totalRegistros, setTotalRegistros] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(0);
+  const [cargandoLista, setCargandoLista] = useState(false);
   const [personaEditando, setPersonaEditando] = useState(null);
   const [personaADesactivar, setPersonaADesactivar] = useState(null);
   const [form, setForm] = useState(FORM_INICIAL);
@@ -330,8 +78,6 @@ export function PersonasForm() {
   const [departamentoOptions, setDepartamentoOptions] = useState([]);
   const [municipioOptions, setMunicipioOptions] = useState([]);
   const [barrioOptions, setBarrioOptions] = useState([]);
-  const [municipioCatalogoOptions, setMunicipioCatalogoOptions] = useState([]);
-  const [barrioCatalogoOptions, setBarrioCatalogoOptions] = useState([]);
 
   const router = useRouter();
 
@@ -346,67 +92,37 @@ export function PersonasForm() {
     PERMISOS.CAMBIAR_ESTADO_PERSONAS
   );
 
-  const tipoPersonaMap = useMemo(
-    () => optionsMap(tipoPersonaOptions),
-    [tipoPersonaOptions]
-  );
-  const municipioMap = useMemo(
-    () => optionsMap(municipioCatalogoOptions),
-    [municipioCatalogoOptions]
-  );
-  const barrioMap = useMemo(
-    () => optionsMap(barrioCatalogoOptions),
-    [barrioCatalogoOptions]
-  );
-
-  const personasFiltradas = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-
-    const base = !q
-      ? personas
-      : personas.filter((persona) =>
-          [
-            persona.id,
-            persona.numeroDocumento,
-            persona.nombres,
-            persona.apellidos,
-            persona.telefono,
-            persona.correo,
-            persona.direccion,
-            labelFromMap(tipoPersonaMap, persona.tipoPersonaId, ""),
-            labelFromMap(municipioMap, persona.municipioId, ""),
-            labelFromMap(barrioMap, persona.barrioId, ""),
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase()
-            .includes(q)
-        );
-
-    return ordenarPorIdAscendente(base);
-  }, [personas, busqueda, tipoPersonaMap, municipioMap, barrioMap]);
-
-  const totalRegistros = personasFiltradas.length;
-  const totalPaginas = Math.max(1, Math.ceil(totalRegistros / registrosPorPagina));
-  const indiceInicial = (paginaActual - 1) * registrosPorPagina;
-  const indiceFinal = Math.min(indiceInicial + registrosPorPagina, totalRegistros);
-  const paginasVisibles = obtenerPaginasVisibles(paginaActual, totalPaginas);
-
-  const personasPaginadas = useMemo(
-    () => personasFiltradas.slice(indiceInicial, indiceInicial + registrosPorPagina),
-    [personasFiltradas, indiceInicial, registrosPorPagina]
-  );
+  const indiceInicial =
+    totalRegistros === 0 ? 0 : (paginaActual - 1) * registrosPorPagina;
+  const indiceFinal =
+    totalRegistros === 0
+      ? 0
+      : Math.min(paginaActual * registrosPorPagina, totalRegistros);
 
   useEffect(() => {
     cargarInicial();
   }, [router]);
 
   useEffect(() => {
-    setPaginaActual(1);
-  }, [busqueda, registrosPorPagina]);
+    const timeoutId = window.setTimeout(() => {
+      setPaginaActual(1);
+      setBusquedaAplicada(busqueda.trim());
+    }, 350);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [busqueda]);
 
   useEffect(() => {
-    if (paginaActual > totalPaginas) {
+    if (!user) return;
+
+    const controller = new AbortController();
+    cargarPersonas({ signal: controller.signal });
+
+    return () => controller.abort();
+  }, [user, busquedaAplicada, paginaActual, registrosPorPagina]);
+
+  useEffect(() => {
+    if (totalPaginas > 0 && paginaActual > totalPaginas) {
       setPaginaActual(totalPaginas);
     }
   }, [paginaActual, totalPaginas]);
@@ -463,7 +179,7 @@ export function PersonasForm() {
       setError("");
       setMensaje("");
 
-      const meRes = await fetch(`${API_URL_BASE}/auth/me`, {
+      const meRes = await apiClient.request(`${API_URL_BASE}/auth/me`, {
         credentials: "include",
       });
 
@@ -491,7 +207,6 @@ export function PersonasForm() {
       setUser(meData);
 
       await cargarCatalogosBase();
-      await cargarPersonas();
     } catch (err) {
       console.error(err);
       setError(err.message || "Error cargando personas");
@@ -509,8 +224,6 @@ export function PersonasForm() {
       ocupaciones,
       empresas,
       departamentos,
-      municipios,
-      barrios,
     ] = await Promise.all([
       fetchCatalogo("/tipos-documento/activos"),
       fetchCatalogo("/tipos-persona"),
@@ -519,8 +232,6 @@ export function PersonasForm() {
       fetchCatalogo("/ocupaciones"),
       fetchCatalogo("/empresas"),
       fetchCatalogo("/departamentos"),
-      fetchCatalogo("/municipios"),
-      fetchCatalogo("/barrios"),
     ]);
 
     const opcionesDocumento = tiposDocumento
@@ -538,62 +249,102 @@ export function PersonasForm() {
     setOcupacionOptions(ocupaciones.map(toOption));
     setEmpresaOptions(empresas.map(toOption));
     setDepartamentoOptions(departamentos.map(toOption));
-    setMunicipioCatalogoOptions(municipios.map(toOption));
-    setBarrioCatalogoOptions(barrios.map(toOption));
   }
 
-  async function cargarPersonas() {
-    const personasRes = await fetch(`${API_URL_BASE}/personas/activos`, {
-      credentials: "include",
-    });
+  async function cargarPersonas({ signal } = {}) {
+    try {
+      setCargandoLista(true);
+      setError("");
 
-    if (personasRes.status === 401) {
-      router.replace("/");
-      return;
+      const resultado = await buscarPersonasActivas({
+        search: busquedaAplicada,
+        page: paginaActual,
+        size: registrosPorPagina,
+        signal,
+      });
+
+      if (
+        resultado.totalPages > 0 &&
+        paginaActual > resultado.totalPages
+      ) {
+        setPaginaActual(resultado.totalPages);
+        return;
+      }
+
+      setPersonas(resultado.content);
+      setTotalRegistros(resultado.totalElements);
+      setTotalPaginas(resultado.totalPages);
+    } catch (err) {
+      if (err.name === "AbortError") return;
+
+      if (err.status === 401) {
+        router.replace("/");
+        return;
+      }
+
+      if (err.status === 403) {
+        router.replace("/inicio");
+        return;
+      }
+
+      setPersonas([]);
+      setTotalRegistros(0);
+      setTotalPaginas(0);
+      setError(err.message || "No se pudieron cargar las personas");
+    } finally {
+      setCargandoLista(false);
     }
-
-    if (personasRes.status === 403) {
-      router.replace("/inicio");
-      return;
-    }
-
-    if (!personasRes.ok) {
-      throw new Error("No se pudieron cargar las personas");
-    }
-
-    const personasData = await personasRes.json();
-    const personasOrdenadas = ordenarPorIdAscendente(
-      Array.isArray(personasData) ? personasData : []
-    );
-
-    setPersonas(personasOrdenadas);
   }
 
-  async function abrirEdicion(persona) {
+  async function abrirEdicion(personaResumen) {
     if (!puedeEditar) {
       setError("No tienes permisos para editar personas");
       return;
     }
 
-    setMensaje("");
-    setError("");
-    setPersonaEditando(persona);
-    setForm(convertirPersonaAForm(persona));
+    try {
+      setMensaje("");
+      setError("");
 
-    if (persona.departamentoId) {
-      const municipios = await fetchCatalogo(
-        `/municipios/departamento/${persona.departamentoId}`
-      );
-      setMunicipioOptions(municipios.map(toOption));
-    } else {
-      setMunicipioOptions([]);
-    }
+      const persona = await obtenerPersonaDetalle(personaResumen.id);
 
-    if (persona.municipioId) {
-      const barrios = await fetchCatalogo(`/barrios/municipio/${persona.municipioId}`);
-      setBarrioOptions(barrios.map(toOption));
-    } else {
-      setBarrioOptions([]);
+      setPersonaEditando(persona);
+      setForm(convertirPersonaAForm(persona));
+
+      if (persona.departamentoId) {
+        const municipios = await fetchCatalogo(
+          `/municipios/departamento/${persona.departamentoId}`
+        );
+        setMunicipioOptions(municipios.map(toOption));
+      } else {
+        setMunicipioOptions([]);
+      }
+
+      if (persona.municipioId) {
+        const barrios = await fetchCatalogo(
+          `/barrios/municipio/${persona.municipioId}`
+        );
+        setBarrioOptions(barrios.map(toOption));
+      } else {
+        setBarrioOptions([]);
+      }
+    } catch (err) {
+      if (err.status === 401) {
+        router.replace("/");
+        return;
+      }
+
+      if (err.status === 403) {
+        setError("No tienes permisos para consultar esta persona");
+        return;
+      }
+
+      if (err.status === 404) {
+        setError("La persona no está disponible para consulta o edición");
+        return;
+      }
+
+      setError(err.message || "No se pudo abrir la persona");
     }
   }
 
@@ -618,7 +369,6 @@ export function PersonasForm() {
 
   function handleBusquedaChange(event) {
     setBusqueda(event.target.value);
-    setPaginaActual(1);
   }
 
   function handleRegistrosPorPaginaChange(event) {
@@ -659,12 +409,73 @@ export function PersonasForm() {
   }
 
   function validarEdicionPersona() {
+    const requerido = [
+      ["tipoPersonaId", "tipo de persona"],
+      ["tipoDocumento", "tipo de documento"],
+      ["numeroDocumento", "número de documento"],
+      ["fechaExpedicion", "fecha de expedición"],
+      ["ciudadExpedicion", "ciudad de expedición"],
+      ["nombres", "nombres"],
+      ["apellidos", "apellidos"],
+      ["nombreIdentitario", "nombre identitario"],
+      ["pronombre", "pronombre"],
+      ["sexo", "sexo"],
+      ["genero", "género"],
+      ["orientacionSexual", "orientación sexual"],
+      ["fechaNacimiento", "fecha de nacimiento"],
+      ["nacionalidadId", "nacionalidad"],
+      ["estadoCivil", "estado civil"],
+      ["escolaridad", "escolaridad"],
+      ["grupoEtnico", "grupo étnico"],
+      ["condicionActualId", "condición actual"],
+      ["discapacidad", "discapacidad"],
+      ["caracterizacionPcd", "caracterización PCD"],
+      ["departamentoId", "departamento"],
+      ["municipioId", "municipio"],
+      ["barrioId", "barrio"],
+      ["direccion", "dirección"],
+      ["comuna", "comuna"],
+      ["localidad", "localidad"],
+      ["estrato", "estrato"],
+      ["tipoVivienda", "tipo de vivienda"],
+      ["zona", "zona"],
+      ["tenencia", "tenencia"],
+      ["numeroPersonasACargo", "personas a cargo"],
+      ["ocupacionId", "ocupación"],
+      ["empresaId", "empresa"],
+      ["salario", "salario"],
+      ["cargo", "cargo"],
+      ["direccionEmpresa", "dirección de la empresa"],
+      ["telefonoEmpresa", "teléfono de la empresa"],
+      ["comoSeEntero", "cómo se enteró del servicio"],
+      ["relacionConUniversidad", "relación con la universidad"],
+    ];
+
+    const faltante = requerido.find(([name]) => String(form[name] ?? "").trim() === "");
+    if (faltante) {
+      return `El campo ${faltante[1]} es obligatorio.`;
+    }
+
     const telefono = String(form.telefono || "").trim();
     const correo = String(form.correo || "").trim();
+    const telefonoEmpresa = String(form.telefonoEmpresa || "").trim();
+    const telefonoAcudiente = String(form.telefonoAcudiente || "").trim();
     const correoAcudiente = String(form.correoAcudiente || "").trim();
 
     if (!telefono && !correo) {
       return "Debe registrar al menos un teléfono o un correo electrónico.";
+    }
+
+    if (telefono && !DIGITS_PATTERN.test(telefono)) {
+      return "El teléfono solo puede contener números.";
+    }
+
+    if (!DIGITS_PATTERN.test(telefonoEmpresa)) {
+      return "El teléfono de la empresa solo puede contener números.";
+    }
+
+    if (telefonoAcudiente && !DIGITS_PATTERN.test(telefonoAcudiente)) {
+      return "El teléfono del acudiente solo puede contener números.";
     }
 
     if (correo && !EMAIL_PATTERN.test(correo)) {
@@ -675,6 +486,50 @@ export function PersonasForm() {
       return "Ingrese un correo electrónico válido para el acudiente.";
     }
 
+    const limites = {
+      tipoDocumento: 10,
+      numeroDocumento: 30,
+      ciudadExpedicion: 100,
+      nombres: 100,
+      apellidos: 100,
+      nombreIdentitario: 100,
+      pronombre: 50,
+      sexo: 20,
+      genero: 20,
+      orientacionSexual: 50,
+      telefono: 30,
+      correo: 120,
+      estadoCivil: 30,
+      escolaridad: 100,
+      grupoEtnico: 100,
+      discapacidad: 100,
+      caracterizacionPcd: 150,
+      direccion: 150,
+      comuna: 100,
+      localidad: 100,
+      tipoVivienda: 100,
+      zona: 50,
+      tenencia: 100,
+      cargo: 100,
+      direccionEmpresa: 150,
+      telefonoEmpresa: 30,
+      nombreCompletoAcudiente: 150,
+      relacionAcudiente: 100,
+      telefonoAcudiente: 30,
+      correoAcudiente: 120,
+      direccionAcudiente: 150,
+      comoSeEntero: 150,
+      relacionConUniversidad: 150,
+    };
+
+    const excedido = Object.entries(limites).find(
+      ([name, max]) => String(form[name] ?? "").length > max
+    );
+
+    if (excedido) {
+      return `El campo ${excedido[0]} no puede superar ${excedido[1]} caracteres.`;
+    }
+
     const camposNumericos = [
       ["estrato", "estrato"],
       ["numeroPersonasACargo", "personas a cargo"],
@@ -682,9 +537,38 @@ export function PersonasForm() {
     ];
 
     const campoNegativo = camposNumericos.find(([name]) => Number(form[name]) < 0);
-
     if (campoNegativo) {
       return `El campo ${campoNegativo[1]} no puede ser negativo.`;
+    }
+
+    if (
+      form.municipioId &&
+      municipioOptions.length > 0 &&
+      !municipioOptions.some((item) => String(item.value) === String(form.municipioId))
+    ) {
+      return "El municipio seleccionado no pertenece al departamento seleccionado.";
+    }
+
+    if (
+      form.barrioId &&
+      barrioOptions.length > 0 &&
+      !barrioOptions.some((item) => String(item.value) === String(form.barrioId))
+    ) {
+      return "El barrio seleccionado no pertenece al municipio seleccionado.";
+    }
+
+    if (esMenorEdadFormulario) {
+      if (!String(form.nombreCompletoAcudiente || "").trim()) {
+        return "Si la persona es menor de edad, el nombre del acudiente es obligatorio.";
+      }
+
+      if (!String(form.relacionAcudiente || "").trim()) {
+        return "Si la persona es menor de edad, la relación del acudiente es obligatoria.";
+      }
+
+      if (!telefonoAcudiente && !correoAcudiente) {
+        return "Si la persona es menor de edad, debe informar teléfono o correo del acudiente.";
+      }
     }
 
     return "";
@@ -717,7 +601,7 @@ export function PersonasForm() {
 
       const payload = construirPayload(form, personaEditando.id);
 
-      const res = await fetch(`${API_URL_BASE}/personas/${personaEditando.id}`, {
+      const res = await apiClient.request(`${API_URL_BASE}/personas/${personaEditando.id}`, {
         method: "PUT",
         credentials: "include",
         headers: {
@@ -772,7 +656,7 @@ export function PersonasForm() {
       setError("");
       setMensaje("");
 
-      const res = await fetch(
+      const res = await apiClient.request(
         `${API_URL_BASE}/personas/${personaADesactivar.id}/desactivar`,
         {
           method: "PATCH",
@@ -843,8 +727,13 @@ export function PersonasForm() {
             </p>
           </div>
 
-          <Button type="button" variant="outline" onClick={cargarInicial}>
-            Actualizar
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => cargarPersonas()}
+            disabled={cargandoLista}
+          >
+            {cargandoLista ? "Actualizando..." : "Actualizar"}
           </Button>
         </div>
 
@@ -853,7 +742,8 @@ export function PersonasForm() {
           <input
             value={busqueda}
             onChange={handleBusquedaChange}
-            placeholder="Buscar por documento, nombre, teléfono, correo o dirección..."
+            placeholder="Buscar por nombre, apellido o documento..."
+            maxLength={100}
             className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
@@ -876,7 +766,7 @@ export function PersonasForm() {
                 <span className="font-semibold text-foreground">
                   {totalRegistros}
                 </span>{" "}
-                personas, ordenadas por ID de menor a mayor.
+                personas.
               </>
             )}
           </div>
@@ -905,25 +795,23 @@ export function PersonasForm() {
                   <th className="px-4 py-3 text-left font-medium">ID</th>
                   <th className="px-4 py-3 text-left font-medium">Persona</th>
                   <th className="px-4 py-3 text-left font-medium">Documento</th>
-                  <th className="px-4 py-3 text-left font-medium">Contacto</th>
-                  <th className="px-4 py-3 text-left font-medium">Ubicación</th>
                   <th className="px-4 py-3 text-left font-medium">Tipo</th>
                   <th className="px-4 py-3 text-right font-medium">Acciones</th>
                 </tr>
               </thead>
 
               <tbody>
-                {personasPaginadas.length === 0 ? (
+                {personas.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={5}
                       className="px-4 py-8 text-center text-muted-foreground"
                     >
                       No hay personas para mostrar.
                     </td>
                   </tr>
                 ) : (
-                  personasPaginadas.map((persona) => (
+                  personas.map((persona) => (
                     <tr
                       key={persona.id}
                       className="border-t border-primary/20 transition hover:bg-primary/10"
@@ -934,45 +822,18 @@ export function PersonasForm() {
                         <div className="font-medium">
                           {nombreCompleto(persona) || "Sin nombre"}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Nacimiento: {valorTexto(persona.fechaNacimiento)}
-                        </div>
                       </td>
 
                       <td className="px-4 py-3">
-                        <div>{valorTexto(persona.tipoDocumento)}</div>
+                        <div>{persona.tipoDocumento || "N/A"}</div>
                         <div className="text-xs text-muted-foreground">
-                          {valorTexto(persona.numeroDocumento)}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <div>{valorTexto(persona.telefono)}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {valorTexto(persona.correo)}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <div>
-                          {labelFromMap(
-                            municipioMap,
-                            persona.municipioId,
-                            persona.municipio || "N/A"
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {valorTexto(persona.direccion)}
+                          {persona.numeroDocumentoEnmascarado || "N/A"}
                         </div>
                       </td>
 
                       <td className="px-4 py-3">
                         <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                          {labelFromMap(
-                            tipoPersonaMap,
-                            persona.tipoPersonaId,
-                            persona.tipoUsuario || "N/A"
-                          )}
+                          {persona.tipoPersona || "N/A"}
                         </span>
                       </td>
 
@@ -1017,7 +878,10 @@ export function PersonasForm() {
           totalPages={totalPaginas}
           onPageChange={setPaginaActual}
           pageSize={registrosPorPagina}
-          onPageSizeChange={setRegistrosPorPagina}
+          onPageSizeChange={(size) => {
+            setRegistrosPorPagina(size);
+            setPaginaActual(1);
+          }}
           pageSizeOptions={REGISTROS_POR_PAGINA_OPTIONS}
           totalItems={totalRegistros}
         />
@@ -1049,12 +913,12 @@ export function PersonasForm() {
                   <Seccion titulo="Información básica">
                     <Select label="Tipo persona" name="tipoPersonaId" value={form.tipoPersonaId} onChange={handleChange} options={tipoPersonaOptions} />
                     <Select label="Tipo documento" name="tipoDocumento" value={form.tipoDocumento} onChange={handleChange} options={tipoDocumentoOptions} />
-                    <Input label="Número documento" name="numeroDocumento" value={form.numeroDocumento} onChange={handleChange} />
+                    <Input label="Número documento" name="numeroDocumento" value={form.numeroDocumento} onChange={handleChange} maxLength={30} />
                     <Input label="Fecha expedición" name="fechaExpedicion" type="date" value={form.fechaExpedicion} onChange={handleChange} />
-                    <Input label="Ciudad expedición" name="ciudadExpedicion" value={form.ciudadExpedicion} onChange={handleChange} />
-                    <Input label="Nombres" name="nombres" value={form.nombres} onChange={handleChange} />
-                    <Input label="Apellidos" name="apellidos" value={form.apellidos} onChange={handleChange} />
-                    <Input label="Nombre identitario" name="nombreIdentitario" value={form.nombreIdentitario} onChange={handleChange} />
+                    <Input label="Ciudad expedición" name="ciudadExpedicion" value={form.ciudadExpedicion} onChange={handleChange} maxLength={100} />
+                    <Input label="Nombres" name="nombres" value={form.nombres} onChange={handleChange} maxLength={100} />
+                    <Input label="Apellidos" name="apellidos" value={form.apellidos} onChange={handleChange} maxLength={100} />
+                    <Input label="Nombre identitario" name="nombreIdentitario" value={form.nombreIdentitario} onChange={handleChange} maxLength={100} />
                     <Select label="Pronombre" name="pronombre" value={form.pronombre} onChange={handleChange} options={PRONOMBRE_OPTIONS} />
                     <Select label="Sexo" name="sexo" value={form.sexo} onChange={handleChange} options={SEXO_OPTIONS} />
                     <Select label="Género" name="genero" value={form.genero} onChange={handleChange} options={GENERO_OPTIONS} />
@@ -1063,28 +927,28 @@ export function PersonasForm() {
                   </Seccion>
 
                   <Seccion titulo="Contacto e identidad social">
-                    <Input label="Teléfono" name="telefono" value={form.telefono} onChange={handleChange} />
-                    <Input label="Correo" name="correo" type="email" value={form.correo} onChange={handleChange} />
+                    <Input label="Teléfono" name="telefono" value={form.telefono} onChange={handleChange} digitsOnly maxLength={30} />
+                    <Input label="Correo" name="correo" type="email" value={form.correo} onChange={handleChange} maxLength={120} />
                     <Select label="Nacionalidad" name="nacionalidadId" value={form.nacionalidadId} onChange={handleChange} options={nacionalidadOptions} />
                     <Select label="Estado civil" name="estadoCivil" value={form.estadoCivil} onChange={handleChange} options={ESTADO_CIVIL_OPTIONS} />
                     <Select label="Escolaridad" name="escolaridad" value={form.escolaridad} onChange={handleChange} options={ESCOLARIDAD_OPTIONS} />
-                    <Input label="Grupo étnico" name="grupoEtnico" value={form.grupoEtnico} onChange={handleChange} />
+                    <Input label="Grupo étnico" name="grupoEtnico" value={form.grupoEtnico} onChange={handleChange} maxLength={100} />
                     <Select label="Condición actual" name="condicionActualId" value={form.condicionActualId} onChange={handleChange} options={condicionOptions} />
-                    <Input label="Discapacidad" name="discapacidad" value={form.discapacidad} onChange={handleChange} />
-                    <Input label="Caracterización PCD" name="caracterizacionPcd" value={form.caracterizacionPcd} onChange={handleChange} />
+                    <Input label="Discapacidad" name="discapacidad" value={form.discapacidad} onChange={handleChange} maxLength={100} />
+                    <Input label="Caracterización PCD" name="caracterizacionPcd" value={form.caracterizacionPcd} onChange={handleChange} maxLength={150} />
                   </Seccion>
 
                   <Seccion titulo="Ubicación y vivienda">
                     <Select label="Departamento" name="departamentoId" value={form.departamentoId} onChange={handleChange} options={departamentoOptions} />
                     <Select label="Municipio" name="municipioId" value={form.municipioId} onChange={handleChange} options={municipioOptions} disabled={!form.departamentoId} />
                     <Select label="Barrio" name="barrioId" value={form.barrioId} onChange={handleChange} options={barrioOptions} disabled={!form.municipioId} />
-                    <Input label="Dirección" name="direccion" value={form.direccion} onChange={handleChange} />
-                    <Input label="Comuna" name="comuna" value={form.comuna} onChange={handleChange} />
-                    <Input label="Localidad" name="localidad" value={form.localidad} onChange={handleChange} />
+                    <Input label="Dirección" name="direccion" value={form.direccion} onChange={handleChange} maxLength={150} />
+                    <Input label="Comuna" name="comuna" value={form.comuna} onChange={handleChange} maxLength={100} />
+                    <Input label="Localidad" name="localidad" value={form.localidad} onChange={handleChange} maxLength={100} />
                     <Input label="Estrato" name="estrato" type="number" min={0} value={form.estrato} onChange={handleNumberChange} />
-                    <Input label="Tipo vivienda" name="tipoVivienda" value={form.tipoVivienda} onChange={handleChange} />
+                    <Input label="Tipo vivienda" name="tipoVivienda" value={form.tipoVivienda} onChange={handleChange} maxLength={100} />
                     <Select label="Zona" name="zona" value={form.zona} onChange={handleChange} options={ZONA_OPTIONS} />
-                    <Input label="Tenencia" name="tenencia" value={form.tenencia} onChange={handleChange} />
+                    <Input label="Tenencia" name="tenencia" value={form.tenencia} onChange={handleChange} maxLength={100} />
                     <Input label="Personas a cargo" name="numeroPersonasACargo" type="number" min={0} value={form.numeroPersonasACargo} onChange={handleNumberChange} />
                   </Seccion>
 
@@ -1092,24 +956,24 @@ export function PersonasForm() {
                     <Select label="Ocupación" name="ocupacionId" value={form.ocupacionId} onChange={handleChange} options={ocupacionOptions} />
                     <Select label="Empresa" name="empresaId" value={form.empresaId} onChange={handleChange} options={empresaOptions} />
                     <Input label="Salario" name="salario" type="number" min={0} value={form.salario} onChange={handleNumberChange} />
-                    <Input label="Cargo" name="cargo" value={form.cargo} onChange={handleChange} />
-                    <Input label="Dirección empresa" name="direccionEmpresa" value={form.direccionEmpresa} onChange={handleChange} />
-                    <Input label="Teléfono empresa" name="telefonoEmpresa" value={form.telefonoEmpresa} onChange={handleChange} />
+                    <Input label="Cargo" name="cargo" value={form.cargo} onChange={handleChange} maxLength={100} />
+                    <Input label="Dirección empresa" name="direccionEmpresa" value={form.direccionEmpresa} onChange={handleChange} maxLength={150} />
+                    <Input label="Teléfono empresa" name="telefonoEmpresa" value={form.telefonoEmpresa} onChange={handleChange} digitsOnly maxLength={30} />
                   </Seccion>
 
                   {esMenorEdadFormulario && (
                     <Seccion titulo="Acudiente">
-                      <Input label="Nombre acudiente" name="nombreCompletoAcudiente" value={form.nombreCompletoAcudiente} onChange={handleChange} />
-                      <Input label="Relación acudiente" name="relacionAcudiente" value={form.relacionAcudiente} onChange={handleChange} />
-                      <Input label="Teléfono acudiente" name="telefonoAcudiente" value={form.telefonoAcudiente} onChange={handleChange} />
-                      <Input label="Correo acudiente" name="correoAcudiente" type="email" value={form.correoAcudiente} onChange={handleChange} />
-                      <Input label="Dirección acudiente" name="direccionAcudiente" value={form.direccionAcudiente} onChange={handleChange} />
+                      <Input label="Nombre acudiente" name="nombreCompletoAcudiente" value={form.nombreCompletoAcudiente} onChange={handleChange} maxLength={150} />
+                      <Input label="Relación acudiente" name="relacionAcudiente" value={form.relacionAcudiente} onChange={handleChange} maxLength={100} />
+                      <Input label="Teléfono acudiente" name="telefonoAcudiente" value={form.telefonoAcudiente} onChange={handleChange} digitsOnly maxLength={30} />
+                      <Input label="Correo acudiente" name="correoAcudiente" type="email" value={form.correoAcudiente} onChange={handleChange} maxLength={120} />
+                      <Input label="Dirección acudiente" name="direccionAcudiente" value={form.direccionAcudiente} onChange={handleChange} maxLength={150} />
                     </Seccion>
                   )}
 
                   <Seccion titulo="Servicio">
-                    <Input label="Cómo se enteró" name="comoSeEntero" value={form.comoSeEntero} onChange={handleChange} />
-                    <Input label="Relación con universidad" name="relacionConUniversidad" value={form.relacionConUniversidad} onChange={handleChange} />
+                    <Input label="Cómo se enteró" name="comoSeEntero" value={form.comoSeEntero} onChange={handleChange} maxLength={150} />
+                    <Input label="Relación con universidad" name="relacionConUniversidad" value={form.relacionConUniversidad} onChange={handleChange} maxLength={150} />
                   </Seccion>
 
                   <div className="rounded-xl border bg-muted/20 p-4">
@@ -1154,70 +1018,5 @@ export function PersonasForm() {
         onConfirm={confirmarDesactivarPersona}
       />
     </div>
-  );
-}
-
-function Seccion({ titulo, children }) {
-  return (
-    <section className="rounded-xl border bg-background p-4">
-      <h4 className="mb-4 border-b pb-2 font-semibold">{titulo}</h4>
-
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {children}
-      </div>
-    </section>
-  );
-}
-
-function Input({ label, name, value, onChange, type = "text", min }) {
-  return (
-    <label className="flex flex-col gap-1.5 text-sm">
-      <span className="font-medium">{label}</span>
-      <input
-        type={type}
-        name={name}
-        value={value ?? ""}
-        min={min}
-        onChange={onChange}
-        className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      />
-    </label>
-  );
-}
-
-function Select({ label, name, value, onChange, options, disabled = false }) {
-  return (
-    <label className="flex flex-col gap-1.5 text-sm">
-      <span className="font-medium">{label}</span>
-      <select
-        name={name}
-        value={value ?? ""}
-        onChange={onChange}
-        disabled={disabled}
-        className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <option value="">Seleccione una opción</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function Checkbox({ label, name, checked, onChange }) {
-  return (
-    <label className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
-      <input
-        type="checkbox"
-        name={name}
-        checked={Boolean(checked)}
-        onChange={onChange}
-        className="h-4 w-4"
-      />
-      <span>{label}</span>
-    </label>
   );
 }

@@ -1,10 +1,11 @@
 "use client"
 
+import { apiClient } from "@/lib/apiClient";
 /**
- * Formulario de gestión de tipos de consulta jurídica.
+ * Form handling.
  *
- * Permite crear, editar y desactivar tipos agrupados por tema.
- * Requiere permiso `GESTIONAR_CATALOGOS`.
+ * Implementation detail.
+ * Permission and authorization handling.
  *
  * @module components/forms/catalogos/TipoForm
  */
@@ -28,8 +29,8 @@ import Pagination from "@/components/ui/Pagination";
 import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils";
 
 /**
- * Formulario para gestionar tipos en el catálogo.
- * @returns {JSX.Element} Componente de formulario de tipos.
+ * Form handling.
+ * @returns {JSX.Element} Result value.
  */
 export function TipoForm() {
   const router = useRouter();
@@ -59,7 +60,7 @@ export function TipoForm() {
   useEffect(() => {
     const verificarYCargar = async () => {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, {
+        const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
           method: "GET",
           credentials: "include",
         });
@@ -81,7 +82,7 @@ export function TipoForm() {
           return;
         }
 
-        const response = await fetch(`${API_URL_BASE}/temas`, {
+        const response = await apiClient.request(`${API_URL_BASE}/temas`, {
           credentials: "include",
         });
 
@@ -121,7 +122,7 @@ export function TipoForm() {
   }, [router]);
 
   async function cargarTipos() {
-    const res = await fetch(`${API_URL_BASE}/tipos`, {
+    const res = await apiClient.request(`${API_URL_BASE}/tipos`, {
       credentials: "include",
     });
 
@@ -157,7 +158,7 @@ export function TipoForm() {
     try {
       setDesactivando(true);
 
-      const res = await fetch(
+      const res = await apiClient.request(
         `${API_URL_BASE}/tipos/${tipoADesactivar.id}/activo?activo=false`,
         {
           method: "PATCH",
@@ -184,8 +185,33 @@ export function TipoForm() {
   }
 
   const onSubmit = async (data) => {
+    const nombre = String(data?.nombre || "").trim();
+    const temaId = String(data?.temaId || "");
+    const duplicado = tipos.find((tipo) =>
+      String(tipo?.nombre || "").trim().toLowerCase() === nombre.toLowerCase()
+      && String(tipo?.temaId ?? tipo?.tema?.id ?? "") === temaId
+      && String(tipo?.id) !== String(editandoId || "")
+    );
+
+    if (duplicado) {
+      toast.error("Ya existe un tipo con ese nombre en el tema seleccionado");
+      return;
+    }
+
     if (editandoId) {
-      const res = await fetch(`${API_URL_BASE}/tipos/${editandoId}`, {
+      const actual = tipos.find((tipo) => String(tipo?.id) === String(editandoId));
+      const sinCambios = actual
+        && String(actual?.nombre || "").trim().toLowerCase() === nombre.toLowerCase()
+        && String(actual?.temaId ?? actual?.tema?.id ?? "") === temaId;
+
+      if (sinCambios) {
+        toast.info("No hay cambios para actualizar");
+        return;
+      }
+    }
+
+    if (editandoId) {
+      const res = await apiClient.request(`${API_URL_BASE}/tipos/${editandoId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -252,7 +278,8 @@ export function TipoForm() {
           label="Nombre del tipo"
           register={register}
           errors={errors}
-          rules={{ required: "El nombre es obligatorio" }}
+          rules={{ required: "El nombre es obligatorio", maxLength: { value: 80, message: "El nombre no puede superar los 80 caracteres" } }}
+          maxLength={80}
         />
 
         <FormSelect

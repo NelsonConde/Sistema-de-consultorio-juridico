@@ -1,16 +1,19 @@
+"use client"
+
 /**
- * Formulario de gestión de áreas jurídicas.
+ * Form handling.
  *
- * Permite crear, editar y desactivar áreas. Incluye tabla paginada
- * con las áreas registradas y diálogo de confirmación para desactivar.
+ * Handles list pagination consistently.
+ * Implementation detail.
  *
- * Requiere permiso `GESTIONAR_CATALOGOS`. Si el usuario no tiene sesión
- * válida redirige a `/`; si no tiene permiso suficiente redirige a `/inicio`.
+ * Permission and authorization handling.
+ * Permission and authorization handling.
  *
  * @module components/forms/catalogos/AreaForm
  */
-"use client"
 
+
+import { apiClient } from "@/lib/apiClient";
 import React, { useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
 import { FormInput } from "../parts/FormInput"
@@ -26,8 +29,8 @@ import Pagination from "@/components/ui/Pagination"
 import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils"
 
 /**
- * Formulario para gestionar áreas de catálogo.
- * @returns {JSX.Element} Componente de formulario de áreas.
+ * Form handling.
+ * @returns {JSX.Element} Result value.
  */
 export function AreaForm() {
   const router = useRouter()
@@ -52,7 +55,7 @@ export function AreaForm() {
   useEffect(() => {
     async function verificar() {
       try {
-        const res = await fetch(`${API_URL_BASE}/auth/me`, {
+        const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
           credentials: "include",
         })
 
@@ -86,12 +89,12 @@ export function AreaForm() {
   }, [router])
 
   /**
-   * Carga la lista de áreas desde el backend y actualiza el estado.
-   * Redirige a raíz si la sesión expiró (401) o muestra toast si hay error de red.
+   * List and table handling.
+   * Error handling.
    */
   async function cargarAreas() {
     try {
-      const res = await fetch(`${API_URL_BASE}/areas`, {
+      const res = await apiClient.request(`${API_URL_BASE}/areas`, {
         credentials: "include",
       })
 
@@ -138,7 +141,7 @@ export function AreaForm() {
     try {
       setConfirmLoading(true)
 
-      const res = await fetch(
+      const res = await apiClient.request(
         `${API_URL_BASE}/areas/${confirmDialog.id}/activo?activo=false`,
         {
           method: "PATCH",
@@ -165,13 +168,31 @@ export function AreaForm() {
   }
 
   /**
-   * Envía el formulario al backend (POST para crear, PUT para editar).
-   * Muestra toast de éxito o error según el resultado.
-   * Recarga la lista de áreas si la operación fue exitosa.
+   * Form handling.
+   * Error handling.
+   * List and table handling.
    *
-   * @param {{ nombre: string }} data - Datos del formulario validados por react-hook-form.
+   * @param {{ nombre: string }} data - Parameter description.
    */
   const onSubmit = async (data) => {
+    const nombre = String(data?.nombre || "").trim()
+    const existente = areas.find(
+      (area) => String(area?.nombre || "").trim().toLowerCase() === nombre.toLowerCase()
+    )
+
+    if (existente && String(existente.id) !== String(editandoId || "")) {
+      toast.error("Ya existe un área con ese nombre")
+      return
+    }
+
+    if (editandoId) {
+      const actual = areas.find((area) => String(area.id) === String(editandoId))
+      if (actual && String(actual.nombre || "").trim().toLowerCase() === nombre.toLowerCase()) {
+        toast.info("No hay cambios para actualizar")
+        return
+      }
+    }
+
     setIsSubmitting(true)
 
     try {
@@ -181,7 +202,7 @@ export function AreaForm() {
 
       const method = editandoId ? "PUT" : "POST"
 
-      const res = await fetch(url, {
+      const res = await apiClient.request(url, {
         method,
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -254,7 +275,8 @@ export function AreaForm() {
           label="Nombre del área"
           register={register}
           errors={errors}
-          rules={{ required: "El nombre es obligatorio" }}
+          rules={{ required: "El nombre es obligatorio", maxLength: { value: 50, message: "El nombre no puede superar los 50 caracteres" } }}
+          maxLength={50}
         />
 
         <div className="flex gap-3">
