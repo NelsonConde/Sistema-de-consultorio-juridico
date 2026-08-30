@@ -444,34 +444,45 @@ export function InicioForm() {
   const [error, setError] = React.useState("")
   const { año, semestre } = calcularSemestreActual()
 
-  // ── fetch stats ────────────────────────────────────────────────────────────
   const cargarStats = React.useCallback(async (u) => {
-    setCargandoStats(true); setError("")
+    setCargandoStats(true)
+    setError("")
+
     try {
       let url = null
+
       if (tienePermiso(u, PERMISOS.VER_REPORTES) || esAdministrativo(u)) {
         url = `${API_URL_BASE}/estadisticas/${año}/semestre/${semestre}`
-      } else if (tienePermiso(u, PERMISOS.VER_CONSULTAS)) {
-        const pid = u.perfilId
-        if (!pid) { setStats(null); return }
-        if (esAsesor(u))          url = `${API_URL_BASE}/estadisticas/${año}/semestre/${semestre}/asesor/${pid}`
-        else if (esMonitor(u))    url = `${API_URL_BASE}/estadisticas/${año}/semestre/${semestre}/monitor/${pid}`
-        else if (esEstudiante(u)) url = `${API_URL_BASE}/estadisticas/${año}/semestre/${semestre}/estudiante/${pid}`
+      } else if (
+          tienePermiso(u, PERMISOS.VER_CONSULTAS) &&
+          (esAsesor(u) || esMonitor(u) || esEstudiante(u))
+      ) {
+        url = `${API_URL_BASE}/estadisticas/${año}/semestre/${semestre}/me`
       }
-      if (!url) { setStats(null); return }
-      const { response: res, data, correlationId } = await apiResponse(url, { method: "GET" })
+
+      if (!url) {
+        setStats(null)
+        return
+      }
+
+      const { response: res, data, correlationId } = await apiResponse(url, {
+        method: "GET",
+      })
+
       if (!res.ok) {
         setStats(null)
         setError(
-          withErrorReference(
-            "No se pudieron cargar las estadísticas.",
-            correlationId
-          )
+            withErrorReference(
+                "No se pudieron cargar las estadísticas.",
+                correlationId
+            )
         )
         return
       }
+
       setStats(data)
     } catch {
+      setStats(null)
       setError("No se pudieron cargar las estadísticas.")
     } finally {
       setCargandoStats(false)

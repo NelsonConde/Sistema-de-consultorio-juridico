@@ -57,8 +57,13 @@ public class EstadisticasController {
     @GetMapping("/reporte")
     @PreAuthorize("hasAuthority('" + VER_REPORTES + "')")
     public EstadisticasSemestreDTO obtenerPorRango(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin) {
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate fechaInicio,
+
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate fechaFin) {
         return estadisticasService.obtenerPorRango(fechaInicio, fechaFin);
     }
 
@@ -66,37 +71,62 @@ public class EstadisticasController {
     @GetMapping("/reporte/pdf")
     @PreAuthorize("hasAuthority('" + VER_REPORTES + "')")
     public ResponseEntity<byte[]> descargarPdfRango(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin) {
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate fechaInicio,
+
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate fechaFin) {
         byte[] pdf = estadisticasService.generarPdfRango(fechaInicio, fechaFin);
-        return pdfResponse(pdf, "estadisticas-" + fechaInicio + "-" + fechaFin + ".pdf");
+        return pdfResponse(
+                pdf,
+                "estadisticas-" + fechaInicio + "-" + fechaFin + ".pdf");
     }
 
-    // Estadísticas por perfil — inicio/dashboard.
-    @GetMapping("/{año}/semestre/{semestre}/estudiante/{id}")
+    // Estadísticas del perfil autenticado — inicio/dashboard.
+    @GetMapping("/{año}/semestre/{semestre}/me")
     @PreAuthorize("hasAuthority('" + VER_CONSULTAS + "')")
+    public EstadisticasSemestreDTO obtenerPorPerfilActual(
+            @PathVariable int año,
+            @PathVariable int semestre) {
+        return estadisticasService.obtenerPorPerfilActual(año, semestre);
+    }
+
+    // Consultas por identificador reservadas para reportes administrativos.
+    @GetMapping("/{año}/semestre/{semestre}/estudiante/{id}")
+    @PreAuthorize("hasAuthority('" + VER_REPORTES + "')")
     public EstadisticasSemestreDTO obtenerPorEstudiante(
-            @PathVariable int año, @PathVariable int semestre, @PathVariable Long id) {
+            @PathVariable int año,
+            @PathVariable int semestre,
+            @PathVariable Long id) {
         return estadisticasService.obtenerPorEstudiante(año, semestre, id);
     }
 
     @GetMapping("/{año}/semestre/{semestre}/asesor/{id}")
-    @PreAuthorize("hasAuthority('" + VER_CONSULTAS + "')")
+    @PreAuthorize("hasAuthority('" + VER_REPORTES + "')")
     public EstadisticasSemestreDTO obtenerPorAsesor(
-            @PathVariable int año, @PathVariable int semestre, @PathVariable Long id) {
+            @PathVariable int año,
+            @PathVariable int semestre,
+            @PathVariable Long id) {
         return estadisticasService.obtenerPorAsesor(año, semestre, id);
     }
 
     @GetMapping("/{año}/semestre/{semestre}/monitor/{id}")
-    @PreAuthorize("hasAuthority('" + VER_CONSULTAS + "')")
+    @PreAuthorize("hasAuthority('" + VER_REPORTES + "')")
     public EstadisticasSemestreDTO obtenerPorMonitor(
-            @PathVariable int año, @PathVariable int semestre, @PathVariable Long id) {
+            @PathVariable int año,
+            @PathVariable int semestre,
+            @PathVariable Long id) {
         return estadisticasService.obtenerPorMonitor(año, semestre, id);
     }
 
-    private ResponseEntity<byte[]> pdfResponse(byte[] pdf, String nombreArchivo) {
+    private ResponseEntity<byte[]> pdfResponse(
+            byte[] pdf,
+            String nombreArchivo) {
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION,
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"" + nombreArchivo + "\"")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);
