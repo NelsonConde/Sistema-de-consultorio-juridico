@@ -85,10 +85,10 @@ public class BrevoEmailService implements EmailService {
             throw ex;
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
-            log.error("Envío de correo de {} interrumpido", tipoCorreo, ex);
+            log.error("Envío de correo de {} interrumpido. Tipo: {}", tipoCorreo, ex.getClass().getName());
             throw new BusinessException("No se pudo enviar el correo de " + tipoCorreo);
         } catch (Exception ex) {
-            log.error("Error enviando correo de {}. Mensaje: {}", tipoCorreo, ex.getMessage(), ex);
+            log.error("Error enviando correo de {}. Tipo: {}", tipoCorreo, ex.getClass().getName());
             throw new BusinessException("No se pudo enviar el correo de " + tipoCorreo);
         }
     }
@@ -126,10 +126,9 @@ public class BrevoEmailService implements EmailService {
         }
 
         log.error(
-                "Brevo no pudo enviar el correo de {}. Status: {}. Body: {}",
+                "Brevo no pudo enviar el correo de {}. Status: {}",
                 tipoCorreo,
-                response.statusCode(),
-                response.body());
+                response.statusCode());
 
         throw new BusinessException("No se pudo enviar el correo de " + tipoCorreo);
     }
