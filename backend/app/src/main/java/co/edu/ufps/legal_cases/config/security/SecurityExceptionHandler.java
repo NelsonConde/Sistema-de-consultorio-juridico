@@ -10,6 +10,7 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 
 import co.edu.ufps.legal_cases.common.exception.dto.ErrorResponseDTO;
+import co.edu.ufps.legal_cases.common.observability.CorrelationIdContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import tools.jackson.databind.json.JsonMapper;
@@ -71,6 +72,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
                 .error(error)
                 .mensaje(mensaje)
                 .ruta(request.getRequestURI())
+                .correlacionId(CorrelationIdContext.getOrCreate(request))
                 .build();
     }
 
@@ -80,6 +82,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
             ErrorResponseDTO error) throws IOException {
 
         response.setStatus(status.value());
+        response.setHeader(CorrelationIdContext.HEADER_NAME, error.getCorrelacionId());
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
 

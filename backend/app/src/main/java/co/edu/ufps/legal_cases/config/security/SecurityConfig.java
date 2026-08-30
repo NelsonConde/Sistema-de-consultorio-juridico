@@ -10,10 +10,12 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
+import co.edu.ufps.legal_cases.common.observability.CorrelationIdFilter;
 import co.edu.ufps.legal_cases.security.filter.jwt.JwtAuthenticationFilter;
 
 @Configuration
@@ -38,6 +40,7 @@ public class SecurityConfig {
 };
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final CorrelationIdFilter correlationIdFilter;
     private final SecurityExceptionHandler securityExceptionHandler;
     private final CsrfTokenRepository csrfTokenRepository;      // Interfaz para almacenar y recuperar tokens CSRF de la cookie.
 
@@ -84,6 +87,11 @@ public class SecurityConfig {
 
                         // Todo lo demás requiere autenticación.
                         .anyRequest().authenticated())
+
+                // La correlacion debe existir antes de autenticacion/autorizacion.
+                .addFilterBefore(
+                        correlationIdFilter,
+                        SecurityContextHolderFilter.class)
 
                 // El filtro JWT valida el token antes del filtro estándar de usuario/password.
                 .addFilterBefore(
