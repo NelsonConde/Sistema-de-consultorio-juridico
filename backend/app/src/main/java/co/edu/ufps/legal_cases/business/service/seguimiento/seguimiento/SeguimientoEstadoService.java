@@ -12,6 +12,7 @@ import co.edu.ufps.legal_cases.business.repository.seguimiento.respuesta.Seguimi
 import co.edu.ufps.legal_cases.business.service.consulta.consulta.ConsultaEstadoService;
 import co.edu.ufps.legal_cases.business.service.seguimiento.SeguimientoNotificacionService;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import jakarta.persistence.EntityManager;
 import lombok.AllArgsConstructor;
 
 @Service
@@ -23,6 +24,7 @@ public class SeguimientoEstadoService {
     private final SeguimientoNotificacionService seguimientoNotificacionService;
     private final SeguimientoValidator seguimientoValidator;
     private final ConsultaEstadoService consultaEstadoService;
+    private final EntityManager entityManager;
 
     @Transactional
     public Seguimiento cambiarEstado(Long seguimientoId, EstadoSeguimiento estado) {
@@ -36,6 +38,9 @@ public class SeguimientoEstadoService {
         seguimiento.setEstado(estado);
 
         Seguimiento seguimientoGuardado = seguimientoRepository.save(seguimiento);
+
+        // Confirma el UPDATE versionado antes de ejecutar efectos derivados.
+        entityManager.flush();
 
         aplicarEfectosPorEstado(seguimientoGuardado);
 
@@ -61,6 +66,8 @@ public class SeguimientoEstadoService {
         seguimiento.setEstado(EstadoSeguimiento.COMPLETADO);
 
         Seguimiento seguimientoGuardado = seguimientoRepository.save(seguimiento);
+
+        entityManager.flush();
 
         aplicarEfectosPorEstado(seguimientoGuardado);
 

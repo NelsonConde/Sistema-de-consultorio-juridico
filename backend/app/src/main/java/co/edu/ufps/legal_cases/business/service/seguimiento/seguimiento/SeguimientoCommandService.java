@@ -17,9 +17,11 @@ import co.edu.ufps.legal_cases.business.repository.seguimiento.SeguimientoReposi
 import co.edu.ufps.legal_cases.business.service.acceso.seguimiento.SeguimientoAccessService;
 import co.edu.ufps.legal_cases.business.service.consulta.consulta.ConsultaEstadoService;
 import co.edu.ufps.legal_cases.business.service.seguimiento.SeguimientoNotificacionService;
+import co.edu.ufps.legal_cases.common.concurrency.ConcurrenciaOptimistaValidator;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
 import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaRepository;
+import jakarta.persistence.EntityManager;
 import lombok.AllArgsConstructor;
 
 @Service
@@ -36,10 +38,15 @@ public class SeguimientoCommandService {
     private final SeguimientoMapper seguimientoMapper;
     private final SeguimientoValidator seguimientoValidator;
     private final ConsultaEstadoService consultaEstadoService;
+    private final ConcurrenciaOptimistaValidator concurrenciaOptimistaValidator;
+    private final EntityManager entityManager;
 
     @Transactional
     @Auditable(action = "CREAR_SEGUIMIENTO", entityName = "Seguimiento")
     public SeguimientoResponseDTO crear(SeguimientoRequestDTO dto) {
+        concurrenciaOptimistaValidator
+                .validarVersionNoEnviadaEnCreacion(dto.getVersion());
+
         seguimientoValidator.validarCreacion(dto);
         seguimientoAccessService.validarPuedeCrearSeguimiento(dto.getConsultaId());
 
@@ -57,6 +64,9 @@ public class SeguimientoCommandService {
 
         Seguimiento seguimientoGuardado = seguimientoRepository.save(seguimiento);
 
+        // Fuerza INSERT y deja establecida la versión antes de ejecutar efectos asociados.
+        entityManager.flush();
+
         // Las notificaciones dependen del id del seguimiento, por eso se sincronizan
         // después de guardar.
         seguimientoNotificacionService.sincronizarNotificaciones(seguimientoGuardado.getId());
@@ -71,6 +81,11 @@ public class SeguimientoCommandService {
 
         Seguimiento seguimiento = buscarPorId(id);
 
+        concurrenciaOptimistaValidator.validarVersion(
+                dto.getVersion(),
+                seguimiento.getVersion(),
+                "seguimiento");
+
         consultaEstadoService.validarPermiteOperacionOperativa(seguimiento.getConsulta());
 
         seguimientoValidator.validarSeguimientoEditable(seguimiento);
@@ -84,6 +99,10 @@ public class SeguimientoCommandService {
         seguimientoMapper.aplicarDatos(seguimiento, datos);
 
         Seguimiento seguimientoGuardado = seguimientoRepository.save(seguimiento);
+
+        // El conflicto debe detectarse antes de ejecutar efectos secundarios
+        // como sincronizar o cancelar notificaciones.
+        entityManager.flush();
 
         // Solo los seguimientos pendientes conservan notificaciones activas.
         seguimientoEstadoService.aplicarEfectosPorEstado(seguimientoGuardado);
@@ -118,6 +137,7 @@ public class SeguimientoCommandService {
         seguimiento.setActivo(false);
 
         seguimientoRepository.save(seguimiento);
+        entityManager.flush();
     }
 
     private DatosSeguimiento prepararDatos(SeguimientoRequestDTO dto) {

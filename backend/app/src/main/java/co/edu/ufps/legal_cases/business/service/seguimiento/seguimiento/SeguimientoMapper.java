@@ -13,6 +13,7 @@ public class SeguimientoMapper {
         SeguimientoResponseDTO dto = new SeguimientoResponseDTO();
 
         dto.setId(seguimiento.getId());
+        dto.setVersion(seguimiento.getVersion());
         dto.setDescripcion(seguimiento.getDescripcion());
         dto.setFechaEntrega(seguimiento.getFechaEntrega());
         dto.setDiasNotificacion(seguimiento.getDiasNotificacion());

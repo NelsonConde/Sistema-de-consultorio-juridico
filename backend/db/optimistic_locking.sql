@@ -40,4 +40,18 @@ ALTER TABLE "DB_consultorioJuridico".proceso
 ALTER TABLE "DB_consultorioJuridico".proceso
     ALTER COLUMN version SET NOT NULL;
 
+-- Seguimiento
+ALTER TABLE "DB_consultorioJuridico".seguimiento
+    ADD COLUMN IF NOT EXISTS version BIGINT;
+
+UPDATE "DB_consultorioJuridico".seguimiento
+SET version = 0
+WHERE version IS NULL;
+
+ALTER TABLE "DB_consultorioJuridico".seguimiento
+    ALTER COLUMN version SET DEFAULT 0;
+
+ALTER TABLE "DB_consultorioJuridico".seguimiento
+    ALTER COLUMN version SET NOT NULL;
+
 COMMIT;
