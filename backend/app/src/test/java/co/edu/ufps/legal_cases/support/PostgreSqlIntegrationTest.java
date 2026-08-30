@@ -12,13 +12,12 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 public abstract class PostgreSqlIntegrationTest {
 
     @Container
-    protected static final PostgreSQLContainer<?> POSTGRESQL =
-            new PostgreSQLContainer<>("postgres:16-alpine")
+    protected static final PostgreSQLContainer POSTGRESQL =
+            new PostgreSQLContainer("postgres:16-alpine")
                     .withDatabaseName("legal_cases_test")
                     .withUsername("legal_cases")
                     .withPassword("legal_cases")
-                    .withInitScript(
-                            "db/postgresql-test-init.sql");
+                    .withInitScript("db/postgresql-test-init.sql");
 
     @DynamicPropertySource
     protected static void configurarPostgreSql(
