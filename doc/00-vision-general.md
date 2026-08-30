@@ -64,7 +64,7 @@ El sistema expone endpoints para carga, carga múltiple, descarga, listado y dir
 
 ### Auditoría
 
-La auditoría se implementa con una anotación `@Auditable` y un aspecto AOP que registra acciones exitosas de servicios marcados. Existe un endpoint administrativo para consultar registros paginados.
+La auditoría se implementa con eventos estructurados e inmutables. Registra éxitos, fallos, denegaciones, lecturas y descargas sensibles con actor, correlación, origen y campos expresamente permitidos. Su consulta exige un permiso dedicado.
 
 ### Estadísticas
 

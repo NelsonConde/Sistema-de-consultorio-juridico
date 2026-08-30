@@ -1,94 +1,55 @@
-# Backend - Auditoría
+# Backend - Auditoría probatoria
 
-> Documento ajustado contra el código fuente actual. Describe la auditoría implementada mediante anotación, aspecto AOP y consulta paginada.
+## Propósito
 
-## 1. Propósito
+El módulo conserva una bitácora estructurada, consultable e inmutable de operaciones críticas. La auditoría es independiente de los logs operativos: no almacena trazas, argumentos completos, contraseñas, tokens, cookies, documentos, correos ni representaciones `toString()` de objetos JVM.
 
-El módulo de auditoría registra acciones relevantes ejecutadas sobre entidades del sistema. Su objetivo es conservar trazabilidad técnica de operaciones funcionales y administrativas sin acoplar esa lógica a los servicios de negocio.
+## Contrato de evento
 
----
+Cada fila registra:
 
-## 2. Componentes principales
+- actor (`actorUsername`), acción y entidad/identificador explícitos;
+- resultado `SUCCESS`, `FAILURE` o `DENIED`;
+- instante UTC, origen `HTTP`/`SYSTEM`, IP, agente y correlación;
+- código/motivo funcional cuando está permitido;
+- snapshots escalares anterior/nuevo declarados mediante `trackedFields`;
+- metadatos escalares incluidos en la lista permitida de la anotación.
 
-| Componente | Responsabilidad |
-|---|---|
-| `@Auditable` | Anotación para marcar métodos auditables. |
-| `AuditAspect` | Intercepta métodos anotados y construye el evento de auditoría. |
-| `AuditLogService` | Guarda auditoría de forma asíncrona y consulta registros. |
-| `AuditLogRepository` | Acceso a persistencia de auditoría. |
-| `AuditLog` | Entidad JPA del registro histórico. |
-| `AuditLogDTO` | DTO expuesto por la API. |
-| `AuditLogController` | Expone `GET /api/audit`. |
+`AuditExpressionEvaluator` acepta únicamente escalares y rechaza claves sensibles. `AuditStateSnapshotService` sólo consulta propiedades declaradas; no descubre identificadores ni serializa objetos por heurística.
 
----
+## Ejecución y transacciones
 
-## 3. Registro con `@Auditable`
+El modelo elegido es síncrono, sin `@Async`:
 
-Los métodos de escritura que requieren trazabilidad se anotan con `@Auditable`, indicando:
+- un éxito de escritura participa en la transacción del caso de uso;
+- si esa transacción hace rollback, el éxito desaparece y se crea evidencia `FAILURE` en una transacción independiente;
+- una excepción o denegación se persiste con `REQUIRES_NEW`, por lo que sobrevive al rollback;
+- lecturas y descargas, cuyas transacciones son read-only, se registran en una transacción independiente.
 
-- acción;
-- nombre de entidad.
+El orden transaccional está declarado en `App` y `AuditAspect`. Un fallo al escribir la auditoría de una operación crítica impide presentar esa operación como correctamente auditada.
 
-El aspecto `AuditAspect` usa `@AfterReturning`, por lo que registra los métodos marcados explícitamente con `@Auditable` cuando terminan correctamente y retornan control al flujo.
+## Cobertura
 
----
+`@Auditable` cubre comandos de consultas, personas, perfiles, procesos, seguimientos y conciliaciones. También se auditan:
 
-## 4. Registro asíncrono
+- lectura individual/listado de personas y consultas jurídicas;
+- listado de archivos y preparación de una descarga firmada;
+- excepciones de autorización dentro de casos de uso;
+- rechazos 401/403 generados antes de entrar a un caso de uso.
 
-`AuditLogService.logAction` está anotado con `@Async` y `@Transactional`. Esto permite enviar el registro de auditoría sin bloquear el hilo principal del servicio de negocio.
+## Consulta y autorización
 
-El registro contiene:
+`GET /api/audit` requiere exclusivamente `Ver auditoría`. La página debe estar entre 0 y el tamaño entre 1 y 100; el ordenamiento usa una lista blanca. Se admiten filtros por actor, acción, entidad, resultado, correlación e intervalo UTC.
 
-- usuario autenticado o `SISTEMA` cuando no hay autenticación válida;
-- acción;
-- entidad;
-- identificador de entidad;
-- fecha y hora;
-- detalles del método ejecutado y argumentos.
+El permiso se crea a partir de `PermisoNombre` y debe asignarse expresamente al rol autorizado. `Acceder administración` no concede acceso implícito a la bitácora.
 
----
+## Inmutabilidad y despliegue
 
-## 5. Extracción del identificador de entidad
+La migración `backend/app/db/migration/V20260830_01__restructure_audit_log.sql`:
 
-`AuditAspect` extrae `entityId` de forma heurística:
+- migra actor e instante heredados;
+- elimina `details` y las columnas antiguas;
+- crea restricciones e índices;
+- instala un trigger que rechaza `UPDATE` y `DELETE` en el esquema institucional.
 
-1. intenta leer `getId()` del resultado;
-2. intenta leer getters terminados en `Id` del resultado;
-3. revisa argumentos `Long` o `String`;
-4. intenta leer `getId()` o getters terminados en `Id` de los argumentos.
-
-Si no encuentra identificador, el registro se guarda sin `entityId`.
-
----
-
-## 6. Consulta de auditoría
-
-El controller expone:
-
-```http
-GET /api/audit?page=0&size=20&username=usuario&sortBy=timestamp&sortDir=desc
-```
-
-La consulta requiere `ACCEDER_ADMINISTRACION`.
-
-Parámetros:
-
-| Parámetro | Descripción | Valor por defecto |
-|---|---|---|
-| `page` | Página solicitada, base cero | `0` |
-| `size` | Tamaño de página | `20` |
-| `username` | Filtro opcional por usuario | no requerido |
-| `sortBy` | Campo de ordenamiento | `timestamp` |
-| `sortDir` | Dirección de ordenamiento | `desc` |
-
----
-
-## 7. Protección de registros
-
-El paquete incluye el script:
-
-```text
-backend/db/triggers/audit_immutable.sql
-```
-
-Este recurso permite reforzar el carácter histórico de la tabla de auditoría a nivel de base de datos cuando se aplica en el ambiente correspondiente. El registro de eventos se realiza desde el módulo backend de auditoría y su consulta HTTP se ofrece mediante `GET /api/audit`.
+El procedimiento de aplicación y recuperación se documenta en `backend/app/db/migration/README.md`.

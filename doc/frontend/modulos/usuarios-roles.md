@@ -273,7 +273,7 @@ Endpoint usado:
 GET /api/audit?page={page}&size={size}&username={username}&sortBy={sortBy}&sortDir={sortDir}
 ```
 
-La tabla consume la paginación del backend con índice base cero. Desde la interfaz se maneja página visual base uno y se envía `page - 1` al backend. Permite búsqueda por `username`, ordenamiento por `timestamp` o `username`, y visualización de detalles en diálogo modal.
+La tabla consume la paginación del backend con índice base cero. Desde la interfaz se maneja página visual base uno y se envía `page - 1` al backend. Permite búsqueda por actor, ordenamiento por `occurredAt` o `actorUsername`, muestra el resultado del evento y abre su evidencia estructurada (correlación, origen, motivo, valores anterior/nuevo y metadatos permitidos). La consulta requiere `Ver auditoría`.
 
 ## 10. Vista de estudiantes
 

@@ -1036,17 +1036,23 @@ Campos principales:
 | Columna | Uso |
 |---|---|
 | `id` | Identificador. |
-| `created_date` | Fecha de creación del registro de auditoría. |
-| `username` | Usuario asociado a la acción. |
+| `occurred_at` | Instante UTC del evento. |
+| `actor_username` | Actor asociado a la acción. |
 | `action` | Acción auditada. |
 | `entity_name` | Entidad lógica auditada. |
 | `entity_id` | Identificador afectado cuando está disponible. |
-| `details` | Detalle adicional. |
+| `outcome` | Resultado `SUCCESS`, `FAILURE` o `DENIED`. |
+| `source` | Origen `HTTP` o `SYSTEM`. |
+| `correlation_id` | Identificador de correlación. |
+| `ip_address`, `user_agent` | Origen técnico permitido. |
+| `reason_code`, `reason` | Código técnico seguro y motivo funcional explícito. |
+| `before_state_json`, `after_state_json` | Valores escalares anterior/nuevo permitidos. |
+| `metadata_json` | Metadatos escalares declarados. |
 
 Características:
 
-- la entidad usa listener de auditoría de Spring Data;
-- los campos principales no se actualizan después de registrados;
+- la entidad no expone setters;
+- un trigger versionado rechaza actualizaciones y eliminaciones;
 - la consulta se expone mediante módulo de auditoría.
 
 ## 10. Estadísticas
