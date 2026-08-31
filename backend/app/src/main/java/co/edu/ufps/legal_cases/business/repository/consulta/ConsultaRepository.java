@@ -592,11 +592,12 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
     // =====================================================
 
     @Query(value = """
-                SELECT COUNT(*) FILTER (WHERE c.resultado IS NOT NULL) AS finished_consultas,
-                       COUNT(*) FILTER (WHERE c.resultado IS NULL) AS unfinished_consultas
+                SELECT COUNT(*) FILTER (WHERE c.estado = 'CERRADO') AS finished_consultas,
+                       COUNT(*) FILTER (WHERE c.estado <> 'CERRADO' AND c.estado <> 'ARCHIVADO') AS unfinished_consultas
                 FROM "DB_consultorioJuridico".consulta c
-                WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                AND c.last_updated_at <= CAST(:fechaFin AS date)
+                WHERE c.fecha >= CAST(:fechaInicio AS date)
+                AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                 """, nativeQuery = true)
     List<Object[]> contarFinalizadasYPendientesPorRango(
             @Param("fechaInicio") String fechaInicio,
@@ -607,14 +608,16 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 FROM (
                     SELECT c.persona_id
                     FROM "DB_consultorioJuridico".consulta c
-                    WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                    AND c.last_updated_at <= CAST(:fechaFin AS date)
+                    WHERE c.fecha >= CAST(:fechaInicio AS date)
+                    AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                     UNION
                     SELECT cp.persona_id
                     FROM "DB_consultorioJuridico".consulta_parte cp
                     JOIN "DB_consultorioJuridico".consulta c ON c.id = cp.consulta_id
-                    WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                    AND c.last_updated_at <= CAST(:fechaFin AS date)
+                    WHERE c.fecha >= CAST(:fechaInicio AS date)
+                    AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                 ) AS personas_unicas
                 """, nativeQuery = true)
     List<Object[]> contarPersonasAtendidasPorRango(
@@ -624,8 +627,9 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
     @Query(value = """
                 SELECT c.estado, COUNT(c.id) AS total
                 FROM "DB_consultorioJuridico".consulta c
-                WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                AND c.last_updated_at <= CAST(:fechaFin AS date)
+                WHERE c.fecha >= CAST(:fechaInicio AS date)
+                AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                 GROUP BY c.estado ORDER BY total DESC
                 """, nativeQuery = true)
     List<Object[]> contarConsultasPorEstadoPorRango(
@@ -636,8 +640,9 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 SELECT a.id AS area_id, a.nombre AS area_nombre, COUNT(c.id) AS total_consultas
                 FROM "DB_consultorioJuridico".consulta c
                 JOIN "DB_consultorioJuridico".area a ON a.id = c.area_id
-                WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                AND c.last_updated_at <= CAST(:fechaFin AS date)
+                WHERE c.fecha >= CAST(:fechaInicio AS date)
+                AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                 GROUP BY a.id, a.nombre ORDER BY total_consultas DESC
                 """, nativeQuery = true)
     List<Object[]> contarConsultasPorAreaPorRango(
@@ -647,8 +652,9 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
     @Query(value = """
                 SELECT COALESCE(c.tipo_violencia, 'No aplica') AS tipo, COUNT(c.id) AS total
                 FROM "DB_consultorioJuridico".consulta c
-                WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                AND c.last_updated_at <= CAST(:fechaFin AS date)
+                WHERE c.fecha >= CAST(:fechaInicio AS date)
+                AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                 GROUP BY tipo ORDER BY total DESC
                 """, nativeQuery = true)
     List<Object[]> contarConsultasPorTipoViolenciaPorRango(
@@ -660,13 +666,15 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 FROM "DB_consultorioJuridico".persona p
                 WHERE p.id IN (
                     SELECT c.persona_id FROM "DB_consultorioJuridico".consulta c
-                    WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                    AND c.last_updated_at <= CAST(:fechaFin AS date)
+                    WHERE c.fecha >= CAST(:fechaInicio AS date)
+                    AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                     UNION
                     SELECT cp.persona_id FROM "DB_consultorioJuridico".consulta_parte cp
                     JOIN "DB_consultorioJuridico".consulta c ON c.id = cp.consulta_id
-                    WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                    AND c.last_updated_at <= CAST(:fechaFin AS date)
+                    WHERE c.fecha >= CAST(:fechaInicio AS date)
+                    AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                 )
                 GROUP BY p.genero ORDER BY total DESC
                 """, nativeQuery = true)
@@ -679,13 +687,15 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 FROM "DB_consultorioJuridico".persona p
                 WHERE p.id IN (
                     SELECT c.persona_id FROM "DB_consultorioJuridico".consulta c
-                    WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                    AND c.last_updated_at <= CAST(:fechaFin AS date)
+                    WHERE c.fecha >= CAST(:fechaInicio AS date)
+                    AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                     UNION
                     SELECT cp.persona_id FROM "DB_consultorioJuridico".consulta_parte cp
                     JOIN "DB_consultorioJuridico".consulta c ON c.id = cp.consulta_id
-                    WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                    AND c.last_updated_at <= CAST(:fechaFin AS date)
+                    WHERE c.fecha >= CAST(:fechaInicio AS date)
+                    AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                 )
                 GROUP BY p.estrato ORDER BY p.estrato
                 """, nativeQuery = true)
@@ -698,13 +708,15 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 FROM "DB_consultorioJuridico".persona p
                 WHERE p.id IN (
                     SELECT c.persona_id FROM "DB_consultorioJuridico".consulta c
-                    WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                    AND c.last_updated_at <= CAST(:fechaFin AS date)
+                    WHERE c.fecha >= CAST(:fechaInicio AS date)
+                    AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                     UNION
                     SELECT cp.persona_id FROM "DB_consultorioJuridico".consulta_parte cp
                     JOIN "DB_consultorioJuridico".consulta c ON c.id = cp.consulta_id
-                    WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                    AND c.last_updated_at <= CAST(:fechaFin AS date)
+                    WHERE c.fecha >= CAST(:fechaInicio AS date)
+                    AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                 )
                 GROUP BY p.zona ORDER BY total DESC
                 """, nativeQuery = true)
@@ -717,13 +729,15 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 FROM "DB_consultorioJuridico".persona p
                 WHERE p.id IN (
                     SELECT c.persona_id FROM "DB_consultorioJuridico".consulta c
-                    WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                    AND c.last_updated_at <= CAST(:fechaFin AS date)
+                    WHERE c.fecha >= CAST(:fechaInicio AS date)
+                    AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                     UNION
                     SELECT cp.persona_id FROM "DB_consultorioJuridico".consulta_parte cp
                     JOIN "DB_consultorioJuridico".consulta c ON c.id = cp.consulta_id
-                    WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                    AND c.last_updated_at <= CAST(:fechaFin AS date)
+                    WHERE c.fecha >= CAST(:fechaInicio AS date)
+                    AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                 )
                 GROUP BY p.grupo_etnico ORDER BY total DESC
                 """, nativeQuery = true)
@@ -737,13 +751,15 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 JOIN "DB_consultorioJuridico".municipio m ON m.id = p.municipio_id
                 WHERE p.id IN (
                     SELECT c.persona_id FROM "DB_consultorioJuridico".consulta c
-                    WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                    AND c.last_updated_at <= CAST(:fechaFin AS date)
+                    WHERE c.fecha >= CAST(:fechaInicio AS date)
+                    AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                     UNION
                     SELECT cp.persona_id FROM "DB_consultorioJuridico".consulta_parte cp
                     JOIN "DB_consultorioJuridico".consulta c ON c.id = cp.consulta_id
-                    WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                    AND c.last_updated_at <= CAST(:fechaFin AS date)
+                    WHERE c.fecha >= CAST(:fechaInicio AS date)
+                    AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                 )
                 GROUP BY m.nombre ORDER BY total DESC
                 """, nativeQuery = true)
@@ -757,13 +773,15 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
                 JOIN "DB_consultorioJuridico".condicion co ON co.id = p.condicion_actual_id
                 WHERE p.id IN (
                     SELECT c.persona_id FROM "DB_consultorioJuridico".consulta c
-                    WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                    AND c.last_updated_at <= CAST(:fechaFin AS date)
+                    WHERE c.fecha >= CAST(:fechaInicio AS date)
+                    AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                     UNION
                     SELECT cp.persona_id FROM "DB_consultorioJuridico".consulta_parte cp
                     JOIN "DB_consultorioJuridico".consulta c ON c.id = cp.consulta_id
-                    WHERE c.last_updated_at >= CAST(:fechaInicio AS date)
-                    AND c.last_updated_at <= CAST(:fechaFin AS date)
+                    WHERE c.fecha >= CAST(:fechaInicio AS date)
+                    AND c.fecha <= CAST(:fechaFin AS date)
+                AND c.estado <> 'ARCHIVADO'
                 )
                 GROUP BY co.nombre ORDER BY total DESC
                 """, nativeQuery = true)
