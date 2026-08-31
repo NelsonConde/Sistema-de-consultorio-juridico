@@ -1,13 +1,13 @@
 "use client"
 
 import { apiClient } from "@/lib/apiClient";
-import { readResponseBody } from "@/lib/api";
+import { ApiError, isConcurrencyConflict, readResponseBody, requireResourceVersion } from "@/lib/api";
 /**
- * Formulario de eliminación y reactivación de registros.
+ * Form handling.
  *
- * Permite cambiar el estado activo/inactivo de personas, usuarios,
- * estudiantes y consultas. Requiere los permisos correspondientes
- * según el tipo de recurso.
+ * State handling.
+ * Permission and authorization handling.
+ * Implementation detail.
  *
  * @module components/forms/EliminacionForm
  */
@@ -85,8 +85,8 @@ const SECCIONES = [
 ];
 
 /**
- * Normaliza un valor a texto para comparaciones internas.
- * @param {any} value - Valor a normalizar.
+ * Implementation detail.
+ * @param {any} value - Implementation detail.
  * @returns {string} Cadena normalizada.
  */
 function normalizar(value) {
@@ -94,18 +94,18 @@ function normalizar(value) {
 }
 
 /**
- * Determina si un registro está inactivo.
- * @param {Object} item - Registro de persona o perfil.
- * @returns {boolean} True si el registro se considera inactivo.
+ * Implementation detail.
+ * @param {Object} item - People workflow detail.
+ * @returns {boolean} Result value.
  */
 function estaInactivo(item) {
   return item?.activo === false || normalizar(item?.estado) === "INACTIVO";
 }
 
 /**
- * Determina si una consulta está archivada.
- * @param {Object} item - Registro de consulta.
- * @returns {boolean} True si la consulta está archivada.
+ * Consultation flow detail.
+ * @param {Object} item - Consultation flow detail.
+ * @returns {boolean} Result value.
  */
 function estaArchivadaConsulta(item) {
   const estado = normalizar(item?.estado);
@@ -114,9 +114,9 @@ function estaArchivadaConsulta(item) {
 }
 
 /**
- * Devuelve el nombre visible de un registro.
- * @param {Object} item - Registro de persona o consulta.
- * @returns {string} Nombre mostrado.
+ * Implementation detail.
+ * @param {Object} item - Consultation flow detail.
+ * @returns {string} Result value.
  */
 function nombrePersona(item) {
   return (
@@ -130,18 +130,18 @@ function nombrePersona(item) {
 }
 
 /**
- * Obtiene el documento o identificador de una persona.
- * @param {Object} item - Registro de persona.
- * @returns {string} Documento o identificador.
+ * Data loading behavior.
+ * @param {Object} item - People workflow detail.
+ * @returns {string} Result value.
  */
 function documentoPersona(item) {
-  return item?.documento || item?.numeroDocumento || item?.cedula || "N/A";
+  return item?.numeroDocumentoEnmascarado || item?.documento || item?.cedula || "N/A";
 }
 
 /**
- * Genera un texto descriptivo para una consulta.
- * @param {Object} item - Registro de consulta.
- * @returns {string} Texto descriptivo.
+ * Descriptive text.
+ * @param {Object} item - Consultation flow detail.
+ * @returns {string} Result value.
  */
 function textoConsulta(item) {
   return (
@@ -154,10 +154,10 @@ function textoConsulta(item) {
 }
 
 /**
- * Obtiene un detalle adicional según el tipo de registro.
- * @param {Object} item - Registro actual.
- * @param {string} tipo - Tipo de registro.
- * @returns {string} Detalle adicional.
+ * Data loading behavior.
+ * @param {Object} item - Current record.
+ * @param {string} tipo - Implementation detail.
+ * @returns {string} Result value.
  */
 function detalleItem(item, tipo) {
   if (tipo === "consulta") {
@@ -169,16 +169,16 @@ function detalleItem(item, tipo) {
   }
 
   if (tipo === "persona") {
-    return item?.tipoUsuario || item?.correo || item?.telefono || "Persona desactivada";
+    return item?.tipoPersona || item?.tipoUsuario || "Persona inactiva";
   }
 
   return item?.codigo || item?.usuario || item?.telefono || "Perfil desactivado";
 }
 
 /**
- * Lee la respuesta de la API y devuelve JSON o mensaje simple.
- * @param {Response} response - Respuesta HTTP recibida.
- * @returns {Promise<any>} Resultado parseado.
+ * Error handling.
+ * @param {Response} response - HTTP response to parse.
+ * @returns {Promise<any>} Result value.
  */
 async function leerRespuesta(response) {
   const data = await readResponseBody(response);
@@ -186,8 +186,8 @@ async function leerRespuesta(response) {
 }
 
 /**
- * Componente que muestra registros desactivados y permite reactivarlos.
- * @returns {JSX.Element} Formulario de eliminación.
+ * Component implementation detail.
+ * @returns {JSX.Element} Result value.
  */
 export function EliminacionForm() {
   const [seccionActiva, setSeccionActiva] = useState("personas");
@@ -314,6 +314,18 @@ export function EliminacionForm() {
             }
 
             const json = await res.json();
+
+            if (item.id === "personas" && !Array.isArray(json)) {
+              // Pagination handling.
+              // Pagination handling.
+              // List and table handling.
+              console.warn(
+                "SEC-07: reactivación de Personas pendiente de endpoint backend para inactivas"
+              );
+              resultados[item.id] = [];
+              return;
+            }
+
             resultados[item.id] = Array.isArray(json) ? json : [];
           } catch (error) {
             console.error(`Error cargando ${item.titulo}`, error);
@@ -347,7 +359,7 @@ export function EliminacionForm() {
       if (seccion.reactivar === "consulta") {
         await reactivarConsulta(itemAReactivar);
       } else {
-        await reactivarActivo(seccion.endpoint, itemAReactivar.id);
+        await reactivarActivo(seccion.endpoint, itemAReactivar);
       }
 
       toast.success(
@@ -358,6 +370,13 @@ export function EliminacionForm() {
       await cargarTodo();
     } catch (error) {
       console.error(error);
+      if (isConcurrencyConflict(error)) {
+        toast.error("El registro cambió antes de reactivarlo", {
+          description: "La lista se actualizará. Confirma nuevamente la acción sobre la versión actual.",
+        });
+        await cargarTodo();
+        return;
+      }
       toast.error(error.message || "No se pudo reactivar el registro");
     } finally {
       setReactivando("");
@@ -365,9 +384,10 @@ export function EliminacionForm() {
     }
   }
 
-  async function reactivarActivo(endpoint, id) {
+  async function reactivarActivo(endpoint, item) {
+    const id = item?.id;
     const url = endpoint === "/personas"
-      ? `${API_URL_BASE}${endpoint}/${id}/reactivar`
+      ? `${API_URL_BASE}${endpoint}/${id}/reactivar?version=${encodeURIComponent(String(requireResourceVersion(item, "registro de persona")))}`
       : `${API_URL_BASE}${endpoint}/${id}/activo?activo=true`;
 
     const res = await apiClient.request(url, {
@@ -378,14 +398,16 @@ export function EliminacionForm() {
     const data = await leerRespuesta(res);
 
     if (!res.ok) {
-      throw new Error(
-        data?.mensaje || data?.message || "No se pudo cambiar el estado"
+      throw new ApiError(
+        data?.mensaje || data?.message || "No se pudo cambiar el estado",
+        { status: res.status, payload: data, response: res }
       );
     }
   }
 
   async function reactivarConsulta(item) {
-    const res = await apiClient.request(`${API_URL_BASE}/consultas/${item.id}/desarchivar`, {
+    const version = requireResourceVersion(item, "consulta");
+    const res = await apiClient.request(`${API_URL_BASE}/consultas/${item.id}/desarchivar?version=${encodeURIComponent(String(version))}`, {
       method: "PATCH",
       credentials: "include",
     });
@@ -393,8 +415,9 @@ export function EliminacionForm() {
     const data = await leerRespuesta(res);
 
     if (!res.ok) {
-      throw new Error(
-        data?.mensaje || data?.message || "No se pudo desarchivar la consulta"
+      throw new ApiError(
+        data?.mensaje || data?.message || "No se pudo desarchivar la consulta",
+        { status: res.status, payload: data, response: res }
       );
     }
   }

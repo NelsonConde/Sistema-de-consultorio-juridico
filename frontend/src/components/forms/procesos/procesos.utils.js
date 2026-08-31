@@ -5,21 +5,21 @@ export function labelEstadoProceso(estado) {
 }
 
 /**
- * Determina si un estado de proceso es final (no puede cambiar).
+ * State handling.
  * 
- * @param {string} estado - Estado a verificar
- * @returns {boolean} True si el estado es final, false si es PENDIENTE
+ * State handling.
+ * @returns {boolean} Result value.
  */
 export function estadoProcesoEsFinal(estado) {
   return estado && estado !== "PENDIENTE";
 }
 
 /**
- * Extrae un array de una estructura de datos anidada, buscando en claves comunes.
- * Útil para normalizar diferentes formatos de respuesta del backend.
+ * Implementation detail.
+ * Implementation detail.
  * 
- * @param {*} data - Datos a procesar (array u objeto)
- * @returns {Array} Array encontrado o array vacío
+ * @param {*} data - Parameter description.
+ * @returns {Array} Result value.
  */
 export function extraerLista(data) {
   if (Array.isArray(data)) return data;
@@ -52,23 +52,23 @@ export function ordenarActivosPrimero(lista) {
 }
 
 /**
- * Crea un Map indexado por id numérico desde una lista de items.
- * Facilita búsquedas rápidas por id.
+ * List and table handling.
+ * Search behavior.
  * 
- * @param {Array<Object>} lista - Lista de items con propiedad 'id'
- * @returns {Map<number, Object>} Mapa id => item
+ * @param {Array<Object>} lista - Parameter description.
+ * @returns {Map<number, Object>} Result value.
  */
 export function crearMapa(lista) {
   return new Map(lista.map((item) => [Number(item.id), item]));
 }
 
 /**
- * Obtiene el nombre de un item del catálogo usando un Map.
+ * Data loading behavior.
  * 
- * @param {Map<number, Object>} mapa - Mapa de items indexado por id
- * @param {number} id - ID a buscar
- * @param {string} [fallback] - Valor por defecto si no se encuentra
- * @returns {string} Nombre/descripción del item o fallback o "#id" si no existe
+ * @param {Map<number, Object>} mapa - Items indexed by ID.
+ * @param {number} id - ID to look up.
+ * @param {string} [fallback] - Fallback value.
+ * @returns {string} Result value.
  */
 export function nombreCatalogo(mapa, id, fallback) {
   const item = mapa.get(Number(id));
@@ -76,11 +76,11 @@ export function nombreCatalogo(mapa, id, fallback) {
 }
 
 /**
- * Genera una etiqueta legible para un item de catálogo.
- * Agrega "(Inactivo)" al nombre si el item no está activo.
+ * Implementation detail.
+ * Implementation detail.
  * 
- * @param {Object} item - Item de catálogo con propiedades {nombre, descripcion, codigo, activo, id}
- * @returns {string} Etiqueta formateada
+ * @param {Object} item - Item to process.
+ * @returns {string} Result value.
  */
 export function labelCatalogo(item) {
   const nombre = item.nombre || item.descripcion || item.codigo || `#${item.id}`;
@@ -88,11 +88,11 @@ export function labelCatalogo(item) {
 }
 
 /**
- * Genera una etiqueta detallada para una consulta.
- * Incluye ID, descripción, nombre de la persona y documento.
+ * Consultation flow detail.
+ * People workflow detail.
  * 
- * @param {Object} consulta - Objeto de consulta
- * @returns {string} Etiqueta en formato: "#id - descripción - persona - documento"
+ * @param {Object} query - Parameter description.
+ * @returns {string} Result value.
  */
 export function labelConsulta(consulta) {
   const persona = consulta.persona || consulta.consultante || {};
@@ -110,16 +110,17 @@ export function labelConsulta(consulta) {
 }
 
 /**
- * Normaliza un formulario de proceso antes de enviarlo al backend.
- * Convierte IDs a números y valores vacíos a null.
+ * Form handling.
+ * Implementation detail.
  * 
- * @param {Object} form - Objeto de formulario
- * @returns {Object} Objeto normalizado listo para enviar al API
+ * @param {Object} form - Parameter description.
+ * @returns {Object} Result value.
  */
-export function normalizarPayload(form) {
+export function normalizarPayload(form, { includeVersion = false } = {}) {
   const numeroRadicado = String(form.numeroRadicado || "").trim();
   return {
     numeroRadicado: numeroRadicado || null,
+    ...(includeVersion ? { version: form.version } : {}),
     departamentoId: form.departamentoId ? Number(form.departamentoId) : null,
     consultaId: form.consultaId ? Number(form.consultaId) : null,
     organoControlId: form.organoControlId ? Number(form.organoControlId) : null,
@@ -128,11 +129,11 @@ export function normalizarPayload(form) {
 }
 
 /**
- * Convierte un objeto de proceso a formato de formulario.
- * Asegura que todos los campos tengan valor por defecto (strings vacíos).
+ * Form handling.
+ * Implementation detail.
  * 
- * @param {Object} proceso - Objeto de proceso del backend
- * @returns {Object} Objeto en formato de formulario
+ * @param {Object} proceso - Process data.
+ * @returns {Object} Result value.
  */
 export function procesoAForm(proceso) {
   return {
@@ -143,7 +144,8 @@ export function procesoAForm(proceso) {
     organoControlId: proceso.organoControlId || "",
     especialidadId: proceso.especialidadId || "",
     estado: proceso.estado || "PENDIENTE",
+    version: proceso.version ?? null,
   };
 }
 
-// ─── Modal de búsqueda de consulta ───────────────────────────────────────────
+// Search behavior.

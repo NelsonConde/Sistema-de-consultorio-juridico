@@ -1,21 +1,21 @@
 import { apiClient } from "@/lib/apiClient";
 
 /**
- * Utilidades para leer y normalizar respuestas HTTP del backend.
+ * Implementation detail.
  *
- * Provee funciones para extraer el cuerpo de la respuesta y construir
- * mensajes de error legibles a partir del DTO de error estándar del backend.
+ * Implementation detail.
+ * Error handling.
  *
  * @module lib/api
  */
 
 /**
- * Lee el cuerpo de una `Response` de fetch y lo devuelve como objeto o string.
- * Devuelve `null` si la respuesta es 204 o no tiene cuerpo.
+ * Implementation detail.
+ * Implementation detail.
  *
- * @param {Response} response - La respuesta cruda de fetch.
- * @returns {Promise<object|string|null>} El cuerpo parseado como JSON,
- *   o como string si no es JSON válido, o `null` si está vacío.
+ * @param {Response} response - Parameter description.
+ * @returns {Promise<object|string|null>} Result value.
+ * Implementation detail.
  */
 export async function readResponseBody(response) {
   if (!response || response.status === 204) return null;
@@ -31,12 +31,12 @@ export async function readResponseBody(response) {
 }
 
 /**
- * Convierte un valor de campo de error a un string de mensaje.
- * Devuelve `null` si el valor está vacío o no es representable directamente.
+ * Error handling.
+ * Implementation detail.
  *
- * @param {unknown} value - Valor del campo.
- * @param {string|null} fieldName - Nombre del campo, usado como prefijo.
- * @returns {string|null} Mensaje formateado o `null`.
+ * @param {unknown} value - Parameter description.
+ * @param {string|null} fieldName - Parameter description.
+ * @returns {string|null} Result value.
  */
 function valueToMessage(value, fieldName) {
   if (value === null || value === undefined || value === "") return null;
@@ -53,12 +53,12 @@ function valueToMessage(value, fieldName) {
 }
 
 /**
- * Recorre recursivamente un valor (string, array u objeto) y acumula
- * los mensajes de error encontrados en el array `messages`.
+ * Implementation detail.
+ * Error handling.
  *
- * @param {unknown} value - Valor a recorrer.
- * @param {string|null} fieldName - Nombre del campo actual.
- * @param {string[]} messages - Array acumulador de mensajes.
+ * @param {unknown} value - Value to inspect.
+ * @param {string|null} fieldName - Parameter description.
+ * @param {string[]} messages - Parameter description.
  * @returns {void}
  */
 function collectMessages(value, fieldName, messages) {
@@ -81,11 +81,11 @@ function collectMessages(value, fieldName, messages) {
 }
 
 /**
- * Extrae todos los mensajes de error de detalle del payload de error del backend.
- * Busca en los campos `detalles`, `details`, `errors`, `fieldErrors` y `validaciones`.
+ * Error handling.
+ * Validation rule.
  *
- * @param {object|string|null} payload - Cuerpo de la respuesta de error.
- * @returns {string[]} Lista de mensajes de error sin duplicados.
+ * @param {object|string|null} payload - Parameter description.
+ * @returns {string[]} Result value.
  */
 export function getApiErrorMessages(payload) {
   if (!payload) return [];
@@ -106,12 +106,12 @@ export function getApiErrorMessages(payload) {
 }
 
 /**
- * Extrae el título/mensaje principal del payload de error del backend.
- * Busca en los campos `mensaje`, `message`, `descripcion` y `error`.
+ * Error handling.
+ * Error handling.
  *
- * @param {object|string|null} payload - Cuerpo de la respuesta de error.
- * @param {string} [fallback="Error en la operación"] - Texto por defecto si no hay mensaje.
- * @returns {string} El título del error.
+ * @param {object|string|null} payload - Parameter description.
+ * @param {string} [fallback] - Fallback value.
+ * @returns {string} Result value.
  */
 export function getApiErrorTitle(payload, fallback = "Error en la operación") {
   if (!payload) return fallback;
@@ -127,12 +127,12 @@ export function getApiErrorTitle(payload, fallback = "Error en la operación") {
 }
 
 /**
- * Construye un texto de descripción de error combinando los mensajes de detalle.
- * Si no hay detalles, usa el título del error como descripción.
+ * Error handling.
+ * Error handling.
  *
- * @param {object|string|null} payload - Cuerpo de la respuesta de error.
- * @param {string} [fallback="Verifica la información e intenta nuevamente."] - Texto por defecto.
- * @returns {string} La descripción del error.
+ * @param {object|string|null} payload - Parameter description.
+ * @param {string} [fallback] - Fallback value.
+ * @returns {string} Result value.
  */
 export function getApiErrorDescription(payload, fallback = "Verifica la información e intenta nuevamente.") {
   const messages = getApiErrorMessages(payload);
@@ -145,9 +145,9 @@ export function getApiErrorDescription(payload, fallback = "Verifica la informac
   return title || fallback;
 }
 /**
- * Error HTTP normalizado para consumidores del frontend.
- * Conserva el estado y el payload original del backend para que cada módulo
- * pueda decidir su comportamiento visual sin volver a interpretar la respuesta.
+ * Error handling.
+ * State handling.
+ * Implementation detail.
  */
 export class ApiError extends Error {
   constructor(message, { status = 0, payload = null, response = null } = {}) {
@@ -155,13 +155,76 @@ export class ApiError extends Error {
     this.name = "ApiError";
     this.status = status;
     this.payload = payload;
+    // Keep a body alias because DB-03 conflict helpers may receive errors from
+    // different transport wrappers while preserving the same backend payload.
+    this.body = payload;
     this.response = response;
   }
 }
 
 /**
- * Ejecuta una petición con apiClient y lee su cuerpo una sola vez.
- * No altera la semántica HTTP: devuelve tanto Response como el cuerpo parseado.
+ * Returns true only for optimistic-concurrency conflicts.
+ * Authentication, authorization, validation, and transport failures must keep
+ * their existing handling paths.
+ */
+export function isConcurrencyConflict(error) {
+  const status = Number(
+    error?.status ??
+      error?.response?.status ??
+      error?.payload?.estado ??
+      error?.body?.estado ??
+      0
+  );
+
+  return status === 409;
+}
+
+/**
+ * Normalizes the backend concurrency payload without changing the draft owned
+ * by the calling screen.
+ */
+export function toConcurrencyConflict(error) {
+  const payload = error?.payload ?? error?.body ?? null;
+
+  return {
+    message:
+      payload?.mensaje ||
+      payload?.message ||
+      error?.message ||
+      "El recurso fue modificado por otro usuario.",
+    correlationId: payload?.correlacionId ?? null,
+    path: payload?.ruta ?? null,
+  };
+}
+
+/**
+ * Returns the exact server-owned version required by a DB-03 mutation.
+ * The frontend must never invent or increment this value.
+ */
+export function requireResourceVersion(resource, label = "recurso") {
+  const version = resource?.version;
+
+  if (version === null || version === undefined || version === "") {
+    throw new Error(
+      `No se recibió la versión actual del ${label}. Actualiza la información antes de continuar.`
+    );
+  }
+
+  return version;
+}
+
+/**
+ * Appends the exact optimistic-locking version to an endpoint query string.
+ */
+export function withResourceVersion(path, resource, label = "recurso") {
+  const version = requireResourceVersion(resource, label);
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}version=${encodeURIComponent(String(version))}`;
+}
+
+/**
+ * Implementation detail.
+ * Implementation detail.
  */
 export async function apiResponse(path, options = {}) {
   const response = await apiClient.request(path, options);
@@ -170,10 +233,10 @@ export async function apiResponse(path, options = {}) {
 }
 
 /**
- * Ejecuta una petición y devuelve únicamente el cuerpo cuando la respuesta es exitosa.
- * Para errores HTTP lanza ApiError con estado y payload normalizados.
- * Los mensajes por estado permiten conservar mensajes funcionales específicos
- * de cada módulo sin duplicar la lectura de respuestas.
+ * Implementation detail.
+ * Error handling.
+ * Error handling.
+ * Implementation detail.
  */
 export async function apiRequestData(
   path,
@@ -201,7 +264,7 @@ export async function apiRequestData(
 }
 
 /**
- * Permite consultar de forma segura el estado HTTP de cualquier error.
+ * Error handling.
  */
 export function getApiErrorStatus(error) {
   return Number(error?.status || 0);

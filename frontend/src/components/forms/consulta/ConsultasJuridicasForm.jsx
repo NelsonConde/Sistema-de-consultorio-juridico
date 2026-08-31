@@ -1,15 +1,16 @@
 "use client"
 
 import { apiClient } from "@/lib/apiClient";
+import { requireResourceVersion } from "@/lib/api";
 import { fileApi } from "@/lib/fileApi";
   /**
-   * Formulario de listado y gestión de consultas jurídicas.
+   * List and table handling.
    *
-   * Muestra las consultas filtradas por permisos del usuario:
-   * - Admin/asesor/monitor: todas las consultas de su alcance.
-   * - Estudiante: solo las consultas asignadas a él.
+   * Permission and authorization handling.
+   * Consultation flow detail.
+   * Consultation flow detail.
    *
-   * Soporta búsqueda, filtrado por estado y área, y paginación.
+   * Pagination handling.
    *
    * @module components/forms/consulta/ConsultasJuridicasForm
    */
@@ -23,6 +24,10 @@ import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
 
 import { API_URL_BASE } from "@/lib/config";
+import {
+  buscarPersonasActivas,
+  obtenerPersonaDetalle,
+} from "@/lib/personasApi";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import Pagination from "@/components/ui/Pagination";
 import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems } from "@/lib/list-utils";
@@ -62,7 +67,14 @@ export function ConsultasJuridicasForm() {
   const [guardando, setGuardando] = useState(false);
   const [resultadoGuardado, setResultadoGuardado] = useState("");
 
-  const [personas, setPersonas] = useState([]);
+  const [personasResultado, setPersonasResultado] = useState([]);
+  const [personasBusquedaAplicada, setPersonasBusquedaAplicada] = useState("");
+  const [personasPagina, setPersonasPagina] = useState(1);
+  const [personasTamano, setPersonasTamano] = useState(10);
+  const [personasTotalPaginas, setPersonasTotalPaginas] = useState(0);
+  const [personasTotalElementos, setPersonasTotalElementos] = useState(0);
+  const [personasLoading, setPersonasLoading] = useState(false);
+  const [personasCache, setPersonasCache] = useState({});
   const [sedes, setSedes] = useState([]);
   const [areas, setAreas] = useState([]);
   const [temas, setTemas] = useState([]);
@@ -76,7 +88,7 @@ export function ConsultasJuridicasForm() {
   const [checkingPermisos, setCheckingPermisos] = useState(true);
   const [confirmArchivar, setConfirmArchivar] = useState({ abierto: false, id: null, loading: false });
 
-  // Estados modales edición
+  // Modal behavior.
   const [modalAsesor, setModalAsesor] = useState({ abierto: false, busqueda: "" });
   const [modalMonitor, setModalMonitor] = useState({ abierto: false, busqueda: "" });
   const [modalEstudiante, setModalEstudiante] = useState({ abierto: false, busqueda: "" });
@@ -84,7 +96,7 @@ export function ConsultasJuridicasForm() {
   const [modalPartesAdicionales, setModalPartesAdicionales] = useState({ abierto: false, busqueda: "" });
   const [modalContrapartes, setModalContrapartes] = useState({ abierto: false, busqueda: "" });
 
-  // Seleccionados
+  // Selected items
   const areaSeleccionadaId = useMemo(
     () => idNormalizado(form.areaId),
     [form.areaId]
@@ -104,29 +116,69 @@ export function ConsultasJuridicasForm() {
     () => estudiantes.find((e) => idNormalizado(e.id) === idNormalizado(form.estudianteId)) || null,
     [estudiantes, form.estudianteId]
   );
-  const parteSeleccionada = useMemo(() => personas.find(p => Number(p.id) === Number(form.personaId)) || null, [personas, form.personaId]);
-  const partesAdicionalesSeleccionadas = useMemo(() => personas.filter(p => (form.partesIds || []).includes(Number(p.id))), [personas, form.partesIds]);
-  const contrapartesSeleccionadas = useMemo(() => personas.filter(p => (form.contrapartesIds || []).includes(Number(p.id))), [personas, form.contrapartesIds]);
+  const parteSeleccionada = useMemo(
+    () =>
+      form.personaId
+        ? personasCache[String(form.personaId)] || null
+        : null,
+    [personasCache, form.personaId]
+  );
 
-  // Filtros con regla de duplicados
-  const personasParaPrincipal = useMemo(() => personas.filter(p => {
-    const id = Number(p.id);
-    return !(form.partesIds || []).includes(id) && !(form.contrapartesIds || []).includes(id);
-  }), [personas, form.partesIds, form.contrapartesIds]);
+  const partesAdicionalesSeleccionadas = useMemo(
+    () =>
+      (form.partesIds || [])
+        .map((id) => personasCache[String(id)] || null)
+        .filter(Boolean),
+    [personasCache, form.partesIds]
+  );
 
-  const personasParaAdicionales = useMemo(() => personas.filter(p => {
-    const id = Number(p.id);
-    return id !== Number(form.personaId) && !(form.contrapartesIds || []).includes(id);
-  }), [personas, form.personaId, form.contrapartesIds]);
+  const contrapartesSeleccionadas = useMemo(
+    () =>
+      (form.contrapartesIds || [])
+        .map((id) => personasCache[String(id)] || null)
+        .filter(Boolean),
+    [personasCache, form.contrapartesIds]
+  );
 
-  const personasParaContrapartes = useMemo(() => personas.filter(p => {
-    const id = Number(p.id);
-    return id !== Number(form.personaId) && !(form.partesIds || []).includes(id);
-  }), [personas, form.personaId, form.partesIds]);
+  const personasParaPrincipal = useMemo(
+    () =>
+      personasResultado.filter((p) => {
+        const id = Number(p.id);
+        return (
+          !(form.partesIds || []).includes(id) &&
+          !(form.contrapartesIds || []).includes(id)
+        );
+      }),
+    [personasResultado, form.partesIds, form.contrapartesIds]
+  );
 
-  // Filtros por búsqueda
-  // Filtros por búsqueda y coherencia funcional de responsables.
-  // El backend valida estas reglas; aquí solo evitamos que la UI proponga combinaciones inválidas.
+  const personasParaAdicionales = useMemo(
+    () =>
+      personasResultado.filter((p) => {
+        const id = Number(p.id);
+        return (
+          id !== Number(form.personaId) &&
+          !(form.contrapartesIds || []).includes(id)
+        );
+      }),
+    [personasResultado, form.personaId, form.contrapartesIds]
+  );
+
+  const personasParaContrapartes = useMemo(
+    () =>
+      personasResultado.filter((p) => {
+        const id = Number(p.id);
+        return (
+          id !== Number(form.personaId) &&
+          !(form.partesIds || []).includes(id)
+        );
+      }),
+    [personasResultado, form.personaId, form.partesIds]
+  );
+
+  // Search behavior.
+  // Search behavior.
+  // Validation rule.
   const asesoresDisponiblesPorArea = useMemo(() => {
     if (!areaSeleccionadaId) {
       return [];
@@ -178,21 +230,146 @@ export function ConsultasJuridicasForm() {
       )
       : estudiantesDisponiblesPorAsesor;
   }, [estudiantesDisponiblesPorAsesor, modalEstudiante.busqueda]);
-  const parteFiltrada = useMemo(() => {
-    const t = modalParte.busqueda.toLowerCase();
-    return t ? personasParaPrincipal.filter(p => `${p.nombres} ${p.apellidos} ${p.numeroDocumento}`.toLowerCase().includes(t)) : personasParaPrincipal;
-  }, [personasParaPrincipal, modalParte.busqueda]);
+  const parteFiltrada = personasParaPrincipal;
+  const partesAdicionalesFiltradas = personasParaAdicionales;
+  const contrapartesFiltradas = personasParaContrapartes;
 
-  const partesAdicionalesFiltradas = useMemo(() => {
-    const t = modalPartesAdicionales.busqueda.toLowerCase();
-    return t ? personasParaAdicionales.filter(p => `${p.nombres} ${p.apellidos} ${p.numeroDocumento}`.toLowerCase().includes(t)) : personasParaAdicionales;
-  }, [personasParaAdicionales, modalPartesAdicionales.busqueda]);
 
-  const contrapartesFiltradas = useMemo(() => {
-    const t = modalContrapartes.busqueda.toLowerCase();
-    return t ? personasParaContrapartes.filter(p => `${p.nombres} ${p.apellidos} ${p.numeroDocumento}`.toLowerCase().includes(t)) : personasParaContrapartes;
-  }, [personasParaContrapartes, modalContrapartes.busqueda]);
+  const modalPersonasAbierto =
+    modalParte.abierto ||
+    modalPartesAdicionales.abierto ||
+    modalContrapartes.abierto;
 
+  const busquedaPersonasActual = modalParte.abierto
+    ? modalParte.busqueda
+    : modalPartesAdicionales.abierto
+      ? modalPartesAdicionales.busqueda
+      : modalContrapartes.abierto
+        ? modalContrapartes.busqueda
+        : "";
+
+  useEffect(() => {
+    if (!modalPersonasAbierto) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setPersonasPagina(1);
+      setPersonasBusquedaAplicada(busquedaPersonasActual.trim());
+    }, 350);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [modalPersonasAbierto, busquedaPersonasActual]);
+
+  useEffect(() => {
+    if (!modalPersonasAbierto) return;
+
+    const controller = new AbortController();
+
+    async function cargarPaginaPersonas() {
+      try {
+        setPersonasLoading(true);
+
+        const resultado = await buscarPersonasActivas({
+          search: personasBusquedaAplicada,
+          page: personasPagina,
+          size: personasTamano,
+          signal: controller.signal,
+        });
+
+        setPersonasResultado(resultado.content);
+        setPersonasTotalPaginas(resultado.totalPages);
+        setPersonasTotalElementos(resultado.totalElements);
+        setPersonasCache((prev) => {
+          const next = { ...prev };
+          for (const persona of resultado.content) {
+            if (persona?.id != null) {
+              next[String(persona.id)] = persona;
+            }
+          }
+          return next;
+        });
+      } catch (error) {
+        if (error.name === "AbortError") return;
+
+        if (error.status === 401) {
+          router.replace("/");
+          return;
+        }
+
+        if (error.status === 403) {
+          router.replace("/inicio");
+          return;
+        }
+
+        setPersonasResultado([]);
+        setPersonasTotalPaginas(0);
+        setPersonasTotalElementos(0);
+        toast.error(error.message || "No se pudieron buscar personas");
+      } finally {
+        setPersonasLoading(false);
+      }
+    }
+
+    cargarPaginaPersonas();
+    return () => controller.abort();
+  }, [
+    modalPersonasAbierto,
+    personasBusquedaAplicada,
+    personasPagina,
+    personasTamano,
+    router,
+  ]);
+
+  function abrirModalPersona(setModal) {
+    setPersonasPagina(1);
+    setPersonasBusquedaAplicada("");
+    setModal({ abierto: true, busqueda: "" });
+  }
+
+  async function hidratarPersonasSeleccionadas(data) {
+    const ids = [
+      data?.personaId ?? data?.persona?.id,
+      ...(Array.isArray(data?.partesIds) ? data.partesIds : []),
+      ...(Array.isArray(data?.contrapartesIds) ? data.contrapartesIds : []),
+    ]
+      .filter(Boolean)
+      .map(Number)
+      .filter((id, index, all) => all.indexOf(id) === index);
+
+    if (ids.length === 0) return;
+
+    const resueltas = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const detalle = await obtenerPersonaDetalle(id);
+          return {
+            id: detalle.id,
+            nombres: detalle.nombres || "",
+            apellidos: detalle.apellidos || "",
+            activo: detalle.activo,
+          };
+        } catch (error) {
+          if (error.status === 401) {
+            router.replace("/");
+          }
+
+          return {
+            id,
+            nombres: `Persona #${id}`,
+            apellidos: "",
+            numeroDocumentoEnmascarado: null,
+          };
+        }
+      })
+    );
+
+    setPersonasCache((prev) => {
+      const next = { ...prev };
+      for (const persona of resueltas) {
+        next[String(persona.id)] = persona;
+      }
+      return next;
+    });
+  }
 
   const puedeEditarConsultas = useMemo(
     () => tienePermiso(user, PERMISOS.EDITAR_CONSULTAS),
@@ -424,8 +601,7 @@ export function ConsultasJuridicasForm() {
         return obtenerArrayDesdeRespuesta(payload);
       };
 
-      const [pR, sR, aR, asR, moR, esR] = await Promise.all([
-        fetchCatalogo(`${API_URL_BASE}/personas/activos`),
+      const [sR, aR, asR, moR, esR] = await Promise.all([
         fetchCatalogo(`${API_URL_BASE}/sedes`),
         fetchCatalogo(`${API_URL_BASE}/areas`),
         fetchCatalogo(`${API_URL_BASE}/asesores/activos`),
@@ -433,7 +609,6 @@ export function ConsultasJuridicasForm() {
         fetchCatalogo(`${API_URL_BASE}/estudiantes/activos`),
       ]);
 
-      setPersonas(pR);
       setSedes(sR);
       setAreas(aR);
       setAsesores(asR);
@@ -507,6 +682,8 @@ export function ConsultasJuridicasForm() {
         setTipos(tiposRes.ok ? obtenerArrayDesdeRespuesta(tiposData) : []);
       }
 
+      await hidratarPersonasSeleccionadas(data);
+
       setForm({
         fecha: data.fecha ?? "",
         descripcion: data.descripcion ?? "",
@@ -528,6 +705,7 @@ export function ConsultasJuridicasForm() {
         estudianteId: data.estudianteId ?? data.estudiante?.id ?? "",
         partesIds: Array.isArray(data.partesIds) ? data.partesIds.map(Number) : [],
         contrapartesIds: Array.isArray(data.contrapartesIds) ? data.contrapartesIds.map(Number) : [],
+        version: data.version ?? null,
       });
 
       setResultadoGuardado(data.resultado ?? "");
@@ -548,14 +726,17 @@ export function ConsultasJuridicasForm() {
     } catch (error) {
       console.error(error);
       setArchivosCaso([]);
+    } finally {
+      setCargandoArchivos(false);
     }
-    finally { setCargandoArchivos(false); }
   }
 
   const descargarArchivo = async (file) => {
     try {
       await fileApi.download(file, { type: "consulta", id: idEditando });
-    } catch (error) { console.error(error); }
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   async function handleGuardar(e) {
@@ -563,44 +744,6 @@ export function ConsultasJuridicasForm() {
 
     if (!puedeEditarConsultas) {
       toast.error("No tienes permisos para editar consultas.");
-      return;
-    }
-
-    const camposObligatorios = [
-      [form.fecha, "La fecha es obligatoria"],
-      [form.descripcion, "La descripción es obligatoria"],
-      [form.hechos, "Los hechos son obligatorios"],
-      [form.pretensiones, "Las pretensiones son obligatorias"],
-      [form.conceptoJuridico, "El concepto jurídico es obligatorio"],
-      [form.tramite, "El trámite es obligatorio"],
-      [form.personaId, "La parte principal es obligatoria"],
-      [form.sedeId, "La sede es obligatoria"],
-      [form.areaId, "El área es obligatoria"],
-      [form.temaId, "El tema es obligatorio"],
-    ];
-
-    const campoFaltante = camposObligatorios.find(([valor]) =>
-      valor === null || valor === undefined || String(valor).trim() === ""
-    );
-
-    if (campoFaltante) {
-      toast.error(campoFaltante[1]);
-      return;
-    }
-
-    const limitesTexto = [
-      [form.descripcion, 500, "La descripción"],
-      [form.tramite, 100, "El trámite"],
-      [form.tipoViolencia, 100, "El tipo de violencia"],
-      [form.resultado, 100, "El resultado"],
-    ];
-
-    const limiteExcedido = limitesTexto.find(([valor, max]) =>
-      String(valor || "").length > max
-    );
-
-    if (limiteExcedido) {
-      toast.error(`${limiteExcedido[2]} no puede superar ${limiteExcedido[1]} caracteres`);
       return;
     }
 
@@ -641,6 +784,7 @@ export function ConsultasJuridicasForm() {
       contrapartesIds: Array.isArray(form.contrapartesIds)
         ? form.contrapartesIds.map(Number)
         : [],
+      version: requireResourceVersion(form, "consulta"),
     };
 
 
@@ -670,6 +814,27 @@ export function ConsultasJuridicasForm() {
         return;
       }
 
+      if (res.status === 409) {
+        toast.error("Este registro cambió mientras lo estabas editando", {
+          description: "Tus cambios se conservaron. Se consultará la versión actual antes de un reintento manual.",
+        });
+
+        try {
+          const latestRes = await apiClient.request(`${API_URL_BASE}/consultas/${idEditando}`, {
+            method: "GET",
+            credentials: "include",
+          });
+          const latestPayload = await leerJsonSeguro(latestRes);
+          const latest = latestPayload?.data || latestPayload?.consulta || latestPayload;
+          if (latestRes.ok && latest?.version != null) {
+            setForm((prev) => ({ ...prev, version: latest.version }));
+          }
+        } catch (refreshError) {
+          console.error("Could not refresh the consultation after a concurrency conflict", refreshError);
+        }
+        return;
+      }
+
       if (res.ok) {
         setResultadoGuardado(form.resultado ?? "");
         toast.success("Consulta actualizada");
@@ -682,7 +847,7 @@ export function ConsultasJuridicasForm() {
       }
     } catch (error) {
       console.error(error);
-      toast.error("Error de conexión");
+      toast.error(error.message || "Error de conexión");
     } finally {
       setGuardando(false);
     }
@@ -701,32 +866,6 @@ export function ConsultasJuridicasForm() {
       return;
     }
 
-    if (["ACTIVO", "EN_PROCESO", "URGENTE"].includes(estadoNormalizado)) {
-      if (!form.asesorId) {
-        toast.error("No se puede activar la consulta porque no tiene asesor asignado");
-        return;
-      }
-
-      if (!form.estudianteId) {
-        toast.error("No se puede activar la consulta porque no tiene estudiante asignado");
-        return;
-      }
-
-      const errorCoherencia = validarCoherenciaConsultaFrontend({
-        form,
-        temas,
-        tipos,
-        asesores,
-        monitores,
-        estudiantes,
-      });
-
-      if (errorCoherencia) {
-        toast.error("Asignación o relación inválida", { description: errorCoherencia });
-        return;
-      }
-    }
-
     if (estadoNormalizado === "CERRADO") {
       if (textoVacio(form.resultado)) {
         toast.error("Antes de cerrar la consulta debes registrar un resultado o conclusión final.");
@@ -741,7 +880,7 @@ export function ConsultasJuridicasForm() {
 
     try {
       const res = await apiClient.request(
-        `${API_URL_BASE}/consultas/${id}/estado?estado=${encodeURIComponent(estadoNormalizado)}`,
+        `${API_URL_BASE}/consultas/${id}/estado?estado=${encodeURIComponent(estadoNormalizado)}&version=${encodeURIComponent(String(requireResourceVersion(form, "consulta")))}`,
         {
           method: "PATCH",
           credentials: "include",
@@ -760,6 +899,23 @@ export function ConsultasJuridicasForm() {
         return;
       }
 
+      if (res.status === 409) {
+        toast.error("La consulta cambió antes de actualizar su estado", {
+          description: "El cambio no se reintentó automáticamente y el formulario permanece abierto.",
+        });
+        try {
+          const latestRes = await apiClient.request(`${API_URL_BASE}/consultas/${id}`, { method: "GET", credentials: "include" });
+          const latestPayload = await leerJsonSeguro(latestRes);
+          const latest = latestPayload?.data || latestPayload?.consulta || latestPayload;
+          if (latestRes.ok && latest?.version != null) {
+            setForm((prev) => ({ ...prev, version: latest.version }));
+          }
+        } catch (refreshError) {
+          console.error("Could not refresh the consultation after a concurrency conflict", refreshError);
+        }
+        return;
+      }
+
       if (res.ok) {
         toast.success("Estado de la consulta actualizado");
         setMostrarFormEdicion(false);
@@ -769,7 +925,7 @@ export function ConsultasJuridicasForm() {
       }
     } catch (error) {
       console.error(error);
-      toast.error("Error de conexión");
+      toast.error(error.message || "Error de conexión");
     }
   }
 
@@ -789,10 +945,15 @@ export function ConsultasJuridicasForm() {
     setConfirmArchivar((s) => ({ ...s, loading: true }));
 
     try {
-      const res = await apiClient.request(`${API_URL_BASE}/consultas/${id}/archivar`, {
-        method: "PATCH",
-        credentials: "include",
-      });
+      const row = consultas.find((item) => String(item?.id) === String(id));
+      const version = requireResourceVersion(row, "consulta");
+      const res = await apiClient.request(
+        `${API_URL_BASE}/consultas/${id}/archivar?version=${encodeURIComponent(String(version))}`,
+        {
+          method: "PATCH",
+          credentials: "include",
+        }
+      );
 
       const payload = await leerJsonSeguro(res);
 
@@ -806,6 +967,14 @@ export function ConsultasJuridicasForm() {
         return;
       }
 
+      if (res.status === 409) {
+        toast.error("La consulta cambió antes de archivarla", {
+          description: "La lista se actualizará. Confirma nuevamente la acción sobre la versión actual.",
+        });
+        await cargarConsultas(searchText);
+        return;
+      }
+
       if (res.ok) {
         toast.success("Consulta archivada");
         cargarConsultas(searchText);
@@ -814,7 +983,7 @@ export function ConsultasJuridicasForm() {
       }
     } catch (error) {
       console.error(error);
-      toast.error("Error de conexión");
+      toast.error(error.message || "Error de conexión");
     } finally {
       setConfirmArchivar({ abierto: false, id: null, loading: false });
     }
@@ -842,7 +1011,9 @@ export function ConsultasJuridicasForm() {
     return (
       <>
         <div className="font-medium">{p.nombres} {p.apellidos}</div>
-        <div className="text-xs text-muted-foreground">{p.numeroDocumento}</div>
+        <div className="text-xs text-muted-foreground">
+          {p.tipoDocumento} {p.numeroDocumentoEnmascarado || ""}
+        </div>
       </>
     );
   }
@@ -854,7 +1025,7 @@ export function ConsultasJuridicasForm() {
   return (
     <>
       <div className="space-y-6">
-        {/* BUSCADOR */}
+        {/* SEARCH */}
         <div className="flex gap-3 items-end">
           <div className="flex-1 space-y-1">
             <label className="text-sm font-medium">Buscar consulta</label>
@@ -874,7 +1045,7 @@ export function ConsultasJuridicasForm() {
           </Button>
         </div>
 
-        {/* FORMULARIO DE EDICIÓN INLINE */}
+        {/* Form handling.*/}
         {mostrarFormEdicion && (
           <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
             <h2 className="text-lg font-semibold">Editar consulta #{idEditando}</h2>
@@ -911,7 +1082,7 @@ export function ConsultasJuridicasForm() {
                     <input value={labelEstadoConsulta(form.estado)} disabled className={ic} />
                   )}
                 </C>
-                <C label="Trámite *"><input name="tramite" value={form.tramite} onChange={handleChange} required maxLength={100} placeholder="Ej: Conciliación" className={ic} /></C>
+                <C label="Trámite *"><input name="tramite" value={form.tramite} onChange={handleChange} required placeholder="Ej: Conciliación" className={ic} /></C>
                 <C label="Sede *">
                   <select name="sedeId" value={form.sedeId} onChange={handleChange} required className={ic}>
                     <option value="">Seleccione</option>
@@ -936,12 +1107,12 @@ export function ConsultasJuridicasForm() {
                     {tipos.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
                   </select>
                 </C>
-                <C label="Tipo de violencia"><input name="tipoViolencia" value={form.tipoViolencia} onChange={handleChange} maxLength={100} placeholder="Opcional" className={ic} /></C>
-                <C label="Resultado"><input name="resultado" value={form.resultado} onChange={handleChange} maxLength={100} placeholder="Opcional" className={ic} /></C>
+                <C label="Tipo de violencia"><input name="tipoViolencia" value={form.tipoViolencia} onChange={handleChange} placeholder="Opcional" className={ic} /></C>
+                <C label="Resultado"><input name="resultado" value={form.resultado} onChange={handleChange} placeholder="Opcional" className={ic} /></C>
 
                 {puedeAsignarResponsablesConsulta ? (
                   <>
-                    {/* ASESOR */}
+                    {/* ADVISOR */}
                     <C label="Asesor">
                       <button
                         type="button"
@@ -971,7 +1142,7 @@ export function ConsultasJuridicasForm() {
                       </button>
                     </C>
 
-                    {/* ESTUDIANTE */}
+                    {/* STUDENT */}
                     <C label="Estudiante">
                       <button
                         type="button"
@@ -997,20 +1168,20 @@ export function ConsultasJuridicasForm() {
                 )}
               </div>
 
-              {/* PARTE PRINCIPAL */}
+              {/* PRIMARY PARTY */}
               <C label="Parte principal *">
-                <button type="button" onClick={() => setModalParte(p => ({ ...p, abierto: true }))}
+                <button type="button" onClick={() => abrirModalPersona(setModalParte)}
                   className="flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors">
                   <span className={parteSeleccionada ? "text-foreground" : "text-muted-foreground"}>
-                    {parteSeleccionada ? `${parteSeleccionada.nombres} ${parteSeleccionada.apellidos} - ${parteSeleccionada.numeroDocumento}` : "Buscar parte principal..."}
+                    {parteSeleccionada ? `${parteSeleccionada.nombres} ${parteSeleccionada.apellidos} - ${parteSeleccionada.numeroDocumentoEnmascarado || ""}` : "Buscar parte principal..."}
                   </span>
                   <span className="text-muted-foreground">▼</span>
                 </button>
               </C>
 
-              {/* PARTES ADICIONALES */}
+              {/* ADDITIONAL PARTIES */}
               <C label="Partes adicionales">
-                <button type="button" onClick={() => setModalPartesAdicionales(p => ({ ...p, abierto: true }))}
+                <button type="button" onClick={() => abrirModalPersona(setModalPartesAdicionales)}
                   className="flex min-h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors">
                   <span className={partesAdicionalesSeleccionadas.length > 0 ? "text-foreground" : "text-muted-foreground"}>
                     {partesAdicionalesSeleccionadas.length > 0
@@ -1021,9 +1192,9 @@ export function ConsultasJuridicasForm() {
                 </button>
               </C>
 
-              {/* CONTRAPARTES */}
+              {/* COUNTERPARTIES */}
               <C label="Contrapartes">
-                <button type="button" onClick={() => setModalContrapartes(p => ({ ...p, abierto: true }))}
+                <button type="button" onClick={() => abrirModalPersona(setModalContrapartes)}
                   className="flex min-h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors">
                   <span className={contrapartesSeleccionadas.length > 0 ? "text-foreground" : "text-muted-foreground"}>
                     {contrapartesSeleccionadas.length > 0
@@ -1034,7 +1205,7 @@ export function ConsultasJuridicasForm() {
                 </button>
               </C>
 
-              <C label="Descripción *"><textarea name="descripcion" value={form.descripcion} onChange={handleChange} required maxLength={500} rows={3} placeholder="Resumen de la consulta" className={ic} /></C>
+              <C label="Descripción *"><textarea name="descripcion" value={form.descripcion} onChange={handleChange} required rows={3} placeholder="Resumen de la consulta" className={ic} /></C>
               <C label="Hechos *"><textarea name="hechos" value={form.hechos} onChange={handleChange} required rows={3} placeholder="Descripción de los hechos" className={ic} /></C>
               <C label="Pretensiones *"><textarea name="pretensiones" value={form.pretensiones} onChange={handleChange} required rows={3} placeholder="Qué solicita el consultante" className={ic} /></C>
               <C label="Concepto jurídico *"><textarea name="conceptoJuridico" value={form.conceptoJuridico} onChange={handleChange} required rows={3} placeholder="Fundamento legal aplicable" className={ic} /></C>
@@ -1049,8 +1220,8 @@ export function ConsultasJuridicasForm() {
                 ) : (
                   <ul className="space-y-2">
                     {archivosCaso.map((file) => (
-                      <li key={file.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                        <span className="truncate">{file.fileName}</span>
+                      <li key={file.id ?? file.fileName} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                        <span className="truncate">{file.fileName ?? file.nombre ?? "Archivo"}</span>
                         <button type="button" onClick={() => descargarArchivo(file)} className="text-primary hover:underline">Descargar</button>
                       </li>
                     ))}
@@ -1066,7 +1237,7 @@ export function ConsultasJuridicasForm() {
           </div>
         )}
 
-        {/* TABLA DE RESULTADOS */}
+        {/* List and table handling.*/}
         <div className="overflow-hidden rounded-lg border bg-card">
           <table className="min-w-full">
             <thead className="bg-muted">
@@ -1140,7 +1311,7 @@ export function ConsultasJuridicasForm() {
         />
       </div>
 
-      {/* MODAL ASESOR */}
+      {/* MODAL ADVISOR */}
       <ModalSimple
         abierto={modalAsesor.abierto}
         titulo="Seleccionar Asesor"
@@ -1178,7 +1349,7 @@ export function ConsultasJuridicasForm() {
         renderItem={m => (<><div className="font-medium">{m.nombre}</div><div className="text-xs text-muted-foreground">{m.documento}</div></>)}
       />
 
-      {/* MODAL ESTUDIANTE */}
+      {/* MODAL STUDENT */}
       <ModalSimple
         abierto={modalEstudiante.abierto}
         titulo="Seleccionar Estudiante"
@@ -1204,35 +1375,74 @@ export function ConsultasJuridicasForm() {
         )}
       />
 
-      {/* MODAL PARTE PRINCIPAL */}
+      {/* MODAL PRIMARY PARTY */}
       <ModalSimple
         abierto={modalParte.abierto} titulo="Seleccionar Parte Principal"
         items={parteFiltrada} busqueda={modalParte.busqueda}
         setBusqueda={v => setModalParte(p => ({ ...p, busqueda: v }))}
         onSeleccionar={item => { setForm(prev => ({ ...prev, personaId: item ? String(item.id) : "" })); setModalParte({ abierto: false, busqueda: "" }); }}
         onCerrar={() => setModalParte({ abierto: false, busqueda: "" })}
+        loading={personasLoading}
+        pagination={{
+          currentPage: personasPagina,
+          totalPages: personasTotalPaginas,
+          onPageChange: setPersonasPagina,
+          pageSize: personasTamano,
+          onPageSizeChange: (size) => {
+            setPersonasTamano(size);
+            setPersonasPagina(1);
+          },
+          pageSizeOptions: [10, 20, 50],
+          totalItems: personasTotalElementos,
+        }}
         seleccionado={parteSeleccionada}
         renderItem={renderPersona}
       />
 
-      {/* MODAL PARTES ADICIONALES */}
+      {/* MODAL ADDITIONAL PARTIES */}
       <ModalMultiple
         abierto={modalPartesAdicionales.abierto} titulo="Seleccionar Partes Adicionales"
         items={partesAdicionalesFiltradas} busqueda={modalPartesAdicionales.busqueda}
         setBusqueda={v => setModalPartesAdicionales(p => ({ ...p, busqueda: v }))}
         onConfirmar={ids => { setForm(prev => ({ ...prev, partesIds: ids })); setModalPartesAdicionales({ abierto: false, busqueda: "" }); }}
         onCerrar={() => setModalPartesAdicionales({ abierto: false, busqueda: "" })}
+        loading={personasLoading}
+        pagination={{
+          currentPage: personasPagina,
+          totalPages: personasTotalPaginas,
+          onPageChange: setPersonasPagina,
+          pageSize: personasTamano,
+          onPageSizeChange: (size) => {
+            setPersonasTamano(size);
+            setPersonasPagina(1);
+          },
+          pageSizeOptions: [10, 20, 50],
+          totalItems: personasTotalElementos,
+        }}
         seleccionados={form.partesIds}
         renderItem={renderPersona}
       />
 
-      {/* MODAL CONTRAPARTES */}
+      {/* MODAL COUNTERPARTIES */}
       <ModalMultiple
         abierto={modalContrapartes.abierto} titulo="Seleccionar Contrapartes"
         items={contrapartesFiltradas} busqueda={modalContrapartes.busqueda}
         setBusqueda={v => setModalContrapartes(p => ({ ...p, busqueda: v }))}
         onConfirmar={ids => { setForm(prev => ({ ...prev, contrapartesIds: ids })); setModalContrapartes({ abierto: false, busqueda: "" }); }}
         onCerrar={() => setModalContrapartes({ abierto: false, busqueda: "" })}
+        loading={personasLoading}
+        pagination={{
+          currentPage: personasPagina,
+          totalPages: personasTotalPaginas,
+          onPageChange: setPersonasPagina,
+          pageSize: personasTamano,
+          onPageSizeChange: (size) => {
+            setPersonasTamano(size);
+            setPersonasPagina(1);
+          },
+          pageSizeOptions: [10, 20, 50],
+          totalItems: personasTotalElementos,
+        }}
         seleccionados={form.contrapartesIds}
         renderItem={renderPersona}
       />
