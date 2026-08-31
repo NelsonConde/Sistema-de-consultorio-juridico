@@ -1,11 +1,11 @@
 /**
- * Reglas de permisos del módulo de seguimientos.
+ * Permission rules for the follow-up module.
  *
- * Este archivo concentra únicamente decisiones de autorización de interfaz.
- * La autorización real sigue siendo responsabilidad del backend.
+ * This file contains only UI authorization decisions.
+ * Actual authorization remains the backend's responsibility.
  */
 
-import { normalizar, tieneAlgunPermiso, tienePermiso } from "@/lib/authz"
+import { tieneAlgunPermiso, tienePerfil as tienePerfilAuthz, tienePermiso } from "@/lib/authz"
 import { PERMISOS } from "@/lib/permission"
 
 const PERMISOS_LEGACY = {
@@ -14,7 +14,7 @@ const PERMISOS_LEGACY = {
 }
 
 export function tienePerfil(user, perfil) {
-  return normalizar(user?.tipoPerfil || user?.rolNombre) === normalizar(perfil)
+  return tienePerfilAuthz(user, perfil)
 }
 
 export function esEstudiante(user) {

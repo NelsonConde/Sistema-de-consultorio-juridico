@@ -1,4 +1,4 @@
-/** Configuración del formulario de cambio de rol. */
+/** Configuration for the user role/profile change form. */
 export const PERMISO_GESTIONAR_USUARIOS = "Gestionar usuarios";
 
 export const TIPOS_PERFIL = [
@@ -7,46 +7,37 @@ export const TIPOS_PERFIL = [
     label: "Administrativo",
     endpoint: "administrativo",
     endpointActual: "administrativos",
-    rolIdFallback: 1,
-    nombresRol: ["Administrador", "Administrativo"],
   },
   {
     value: "ASESOR",
     label: "Asesor",
     endpoint: "asesor",
     endpointActual: "asesores",
-    rolIdFallback: 2,
-    nombresRol: ["Asesor"],
   },
   {
     value: "ESTUDIANTE",
     label: "Estudiante",
     endpoint: "estudiante",
     endpointActual: "estudiantes",
-    rolIdFallback: 3,
-    nombresRol: ["Estudiante"],
   },
   {
     value: "MONITOR",
     label: "Monitor",
     endpoint: "monitor",
     endpointActual: "monitores",
-    rolIdFallback: 4,
-    nombresRol: ["Monitor"],
   },
   {
     value: "CONCILIADOR",
     label: "Conciliador",
     endpoint: "conciliador",
     endpointActual: "conciliadores",
-    rolIdFallback: 5,
-    nombresRol: ["Conciliador"],
   },
 ];
 
 export const VALORES_INICIALES = {
   usuarioSistemaId: "",
   destino: "",
+  rolIdDestino: "",
   motivo: "",
   nombre: "",
   tipoDocumentoId: "",
