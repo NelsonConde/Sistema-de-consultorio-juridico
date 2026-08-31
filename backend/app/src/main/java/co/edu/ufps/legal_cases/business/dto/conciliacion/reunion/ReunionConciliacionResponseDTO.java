@@ -12,6 +12,10 @@ public class ReunionConciliacionResponseDTO {
 
     private Long conciliacionId;
 
+    private Long version;
+
+    private Long conciliacionVersion;
+
     private LocalDateTime fechaReunion;
 
     private Long sedeId;

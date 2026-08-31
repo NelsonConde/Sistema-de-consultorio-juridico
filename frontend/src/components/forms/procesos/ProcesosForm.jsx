@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import Pagination from "@/components/ui/Pagination";
 import { API_URL_BASE } from "@/lib/config";
+import { isConcurrencyConflict, requireResourceVersion } from "@/lib/api";
 import { getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils";
 
 import { ESTADOS_PROCESO, FORM_INICIAL } from "./procesos.constants";
@@ -255,9 +256,11 @@ export function ProcesosForm() {
 
     try {
       setGuardando(true);
-      await apiEnviar(`${API_URL_BASE}/procesos/${procesoCambioEstado.id}/estado?estado=${encodeURIComponent(estadoSeleccionado)}`, {
-        method: "PATCH",
-      });
+      const version = requireResourceVersion(procesoCambioEstado, "proceso");
+      await apiEnviar(
+        `${API_URL_BASE}/procesos/${procesoCambioEstado.id}/estado?estado=${encodeURIComponent(estadoSeleccionado)}&version=${encodeURIComponent(String(version))}`,
+        { method: "PATCH" }
+      );
       toast.success("Estado del proceso actualizado correctamente");
       cerrarCambioEstado();
       await cargarDatos();
@@ -265,6 +268,13 @@ export function ProcesosForm() {
       console.error(error);
       if (error.status === 401) {
         router.push("/");
+        return;
+      }
+      if (isConcurrencyConflict(error)) {
+        toast.error("El proceso cambió antes de actualizar su estado", {
+          description: "La lista se actualizará y la acción deberá confirmarse nuevamente.",
+        });
+        await cargarDatos();
         return;
       }
       toast.error(error.message || "No se pudo cambiar el estado del proceso");
@@ -281,7 +291,12 @@ export function ProcesosForm() {
         setGuardando(true);
         await apiEnviar(`${API_URL_BASE}/procesos/${form.id}`, {
           method: "PUT",
-          body: JSON.stringify(normalizarPayload(form)),
+          body: JSON.stringify(
+            normalizarPayload(
+              { ...form, version: requireResourceVersion(form, "proceso") },
+              { includeVersion: true }
+            )
+          ),
         });
         toast.success("Proceso actualizado correctamente");
         cerrarEdicion();
@@ -289,6 +304,20 @@ export function ProcesosForm() {
       } catch (error) {
         console.error(error);
         if (error.status === 401) { router.push("/"); return; }
+        if (isConcurrencyConflict(error)) {
+          toast.error("Este proceso cambió mientras lo estabas editando", {
+            description: "Tus cambios se conservaron. Se cargará la versión actual como nueva base.",
+          });
+          try {
+            const latest = await apiGet(`${API_URL_BASE}/procesos/${form.id}`);
+            if (latest?.version != null) {
+              setForm((prev) => ({ ...prev, version: latest.version }));
+            }
+          } catch (refreshError) {
+            console.error("Could not refresh the process after a concurrency conflict", refreshError);
+          }
+          return;
+        }
         toast.error(error.message || "No se pudo actualizar el proceso");
       } finally {
         setGuardando(false);
@@ -307,12 +336,20 @@ export function ProcesosForm() {
       setConfirmEliminar((s) => ({ ...s, loading: true }));
 
       try {
-        await apiEnviar(`${API_URL_BASE}/procesos/${proceso.id}`, { method: "DELETE" });
+        const version = requireResourceVersion(proceso, "proceso");
+        await apiEnviar(`${API_URL_BASE}/procesos/${proceso.id}?version=${encodeURIComponent(String(version))}`, { method: "DELETE" });
         toast.success("Proceso eliminado correctamente");
         await cargarDatos();
       } catch (error) {
         console.error(error);
         if (error.status === 401) { router.push("/"); return; }
+        if (isConcurrencyConflict(error)) {
+          toast.error("El proceso cambió antes de eliminarlo", {
+            description: "La lista se actualizará. Confirma nuevamente la eliminación sobre la versión actual.",
+          });
+          await cargarDatos();
+          return;
+        }
         toast.error(error.message || "No se pudo eliminar el proceso");
       } finally {
         setConfirmEliminar({ abierto: false, proceso: null, loading: false });

@@ -105,13 +105,16 @@ public class SeguimientoController {
     @PreAuthorize("hasAuthority('" + EDITAR_SEGUIMIENTOS + "')")
     public SeguimientoResponseDTO cambiarEstadoSeguimiento(
             @PathVariable Long id,
-            @RequestParam EstadoSeguimiento estado) {
-        return seguimientoService.cambiarEstadoSeguimiento(id, estado);
+            @RequestParam EstadoSeguimiento estado,
+            @RequestParam Long version) {
+        return seguimientoService.cambiarEstadoSeguimiento(id, estado, version);
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('" + ELIMINAR_SEGUIMIENTOS + "')")
-    public void eliminar(@PathVariable Long id) {
-        seguimientoService.eliminar(id);
+    public void eliminar(
+            @PathVariable Long id,
+            @RequestParam Long version) {
+        seguimientoService.eliminar(id, version);
     }
 }

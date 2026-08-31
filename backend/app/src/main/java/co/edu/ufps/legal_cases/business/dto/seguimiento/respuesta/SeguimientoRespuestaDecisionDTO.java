@@ -12,6 +12,9 @@ import lombok.Setter;
 @Setter
 public class SeguimientoRespuestaDecisionDTO {
 
+    @NotNull(message = "La versión de la respuesta es obligatoria")
+    private Long version;
+
     @NotNull(message = "El estado de la respuesta es obligatorio")
     private EstadoRespuestaSeguimiento estado;
 

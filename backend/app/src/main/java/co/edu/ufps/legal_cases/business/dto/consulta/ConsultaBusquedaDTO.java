@@ -21,6 +21,8 @@ public class ConsultaBusquedaDTO {
 
     private Long id;
 
+    private Long version;
+
     /** Descripción de la consulta (campo "consulta" en el frontend). */
     private String consulta;
 
