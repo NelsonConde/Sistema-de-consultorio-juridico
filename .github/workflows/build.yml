@@ -1,0 +1,72 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - develop
+      - feature/**
+      - bugfix/**
+      - hotfix/**
+      - chore/**
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/app/pom.xml
+
+      - name: Ensure Maven Wrapper is executable
+        working-directory: backend/app
+        run: chmod +x mvnw
+
+      - name: Test
+        working-directory: backend/app
+        run: ./mvnw test
+
+      - name: Package
+        working-directory: backend/app
+        run: ./mvnw -DskipTests package
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up npm
+        run: npm install -g npm@10.9.4
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint

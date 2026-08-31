@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 
 import co.edu.ufps.legal_cases.security.constant.PermisoNombre;
@@ -21,6 +22,7 @@ import co.edu.ufps.legal_cases.security.repository.access.PermisoRepository;
 import co.edu.ufps.legal_cases.security.repository.access.RolRepository;
 
 @Configuration
+@Profile("!test")
 public class SecurityDataInitializer {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityDataInitializer.class);

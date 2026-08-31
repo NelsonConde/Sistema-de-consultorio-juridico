@@ -20,6 +20,7 @@
 
     <properties>
         <java.version>21</java.version>
+        <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
         <jjwt.version>0.12.6</jjwt.version>
         <aws.sdk.version>2.31.67</aws.sdk.version>
     </properties>
@@ -179,6 +180,31 @@
 
     <build>
         <plugins>
+            <!-- Toolchain policy for reproducible local and CI builds -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${maven-enforcer-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>enforce-build-toolchain</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[21,22)</version>
+                                </requireJavaVersion>
+                                <requireMavenVersion>
+                                    <version>[3.9.14,3.9.15)</version>
+                                </requireMavenVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
             <!-- Empaquetado ejecutable de Spring Boot -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
