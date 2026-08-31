@@ -15,7 +15,6 @@ import {
 import { Button } from "@/components/ui/button";
 import Pagination from "@/components/ui/Pagination";
 import { API_URL_BASE } from "@/lib/config";
-import { isConcurrencyConflict, requireResourceVersion } from "@/lib/api";
 import { PERMISOS } from "@/lib/permission";
 import { esEstudiante, tienePermiso } from "@/lib/authz";
 import { requestConciliacion } from "./conciliaciones.service";
@@ -145,7 +144,6 @@ export function ReunionesConciliacionForm() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [form, setForm] = useState(FORM_INICIAL);
-  const [versionBase, setVersionBase] = useState({ conciliacion: null, reunion: null });
 
   const puedeVer = usuario && tienePermiso(usuario, PERMISOS.VER_CONCILIACIONES);
   const puedeProgramar = usuario && tienePermiso(usuario, PERMISOS.PROGRAMAR_REUNIONES_CONCILIACION) && !esEstudiante(usuario);
@@ -281,10 +279,6 @@ export function ReunionesConciliacionForm() {
       );
 
       setDetalle(data);
-      setVersionBase({
-        conciliacion: data?.version ?? null,
-        reunion: data?.reunion?.version ?? null,
-      });
     } catch (err) {
       console.error(err);
       setError(err.message || "No se pudo cargar el detalle de la conciliación");
@@ -320,15 +314,6 @@ export function ReunionesConciliacionForm() {
       fechaReunion: normalizarFechaRequest(form.fechaReunion),
       sedeId: Number(form.sedeId),
       observaciones: form.observaciones?.trim() || null,
-      conciliacionVersion:
-        versionBase.conciliacion ?? requireResourceVersion(detalle, "conciliación"),
-      ...(reunionActual
-        ? {
-            version:
-              versionBase.reunion ??
-              requireResourceVersion(reunionActual, "reunión de conciliación"),
-          }
-        : {}),
     };
 
     try {
@@ -349,30 +334,6 @@ export function ReunionesConciliacionForm() {
       await refrescar(reunionActual ? "La reunión fue reprogramada correctamente." : "La reunión fue programada correctamente.");
     } catch (err) {
       console.error(err);
-      if (isConcurrencyConflict(err) && detalle?.id) {
-        setError("La conciliación o su reunión cambió mientras editabas. El formulario se conserva.");
-        toast.error("La reunión cambió mientras la estabas editando", {
-          description: "No hubo reintento automático. Se cargará la versión actual sin borrar tus campos.",
-        });
-        try {
-          const latest = await apiFetch(
-            `/conciliaciones/${detalle.id}`,
-            { method: "GET" },
-            "No se pudo cargar la versión actual de la conciliación"
-          );
-          setVersionBase({
-            conciliacion: latest?.version ?? versionBase.conciliacion,
-            reunion: latest?.reunion?.version ?? versionBase.reunion,
-          });
-          setError(
-            `La versión actual del servidor se cargó sin reemplazar tus campos. ` +
-              `Reunión actual: ${formatearFecha(latest?.reunion?.fechaReunion)}.`
-          );
-        } catch (refreshError) {
-          console.error("Could not refresh meeting versions after a concurrency conflict", refreshError);
-        }
-        return;
-      }
       setError(err.message || "No se pudo guardar la reunión");
       toast.error(err.message || "No se pudo guardar la reunión");
     } finally {

@@ -22,9 +22,6 @@ public class PersonaDTO {
 
     private Long id;
 
-    // Version de concurrencia recibida al consultar el recurso.
-    private Long version;
-
     // Informacion basica
     @NotNull(message = "El tipo de persona es obligatorio")
     private Long tipoPersonaId;

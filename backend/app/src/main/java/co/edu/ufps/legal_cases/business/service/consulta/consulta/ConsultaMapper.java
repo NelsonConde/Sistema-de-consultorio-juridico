@@ -15,9 +15,7 @@ public class ConsultaMapper {
 
     public ConsultaDTO convertirADTO(Consulta c) {
         ConsultaDTO dto = new ConsultaDTO();
-
         dto.setId(c.getId());
-        dto.setVersion(c.getVersion());
         dto.setFecha(c.getFecha());
         dto.setDescripcion(c.getDescripcion());
         dto.setHechos(c.getHechos());
@@ -36,26 +34,23 @@ public class ConsultaMapper {
         dto.setAsesorId(c.getAsesor() != null ? c.getAsesor().getId() : null);
         dto.setMonitorId(c.getMonitor() != null ? c.getMonitor().getId() : null);
         dto.setEstudianteId(c.getEstudiante() != null ? c.getEstudiante().getId() : null);
-
         dto.setPartesIds(
                 c.getPartes() != null
                         ? c.getPartes().stream().map(Persona::getId).toList()
-                        : List.of());
-
+                        : List.of()
+        );
         dto.setContrapartesIds(
                 c.getContrapartes() != null
                         ? c.getContrapartes().stream().map(Persona::getId).toList()
-                        : List.of());
-
+                        : List.of()
+        );
         return dto;
     }
 
     public ConsultaBusquedaDTO convertirABusquedaDTO(Consulta c) {
         Persona p = c.getPersona();
-
         return new ConsultaBusquedaDTO(
                 c.getId(),
-                c.getVersion(),
                 c.getDescripcion(),
                 c.getFecha(),
                 p != null ? p.getNombres() : null,

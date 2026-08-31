@@ -116,11 +116,10 @@ export function labelConsulta(consulta) {
  * @param {Object} form - Parameter description.
  * @returns {Object} Result value.
  */
-export function normalizarPayload(form, { includeVersion = false } = {}) {
+export function normalizarPayload(form) {
   const numeroRadicado = String(form.numeroRadicado || "").trim();
   return {
     numeroRadicado: numeroRadicado || null,
-    ...(includeVersion ? { version: form.version } : {}),
     departamentoId: form.departamentoId ? Number(form.departamentoId) : null,
     consultaId: form.consultaId ? Number(form.consultaId) : null,
     organoControlId: form.organoControlId ? Number(form.organoControlId) : null,
@@ -144,7 +143,6 @@ export function procesoAForm(proceso) {
     organoControlId: proceso.organoControlId || "",
     especialidadId: proceso.especialidadId || "",
     estado: proceso.estado || "PENDIENTE",
-    version: proceso.version ?? null,
   };
 }
 

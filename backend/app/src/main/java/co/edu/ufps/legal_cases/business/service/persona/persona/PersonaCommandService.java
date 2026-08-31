@@ -24,9 +24,7 @@ import co.edu.ufps.legal_cases.business.repository.persona.PersonaRepository;
 import co.edu.ufps.legal_cases.business.repository.persona.TipoPersonaRepository;
 import co.edu.ufps.legal_cases.business.service.acceso.persona.PersonaAccessService;
 import co.edu.ufps.legal_cases.business.service.persona.persona.PersonaMapper.DatosPersona;
-import co.edu.ufps.legal_cases.common.concurrency.ConcurrenciaOptimistaValidator;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
-import jakarta.persistence.EntityManager;
 
 @Service
 public class PersonaCommandService {
@@ -44,8 +42,6 @@ public class PersonaCommandService {
     private final BarrioRepository barrioRepository;
     private final OcupacionRepository ocupacionRepository;
     private final EmpresaRepository empresaRepository;
-    private final ConcurrenciaOptimistaValidator concurrenciaOptimistaValidator;
-    private final EntityManager entityManager;
 
     public PersonaCommandService(
             PersonaRepository personaRepository,
@@ -58,9 +54,7 @@ public class PersonaCommandService {
             MunicipioRepository municipioRepository,
             BarrioRepository barrioRepository,
             OcupacionRepository ocupacionRepository,
-            EmpresaRepository empresaRepository,
-            ConcurrenciaOptimistaValidator concurrenciaOptimistaValidator,
-            EntityManager entityManager) {
+            EmpresaRepository empresaRepository) {
         this.personaRepository = personaRepository;
         this.personaAccessService = personaAccessService;
         this.personaMapper = personaMapper;
@@ -72,38 +66,23 @@ public class PersonaCommandService {
         this.barrioRepository = barrioRepository;
         this.ocupacionRepository = ocupacionRepository;
         this.empresaRepository = empresaRepository;
-        this.concurrenciaOptimistaValidator = concurrenciaOptimistaValidator;
-        this.entityManager = entityManager;
     }
 
     @Transactional
     @Auditable(action = "REGISTRAR_PERSONA", entityName = "Persona", entityId = "#result.id")
     public PersonaDTO crear(PersonaDTO dto) {
         personaAccessService.validarPuedeCrearPersonas();
-
-        concurrenciaOptimistaValidator
-                .validarVersionNoEnviadaEnCreacion(dto.getVersion());
-
         personaValidator.validarCreacion(dto);
 
-        String numeroDocumento =
-                personaValidator.normalizarDocumento(dto.getNumeroDocumento());
-
+        String numeroDocumento = personaValidator.normalizarDocumento(dto.getNumeroDocumento());
         personaValidator.validarDocumentoDisponible(numeroDocumento);
 
         DatosPersona datos = cargarRelaciones(dto);
+        personaValidator.validarBarrioPerteneceAMunicipio(datos.barrio(), datos.municipio());
 
-        personaValidator.validarBarrioPerteneceAMunicipio(
-                datos.barrio(),
-                datos.municipio());
+        Persona persona = personaMapper.crearEntidad(dto, numeroDocumento, datos);
 
-        Persona persona =
-                personaMapper.crearEntidad(dto, numeroDocumento, datos);
-
-        Persona guardada = personaRepository.save(persona);
-        entityManager.flush();
-
-        return personaMapper.convertirADTO(guardada);
+        return personaMapper.convertirADTO(personaRepository.save(persona));
     }
 
     @Transactional
@@ -113,70 +92,36 @@ public class PersonaCommandService {
         personaValidator.validarActualizacion(id, dto);
 
         Persona persona = buscarPorId(id);
-
-        concurrenciaOptimistaValidator.validarVersion(
-                dto.getVersion(),
-                persona.getVersion(),
-                "persona");
-
-        String numeroDocumentoNuevo =
-                personaValidator.normalizarDocumento(dto.getNumeroDocumento());
-
+        String numeroDocumentoNuevo = personaValidator.normalizarDocumento(dto.getNumeroDocumento());
         personaValidator.validarDocumentoDisponibleParaActualizacion(persona, numeroDocumentoNuevo);
 
         DatosPersona datos = cargarRelaciones(dto);
+        personaValidator.validarBarrioPerteneceAMunicipio(datos.barrio(), datos.municipio());
 
-        personaValidator.validarBarrioPerteneceAMunicipio(
-                datos.barrio(),
-                datos.municipio());
+        // Se actualiza sobre la entidad existente para no tocar campos de control como activo.
+        personaMapper.aplicarDatos(persona, dto, numeroDocumentoNuevo, datos);
 
-        // No modifica activo ni version.
-        personaMapper.aplicarDatos(
-                persona,
-                dto,
-                numeroDocumentoNuevo,
-                datos);
-
-        Persona guardada = personaRepository.save(persona);
-        entityManager.flush();
-
-        return personaMapper.convertirADTO(guardada);
+        return personaMapper.convertirADTO(personaRepository.save(persona));
     }
 
     @Transactional
-    @Auditable(action = "DESACTIVAR_PERSONA", entityName = "Persona")
-    public void desactivar(Long id, Long versionEsperada) {
+    @Auditable(action = "DESACTIVAR_PERSONA", entityName = "Persona", entityId = "#id")
+    public void desactivar(Long id) {
         personaAccessService.validarPuedeCambiarEstadoPersonas();
 
         Persona persona = buscarPorId(id);
-
-        concurrenciaOptimistaValidator.validarVersion(
-                versionEsperada,
-                persona.getVersion(),
-                "persona");
-
         persona.setActivo(false);
-
         personaRepository.save(persona);
-        entityManager.flush();
     }
 
     @Transactional
-    @Auditable(action = "REACTIVAR_PERSONA", entityName = "Persona")
-    public void reactivar(Long id, Long versionEsperada) {
+    @Auditable(action = "REACTIVAR_PERSONA", entityName = "Persona", entityId = "#id")
+    public void reactivar(Long id) {
         personaAccessService.validarPuedeCambiarEstadoPersonas();
 
         Persona persona = buscarPorId(id);
-
-        concurrenciaOptimistaValidator.validarVersion(
-                versionEsperada,
-                persona.getVersion(),
-                "persona");
-
         persona.setActivo(true);
-
         personaRepository.save(persona);
-        entityManager.flush();
     }
 
     // Carga todas las relaciones activas desde formulario en un solo lugar.

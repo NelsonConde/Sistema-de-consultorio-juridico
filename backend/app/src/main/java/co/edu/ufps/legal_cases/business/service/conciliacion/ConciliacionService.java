@@ -48,27 +48,27 @@ public class ConciliacionService {
         return reunionConciliacionService.reprogramar(conciliacionId, dto);
     }
 
-    public ConciliacionResponseDTO asignarEstudiante(Long id, Long estudianteId, Long version) {
-        return conciliacionCommandService.asignarEstudiante(id, estudianteId, version);
+    public ConciliacionResponseDTO asignarEstudiante(Long id, Long estudianteId) {
+        return conciliacionCommandService.asignarEstudiante(id, estudianteId);
     }
 
-    public ConciliacionResponseDTO asignarConciliador(Long id, Long conciliadorId, Long version) {
-        return conciliacionCommandService.asignarConciliador(id, conciliadorId, version);
+    public ConciliacionResponseDTO asignarConciliador(Long id, Long conciliadorId) {
+        return conciliacionCommandService.asignarConciliador(id, conciliadorId);
     }
 
-    public ConciliacionResponseDTO cambiarEstado(Long id, String estado, Long version) {
-        return conciliacionCommandService.cambiarEstado(id, estado, version);
+    public ConciliacionResponseDTO cambiarEstado(Long id, String estado) {
+        return conciliacionCommandService.cambiarEstado(id, estado);
     }
 
-    public ConciliacionResponseDTO finalizar(Long id, String estado, MultipartFile acta, Long version) {
-        return conciliacionCommandService.finalizar(id, estado, acta, version);
+    public ConciliacionResponseDTO finalizar(Long id, String estado, MultipartFile acta) {
+        return conciliacionCommandService.finalizar(id, estado, acta);
     }
 
-    public ConciliacionResponseDTO reemplazarSolicitud(Long id, MultipartFile solicitud, Long version) {
-        return conciliacionCommandService.reemplazarSolicitud(id, solicitud, version);
+    public ConciliacionResponseDTO reemplazarSolicitud(Long id, MultipartFile solicitud) {
+        return conciliacionCommandService.reemplazarSolicitud(id, solicitud);
     }
 
-    public void desactivar(Long id, Long version) {
-        conciliacionCommandService.desactivar(id, version);
+    public void desactivar(Long id) {
+        conciliacionCommandService.desactivar(id);
     }
 }

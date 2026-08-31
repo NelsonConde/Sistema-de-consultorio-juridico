@@ -62,18 +62,14 @@ public class PersonaController {
     @PatchMapping("/{id}/desactivar")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('" + CAMBIAR_ESTADO_PERSONAS + "', '" + GESTIONAR_PERSONAS + "')")
-    public void desactivar(
-            @PathVariable Long id,
-            @RequestParam Long version) {
-        personaService.desactivar(id, version);
+    public void desactivar(@PathVariable Long id) {
+        personaService.desactivar(id);
     }
 
     @PatchMapping("/{id}/reactivar")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('" + CAMBIAR_ESTADO_PERSONAS + "', '" + GESTIONAR_PERSONAS + "')")
-    public void reactivar(
-            @PathVariable Long id,
-            @RequestParam Long version) {
-        personaService.reactivar(id, version);
+    public void reactivar(@PathVariable Long id) {
+        personaService.reactivar(id);
     }
 }

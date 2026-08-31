@@ -65,26 +65,22 @@ public class ProcesoController {
     @PreAuthorize("hasAuthority('" + GESTIONAR_PROCESOS + "')")
     public ProcesoDTO cambiarEstadoProceso(
             @PathVariable Long id,
-            @RequestParam EstadoProceso estado,
-            @RequestParam Long version) {
-        return procesoService.cambiarEstadoProceso(id, estado, version);
+            @RequestParam EstadoProceso estado) {
+        return procesoService.cambiarEstadoProceso(id, estado);
     }
 
     @PatchMapping("/{id}/activo")
     @PreAuthorize("hasAuthority('" + GESTIONAR_PROCESOS + "')")
     public ProcesoDTO cambiarEstado(
             @PathVariable Long id,
-            @RequestParam Boolean activo,
-            @RequestParam Long version) {
-        return procesoService.cambiarEstado(id, activo, version);
+            @RequestParam Boolean activo) {
+        return procesoService.cambiarEstado(id, activo);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAuthority('" + GESTIONAR_PROCESOS + "')")
-    public void eliminar(
-            @PathVariable Long id,
-            @RequestParam Long version) {
-        procesoService.eliminar(id, version);
+    public void eliminar(@PathVariable Long id) {
+        procesoService.eliminar(id);
     }
 }

@@ -13,8 +13,6 @@ public class SeguimientoRespuestaResponseDTO {
 
     private Long id;
 
-    private Long version;
-
     private Long seguimientoId;
 
     private Long consultaId;

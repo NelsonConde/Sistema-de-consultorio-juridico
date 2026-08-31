@@ -15,9 +15,6 @@ public class ProcesoDTO {
 
     private Long id;
 
-    // Versión de concurrencia recibida al consultar el proceso.
-    private Long version;
-
     // Puede ser nulo mientras el proceso permanezca PENDIENTE.
     // Para estados finales se valida en ProcesoValidator.
     private String numeroRadicado;

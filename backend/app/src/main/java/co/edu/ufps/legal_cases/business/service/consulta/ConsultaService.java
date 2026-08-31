@@ -54,19 +54,19 @@ public class ConsultaService {
         return consultaCommandService.actualizar(id, dto);
     }
 
-    public ConsultaDTO cambiarEstado(Long id, EstadoConsulta estado, Long version) {
-        return consultaCommandService.cambiarEstado(id, estado, version);
+    public ConsultaDTO cambiarEstado(Long id, EstadoConsulta estado) {
+        return consultaCommandService.cambiarEstado(id, estado);
     }
 
-    public void eliminar(Long id, Long version) {
-        consultaCommandService.eliminar(id, version);
+    public void eliminar(Long id) {
+        consultaCommandService.eliminar(id);
     }
 
-    public ConsultaDTO archivar(Long id, Long version) {
-        return consultaCommandService.archivar(id, version);
+    public ConsultaDTO archivar(Long id) {
+        return consultaCommandService.archivar(id);
     }
 
-    public ConsultaDTO desarchivar(Long id, Long version) {
-        return consultaCommandService.desarchivar(id, version);
+    public ConsultaDTO desarchivar(Long id) {
+        return consultaCommandService.desarchivar(id);
     }
 }

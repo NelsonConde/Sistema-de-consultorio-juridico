@@ -65,9 +65,8 @@ public class ConsultaController {
             + GESTIONAR_CONSULTAS + "')")
     public ConsultaDTO cambiarEstado(
             @PathVariable Long id,
-            @RequestParam EstadoConsulta estado,
-            @RequestParam Long version) {
-        return consultaService.cambiarEstado(id, estado, version);
+            @RequestParam EstadoConsulta estado) {
+        return consultaService.cambiarEstado(id, estado);
     }
 
     /**
@@ -77,18 +76,14 @@ public class ConsultaController {
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAuthority('" + ARCHIVAR_CONSULTAS + "')")
-    public void eliminar(
-            @PathVariable Long id,
-            @RequestParam Long version) {
-        consultaService.eliminar(id, version);
+    public void eliminar(@PathVariable Long id) {
+        consultaService.eliminar(id);
     }
 
     @PatchMapping("/{id}/archivar")
     @PreAuthorize("hasAuthority('" + ARCHIVAR_CONSULTAS + "')")
-    public ConsultaDTO archivar(
-            @PathVariable Long id,
-            @RequestParam Long version) {
-        return consultaService.archivar(id, version);
+    public ConsultaDTO archivar(@PathVariable Long id) {
+        return consultaService.archivar(id);
     }
 
     @GetMapping("/archivadas")
@@ -99,9 +94,7 @@ public class ConsultaController {
 
     @PatchMapping("/{id}/desarchivar")
     @PreAuthorize("hasAuthority('" + ARCHIVAR_CONSULTAS + "')")
-    public ConsultaDTO desarchivar(
-            @PathVariable Long id,
-            @RequestParam Long version) {
-        return consultaService.desarchivar(id, version);
+    public ConsultaDTO desarchivar(@PathVariable Long id) {
+        return consultaService.desarchivar(id);
     }
 }

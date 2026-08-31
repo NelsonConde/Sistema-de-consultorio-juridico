@@ -155,71 +155,8 @@ export class ApiError extends Error {
     this.name = "ApiError";
     this.status = status;
     this.payload = payload;
-    // Keep a body alias because DB-03 conflict helpers may receive errors from
-    // different transport wrappers while preserving the same backend payload.
-    this.body = payload;
     this.response = response;
   }
-}
-
-/**
- * Returns true only for optimistic-concurrency conflicts.
- * Authentication, authorization, validation, and transport failures must keep
- * their existing handling paths.
- */
-export function isConcurrencyConflict(error) {
-  const status = Number(
-    error?.status ??
-      error?.response?.status ??
-      error?.payload?.estado ??
-      error?.body?.estado ??
-      0
-  );
-
-  return status === 409;
-}
-
-/**
- * Normalizes the backend concurrency payload without changing the draft owned
- * by the calling screen.
- */
-export function toConcurrencyConflict(error) {
-  const payload = error?.payload ?? error?.body ?? null;
-
-  return {
-    message:
-      payload?.mensaje ||
-      payload?.message ||
-      error?.message ||
-      "El recurso fue modificado por otro usuario.",
-    correlationId: payload?.correlacionId ?? null,
-    path: payload?.ruta ?? null,
-  };
-}
-
-/**
- * Returns the exact server-owned version required by a DB-03 mutation.
- * The frontend must never invent or increment this value.
- */
-export function requireResourceVersion(resource, label = "recurso") {
-  const version = resource?.version;
-
-  if (version === null || version === undefined || version === "") {
-    throw new Error(
-      `No se recibió la versión actual del ${label}. Actualiza la información antes de continuar.`
-    );
-  }
-
-  return version;
-}
-
-/**
- * Appends the exact optimistic-locking version to an endpoint query string.
- */
-export function withResourceVersion(path, resource, label = "recurso") {
-  const version = requireResourceVersion(resource, label);
-  const separator = path.includes("?") ? "&" : "?";
-  return `${path}${separator}version=${encodeURIComponent(String(version))}`;
 }
 
 /**

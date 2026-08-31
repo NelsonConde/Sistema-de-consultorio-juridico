@@ -126,18 +126,6 @@ public class FileResourceService {
         }
     }
 
-    public void discardStoredAsset(FileAsset asset) {
-        if (asset == null || asset.getObjectKey() == null) {
-            return;
-        }
-
-        storageProvider.delete(asset.getObjectKey());
-
-        if (asset.getUploadId() != null) {
-            fileAssetService.markUploadFailed(asset.getUploadId());
-        }
-    }
-
     @Transactional
     public FileResponse complete(UUID uploadId, Long parentId) {
         FileAsset asset = fileAssetService.findByUploadId(uploadId);

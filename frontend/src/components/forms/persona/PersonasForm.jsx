@@ -20,7 +20,7 @@ import Pagination from "@/components/ui/Pagination";
 import { useRouter } from "next/navigation";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
-import { getApiErrorDescription, getApiErrorTitle, requireResourceVersion } from "@/lib/api";
+import { getApiErrorDescription, getApiErrorTitle } from "@/lib/api";
 import { buscarPersonasActivas, obtenerPersonaDetalle } from "@/lib/personasApi";
 import { DIGITS_PATTERN, EMAIL_PATTERN } from "@/lib/form-validation";
 
@@ -599,11 +599,7 @@ export function PersonasForm() {
       setError("");
       setMensaje("");
 
-      const payload = construirPayload(
-        form,
-        personaEditando.id,
-        requireResourceVersion(personaEditando, "registro de persona")
-      );
+      const payload = construirPayload(form, personaEditando.id);
 
       const res = await apiClient.request(`${API_URL_BASE}/personas/${personaEditando.id}`, {
         method: "PUT",
@@ -623,26 +619,6 @@ export function PersonasForm() {
 
       if (res.status === 403) {
         router.replace("/inicio");
-        return;
-      }
-
-      if (res.status === 409) {
-        const message = getApiErrorDescription(
-          data,
-          "La persona fue modificada por otro usuario."
-        );
-
-        try {
-          const latest = await obtenerPersonaDetalle(personaEditando.id);
-          setPersonaEditando((prev) => ({ ...prev, version: latest.version }));
-        } catch (refreshError) {
-          console.error("Could not refresh the person after a concurrency conflict", refreshError);
-        }
-
-        setError(`${message} Tus cambios siguen en el formulario. Revisa la información y vuelve a intentar.`);
-        toast.error("Este registro cambió mientras lo estabas editando", {
-          description: "Tus cambios se conservaron. Se cargó la versión actual como nueva base para un reintento manual.",
-        });
         return;
       }
 
@@ -680,9 +656,8 @@ export function PersonasForm() {
       setError("");
       setMensaje("");
 
-      const version = requireResourceVersion(personaADesactivar, "registro de persona");
       const res = await apiClient.request(
-        `${API_URL_BASE}/personas/${personaADesactivar.id}/desactivar?version=${encodeURIComponent(String(version))}`,
+        `${API_URL_BASE}/personas/${personaADesactivar.id}/desactivar`,
         {
           method: "PATCH",
           credentials: "include",
@@ -698,19 +673,6 @@ export function PersonasForm() {
 
       if (res.status === 403) {
         router.replace("/inicio");
-        return;
-      }
-
-      if (res.status === 409) {
-        const message = getApiErrorDescription(
-          data,
-          "La persona fue modificada por otro usuario."
-        );
-        setError(`${message} La lista se actualizará para que confirmes nuevamente la acción.`);
-        toast.error("No se pudo desactivar porque el registro cambió", {
-          description: "La acción no se reintentó automáticamente.",
-        });
-        await cargarPersonas();
         return;
       }
 

@@ -86,27 +86,24 @@ public class ConciliacionController {
     @PreAuthorize("hasAnyAuthority('" + GESTIONAR_CONCILIACIONES + "', '" + CONCLUIR_CONCILIACIONES + "')")
     public ConciliacionResponseDTO asignarEstudiante(
             @PathVariable Long id,
-            @RequestParam Long estudianteId,
-            @RequestParam Long version) {
-        return conciliacionService.asignarEstudiante(id, estudianteId, version);
+            @RequestParam Long estudianteId) {
+        return conciliacionService.asignarEstudiante(id, estudianteId);
     }
 
     @PatchMapping("/{id}/conciliador")
     @PreAuthorize("hasAuthority('" + GESTIONAR_CONCILIACIONES + "')")
     public ConciliacionResponseDTO asignarConciliador(
             @PathVariable Long id,
-            @RequestParam Long conciliadorId,
-            @RequestParam Long version) {
-        return conciliacionService.asignarConciliador(id, conciliadorId, version);
+            @RequestParam Long conciliadorId) {
+        return conciliacionService.asignarConciliador(id, conciliadorId);
     }
 
     @PatchMapping("/{id}/estado")
     @PreAuthorize("hasAnyAuthority('" + GESTIONAR_CONCILIACIONES + "', '" + CONCLUIR_CONCILIACIONES + "')")
     public ConciliacionResponseDTO cambiarEstado(
             @PathVariable Long id,
-            @RequestParam String estado,
-            @RequestParam Long version) {
-        return conciliacionService.cambiarEstado(id, estado, version);
+            @RequestParam String estado) {
+        return conciliacionService.cambiarEstado(id, estado);
     }
 
     @PostMapping("/{id}/finalizar")
@@ -114,26 +111,22 @@ public class ConciliacionController {
     public ConciliacionResponseDTO finalizar(
             @PathVariable Long id,
             @RequestParam String estado,
-            @RequestParam("acta") MultipartFile acta,
-            @RequestParam Long version) {
-        return conciliacionService.finalizar(id, estado, acta, version);
+            @RequestParam("acta") MultipartFile acta) {
+        return conciliacionService.finalizar(id, estado, acta);
     }
 
     @PostMapping("/{id}/solicitud")
     @PreAuthorize("hasAuthority('" + GESTIONAR_CONCILIACIONES + "')")
     public ConciliacionResponseDTO reemplazarSolicitud(
             @PathVariable Long id,
-            @RequestParam("solicitud") MultipartFile solicitud,
-            @RequestParam Long version) {
-        return conciliacionService.reemplazarSolicitud(id, solicitud, version);
+            @RequestParam("solicitud") MultipartFile solicitud) {
+        return conciliacionService.reemplazarSolicitud(id, solicitud);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAuthority('" + GESTIONAR_CONCILIACIONES + "')")
-    public void desactivar(
-            @PathVariable Long id,
-            @RequestParam Long version) {
-        conciliacionService.desactivar(id, version);
+    public void desactivar(@PathVariable Long id) {
+        conciliacionService.desactivar(id);
     }
 }

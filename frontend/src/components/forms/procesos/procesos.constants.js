@@ -14,7 +14,6 @@ export const FORM_INICIAL = {
   organoControlId: "",
   especialidadId: "",
   estado: "",
-  version: null,
 };
 
 export const ESTADOS_PROCESO = [

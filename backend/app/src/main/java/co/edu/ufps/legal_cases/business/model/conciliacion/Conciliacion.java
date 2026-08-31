@@ -19,7 +19,6 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import jakarta.persistence.Version;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -32,10 +31,6 @@ public class Conciliacion {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Version
-    @Column(name = "version", nullable = false)
-    private Long version;
 
     // Consulta desde la que nace la conciliación.
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

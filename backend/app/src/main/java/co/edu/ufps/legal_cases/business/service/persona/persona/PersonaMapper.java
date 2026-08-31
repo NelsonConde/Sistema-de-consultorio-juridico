@@ -24,7 +24,6 @@ public class PersonaMapper {
         PersonaDTO dto = new PersonaDTO();
 
         dto.setId(persona.getId());
-        dto.setVersion(persona.getVersion());
 
         // Relaciones: se expone solo el id para que el frontend pueda reconstruir los selects.
         dto.setTipoPersonaId(persona.getTipoPersona().getId());

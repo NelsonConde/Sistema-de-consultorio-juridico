@@ -40,15 +40,15 @@ public class ProcesoService {
         return procesoCommandService.actualizar(id, dto);
     }
 
-    public ProcesoDTO cambiarEstado(Long id, Boolean activo, Long version) {
-        return procesoCommandService.cambiarEstado(id, activo, version);
+    public ProcesoDTO cambiarEstado(Long id, Boolean activo) {
+        return procesoCommandService.cambiarEstado(id, activo);
     }
 
-    public ProcesoDTO cambiarEstadoProceso(Long id, EstadoProceso estado, Long version) {
-        return procesoCommandService.cambiarEstadoProceso(id, estado, version);
+    public ProcesoDTO cambiarEstadoProceso(Long id, EstadoProceso estado) {
+        return procesoCommandService.cambiarEstadoProceso(id, estado);
     }
 
-    public void eliminar(Long id, Long version) {
-        procesoCommandService.eliminar(id, version);
+    public void eliminar(Long id) {
+        procesoCommandService.eliminar(id);
     }
 }

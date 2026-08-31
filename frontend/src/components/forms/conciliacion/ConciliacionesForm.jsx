@@ -21,7 +21,6 @@ import {
 import { Button } from "@/components/ui/button";
 import Pagination from "@/components/ui/Pagination";
 import { API_URL_BASE } from "@/lib/config";
-import { isConcurrencyConflict, requireResourceVersion } from "@/lib/api";
 import { PERMISOS } from "@/lib/permission";
 import {
   esConciliador,
@@ -364,7 +363,7 @@ export function ConciliacionesForm() {
 
     await ejecutarAccion(async () => {
       await apiFetch(
-        `/conciliaciones/${detalle.id}/estudiante?estudianteId=${encodeURIComponent(estudianteId)}&version=${encodeURIComponent(String(requireResourceVersion(detalle, "conciliación")))}`,
+        `/conciliaciones/${detalle.id}/estudiante?estudianteId=${encodeURIComponent(estudianteId)}`,
         { method: "PATCH" },
         "No se pudo asignar el estudiante"
       );
@@ -385,7 +384,7 @@ export function ConciliacionesForm() {
 
     await ejecutarAccion(async () => {
       await apiFetch(
-        `/conciliaciones/${detalle.id}/conciliador?conciliadorId=${encodeURIComponent(conciliadorId)}&version=${encodeURIComponent(String(requireResourceVersion(detalle, "conciliación")))}`,
+        `/conciliaciones/${detalle.id}/conciliador?conciliadorId=${encodeURIComponent(conciliadorId)}`,
         { method: "PATCH" },
         "No se pudo asignar el conciliador"
       );
@@ -411,7 +410,7 @@ export function ConciliacionesForm() {
 
     await ejecutarAccion(async () => {
       await apiFetch(
-        `/conciliaciones/${detalle.id}/estado?estado=${encodeURIComponent(estadoNoFinal)}&version=${encodeURIComponent(String(requireResourceVersion(detalle, "conciliación")))}`,
+        `/conciliaciones/${detalle.id}/estado?estado=${encodeURIComponent(estadoNoFinal)}`,
         { method: "PATCH" },
         "No se pudo cambiar el estado"
       );
@@ -445,10 +444,11 @@ export function ConciliacionesForm() {
 
     await ejecutarAccion(async () => {
       const formData = new FormData();
+      formData.append("estado", estadoFinal);
       formData.append("acta", archivoActa);
 
       await apiFetch(
-        `/conciliaciones/${detalle.id}/finalizar?estado=${encodeURIComponent(estadoFinal)}&version=${encodeURIComponent(String(requireResourceVersion(detalle, "conciliación")))}`,
+        `/conciliaciones/${detalle.id}/finalizar`,
         { method: "POST", body: formData },
         "No se pudo finalizar la conciliación"
       );
@@ -474,7 +474,7 @@ export function ConciliacionesForm() {
       formData.append("solicitud", archivoSolicitudReemplazo);
 
       await apiFetch(
-        `/conciliaciones/${detalle.id}/solicitud?version=${encodeURIComponent(String(requireResourceVersion(detalle, "conciliación")))}`,
+        `/conciliaciones/${detalle.id}/solicitud`,
         { method: "POST", body: formData },
         "No se pudo reemplazar la solicitud"
       );
@@ -497,7 +497,7 @@ export function ConciliacionesForm() {
 
     await ejecutarAccion(async () => {
       await apiFetch(
-        `/conciliaciones/${detalle.id}?version=${encodeURIComponent(String(requireResourceVersion(detalle, "conciliación")))}`,
+        `/conciliaciones/${detalle.id}`,
         { method: "DELETE" },
         "No se pudo desactivar la conciliación"
       );
@@ -515,28 +515,6 @@ export function ConciliacionesForm() {
       await action();
     } catch (err) {
       console.error(err);
-      if (isConcurrencyConflict(err) && detalle?.id) {
-        setError("La conciliación cambió mientras realizabas la operación. Tus selecciones y archivos se conservaron.");
-        toast.error("Este registro cambió mientras realizabas la operación", {
-          description: "No hubo reintento automático. Se cargará la versión actual como nueva base.",
-        });
-
-        try {
-          const selectedStudent = estudianteId;
-          const selectedConciliator = conciliadorId;
-          const latest = await apiFetch(
-            `/conciliaciones/${detalle.id}`,
-            { method: "GET" },
-            "No se pudo cargar la versión actual de la conciliación"
-          );
-          setDetalle(latest);
-          setEstudianteId(selectedStudent);
-          setConciliadorId(selectedConciliator);
-        } catch (refreshError) {
-          console.error("Could not refresh the conciliation after a concurrency conflict", refreshError);
-        }
-        return;
-      }
       setError(err.message || "No se pudo completar la acción");
       toast.error(err.message || "No se pudo completar la acción");
     } finally {

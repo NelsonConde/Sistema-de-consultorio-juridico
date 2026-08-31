@@ -27,7 +27,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import jakarta.persistence.Version;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -40,11 +39,6 @@ public class Consulta {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    // Hibernate utiliza este campo para detectar actualizaciones concurrentes.
-    @Version
-    @Column(name = "version", nullable = false)
-    private Long version;
 
     @Column(name = "fecha", nullable = false)
     private LocalDate fecha;
@@ -90,18 +84,12 @@ public class Consulta {
 
     // Relación ManyToMany: partes (pueden ser varias personas)
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "consulta_parte",
-            joinColumns = @JoinColumn(name = "consulta_id"),
-            inverseJoinColumns = @JoinColumn(name = "persona_id"))
+    @JoinTable(name = "consulta_parte", joinColumns = @JoinColumn(name = "consulta_id"), inverseJoinColumns = @JoinColumn(name = "persona_id"))
     private List<Persona> partes = new ArrayList<>();
 
     // Relación ManyToMany: contrapartes
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "consulta_contraparte",
-            joinColumns = @JoinColumn(name = "consulta_id"),
-            inverseJoinColumns = @JoinColumn(name = "persona_id"))
+    @JoinTable(name = "consulta_contraparte", joinColumns = @JoinColumn(name = "consulta_id"), inverseJoinColumns = @JoinColumn(name = "persona_id"))
     private List<Persona> contrapartes = new ArrayList<>();
 
     @ManyToOne(fetch = FetchType.LAZY)

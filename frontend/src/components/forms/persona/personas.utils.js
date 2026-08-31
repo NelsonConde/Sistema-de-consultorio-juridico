@@ -113,13 +113,12 @@ export function convertirPersonaAForm(persona) {
   };
 }
 
-export function construirPayload(form, id, version) {
+export function construirPayload(form, id) {
   const esMenorEdad = calcularEsMenorEdad(form.fechaNacimiento);
 
   return {
     ...form,
     id,
-    version,
     tipoPersonaId: numberOrNull(form.tipoPersonaId),
     nacionalidadId: numberOrNull(form.nacionalidadId),
     condicionActualId: numberOrNull(form.condicionActualId),

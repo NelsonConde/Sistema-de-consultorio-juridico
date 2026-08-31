@@ -22,7 +22,7 @@ import Pagination from "@/components/ui/Pagination"
 import { FormFileUpload } from "@/components/forms/parts/FormFileUpload"
 import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils"
 import { normalizar } from "@/lib/authz"
-import { apiRequestData, isConcurrencyConflict, requireResourceVersion } from "@/lib/api"
+import { apiRequestData } from "@/lib/api"
 
 import {
   ESTADOS_SEGUIMIENTO,
@@ -499,9 +499,6 @@ export function SeguimientosForm() {
         notificarPartes: Boolean(formTarea.notificarPartes),
         alertaDisciplinaria: Boolean(formTarea.alertaDisciplinaria),
         notificarEstudiante: Boolean(formTarea.notificarEstudiante),
-        ...(tareaEditando
-          ? { version: requireResourceVersion(tareaEditando, "seguimiento") }
-          : {}),
       }
 
       const url = tareaEditando
@@ -533,20 +530,6 @@ export function SeguimientosForm() {
       await cargarTareasPorConsulta(consultaSeleccionada.id || consultaSeleccionada.consultaId)
     } catch (error) {
       console.error(error)
-      if (isConcurrencyConflict(error) && tareaEditando?.id) {
-        toast.error("Esta tarea cambió mientras la estabas editando", {
-          description: "Tus campos y archivos se conservaron. Se cargará la versión actual como nueva base.",
-        })
-        try {
-          const latest = await apiRequest(`${API_URL_BASE}/seguimientos/${obtenerIdTarea(tareaEditando)}`)
-          if (latest?.version != null) {
-            setTareaEditando((prev) => ({ ...prev, version: latest.version }))
-          }
-        } catch (refreshError) {
-          console.error("Could not refresh the follow-up after a concurrency conflict", refreshError)
-        }
-        return
-      }
       toast.error(error.message || "Error guardando tarea")
     } finally {
       setGuardando(false)
@@ -578,11 +561,9 @@ export function SeguimientosForm() {
     try {
       setEliminando(true)
 
-      const version = requireResourceVersion(tareaAEliminar, "seguimiento")
-      await apiRequest(
-        `${API_URL_BASE}/seguimientos/${obtenerIdTarea(tareaAEliminar)}?version=${encodeURIComponent(String(version))}`,
-        { method: "DELETE" }
-      )
+      await apiRequest(`${API_URL_BASE}/seguimientos/${obtenerIdTarea(tareaAEliminar)}`, {
+        method: "DELETE",
+      })
 
       toast.success("Tarea eliminada correctamente")
       setTareaAEliminar(null)
@@ -592,15 +573,6 @@ export function SeguimientosForm() {
       }
     } catch (error) {
       console.error(error)
-      if (isConcurrencyConflict(error)) {
-        toast.error("La tarea cambió antes de eliminarla", {
-          description: "La lista se actualizará. Confirma nuevamente la eliminación.",
-        })
-        if (consultaSeleccionada?.id || consultaSeleccionada?.consultaId) {
-          await cargarTareasPorConsulta(consultaSeleccionada.id || consultaSeleccionada.consultaId)
-        }
-        return
-      }
       toast.error(error.message || "Error eliminando tarea")
     } finally {
       setEliminando(false)
@@ -782,12 +754,7 @@ export function SeguimientosForm() {
       setSubiendoRespuesta(true)
 
       const seguimientoId = obtenerIdTarea(tareaRespuesta)
-      const payload = {
-        contenido: data.contenido.trim(),
-        ...(respuestaEditando
-          ? { version: requireResourceVersion(respuestaEditando, "respuesta de seguimiento") }
-          : {}),
-      }
+      const payload = { contenido: data.contenido.trim() }
       const url = respuestaEditando
         ? `${API_URL_BASE}/seguimientos/respuestas/${respuestaEditando.id}`
         : `${API_URL_BASE}/seguimientos/${seguimientoId}/respuestas`
@@ -811,20 +778,6 @@ export function SeguimientosForm() {
       await cargarRespuestasPorSeguimiento(seguimientoId)
     } catch (error) {
       console.error(error)
-      if (isConcurrencyConflict(error) && respuestaEditando?.id) {
-        toast.error("Esta respuesta cambió mientras la estabas editando", {
-          description: "Tu texto y archivos se conservaron. Se cargará la versión actual como nueva base.",
-        })
-        try {
-          const latest = await apiRequest(`${API_URL_BASE}/seguimientos/respuestas/${respuestaEditando.id}`)
-          if (latest?.version != null) {
-            setRespuestaEditando((prev) => ({ ...prev, version: latest.version }))
-          }
-        } catch (refreshError) {
-          console.error("Could not refresh the response after a concurrency conflict", refreshError)
-        }
-        return
-      }
       toast.error(error.message || "Error enviando respuesta")
     } finally {
       setSubiendoRespuesta(false)
@@ -872,7 +825,6 @@ export function SeguimientosForm() {
         body: JSON.stringify({
           estado: formDecision.estado,
           observacionRevision,
-          version: requireResourceVersion(respuestaDecision, "respuesta de seguimiento"),
         }),
       })
 
@@ -891,20 +843,6 @@ export function SeguimientosForm() {
       }
     } catch (error) {
       console.error(error)
-      if (isConcurrencyConflict(error) && respuestaDecision?.id) {
-        toast.error("La respuesta cambió antes de registrar la decisión", {
-          description: "La decisión no se aplicó. Se cargará la versión actual para que revises y confirmes nuevamente.",
-        })
-        try {
-          const latest = await apiRequest(`${API_URL_BASE}/seguimientos/respuestas/${respuestaDecision.id}`)
-          if (latest?.version != null) {
-            setRespuestaDecision((prev) => ({ ...prev, version: latest.version }))
-          }
-        } catch (refreshError) {
-          console.error("Could not refresh the response after a concurrency conflict", refreshError)
-        }
-        return
-      }
       toast.error(error.message || "No se pudo guardar la decisión")
     } finally {
       setGuardandoDecision(false)
@@ -952,7 +890,7 @@ export function SeguimientosForm() {
       setGuardandoEstadoSeguimiento(true)
 
       await apiRequest(
-        `${API_URL_BASE}/seguimientos/${obtenerIdTarea(seguimientoEstado)}/estado?estado=${encodeURIComponent(formEstadoSeguimiento.estado)}&version=${encodeURIComponent(String(requireResourceVersion(seguimientoEstado, "seguimiento")))}`,
+        `${API_URL_BASE}/seguimientos/${obtenerIdTarea(seguimientoEstado)}/estado?estado=${encodeURIComponent(formEstadoSeguimiento.estado)}`,
         { method: "PATCH" }
       )
 
@@ -968,20 +906,6 @@ export function SeguimientosForm() {
       }
     } catch (error) {
       console.error(error)
-      if (isConcurrencyConflict(error) && seguimientoEstado) {
-        toast.error("La tarea cambió antes de actualizar su estado", {
-          description: "El cambio no se aplicó. Se cargará la versión actual y deberás confirmar nuevamente.",
-        })
-        try {
-          const latest = await apiRequest(`${API_URL_BASE}/seguimientos/${obtenerIdTarea(seguimientoEstado)}`)
-          if (latest?.version != null) {
-            setSeguimientoEstado((prev) => ({ ...prev, version: latest.version }))
-          }
-        } catch (refreshError) {
-          console.error("Could not refresh the follow-up after a concurrency conflict", refreshError)
-        }
-        return
-      }
       toast.error(error.message || "No se pudo cambiar el estado de la tarea")
     } finally {
       setGuardandoEstadoSeguimiento(false)

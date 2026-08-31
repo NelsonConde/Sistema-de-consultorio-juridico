@@ -15,8 +15,6 @@ public class ConciliacionDetalleResponseDTO {
 
     private Long id;
 
-    private Long version;
-
     private Long consultaId;
 
     private Long estudianteId;
