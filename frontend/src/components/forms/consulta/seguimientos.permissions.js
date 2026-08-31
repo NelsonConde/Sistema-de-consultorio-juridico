@@ -1,11 +1,11 @@
 /**
- * Permission and authorization handling.
+ * Permission rules for the follow-up module.
  *
- * Permission and authorization handling.
- * Permission and authorization handling.
+ * This file contains only UI authorization decisions.
+ * Actual authorization remains the backend's responsibility.
  */
 
-import { normalizar, tieneAlgunPermiso, tienePermiso } from "@/lib/authz"
+import { tieneAlgunPermiso, tienePerfil as tienePerfilAuthz, tienePermiso } from "@/lib/authz"
 import { PERMISOS } from "@/lib/permission"
 
 const PERMISOS_LEGACY = {
@@ -14,7 +14,7 @@ const PERMISOS_LEGACY = {
 }
 
 export function tienePerfil(user, perfil) {
-  return normalizar(user?.tipoPerfil || user?.rolNombre) === normalizar(perfil)
+  return tienePerfilAuthz(user, perfil)
 }
 
 export function esEstudiante(user) {

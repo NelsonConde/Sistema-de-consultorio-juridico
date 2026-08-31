@@ -48,9 +48,9 @@ export function buscarPerfil(value) {
   return TIPOS_PERFIL.find((perfil) => perfil.value === value);
 }
 
-export function coincideNombreRol(rol, perfil) {
-  const nombre = normalizar(rol?.nombre);
-  return perfil.nombresRol.some((nombreRol) => normalizar(nombreRol) === nombre);
+export function rolCoincideConPerfil(rol, perfil) {
+  if (!rol?.tipoPerfil || !perfil?.value) return false;
+  return normalizar(rol.tipoPerfil) === normalizar(perfil.value);
 }
 
 /**

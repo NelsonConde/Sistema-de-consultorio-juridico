@@ -3,9 +3,9 @@
 import { apiClient } from "@/lib/apiClient";
 import { apiResponse, readResponseBody } from "@/lib/api";
 /**
- * Role handling.
+ * Form for changing a system user's role/profile.
  *
- * Permission and authorization handling.
+ * Requires the `ASIGNAR_ROL_USUARIOS` permission.
  *
  * @module components/forms/AdminUsuarios/CambiarRolUsuarioForm
  */
@@ -21,7 +21,7 @@ import { FormCheckbox } from "../parts/FormCheckbox";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { PERMISOS } from "@/lib/permission";
-import { normalizar, tieneAlgunPermiso, tienePermiso } from "@/lib/authz";
+import { tieneAlgunPermiso, tienePermiso } from "@/lib/authz";
 import { digitsOnlyRule, maxLengthRule } from "@/lib/form-validation";
 import Pagination from "@/components/ui/Pagination";
 import { sortByIdAsc } from "@/lib/list-utils";
@@ -29,11 +29,11 @@ import { sortByIdAsc } from "@/lib/list-utils";
 import { PERMISO_GESTIONAR_USUARIOS, TIPOS_PERFIL, VALORES_INICIALES } from "./cambiar-rol.constants";
 import {
   buscarPerfil,
-  coincideNombreRol,
   extraerLista,
   filtrarActivos,
   mapOption,
   normalizarTexto,
+  rolCoincideConPerfil,
   toNumberOrNull,
   usuarioActivo,
 } from "./cambiar-rol.utils";
@@ -69,6 +69,7 @@ export function CambiarRolUsuarioForm() {
   const REQUIRED = "Campo obligatorio";
   const usuarioSistemaId = watch("usuarioSistemaId");
   const destino = watch("destino");
+  const rolIdDestino = watch("rolIdDestino");
 
   const usuarioSeleccionado = useMemo(() => {
     return usuarios.find((usuario) => String(usuario.id) === String(usuarioSistemaId));
@@ -76,16 +77,13 @@ export function CambiarRolUsuarioForm() {
 
   const perfilDestino = useMemo(() => buscarPerfil(destino), [destino]);
 
-  const rolesPorPerfil = useMemo(() => {
-    const mapa = {};
+  const rolesCompatibles = useMemo(() => {
+    if (!perfilDestino) return [];
 
-    TIPOS_PERFIL.forEach((perfil) => {
-      const rol = roles.find((item) => coincideNombreRol(item, perfil));
-      if (rol?.id) mapa[perfil.value] = rol;
-    });
-
-    return mapa;
-  }, [roles]);
+    return roles.filter(
+      (rol) => usuarioActivo(rol) && rolCoincideConPerfil(rol, perfilDestino)
+    );
+  }, [roles, perfilDestino]);
 
   const puedeAsignarRol = tieneAlgunPermiso(user, [
     PERMISOS.ASIGNAR_ROL_USUARIOS,
@@ -150,16 +148,21 @@ export function CambiarRolUsuarioForm() {
   useEffect(() => {
     if (!perfilDestino) {
       setAvisoPerfil(null);
+      setValue("rolIdDestino", "");
       return;
     }
 
     limpiarCamposDestino();
+    setValue(
+      "rolIdDestino",
+      rolesCompatibles.length === 1 ? String(rolesCompatibles[0].id) : ""
+    );
     setAvisoPerfil({
       tipo: "info",
       mensaje:
         "Se usarán los datos comunes cargados desde el perfil actual. Si el usuario ya tuvo el perfil destino, el backend reutilizará o reactivará ese registro al guardar.",
     });
-  }, [perfilDestino]);
+  }, [perfilDestino, rolesCompatibles, setValue]);
 
   async function leerRespuesta(response) {
     const data = await readResponseBody(response);
@@ -295,9 +298,13 @@ export function CambiarRolUsuarioForm() {
   }
 
   function obtenerRolIdDestino() {
-    if (!perfilDestino) return null;
+    if (!perfilDestino || !rolIdDestino) return null;
 
-    return rolesPorPerfil[perfilDestino.value]?.id || perfilDestino.rolIdFallback;
+    const rolSeleccionado = rolesCompatibles.find(
+      (rol) => String(rol.id) === String(rolIdDestino)
+    );
+
+    return rolSeleccionado?.id ?? null;
   }
 
   function construirPayload(data) {
@@ -365,10 +372,15 @@ export function CambiarRolUsuarioForm() {
       return;
     }
 
-    const rolIdDestino = obtenerRolIdDestino();
+    if (rolesCompatibles.length === 0) {
+      toast.error("No hay roles activos compatibles con el perfil seleccionado");
+      return;
+    }
 
-    if (!rolIdDestino) {
-      toast.error("No se pudo resolver el rol destino");
+    const rolIdDestinoValidado = obtenerRolIdDestino();
+
+    if (!rolIdDestinoValidado) {
+      toast.error("Selecciona un rol destino válido");
       return;
     }
 
@@ -658,7 +670,8 @@ export function CambiarRolUsuarioForm() {
             )}
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium">Nuevo perfil / rol</label>
 
             <select
@@ -670,21 +683,61 @@ export function CambiarRolUsuarioForm() {
             >
               <option value="">Seleccione un perfil destino</option>
 
-              {perfilesDisponibles.map((perfil) => {
-                const rolAsignado = rolesPorPerfil[perfil.value];
-                return (
-                  <option key={perfil.value} value={perfil.value}>
-                    {perfil.label}
-                    {rolAsignado?.nombre ? ` - Rol: ${rolAsignado.nombre}` : ""}
-                  </option>
-                );
-              })}
+              {perfilesDisponibles.map((perfil) => (
+                <option key={perfil.value} value={perfil.value}>
+                  {perfil.label}
+                </option>
+              ))}
             </select>
 
             {errors?.destino && (
               <p className="text-xs text-red-500">
                 {errors.destino.message}
               </p>
+            )}
+            </div>
+
+            {perfilDestino && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Rol destino</label>
+
+                <select
+                  {...register("rolIdDestino", {
+                    required:
+                      rolesCompatibles.length > 0
+                        ? "Selecciona un rol destino"
+                        : false,
+                  })}
+                  disabled={rolesCompatibles.length === 0}
+                  className={`flex h-9 w-full rounded-lg border bg-background px-3 py-2 text-sm ${
+                    errors?.rolIdDestino ? "border-red-500" : ""
+                  }`}
+                >
+                  <option value="">
+                    {rolesCompatibles.length === 0
+                      ? "No hay roles compatibles"
+                      : "Seleccione un rol destino"}
+                  </option>
+
+                  {rolesCompatibles.map((rol) => (
+                    <option key={rol.id} value={rol.id}>
+                      {rol.nombre || `Rol #${rol.id}`}
+                    </option>
+                  ))}
+                </select>
+
+                {errors?.rolIdDestino && (
+                  <p className="text-xs text-red-500">
+                    {errors.rolIdDestino.message}
+                  </p>
+                )}
+
+                {rolesCompatibles.length === 0 && (
+                  <p className="text-xs text-red-500">
+                    No existe un rol activo compatible con este perfil.
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </div>

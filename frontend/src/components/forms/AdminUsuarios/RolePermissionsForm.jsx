@@ -1,16 +1,16 @@
 "use client"
 
 /**
- * Permission and authorization handling.
+ * Form for managing page permissions for system roles.
  *
- * Role handling.
- * Permission and authorization handling.
+ * Allows selecting which pages a role can access by assigning and revoking
+ * the permissions required to access each page.
  *
- * Protecciones implementadas:
- * Role handling.
- * Permission and authorization handling.
- * Permission and authorization handling.
- * Permission and authorization handling.
+ * Implemented safeguards:
+ * - Prevents removing Administration access from your own role.
+ * - Unauthorized actions show a toast instead of redirecting.
+ * - The diff algorithm only revokes permissions managed by this form,
+ *   preserving permissions assigned through other mechanisms.
  *
  * @module components/forms/AdminUsuarios/RolePermissionsForm
  */
@@ -33,7 +33,6 @@ import {
   leerRespuesta,
   nombrePermiso,
   nombreRol,
-  normalizar,
   paginaMarcada,
   permisosAsignarPagina,
   permisosGestionadosPagina,
@@ -59,7 +58,13 @@ export function RolePermissionsForm() {
     PERMISOS.ASIGNAR_PERMISOS_ROLES
   );
 
-  const paginasConfigurables = useMemo(() => PAGINAS, []);
+  // Administration is intentionally excluded from this form.
+  // Its existing permissions remain untouched because this form only manages
+  // permissions associated with the pages included in paginasConfigurables.
+  const paginasConfigurables = useMemo(
+    () => PAGINAS.filter((page) => page.path !== "/admin"),
+    []
+  );
 
   const paginaAdministracion = "/admin";
 
@@ -69,24 +74,9 @@ export function RolePermissionsForm() {
   );
 
   const rolSeleccionadoEsPropio = useMemo(() => {
-    if (!me || !rolId) return false;
-
-    const roleById = rolSeleccionado;
-    if (roleById && me?.rolId != null) {
-      return String(me.rolId) === String(roleById.id);
-    }
-
-    if (roleById && me?.rolNombre) {
-      return normalizar(nombreRol(roleById)) === normalizar(me.rolNombre);
-    }
-
-    if (me?.rolNombre) {
-      return normalizar(nombreRol({ nombre: me.rolNombre })) ===
-        normalizar(me.rolNombre);
-    }
-
-    return false;
-  }, [me, rolId, rolSeleccionado]);
+    if (!me || !rolId || me?.rolId == null) return false;
+    return String(me.rolId) === String(rolId);
+  }, [me, rolId]);
 
   useEffect(() => {
     cargarDatosIniciales();
@@ -334,11 +324,11 @@ export function RolePermissionsForm() {
   }
 
   /**
-   * Permission and authorization handling.
-   * Permission and authorization handling.
-   * Error handling.
+   * Toggles a page selection in the permissions form.
+   * Shows a toast when the user cannot assign permissions.
+   * Shows a UI error when attempting to remove Administration access from the current role.
    *
-   * @param {string} path - Parameter description.
+   * @param {string} path - Page route to toggle.
    */
   function togglePagina(path) {
     if (!puedeAsignarPermisos) {

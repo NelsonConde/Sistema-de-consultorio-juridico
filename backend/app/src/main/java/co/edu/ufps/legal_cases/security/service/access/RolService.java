@@ -72,10 +72,13 @@ public class RolService {
 
         validarNombreDisponible(nombre);
 
-        // Se cargan únicamente permisos activos para evitar asignar permisos deshabilitados.
+        // Se cargan únicamente permisos activos para evitar asignar permisos
+        // deshabilitados.
         Set<Permiso> permisos = obtenerPermisosActivos(dto.getPermisoIds());
 
         Rol rol = new Rol();
+        rol.setTipoPerfil(dto.getTipoPerfil());
+
         rolMapper.aplicarDatos(rol, nombre, descripcion, activo, permisos);
 
         return rolMapper.convertirADTO(rolRepository.save(rol));
@@ -100,7 +103,8 @@ public class RolService {
 
         validarNombreDisponibleParaActualizar(nombreNuevo, rol.getId());
 
-        // Si se envían permisos, se reemplaza la lista actual; si no se envían, se conservan.
+        // Si se envían permisos, se reemplaza la lista actual; si no se envían, se
+        // conservan.
         Set<Permiso> permisosNuevos = dto.getPermisoIds() != null
                 ? obtenerPermisosActivos(dto.getPermisoIds())
                 : rol.getPermisos();
