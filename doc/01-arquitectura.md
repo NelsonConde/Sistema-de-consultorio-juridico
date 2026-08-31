@@ -71,12 +71,12 @@ Elementos relevantes:
 
 ### Paquete `audit`
 
-Implementa auditoría mediante AOP:
+Implementa auditoría probatoria estructurada mediante AOP:
 
 - `Auditable` marca métodos de servicio auditables;
-- `AuditAspect` intercepta ejecuciones exitosas;
-- `AuditLogService` persiste eventos;
-- `AuditLogController` expone consulta paginada.
+- `AuditAspect` intercepta éxitos, fallos y denegaciones;
+- `AuditLogService` coordina persistencia transaccional y eventos que sobreviven al rollback;
+- `AuditLogController` expone consulta paginada con permiso dedicado y tamaño limitado.
 
 ### Paquete `file_storage`
 

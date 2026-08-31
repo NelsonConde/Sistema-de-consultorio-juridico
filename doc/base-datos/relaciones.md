@@ -180,10 +180,11 @@ persona N---1 empresa
 ## 11. Relación de auditoría
 
 ```text
-audit_logs registra acción, entidad lógica, id afectado y usuario textual
+audit_logs registra actor, acción, entidad, resultado, instante, origen,
+correlación y cambios escalares permitidos
 ```
 
-La auditoría se produce mediante aspecto asociado a métodos anotados con `@Auditable`.
+La auditoría se produce mediante aspecto asociado a métodos anotados con `@Auditable` y se protege contra `UPDATE`/`DELETE` con una migración versionada.
 
 ## 12. Relación de estadísticas
 

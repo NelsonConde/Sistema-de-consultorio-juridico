@@ -66,7 +66,7 @@ public class EstudianteCommandService {
     }
 
     @Transactional
-    @Auditable(action = "CREAR_PERFIL", entityName = "Estudiante")
+    @Auditable(action = "CREAR_PERFIL", entityName = "Estudiante", entityId = "#result.id")
     public EstudianteDTO crear(EstudianteDTO dto) {
         estudianteAccessService.validarPuedeGestionarEstudiantes();
         estudianteValidator.validarIdNoEnviadoEnCreacion(dto.getId());
@@ -95,7 +95,7 @@ public class EstudianteCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ACTUALIZAR_PERFIL", entityName = "Estudiante")
+    @Auditable(action = "ACTUALIZAR_PERFIL", entityName = "Estudiante", entityId = "#id")
     public EstudianteDTO actualizar(Long id, EstudianteDTO dto) {
         estudianteAccessService.validarPuedeGestionarEstudiantes();
 
@@ -126,7 +126,12 @@ public class EstudianteCommandService {
     }
 
     @Transactional
-    @Auditable(action = "DESACTIVAR/REACTIVAR_PERFIL", entityName = "Estudiante")
+    @Auditable(
+            action = "CAMBIAR_ESTADO_PERFIL",
+            entityName = "Estudiante",
+            entityId = "#id",
+            trackedFields = "activo",
+            metadata = "requestedActive=#activo")
     public EstudianteDTO cambiarEstado(Long id, Boolean activo) {
         estudianteAccessService.validarPuedeCambiarEstadoEstudiante();
 
@@ -152,7 +157,12 @@ public class EstudianteCommandService {
     }
 
     @Transactional
-    @Auditable(action = "HABILITAR_CONCILIACION", entityName = "Estudiante")
+    @Auditable(
+            action = "CAMBIAR_HABILITACION_CONCILIACION",
+            entityName = "Estudiante",
+            entityId = "#id",
+            trackedFields = "conciliacion",
+            metadata = "requestedEnabled=#conciliacion")
     public EstudianteDTO cambiarConciliacion(Long id, Boolean conciliacion) {
         estudianteAccessService.validarPuedeGestionarEstudiantes();
 
@@ -166,7 +176,7 @@ public class EstudianteCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ELIMINAR_PERFIL", entityName = "Estudiante")
+    @Auditable(action = "ELIMINAR_PERFIL", entityName = "Estudiante", entityId = "#id")
     public void eliminar(Long id) {
         estudianteAccessService.validarPuedeGestionarEstudiantes();
 

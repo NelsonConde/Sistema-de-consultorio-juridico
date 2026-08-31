@@ -34,7 +34,11 @@ public class ReunionConciliacionCommandService {
     private final ReunionConciliacionNotificacionService reunionConciliacionNotificacionService;
 
     @Transactional
-    @Auditable(action = "PROGRAMAR_REUNION", entityName = "ReunionConciliacion")
+    @Auditable(
+            action = "PROGRAMAR_REUNION",
+            entityName = "ReunionConciliacion",
+            entityId = "#result.id",
+            metadata = "conciliacionId=#conciliacionId")
     public ReunionConciliacionResponseDTO programar(Long conciliacionId, ReunionConciliacionRequestDTO dto) {
         conciliacionAccessService.validarPuedeProgramarReunion(conciliacionId);
 
@@ -64,7 +68,11 @@ public class ReunionConciliacionCommandService {
     }
 
     @Transactional
-    @Auditable(action = "REPROGRAMAR_REUNION", entityName = "ReunionConciliacion")
+    @Auditable(
+            action = "REPROGRAMAR_REUNION",
+            entityName = "ReunionConciliacion",
+            entityId = "#result.id",
+            metadata = "conciliacionId=#conciliacionId")
     public ReunionConciliacionResponseDTO reprogramar(Long conciliacionId, ReunionConciliacionRequestDTO dto) {
         conciliacionAccessService.validarPuedeReprogramarReunion(conciliacionId);
 

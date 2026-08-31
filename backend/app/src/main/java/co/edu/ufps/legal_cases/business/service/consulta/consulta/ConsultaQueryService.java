@@ -7,6 +7,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import co.edu.ufps.legal_cases.audit.aop.log.Auditable;
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaBusquedaDTO;
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.Consulta;
@@ -84,6 +85,7 @@ public class ConsultaQueryService {
     }
 
     @Transactional(readOnly = true)
+    @Auditable(action = "READ_LEGAL_CASE_LIST", entityName = "Consulta", entityId = "'collection'")
     public List<ConsultaDTO> listar() {
         consultaAccessService.validarPuedeBuscarConsultas();
 
@@ -95,6 +97,7 @@ public class ConsultaQueryService {
     }
 
     @Transactional(readOnly = true)
+    @Auditable(action = "READ_LEGAL_CASE", entityName = "Consulta", entityId = "#id")
     public ConsultaDTO obtenerPorId(Long id) {
         consultaAccessService.validarPuedeVerConsulta(id);
 
@@ -108,6 +111,7 @@ public class ConsultaQueryService {
     }
 
     @Transactional(readOnly = true)
+    @Auditable(action = "READ_ARCHIVED_LEGAL_CASES", entityName = "Consulta", entityId = "'archived'")
     public List<ConsultaBusquedaDTO> listarArchivadas() {
         consultaAccessService.validarPuedeListarConsultasArchivadas();
 

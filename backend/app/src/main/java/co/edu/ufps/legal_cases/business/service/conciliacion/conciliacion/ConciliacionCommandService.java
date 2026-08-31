@@ -41,7 +41,11 @@ public class ConciliacionCommandService {
     private final ReunionConciliacionNotificacionService reunionConciliacionNotificacionService;
 
     @Transactional
-    @Auditable(action = "CREAR_CONCILIACION", entityName = "Conciliacion")
+    @Auditable(
+            action = "CREAR_CONCILIACION",
+            entityName = "Conciliacion",
+            entityId = "#result.id",
+            metadata = "consultaId=#consultaId")
     public ConciliacionResponseDTO crearDesdeConsulta(Long consultaId, MultipartFile solicitud) {
         conciliacionAccessService.validarPuedeCrearConciliacion(consultaId);
 
@@ -83,7 +87,11 @@ public class ConciliacionCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ASIGNAR_ESTUDIANTE", entityName = "Conciliacion")
+    @Auditable(
+            action = "ASIGNAR_ESTUDIANTE",
+            entityName = "Conciliacion",
+            entityId = "#id",
+            metadata = "assignedStudentId=#estudianteId")
     public ConciliacionResponseDTO asignarEstudiante(Long id, Long estudianteId) {
         conciliacionAccessService.validarPuedeAsignarEstudiante(id);
 
@@ -105,7 +113,11 @@ public class ConciliacionCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ASIGNAR_CONCILIADOR", entityName = "Conciliacion")
+    @Auditable(
+            action = "ASIGNAR_CONCILIADOR",
+            entityName = "Conciliacion",
+            entityId = "#id",
+            metadata = "assignedConciliatorId=#conciliadorId")
     public ConciliacionResponseDTO asignarConciliador(Long id, Long conciliadorId) {
         conciliacionAccessService.validarPuedeAsignarConciliador(id);
 
@@ -127,7 +139,11 @@ public class ConciliacionCommandService {
     }
 
     @Transactional
-    @Auditable(action = "CAMBIAR_ESTADO_CONCILIACION", entityName = "Conciliacion")
+    @Auditable(
+            action = "CAMBIAR_ESTADO_CONCILIACION",
+            entityName = "Conciliacion",
+            entityId = "#id",
+            metadata = "requestedState=#estadoCodigo")
     public ConciliacionResponseDTO cambiarEstado(Long id, String estadoCodigo) {
         conciliacionAccessService.validarPuedeCambiarEstado(id, estadoCodigo);
 
@@ -143,7 +159,11 @@ public class ConciliacionCommandService {
     }
 
     @Transactional
-    @Auditable(action = "FINALIZAR_CONCILIACION", entityName = "Conciliacion")
+    @Auditable(
+            action = "FINALIZAR_CONCILIACION",
+            entityName = "Conciliacion",
+            entityId = "#id",
+            metadata = "requestedState=#estadoCodigo")
     public ConciliacionResponseDTO finalizar(Long id, String estadoCodigo, MultipartFile acta) {
         conciliacionAccessService.validarPuedeFinalizar(id);
 
@@ -169,7 +189,7 @@ public class ConciliacionCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ACTUALIZAR_SOLICITUD", entityName = "Conciliacion")
+    @Auditable(action = "ACTUALIZAR_SOLICITUD", entityName = "Conciliacion", entityId = "#id")
     public ConciliacionResponseDTO reemplazarSolicitud(Long id, MultipartFile solicitud) {
         conciliacionAccessService.validarPuedeReemplazarSolicitud(id);
 
@@ -186,7 +206,11 @@ public class ConciliacionCommandService {
     }
 
     @Transactional
-    @Auditable(action = "DESACTIVAR_CONCILIACION", entityName = "Conciliacion")
+    @Auditable(
+            action = "DESACTIVAR_CONCILIACION",
+            entityName = "Conciliacion",
+            entityId = "#id",
+            trackedFields = "activo")
     public void desactivar(Long id) {
         conciliacionAccessService.validarPuedeDesactivarConciliacion(id);
 

@@ -38,7 +38,7 @@ public class SeguimientoCommandService {
     private final ConsultaEstadoService consultaEstadoService;
 
     @Transactional
-    @Auditable(action = "CREAR_SEGUIMIENTO", entityName = "Seguimiento")
+    @Auditable(action = "CREAR_SEGUIMIENTO", entityName = "Seguimiento", entityId = "#result.id")
     public SeguimientoResponseDTO crear(SeguimientoRequestDTO dto) {
         seguimientoValidator.validarCreacion(dto);
         seguimientoAccessService.validarPuedeCrearSeguimiento(dto.getConsultaId());
@@ -65,7 +65,7 @@ public class SeguimientoCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ACTUALIZAR_SEGUIMIENTO", entityName = "Seguimiento")
+    @Auditable(action = "ACTUALIZAR_SEGUIMIENTO", entityName = "Seguimiento", entityId = "#id")
     public SeguimientoResponseDTO actualizar(Long id, SeguimientoRequestDTO dto) {
         seguimientoAccessService.validarPuedeEditarSeguimiento(id);
 
@@ -92,7 +92,12 @@ public class SeguimientoCommandService {
     }
 
     @Transactional
-    @Auditable(action = "CAMBIAR_ESTADO_SEGUIMIENTO", entityName = "Seguimiento")
+    @Auditable(
+            action = "CAMBIAR_ESTADO_SEGUIMIENTO",
+            entityName = "Seguimiento",
+            entityId = "#id",
+            trackedFields = "estado",
+            metadata = "requestedState=#estado")
     public SeguimientoResponseDTO cambiarEstadoSeguimiento(Long id, EstadoSeguimiento estado) {
         seguimientoAccessService.validarPuedeEditarSeguimiento(id);
 
@@ -102,7 +107,11 @@ public class SeguimientoCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ELIMINAR_SEGUIMIENTO", entityName = "Seguimiento")
+    @Auditable(
+            action = "ELIMINAR_SEGUIMIENTO",
+            entityName = "Seguimiento",
+            entityId = "#id",
+            trackedFields = "activo")
     public void eliminar(Long id) {
         seguimientoAccessService.validarPuedeEliminarSeguimiento(id);
 

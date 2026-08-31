@@ -61,7 +61,7 @@ public class AdministrativoCommandService {
     }
 
     @Transactional
-    @Auditable(action = "CREAR_PERFIL", entityName = "Administrativo")
+    @Auditable(action = "CREAR_PERFIL", entityName = "Administrativo", entityId = "#result.id")
     public AdministrativoDTO crear(AdministrativoDTO dto) {
         administrativoAccessService.validarPuedeGestionarAdministradores();
         administrativoValidator.validarIdNoEnviadoEnCreacion(dto.getId());
@@ -92,7 +92,7 @@ public class AdministrativoCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ACTUALIZAR_PERFIL", entityName = "Administrativo")
+    @Auditable(action = "ACTUALIZAR_PERFIL", entityName = "Administrativo", entityId = "#id")
     public AdministrativoDTO actualizar(Long id, AdministrativoDTO dto) {
         administrativoAccessService.validarPuedeGestionarAdministradores();
 
@@ -124,7 +124,12 @@ public class AdministrativoCommandService {
     }
 
     @Transactional
-    @Auditable(action = "DESACTIVAR/REACTIVAR_PERFIL", entityName = "Administrativo")
+    @Auditable(
+            action = "CAMBIAR_ESTADO_PERFIL",
+            entityName = "Administrativo",
+            entityId = "#id",
+            trackedFields = "activo",
+            metadata = "requestedActive=#activo")
     public AdministrativoDTO cambiarEstado(Long id, Boolean activo) {
         administrativoAccessService.validarPuedeGestionarAdministradores();
 
@@ -147,7 +152,12 @@ public class AdministrativoCommandService {
     }
 
     @Transactional
-    @Auditable(action = "CAMBIAR_DIRECTORA", entityName = "Administrativo")
+    @Auditable(
+            action = "CAMBIAR_DIRECTORA",
+            entityName = "Administrativo",
+            entityId = "#id",
+            trackedFields = "directora",
+            metadata = "requestedDirector=#directora")
     public AdministrativoDTO cambiarDirectora(Long id, Boolean directora) {
         administrativoAccessService.validarPuedeGestionarAdministradores();
 
@@ -162,7 +172,7 @@ public class AdministrativoCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ELIMINAR_PERFIL", entityName = "Administrativo")
+    @Auditable(action = "ELIMINAR_PERFIL", entityName = "Administrativo", entityId = "#id")
     public void eliminar(Long id) {
         administrativoAccessService.validarPuedeGestionarAdministradores();
 

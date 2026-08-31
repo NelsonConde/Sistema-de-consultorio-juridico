@@ -65,7 +65,7 @@ public class AsesorCommandService {
     }
 
     @Transactional
-    @Auditable(action = "CREAR_PERFIL", entityName = "Asesor")
+    @Auditable(action = "CREAR_PERFIL", entityName = "Asesor", entityId = "#result.id")
     public AsesorDTO crear(AsesorDTO dto) {
         asesorMonitorAccessService.validarPuedeGestionarAsesoresYMonitores();
         asesorValidator.validarIdNoEnviadoEnCreacion(dto.getId());
@@ -95,7 +95,7 @@ public class AsesorCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ACTUALIZAR_PERFIL", entityName = "Asesor")
+    @Auditable(action = "ACTUALIZAR_PERFIL", entityName = "Asesor", entityId = "#id")
     public AsesorDTO actualizar(Long id, AsesorDTO dto) {
         asesorMonitorAccessService.validarPuedeGestionarAsesoresYMonitores();
 
@@ -123,7 +123,12 @@ public class AsesorCommandService {
     }
 
     @Transactional
-    @Auditable(action = "DESACTIVAR/REACTIVAR_PERFIL", entityName = "Asesor")
+    @Auditable(
+            action = "CAMBIAR_ESTADO_PERFIL",
+            entityName = "Asesor",
+            entityId = "#id",
+            trackedFields = "activo",
+            metadata = "requestedActive=#activo")
     public AsesorDTO cambiarEstado(Long id, Boolean activo) {
         asesorMonitorAccessService.validarPuedeGestionarAsesoresYMonitores();
 
@@ -149,7 +154,7 @@ public class AsesorCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ELIMINAR_PERFIL", entityName = "Asesor")
+    @Auditable(action = "ELIMINAR_PERFIL", entityName = "Asesor", entityId = "#id")
     public void eliminar(Long id) {
         asesorMonitorAccessService.validarPuedeGestionarAsesoresYMonitores();
 

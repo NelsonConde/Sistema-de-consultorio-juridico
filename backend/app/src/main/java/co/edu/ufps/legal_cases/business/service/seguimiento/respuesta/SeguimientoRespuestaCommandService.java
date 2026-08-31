@@ -57,7 +57,7 @@ public class SeguimientoRespuestaCommandService {
     }
 
     @Transactional
-    @Auditable(action = "CREAR_RESPUESTA_SEGUIMIENTO", entityName = "SeguimientoRespuesta")
+    @Auditable(action = "CREAR_RESPUESTA_SEGUIMIENTO", entityName = "SeguimientoRespuesta", entityId = "#result.id")
     public SeguimientoRespuestaResponseDTO crear(Long seguimientoId, SeguimientoRespuestaRequestDTO dto) {
         seguimientoRespuestaAccessService.validarPuedeResponderSeguimiento(seguimientoId);
         seguimientoRespuestaValidator.validarCreacion(dto);
@@ -86,7 +86,7 @@ public class SeguimientoRespuestaCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ACTUALIZAR_RESPUESTA_SEGUIMIENTO", entityName = "SeguimientoRespuesta")
+    @Auditable(action = "ACTUALIZAR_RESPUESTA_SEGUIMIENTO", entityName = "SeguimientoRespuesta", entityId = "#id")
     public SeguimientoRespuestaResponseDTO actualizar(Long id, SeguimientoRespuestaRequestDTO dto) {
         seguimientoRespuestaAccessService.validarPuedeEditarRespuesta(id);
         seguimientoRespuestaValidator.validarActualizacion(id, dto);
@@ -112,7 +112,13 @@ public class SeguimientoRespuestaCommandService {
     }
 
     @Transactional
-    @Auditable(action = "APROBAR/RECHAZAR_RESPUESTA", entityName = "SeguimientoRespuesta")
+    @Auditable(
+            action = "DECIDIR_RESPUESTA_SEGUIMIENTO",
+            entityName = "SeguimientoRespuesta",
+            entityId = "#id",
+            trackedFields = "estado",
+            metadata = "requestedState=#dto.estado",
+            reason = "#dto.observacionRevision")
     public SeguimientoRespuestaResponseDTO decidir(Long id, SeguimientoRespuestaDecisionDTO dto) {
         seguimientoRespuestaAccessService.validarPuedeRevisarRespuesta(id);
         seguimientoRespuestaValidator.validarDecision(dto);
