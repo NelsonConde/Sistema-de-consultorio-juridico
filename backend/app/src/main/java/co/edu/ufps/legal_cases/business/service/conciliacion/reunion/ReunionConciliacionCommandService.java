@@ -17,7 +17,9 @@ import co.edu.ufps.legal_cases.business.repository.conciliacion.ConciliacionRepo
 import co.edu.ufps.legal_cases.business.repository.conciliacion.reunion.ReunionConciliacionRepository;
 import co.edu.ufps.legal_cases.business.service.acceso.conciliacion.ConciliacionAccessService;
 import co.edu.ufps.legal_cases.business.service.conciliacion.reunion.notificacion.ReunionConciliacionNotificacionService;
+import co.edu.ufps.legal_cases.common.concurrency.ConcurrenciaOptimistaValidator;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
+import jakarta.persistence.EntityManager;
 import lombok.AllArgsConstructor;
 
 @Service
@@ -32,6 +34,8 @@ public class ReunionConciliacionCommandService {
     private final ReunionConciliacionMapper reunionConciliacionMapper;
     private final ReunionConciliacionHistorialService reunionConciliacionHistorialService;
     private final ReunionConciliacionNotificacionService reunionConciliacionNotificacionService;
+    private final ConcurrenciaOptimistaValidator concurrenciaOptimistaValidator;
+    private final EntityManager entityManager;
 
     @Transactional
     @Auditable(
@@ -43,6 +47,15 @@ public class ReunionConciliacionCommandService {
         conciliacionAccessService.validarPuedeProgramarReunion(conciliacionId);
 
         Conciliacion conciliacion = reunionConciliacionRelacionService.obtenerConciliacionActiva(conciliacionId);
+
+        concurrenciaOptimistaValidator
+                .validarVersionNoEnviadaEnCreacion(dto.getVersion());
+
+        concurrenciaOptimistaValidator.validarVersion(
+                dto.getConciliacionVersion(),
+                conciliacion.getVersion(),
+                "conciliación");
+
         Sede sede = reunionConciliacionRelacionService.obtenerSedeActiva(dto != null ? dto.getSedeId() : null);
 
         reunionConciliacionValidator.validarProgramacion(conciliacion, dto, sede);
@@ -56,6 +69,13 @@ public class ReunionConciliacionCommandService {
         ReunionConciliacion reunionGuardada = reunionConciliacionRepository.save(reunion);
 
         asegurarEstadoReunionProgramada(conciliacion);
+
+        /*
+         * Confirma tanto la creación de la reunión como cualquier
+         * modificación versionada de la conciliación antes de producir
+         * historial o notificaciones.
+         */
+        entityManager.flush();
 
         UsuarioSistema usuario = reunionConciliacionRelacionService.obtenerUsuario(
                 conciliacionAccessService.obtenerUsuarioActualId());
@@ -78,6 +98,17 @@ public class ReunionConciliacionCommandService {
 
         Conciliacion conciliacion = reunionConciliacionRelacionService.obtenerConciliacionActiva(conciliacionId);
         ReunionConciliacion reunion = reunionConciliacionRelacionService.obtenerReunion(conciliacionId);
+
+        concurrenciaOptimistaValidator.validarVersion(
+                dto.getConciliacionVersion(),
+                conciliacion.getVersion(),
+                "conciliación");
+
+        concurrenciaOptimistaValidator.validarVersion(
+                dto.getVersion(),
+                reunion.getVersion(),
+                "reunión de conciliación");
+
         Sede sedeNueva = reunionConciliacionRelacionService.obtenerSedeActiva(dto != null ? dto.getSedeId() : null);
 
         reunionConciliacionValidator.validarReprogramacion(conciliacion, reunion, dto, sedeNueva);
@@ -93,6 +124,8 @@ public class ReunionConciliacionCommandService {
         ReunionConciliacion reunionGuardada = reunionConciliacionRepository.save(reunion);
 
         asegurarEstadoReunionProgramada(conciliacion);
+
+        entityManager.flush();
 
         UsuarioSistema usuario = reunionConciliacionRelacionService.obtenerUsuario(
                 conciliacionAccessService.obtenerUsuarioActualId());

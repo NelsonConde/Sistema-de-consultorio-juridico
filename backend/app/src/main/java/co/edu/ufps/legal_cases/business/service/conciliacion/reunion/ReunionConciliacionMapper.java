@@ -16,6 +16,12 @@ public class ReunionConciliacionMapper {
 
         ReunionConciliacionResponseDTO dto = new ReunionConciliacionResponseDTO();
         dto.setConciliacionId(reunion.getConciliacionId());
+        dto.setVersion(reunion.getVersion());
+        dto.setConciliacionVersion(
+                reunion.getConciliacion() != null
+                        ? reunion.getConciliacion().getVersion()
+                        : null);
+
         dto.setFechaReunion(reunion.getFechaReunion());
         dto.setObservaciones(reunion.getObservaciones());
         dto.setFechaCreacion(reunion.getFechaCreacion());

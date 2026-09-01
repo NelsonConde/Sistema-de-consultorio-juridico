@@ -62,11 +62,11 @@ public class SeguimientoService {
         return seguimientoCommandService.actualizar(id, dto);
     }
 
-    public SeguimientoResponseDTO cambiarEstadoSeguimiento(Long id, EstadoSeguimiento estado) {
-        return seguimientoCommandService.cambiarEstadoSeguimiento(id, estado);
+    public SeguimientoResponseDTO cambiarEstadoSeguimiento(Long id, EstadoSeguimiento estado, Long version) {
+        return seguimientoCommandService.cambiarEstadoSeguimiento(id, estado, version);
     }
 
-    public void eliminar(Long id) {
-        seguimientoCommandService.eliminar(id);
+    public void eliminar(Long id, Long version) {
+        seguimientoCommandService.eliminar(id, version);
     }
 }

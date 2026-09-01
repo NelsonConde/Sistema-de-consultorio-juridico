@@ -14,5 +14,5 @@ export const VACIOS = {
   tipoViolencia: "", estado: "", resultado: "",
   personaId: "", sedeId: "", areaId: "", temaId: "",
   tipoId: "", asesorId: "", monitorId: "", estudianteId: "",
-  partesIds: [], contrapartesIds: [],
+  partesIds: [], contrapartesIds: [], version: null,
 };

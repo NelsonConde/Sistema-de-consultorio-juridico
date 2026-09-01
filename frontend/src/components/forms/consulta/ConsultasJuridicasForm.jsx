@@ -1,6 +1,7 @@
 "use client"
 
 import { apiClient } from "@/lib/apiClient";
+import { requireResourceVersion } from "@/lib/api";
 import { fileApi } from "@/lib/fileApi";
   /**
    * List and table handling.
@@ -95,7 +96,7 @@ export function ConsultasJuridicasForm() {
   const [modalPartesAdicionales, setModalPartesAdicionales] = useState({ abierto: false, busqueda: "" });
   const [modalContrapartes, setModalContrapartes] = useState({ abierto: false, busqueda: "" });
 
-  // Seleccionados
+  // Selected items
   const areaSeleccionadaId = useMemo(
     () => idNormalizado(form.areaId),
     [form.areaId]
@@ -704,6 +705,7 @@ export function ConsultasJuridicasForm() {
         estudianteId: data.estudianteId ?? data.estudiante?.id ?? "",
         partesIds: Array.isArray(data.partesIds) ? data.partesIds.map(Number) : [],
         contrapartesIds: Array.isArray(data.contrapartesIds) ? data.contrapartesIds.map(Number) : [],
+        version: data.version ?? null,
       });
 
       setResultadoGuardado(data.resultado ?? "");
@@ -782,6 +784,7 @@ export function ConsultasJuridicasForm() {
       contrapartesIds: Array.isArray(form.contrapartesIds)
         ? form.contrapartesIds.map(Number)
         : [],
+      version: requireResourceVersion(form, "consulta"),
     };
 
 
@@ -811,6 +814,27 @@ export function ConsultasJuridicasForm() {
         return;
       }
 
+      if (res.status === 409) {
+        toast.error("Este registro cambió mientras lo estabas editando", {
+          description: "Tus cambios se conservaron. Se consultará la versión actual antes de un reintento manual.",
+        });
+
+        try {
+          const latestRes = await apiClient.request(`${API_URL_BASE}/consultas/${idEditando}`, {
+            method: "GET",
+            credentials: "include",
+          });
+          const latestPayload = await leerJsonSeguro(latestRes);
+          const latest = latestPayload?.data || latestPayload?.consulta || latestPayload;
+          if (latestRes.ok && latest?.version != null) {
+            setForm((prev) => ({ ...prev, version: latest.version }));
+          }
+        } catch (refreshError) {
+          console.error("Could not refresh the consultation after a concurrency conflict", refreshError);
+        }
+        return;
+      }
+
       if (res.ok) {
         setResultadoGuardado(form.resultado ?? "");
         toast.success("Consulta actualizada");
@@ -823,7 +847,7 @@ export function ConsultasJuridicasForm() {
       }
     } catch (error) {
       console.error(error);
-      toast.error("Error de conexión");
+      toast.error(error.message || "Error de conexión");
     } finally {
       setGuardando(false);
     }
@@ -856,7 +880,7 @@ export function ConsultasJuridicasForm() {
 
     try {
       const res = await apiClient.request(
-        `${API_URL_BASE}/consultas/${id}/estado?estado=${encodeURIComponent(estadoNormalizado)}`,
+        `${API_URL_BASE}/consultas/${id}/estado?estado=${encodeURIComponent(estadoNormalizado)}&version=${encodeURIComponent(String(requireResourceVersion(form, "consulta")))}`,
         {
           method: "PATCH",
           credentials: "include",
@@ -875,6 +899,23 @@ export function ConsultasJuridicasForm() {
         return;
       }
 
+      if (res.status === 409) {
+        toast.error("La consulta cambió antes de actualizar su estado", {
+          description: "El cambio no se reintentó automáticamente y el formulario permanece abierto.",
+        });
+        try {
+          const latestRes = await apiClient.request(`${API_URL_BASE}/consultas/${id}`, { method: "GET", credentials: "include" });
+          const latestPayload = await leerJsonSeguro(latestRes);
+          const latest = latestPayload?.data || latestPayload?.consulta || latestPayload;
+          if (latestRes.ok && latest?.version != null) {
+            setForm((prev) => ({ ...prev, version: latest.version }));
+          }
+        } catch (refreshError) {
+          console.error("Could not refresh the consultation after a concurrency conflict", refreshError);
+        }
+        return;
+      }
+
       if (res.ok) {
         toast.success("Estado de la consulta actualizado");
         setMostrarFormEdicion(false);
@@ -884,7 +925,7 @@ export function ConsultasJuridicasForm() {
       }
     } catch (error) {
       console.error(error);
-      toast.error("Error de conexión");
+      toast.error(error.message || "Error de conexión");
     }
   }
 
@@ -904,10 +945,15 @@ export function ConsultasJuridicasForm() {
     setConfirmArchivar((s) => ({ ...s, loading: true }));
 
     try {
-      const res = await apiClient.request(`${API_URL_BASE}/consultas/${id}/archivar`, {
-        method: "PATCH",
-        credentials: "include",
-      });
+      const row = consultas.find((item) => String(item?.id) === String(id));
+      const version = requireResourceVersion(row, "consulta");
+      const res = await apiClient.request(
+        `${API_URL_BASE}/consultas/${id}/archivar?version=${encodeURIComponent(String(version))}`,
+        {
+          method: "PATCH",
+          credentials: "include",
+        }
+      );
 
       const payload = await leerJsonSeguro(res);
 
@@ -921,6 +967,14 @@ export function ConsultasJuridicasForm() {
         return;
       }
 
+      if (res.status === 409) {
+        toast.error("La consulta cambió antes de archivarla", {
+          description: "La lista se actualizará. Confirma nuevamente la acción sobre la versión actual.",
+        });
+        await cargarConsultas(searchText);
+        return;
+      }
+
       if (res.ok) {
         toast.success("Consulta archivada");
         cargarConsultas(searchText);
@@ -929,7 +983,7 @@ export function ConsultasJuridicasForm() {
       }
     } catch (error) {
       console.error(error);
-      toast.error("Error de conexión");
+      toast.error(error.message || "Error de conexión");
     } finally {
       setConfirmArchivar({ abierto: false, id: null, loading: false });
     }
