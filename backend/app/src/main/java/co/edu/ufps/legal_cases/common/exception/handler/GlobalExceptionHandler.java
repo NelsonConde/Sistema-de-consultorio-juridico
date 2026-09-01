@@ -17,7 +17,10 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.dao.OptimisticLockingFailureException;
 
+import co.edu.ufps.legal_cases.common.exception.ConcurrenciaOptimistaException;
+import jakarta.persistence.OptimisticLockException;
 import co.edu.ufps.legal_cases.common.exception.AdministracionInvariantException;
 import co.edu.ufps.legal_cases.audit.service.log.AuditSecurityService;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
@@ -53,6 +56,35 @@ public class GlobalExceptionHandler {
                 request);
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+        @ExceptionHandler({
+            ConcurrenciaOptimistaException.class,
+            OptimisticLockingFailureException.class,
+            OptimisticLockException.class
+    })
+    public ResponseEntity<ErrorResponseDTO> manejarConflictoConcurrencia(
+            Exception ex,
+            HttpServletRequest request) {
+
+        String correlationId = obtenerCorrelationId(request);
+
+        log.warn(
+                "Conflicto de concurrencia [{}] en {}: {}",
+                correlationId,
+                request.getRequestURI(),
+                ex.getClass().getSimpleName());
+
+        ErrorResponseDTO error = construirError(
+                HttpStatus.CONFLICT,
+                "Conflicto de concurrencia",
+                "El recurso fue modificado por otro usuario. "
+                        + "Recargue la información y revise sus cambios.",
+                request);
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(error);
     }
 
     // Maneja reglas de negocio controladas por los services.
