@@ -14,6 +14,7 @@ export const FORM_INICIAL = {
   organoControlId: "",
   especialidadId: "",
   estado: "",
+  version: null,
 };
 
 export const ESTADOS_PROCESO = [
@@ -26,8 +27,8 @@ export const ESTADOS_PROCESO = [
 ];
 
 /**
- * Convierte un estado de proceso a su etiqueta en español.
+ * State handling.
  * 
- * @param {string} estado - Código de estado (ej: "PENDIENTE", "SENTENCIA_FAVORABLE")
- * @returns {string} Etiqueta legible del estado
+ * @param {string} estado - Status value.
+ * @returns {string} Result value.
  */

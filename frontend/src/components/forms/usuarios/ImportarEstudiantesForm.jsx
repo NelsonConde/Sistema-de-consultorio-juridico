@@ -10,9 +10,9 @@ import { API_URL_BASE } from "@/lib/config";
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 function descargarPlantilla() {
-  // El backend procesa exclusivamente libros XLSX con Apache POI.
-  // La plantilla se sirve como archivo real para que encabezados y tipos
-  // coincidan con EstudianteExcelService.
+  // The backend processes XLSX workbooks exclusively through Apache POI.
+  // File handling.
+  // Implementation detail.
   const a = document.createElement("a");
   a.href = "/plantilla_importacion_estudiantes.xlsx";
   a.download = "plantilla_importacion_estudiantes.xlsx";
@@ -22,12 +22,12 @@ function descargarPlantilla() {
 }
 
 
-// ─── Componente ───────────────────────────────────────────────────────────────
+// Component implementation detail.
 
 /**
- * Formulario para importar estudiantes desde un archivo Excel.
- * @param {{puedeImportar:boolean}} props - Props del componente.
- * @returns {JSX.Element} Componente de importación de estudiantes.
+ * File handling.
+ * @param {{puedeImportar:boolean}} props - Parameter description.
+ * @returns {JSX.Element} Result value.
  */
 export function ImportarEstudiantesForm({ puedeImportar }) {
   const inputRef = useRef(null);
@@ -86,7 +86,7 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
         body: form,
       });
 
-      // Error de formato (texto plano del backend)
+      // Error handling.
       if (res.status === 400) {
         const text = typeof data === "string" ? data : data ? JSON.stringify(data) : "";
         setErrorFormato(text || "El archivo no tiene el formato correcto.");
@@ -117,7 +117,7 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
         toast.error(`Todos los registros fallaron (${data.fallidos} error(es)).`);
       }
 
-      // Limpiar archivo tras importar
+      // File handling.
       setArchivoSeleccionado(null);
     } catch (err) {
       console.error(err);
@@ -132,7 +132,7 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
   return (
     <div className="space-y-4">
 
-      {/* Encabezado de sección */}
+      {/* Implementation detail.*/}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <FileSpreadsheet className="w-4 h-4 text-primary" />
@@ -150,7 +150,7 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
         </Button>
       </div>
 
-      {/* Zona de drop */}
+      {/* Drop zone */}
       {!archivoSeleccionado && !resultado && (
         <div
           onDragOver={(e) => e.preventDefault()}
@@ -173,7 +173,7 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
         </div>
       )}
 
-      {/* Archivo seleccionado */}
+      {/* Selected file */}
       {archivoSeleccionado && !resultado && (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -208,7 +208,7 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
         </div>
       )}
 
-      {/* Error de formato */}
+      {/* Error handling.*/}
       {errorFormato && (
         <div className="flex gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-xs text-primary">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -219,10 +219,10 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
         </div>
       )}
 
-      {/* Resultado */}
+      {/* Result */}
       {resultado && (
         <div className="space-y-3">
-          {/* Resumen */}
+          {/* Summary */}
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-xl border border-border bg-card px-4 py-3 text-center">
               <p className="text-2xl font-extrabold text-foreground">{resultado.totalFilas}</p>
@@ -240,7 +240,7 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
             </div>
           </div>
 
-          {/* Banner de resultado global */}
+          {/* Implementation detail.*/}
           {resultado.fallidos === 0 ? (
             <div className="flex items-center gap-2 rounded-xl bg-primary/10 border border-primary/30 px-4 py-2.5 text-sm text-primary">
               <CheckCircle className="w-4 h-4 shrink-0" />
@@ -258,7 +258,7 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
             </div>
           )}
 
-          {/* Lista de errores por fila */}
+          {/* List and table handling.*/}
           {resultado.errores && resultado.errores.length > 0 && (
             <div className="rounded-xl border border-border bg-card overflow-hidden">
               <div className="px-4 py-2.5 border-b border-border bg-muted/30 flex items-center gap-2">
@@ -278,7 +278,7 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
             </div>
           )}
 
-          {/* Botón para nueva importación */}
+          {/* Implementation detail.*/}
           <Button
             type="button"
             variant="outline"

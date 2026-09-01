@@ -1,4 +1,4 @@
-/** Valores iniciales del formulario de nueva consulta. */
+/** Form handling.*/
 export const VACIOS = {
   fecha: "",
   descripcion: "",

@@ -21,9 +21,11 @@ import co.edu.ufps.legal_cases.business.repository.seguimiento.SeguimientoReposi
 import co.edu.ufps.legal_cases.business.repository.seguimiento.respuesta.SeguimientoRespuestaRepository;
 import co.edu.ufps.legal_cases.business.service.acceso.seguimiento.SeguimientoRespuestaAccessService;
 import co.edu.ufps.legal_cases.business.service.seguimiento.seguimiento.SeguimientoEstadoService;
+import co.edu.ufps.legal_cases.common.concurrency.ConcurrenciaOptimistaValidator;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
 import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaRepository;
+import jakarta.persistence.EntityManager;
 
 @Service
 public class SeguimientoRespuestaCommandService {
@@ -36,6 +38,8 @@ public class SeguimientoRespuestaCommandService {
     private final SeguimientoRespuestaValidator seguimientoRespuestaValidator;
     private final SeguimientoRespuestaMapper seguimientoRespuestaMapper;
     private final SeguimientoEstadoService seguimientoEstadoService;
+    private final ConcurrenciaOptimistaValidator concurrenciaOptimistaValidator;
+    private final EntityManager entityManager;
 
     public SeguimientoRespuestaCommandService(
             SeguimientoRespuestaRepository seguimientoRespuestaRepository,
@@ -45,7 +49,9 @@ public class SeguimientoRespuestaCommandService {
             SeguimientoRespuestaAccessService seguimientoRespuestaAccessService,
             SeguimientoRespuestaValidator seguimientoRespuestaValidator,
             SeguimientoRespuestaMapper seguimientoRespuestaMapper,
-            SeguimientoEstadoService seguimientoEstadoService) {
+            SeguimientoEstadoService seguimientoEstadoService,
+            ConcurrenciaOptimistaValidator concurrenciaOptimistaValidator,
+            EntityManager entityManager) {
         this.seguimientoRespuestaRepository = seguimientoRespuestaRepository;
         this.seguimientoRepository = seguimientoRepository;
         this.estudianteRepository = estudianteRepository;
@@ -54,11 +60,16 @@ public class SeguimientoRespuestaCommandService {
         this.seguimientoRespuestaValidator = seguimientoRespuestaValidator;
         this.seguimientoRespuestaMapper = seguimientoRespuestaMapper;
         this.seguimientoEstadoService = seguimientoEstadoService;
+        this.concurrenciaOptimistaValidator = concurrenciaOptimistaValidator;
+        this.entityManager = entityManager;
     }
 
     @Transactional
-    @Auditable(action = "CREAR_RESPUESTA_SEGUIMIENTO", entityName = "SeguimientoRespuesta")
+    @Auditable(action = "CREAR_RESPUESTA_SEGUIMIENTO", entityName = "SeguimientoRespuesta", entityId = "#result.id")
     public SeguimientoRespuestaResponseDTO crear(Long seguimientoId, SeguimientoRespuestaRequestDTO dto) {
+        concurrenciaOptimistaValidator
+                .validarVersionNoEnviadaEnCreacion(dto.getVersion());
+
         seguimientoRespuestaAccessService.validarPuedeResponderSeguimiento(seguimientoId);
         seguimientoRespuestaValidator.validarCreacion(dto);
 
@@ -81,19 +92,31 @@ public class SeguimientoRespuestaCommandService {
 
         respuesta.setActivo(true);
 
-        return seguimientoRespuestaMapper.convertirAResponseDTO(
-                seguimientoRespuestaRepository.save(respuesta));
+        SeguimientoRespuesta guardada =
+                seguimientoRespuestaRepository.save(respuesta);
+
+        entityManager.flush();
+
+        return seguimientoRespuestaMapper.convertirAResponseDTO(guardada);
     }
 
     @Transactional
-    @Auditable(action = "ACTUALIZAR_RESPUESTA_SEGUIMIENTO", entityName = "SeguimientoRespuesta")
+    @Auditable(action = "ACTUALIZAR_RESPUESTA_SEGUIMIENTO", entityName = "SeguimientoRespuesta", entityId = "#id")
     public SeguimientoRespuestaResponseDTO actualizar(Long id, SeguimientoRespuestaRequestDTO dto) {
         seguimientoRespuestaAccessService.validarPuedeEditarRespuesta(id);
         seguimientoRespuestaValidator.validarActualizacion(id, dto);
 
         SeguimientoRespuesta respuesta = obtenerRespuestaActiva(id);
+
+        concurrenciaOptimistaValidator.validarVersion(
+                dto.getVersion(),
+                respuesta.getVersion(),
+                "respuesta de seguimiento");
+
         seguimientoEstadoService.validarPermiteRespuesta(respuesta.getSeguimiento());
-        String contenido = seguimientoRespuestaValidator.normalizarContenido(dto.getContenido());
+
+        String contenido =
+                seguimientoRespuestaValidator.normalizarContenido(dto.getContenido());
 
         if (equalsIgnoreCase(respuesta.getContenido(), contenido)) {
             throw new BusinessException("No hay cambios para actualizar");
@@ -107,17 +130,33 @@ public class SeguimientoRespuestaCommandService {
                 Boolean.TRUE.equals(respuesta.getFueraPlazo())
                         || estaFueraDePlazo(respuesta.getSeguimiento()));
 
-        return seguimientoRespuestaMapper.convertirAResponseDTO(
-                seguimientoRespuestaRepository.save(respuesta));
+        SeguimientoRespuesta guardada =
+                seguimientoRespuestaRepository.save(respuesta);
+
+        entityManager.flush();
+
+        return seguimientoRespuestaMapper.convertirAResponseDTO(guardada);
     }
 
     @Transactional
-    @Auditable(action = "APROBAR/RECHAZAR_RESPUESTA", entityName = "SeguimientoRespuesta")
+    @Auditable(
+            action = "DECIDIR_RESPUESTA_SEGUIMIENTO",
+            entityName = "SeguimientoRespuesta",
+            entityId = "#id",
+            trackedFields = "estado",
+            metadata = "requestedState=#dto.estado",
+            reason = "#dto.observacionRevision")
     public SeguimientoRespuestaResponseDTO decidir(Long id, SeguimientoRespuestaDecisionDTO dto) {
         seguimientoRespuestaAccessService.validarPuedeRevisarRespuesta(id);
         seguimientoRespuestaValidator.validarDecision(dto);
 
         SeguimientoRespuesta respuesta = obtenerRespuestaActiva(id);
+
+        concurrenciaOptimistaValidator.validarVersion(
+                dto.getVersion(),
+                respuesta.getVersion(),
+                "respuesta de seguimiento");
+
         seguimientoEstadoService.validarPermiteRespuesta(respuesta.getSeguimiento());
 
         UsuarioSistema revisor = obtenerUsuarioActual();
@@ -129,6 +168,14 @@ public class SeguimientoRespuestaCommandService {
         respuesta.setFechaDecision(LocalDateTime.now());
 
         SeguimientoRespuesta respuestaGuardada = seguimientoRespuestaRepository.save(respuesta);
+
+        /*
+         * Primero confirma que la decisión sobre la respuesta no perdió
+         * una carrera concurrente.
+         *
+         * Solo después pueden ejecutarse efectos derivados sobre Seguimiento.
+         */
+        entityManager.flush();
 
         if (EstadoRespuestaSeguimiento.APROBADA.equals(respuestaGuardada.getEstado())) {
             seguimientoEstadoService.completarPorRespuestaAprobada(respuestaGuardada);

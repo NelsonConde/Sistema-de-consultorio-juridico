@@ -1,16 +1,16 @@
 /**
- * Cliente HTTP centralizado para el backend.
+ * Implementation detail.
  *
  * Responsabilidades:
- * - Incluir cookies con credentials: "include".
+ * Implementation detail.
  * - Serializar JSON.
- * - Obtener el token CSRF desde /auth/csrf.
- * - Enviar CSRF en POST, PUT, PATCH y DELETE.
- * - Mantener el token CSRF únicamente en memoria.
+ * Keep the CSRF token synchronized with the browser cookie and backend session.
+ * - Send CSRF on POST, PUT, PATCH, and DELETE requests.
+ * Keep the CSRF token synchronized with the browser cookie and backend session.
  *
- * Se solicita un CSRF actualizado antes de cada operación mutable para evitar
- * enviar un token almacenado en memoria que ya no corresponda con la cookie
- * XSRF-TOKEN actual del navegador.
+ * Implementation detail.
+ * Implementation detail.
+ * Implementation detail.
  */
 
 import { API_URL_BASE } from "@/lib/config";
@@ -40,11 +40,11 @@ function clearCsrfToken() {
 }
 
 /**
- * Obtiene el token CSRF actual.
+ * Keep the CSRF token synchronized with the browser cookie and backend session.
  *
- * force=true descarta el token almacenado en memoria y consulta nuevamente
- * /auth/csrf. Las solicitudes simultáneas comparten la misma petición para
- * evitar carreras que puedan generar tokens distintos.
+ * Consultation flow detail.
+ * Implementation detail.
+ * Implementation detail.
  */
 async function getCsrfToken({ force = false } = {}) {
   if (csrfRequest) {
@@ -99,7 +99,7 @@ async function getCsrfToken({ force = false } = {}) {
 }
 
 /**
- * Fuerza la obtención de un nuevo token CSRF.
+ * Keep the CSRF token synchronized with the browser cookie and backend session.
  */
 async function refreshCsrfToken() {
   return getCsrfToken({
@@ -108,12 +108,12 @@ async function refreshCsrfToken() {
 }
 
 /**
- * Ejecuta una petición HTTP.
+ * Implementation detail.
  *
- * GET, HEAD y OPTIONS no requieren CSRF.
+ * Implementation detail.
  *
- * POST, PUT, PATCH y DELETE obtienen un token
- * CSRF actualizado antes de ejecutar la petición.
+ * Data loading behavior.
+ * Implementation detail.
  */
 async function request(
   path,
@@ -153,11 +153,11 @@ async function request(
   }
 
   /*
-   * Antes de cada operación mutable obtenemos
-   * el CSRF actual del backend.
+   * Implementation detail.
+   * Implementation detail.
    *
-   * Esto evita enviar un token viejo almacenado
-   * en memoria cuando la cookie XSRF-TOKEN ya cambió.
+   * Implementation detail.
+   * Implementation detail.
    */
   if (
     !SAFE_METHODS.has(
@@ -191,11 +191,11 @@ async function request(
     });
 
   /*
-   * Login y logout invalidan el CSRF utilizado
-   * en el backend.
+   * Login and logout invalidate the CSRF token used by the backend.
+   * Implementation detail.
    *
-   * Se elimina la copia en memoria para que
-   * la siguiente operación obtenga uno nuevo.
+   * Implementation detail.
+   * Implementation detail.
    */
   if (
     response.ok &&

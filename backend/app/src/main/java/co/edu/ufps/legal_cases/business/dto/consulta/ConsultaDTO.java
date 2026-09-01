@@ -17,6 +17,9 @@ public class ConsultaDTO {
 
     private Long id;
 
+    // Se devuelve al consultar el recurso y debe reenviarse al actualizarlo.
+    private Long version;
+
     @NotNull(message = "La fecha es obligatoria")
     private LocalDate fecha;
 

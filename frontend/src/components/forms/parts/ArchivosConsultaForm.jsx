@@ -1,11 +1,11 @@
 import { FormFileUpload } from "./FormFileUpload";
 
 /**
- * Sección de formulario para subir archivos asociados a una consulta.
- * @param {Object} props - Propiedades del componente.
- * @param {Array<File>} props.archivos - Lista de archivos seleccionados.
- * @param {function} props.onChange - Callback para actualizar la lista de archivos.
- * @returns {JSX.Element} Componente de archivos de consulta.
+ * File handling.
+ * @param {Object} props - Parameter description.
+ * @param {Array<File>} props.archivos - Selected files.
+ * @param {function} props.onChange - Parameter description.
+ * @returns {JSX.Element} Result value.
  */
 export default function ArchivosConsultaForm({ archivos, onChange }) {
   return (

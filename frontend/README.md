@@ -15,8 +15,8 @@ El frontend está desarrollado con Next.js y consume el backend principal median
 
 ## Requisitos
 
-- Node.js 22 o superior.
-- npm.
+- Node.js 22.x.
+- npm 10.x.
 
 ## Instalación
 

@@ -1,21 +1,21 @@
 /**
- * Campo de checkbox reutilizable para formularios.
+ * Form handling.
  *
- * Integra `register` de react-hook-form.
+ * Integrates `register` from react-hook-form.
  *
  * @module components/forms/parts/FormCheckbox
  */
 import React from "react";
 
 /**
- * Checkbox para formularios que integra react-hook-form.
- * @param {Object} props - Propiedades del componente.
- * @param {string} props.name - Nombre del campo.
- * @param {string|React.ReactNode} props.label - Etiqueta mostrada junto al checkbox.
- * @param {function} props.register - Función de registro de react-hook-form.
- * @param {Object} props.errors - Errores de validación del formulario.
- * @param {Object} [props.rules] - Reglas de validación.
- * @returns {JSX.Element} Campo checkbox con validación.
+ * Form handling.
+ * @param {Object} props - Parameter description.
+ * @param {string} props.name - Parameter description.
+ * @param {string|React.ReactNode} props.label - Implementation detail.
+ * @param {function} props.register - Parameter description.
+ * @param {Object} props.errors - Parameter description.
+ * @param {Object} [props.rules] - Parameter description.
+ * @returns {JSX.Element} Result value.
  */
 export function FormCheckbox({
   name,

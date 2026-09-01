@@ -200,9 +200,7 @@ export const PAGINAS = [
     title: "Estadísticas",
     path: "/estadisticas",
     permisosVista: [PERMISOS.VER_REPORTES],
-    permisosAsignar: [
-      PERMISOS.VER_REPORTES,
-    ],
+    permisosAsignar: [PERMISOS.VER_REPORTES],
   },
   {
     title: "Administración",
@@ -221,6 +219,7 @@ export const PAGINAS = [
       PERMISOS.GESTIONAR_ADMINISTRADORES,
       PERMISOS.VER_CONCILIADORES,
       PERMISOS.GESTIONAR_CONCILIADORES,
+      PERMISOS.VER_AUDITORIA,
     ],
   },
   {

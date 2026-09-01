@@ -1,14 +1,14 @@
 /**
- * Formulario de registro y edición de personas en el sistema jurídico.
+ * Form handling.
  *
- * Implementa un formulario por pasos (wizard) con 6-7 secciones según si la
- * persona es menor de edad (agrega paso "Acudiente"). Valida campos obligatorios
- * por paso antes de avanzar usando `trigger()` de react-hook-form.
+ * Form handling.
+ * Validation rule.
+ * Implementation detail.
  *
  * Validaciones destacadas:
- * - Al avanzar desde "Identificación" valida los campos del paso actual.
- * - Al guardar verifica que exista al menos teléfono o correo (validación cruzada).
- * - Campos numéricos (estrato, personas a cargo) validados en react-hook-form y en HTML.
+ * Validation rule.
+ * Validation rule.
+ * Validation rule.
  *
  * @module components/forms/persona/PersonaForm
  */
@@ -306,15 +306,15 @@ export function PersonaForm({ onSubmit, initialValues }) {
   }
 
   /**
-   * Normaliza los datos del formulario, valida la regla cruzada de contacto
-   * (debe haber al menos teléfono o correo) y envía al backend.
-   * Solo ejecuta el callback `onSubmit` si el backend respondió con éxito.
+   * Validation rule.
+   * Implementation detail.
+   * Implementation detail.
    *
-   * @param {object} data - Datos del formulario validados por react-hook-form.
+   * @param {object} data - Parameter description.
    * @returns {Promise<void>}
    */
   async function handleSubmitForm(data) {
-    // Validación cruzada: debe existir al menos teléfono o correo
+    // Validation rule.
     const telefono = String(data.telefono ?? "").trim();
     const correo   = String(data.correo ?? "").trim();
 
@@ -355,13 +355,13 @@ export function PersonaForm({ onSubmit, initialValues }) {
   }
 
   /**
-   * Valida los campos del paso actual con react-hook-form `trigger()`
-   * y avanza al siguiente paso solo si todos son válidos.
+   * Validation rule.
+   * Implementation detail.
    *
    * @returns {Promise<void>}
    */
   async function irSiguiente() {
-    // Campos obligatorios agrupados por paso
+    // Implementation detail.
     const camposPorPaso = {
       "Identificación": [
         "tipoPersonaId", "tipoDocumento", "numeroDocumento",
@@ -369,7 +369,7 @@ export function PersonaForm({ onSubmit, initialValues }) {
         "apellidos", "fechaNacimiento",
       ],
       "Identidad": [],
-      "Contacto": [],   // validación cruzada en handleSubmitForm
+      "Contacto": [],   // Validation rule.
       "Vivienda": [],
       "Economía": [],
       "Acudiente": [],

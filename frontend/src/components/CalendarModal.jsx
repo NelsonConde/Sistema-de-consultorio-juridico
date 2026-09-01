@@ -12,8 +12,8 @@ import {
 import Calendar from "@/components/Calendar"
 
 /**
- * Muestra un botón que abre un modal con el calendario.
- * @returns {JSX.Element} Modal de calendario.
+ * Modal behavior.
+ * @returns {JSX.Element} Calendar modal.
  */
 export function CalendarModal() {
   const [open, setOpen] = React.useState(false);
@@ -26,7 +26,7 @@ export function CalendarModal() {
         </Button>
       </DialogTrigger>
       {/* 
-        Ajuste de tamaño 85% del viewport dejando aprox 15% libre.
+        Implementation detail.
       */}
       <DialogContent className="max-w-[95vw] sm:max-w-[95vw] w-[95vw] h-[95vh] flex flex-col p-6">
         <DialogTitle className="sr-only">Calendario de Eventos</DialogTitle>

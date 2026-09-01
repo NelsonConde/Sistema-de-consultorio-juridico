@@ -1,22 +1,22 @@
 "use client"
 
 /**
- * Formulario de creación de consultas jurídicas.
+ * Form handling.
  *
- * Valida que todos los campos obligatorios estén completos antes de enviar,
- * incluyendo la parte principal (validación explícita antes del fetch).
- * Los IDs de personas y catálogos se convierten de forma segura con `numberOrNull()`
- * para evitar enviar `NaN` al backend.
+ * Validation rule.
+ * Validation rule.
+ * People workflow detail.
+ * Implementation detail.
  *
- * Soporta subida de archivos adjuntos después de crear la consulta.
- * Los campos de texto libre tienen límite de caracteres (maxLength).
+ * File handling.
+ * Implementation detail.
  *
  * @module components/forms/consulta/NuevaConsultaForm
  */
 
 import { apiClient } from "@/lib/apiClient";
 import { fileApi } from "@/lib/fileApi";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
@@ -26,9 +26,10 @@ import ArchivosConsultaForm from "../parts/ArchivosConsultaForm";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
 import { getApiErrorDescription, getApiErrorTitle, readResponseBody } from "@/lib/api";
+import { buscarPersonasActivas } from "@/lib/personasApi";
 
 import { VACIOS } from "./nueva-consulta.constants";
-import { numberArray, numberOrNull, textOrNull } from "./nueva-consulta.utils";
+import { leerRespuesta, numberArray, numberOrNull, textOrNull } from "./nueva-consulta.utils";
 import {
   idNormalizado,
   obtenerAreaIdAsesor,
@@ -47,7 +48,14 @@ export function NuevaConsultaForm() {
   const [puedeAsignarResponsables, setPuedeAsignarResponsables] =
     useState(false);
 
-  const [personas, setPersonas] = useState([]);
+  const [personasResultado, setPersonasResultado] = useState([]);
+  const [personasBusquedaAplicada, setPersonasBusquedaAplicada] = useState("");
+  const [personasPagina, setPersonasPagina] = useState(1);
+  const [personasTamano, setPersonasTamano] = useState(10);
+  const [personasTotalPaginas, setPersonasTotalPaginas] = useState(0);
+  const [personasTotalElementos, setPersonasTotalElementos] = useState(0);
+  const [personasLoading, setPersonasLoading] = useState(false);
+  const [personasCache, setPersonasCache] = useState({});
   const [sedes, setSedes] = useState([]);
   const [areas, setAreas] = useState([]);
   const [temas, setTemas] = useState([]);
@@ -127,61 +135,63 @@ export function NuevaConsultaForm() {
   );
 
   const parteSeleccionada = useMemo(
-    () => personas.find((p) => Number(p.id) === Number(form.personaId)) || null,
-    [personas, form.personaId]
+    () =>
+      form.personaId
+        ? personasCache[String(form.personaId)] || null
+        : null,
+    [personasCache, form.personaId]
   );
 
   const partesAdicionalesSeleccionadas = useMemo(
     () =>
-      personas.filter((p) => (form.partesIds || []).includes(Number(p.id))),
-    [personas, form.partesIds]
+      (form.partesIds || [])
+        .map((id) => personasCache[String(id)] || null)
+        .filter(Boolean),
+    [personasCache, form.partesIds]
   );
 
   const contrapartesSeleccionadas = useMemo(
     () =>
-      personas.filter((p) =>
-        (form.contrapartesIds || []).includes(Number(p.id))
-      ),
-    [personas, form.contrapartesIds]
+      (form.contrapartesIds || [])
+        .map((id) => personasCache[String(id)] || null)
+        .filter(Boolean),
+    [personasCache, form.contrapartesIds]
   );
 
   const personasParaPrincipal = useMemo(
     () =>
-      personas.filter((p) => {
+      personasResultado.filter((p) => {
         const id = Number(p.id);
-
         return (
           !(form.partesIds || []).includes(id) &&
           !(form.contrapartesIds || []).includes(id)
         );
       }),
-    [personas, form.partesIds, form.contrapartesIds]
+    [personasResultado, form.partesIds, form.contrapartesIds]
   );
 
   const personasParaAdicionales = useMemo(
     () =>
-      personas.filter((p) => {
+      personasResultado.filter((p) => {
         const id = Number(p.id);
-
         return (
           id !== Number(form.personaId) &&
           !(form.contrapartesIds || []).includes(id)
         );
       }),
-    [personas, form.personaId, form.contrapartesIds]
+    [personasResultado, form.personaId, form.contrapartesIds]
   );
 
   const personasParaContrapartes = useMemo(
     () =>
-      personas.filter((p) => {
+      personasResultado.filter((p) => {
         const id = Number(p.id);
-
         return (
           id !== Number(form.personaId) &&
           !(form.partesIds || []).includes(id)
         );
       }),
-    [personas, form.personaId, form.partesIds]
+    [personasResultado, form.personaId, form.partesIds]
   );
 
   const asesoresFiltrados = useMemo(() => {
@@ -214,41 +224,99 @@ export function NuevaConsultaForm() {
       : estudiantesDisponiblesPorAsesor;
   }, [estudiantesDisponiblesPorAsesor, modalEstudiante.busqueda]);
 
-  const parteFiltrada = useMemo(() => {
-    const t = modalParte.busqueda.toLowerCase();
+  const parteFiltrada = personasParaPrincipal;
+  const partesAdicionalesFiltradas = personasParaAdicionales;
+  const contrapartesFiltradas = personasParaContrapartes;
 
-    return t
-      ? personasParaPrincipal.filter((p) =>
-        `${p.nombres} ${p.apellidos} ${p.numeroDocumento}`
-          .toLowerCase()
-          .includes(t)
-      )
-      : personasParaPrincipal;
-  }, [personasParaPrincipal, modalParte.busqueda]);
+  const modalPersonasAbierto =
+    modalParte.abierto ||
+    modalPartesAdicionales.abierto ||
+    modalContrapartes.abierto;
 
-  const partesAdicionalesFiltradas = useMemo(() => {
-    const t = modalPartesAdicionales.busqueda.toLowerCase();
+  const busquedaPersonasActual = modalParte.abierto
+    ? modalParte.busqueda
+    : modalPartesAdicionales.abierto
+      ? modalPartesAdicionales.busqueda
+      : modalContrapartes.abierto
+        ? modalContrapartes.busqueda
+        : "";
 
-    return t
-      ? personasParaAdicionales.filter((p) =>
-        `${p.nombres} ${p.apellidos} ${p.numeroDocumento}`
-          .toLowerCase()
-          .includes(t)
-      )
-      : personasParaAdicionales;
-  }, [personasParaAdicionales, modalPartesAdicionales.busqueda]);
+  useEffect(() => {
+    if (!modalPersonasAbierto) return;
 
-  const contrapartesFiltradas = useMemo(() => {
-    const t = modalContrapartes.busqueda.toLowerCase();
+    const timeoutId = window.setTimeout(() => {
+      setPersonasPagina(1);
+      setPersonasBusquedaAplicada(busquedaPersonasActual.trim());
+    }, 350);
 
-    return t
-      ? personasParaContrapartes.filter((p) =>
-        `${p.nombres} ${p.apellidos} ${p.numeroDocumento}`
-          .toLowerCase()
-          .includes(t)
-      )
-      : personasParaContrapartes;
-  }, [personasParaContrapartes, modalContrapartes.busqueda]);
+    return () => window.clearTimeout(timeoutId);
+  }, [modalPersonasAbierto, busquedaPersonasActual]);
+
+  useEffect(() => {
+    if (!modalPersonasAbierto) return;
+
+    const controller = new AbortController();
+
+    async function cargarPaginaPersonas() {
+      try {
+        setPersonasLoading(true);
+
+        const resultado = await buscarPersonasActivas({
+          search: personasBusquedaAplicada,
+          page: personasPagina,
+          size: personasTamano,
+          signal: controller.signal,
+        });
+
+        setPersonasResultado(resultado.content);
+        setPersonasTotalPaginas(resultado.totalPages);
+        setPersonasTotalElementos(resultado.totalElements);
+        setPersonasCache((prev) => {
+          const next = { ...prev };
+          for (const persona of resultado.content) {
+            if (persona?.id != null) {
+              next[String(persona.id)] = persona;
+            }
+          }
+          return next;
+        });
+      } catch (error) {
+        if (error.name === "AbortError") return;
+
+        if (error.status === 401) {
+          router.replace("/");
+          return;
+        }
+
+        if (error.status === 403) {
+          router.replace("/inicio");
+          return;
+        }
+
+        setPersonasResultado([]);
+        setPersonasTotalPaginas(0);
+        setPersonasTotalElementos(0);
+        toast.error(error.message || "No se pudieron buscar personas");
+      } finally {
+        setPersonasLoading(false);
+      }
+    }
+
+    cargarPaginaPersonas();
+    return () => controller.abort();
+  }, [
+    modalPersonasAbierto,
+    personasBusquedaAplicada,
+    personasPagina,
+    personasTamano,
+    router,
+  ]);
+
+  function abrirModalPersona(setModal) {
+    setPersonasPagina(1);
+    setPersonasBusquedaAplicada("");
+    setModal({ abierto: true, busqueda: "" });
+  }
 
   useEffect(() => {
     async function verificar() {
@@ -381,13 +449,11 @@ export function NuevaConsultaForm() {
         return Array.isArray(data) ? data : [];
       }
 
-      const [pR, sR, aR] = await Promise.all([
-        fetchLista(`${API_URL_BASE}/personas/activos`),
+      const [sR, aR] = await Promise.all([
         fetchLista(`${API_URL_BASE}/sedes`),
         fetchLista(`${API_URL_BASE}/areas`),
       ]);
 
-      setPersonas(pR);
       setSedes(sR);
       setAreas(aR);
 
@@ -622,7 +688,9 @@ export function NuevaConsultaForm() {
         <div className="font-medium">
           {p.nombres} {p.apellidos}
         </div>
-        <div className="text-xs text-muted-foreground">{p.numeroDocumento}</div>
+        <div className="text-xs text-muted-foreground">
+          {p.tipoDocumento} {p.numeroDocumentoEnmascarado || ""}
+        </div>
       </>
     );
   }
@@ -852,10 +920,7 @@ export function NuevaConsultaForm() {
           <button
             type="button"
             onClick={() =>
-              setModalParte((prev) => ({
-                ...prev,
-                abierto: true,
-              }))
+              abrirModalPersona(setModalParte)
             }
             className="flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors"
           >
@@ -865,7 +930,7 @@ export function NuevaConsultaForm() {
               }
             >
               {parteSeleccionada
-                ? `${parteSeleccionada.nombres} ${parteSeleccionada.apellidos} - ${parteSeleccionada.numeroDocumento}`
+                ? `${parteSeleccionada.nombres} ${parteSeleccionada.apellidos} - ${parteSeleccionada.numeroDocumentoEnmascarado || ""}`
                 : "Buscar parte principal..."}
             </span>
             <span className="text-muted-foreground">▼</span>
@@ -876,10 +941,7 @@ export function NuevaConsultaForm() {
           <button
             type="button"
             onClick={() =>
-              setModalPartesAdicionales((prev) => ({
-                ...prev,
-                abierto: true,
-              }))
+              abrirModalPersona(setModalPartesAdicionales)
             }
             className="flex min-h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors"
           >
@@ -904,10 +966,7 @@ export function NuevaConsultaForm() {
           <button
             type="button"
             onClick={() =>
-              setModalContrapartes((prev) => ({
-                ...prev,
-                abierto: true,
-              }))
+              abrirModalPersona(setModalContrapartes)
             }
             className="flex min-h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors"
           >
@@ -1126,6 +1185,19 @@ export function NuevaConsultaForm() {
           setModalParte({ abierto: false, busqueda: "" });
         }}
         onCerrar={() => setModalParte({ abierto: false, busqueda: "" })}
+        loading={personasLoading}
+        pagination={{
+          currentPage: personasPagina,
+          totalPages: personasTotalPaginas,
+          onPageChange: setPersonasPagina,
+          pageSize: personasTamano,
+          onPageSizeChange: (size) => {
+            setPersonasTamano(size);
+            setPersonasPagina(1);
+          },
+          pageSizeOptions: [10, 20, 50],
+          totalItems: personasTotalElementos,
+        }}
         seleccionado={parteSeleccionada}
         renderItem={renderPersona}
       />
@@ -1151,6 +1223,19 @@ export function NuevaConsultaForm() {
         onCerrar={() =>
           setModalPartesAdicionales({ abierto: false, busqueda: "" })
         }
+        loading={personasLoading}
+        pagination={{
+          currentPage: personasPagina,
+          totalPages: personasTotalPaginas,
+          onPageChange: setPersonasPagina,
+          pageSize: personasTamano,
+          onPageSizeChange: (size) => {
+            setPersonasTamano(size);
+            setPersonasPagina(1);
+          },
+          pageSizeOptions: [10, 20, 50],
+          totalItems: personasTotalElementos,
+        }}
         seleccionados={form.partesIds}
         renderItem={renderPersona}
       />
@@ -1174,6 +1259,19 @@ export function NuevaConsultaForm() {
           setModalContrapartes({ abierto: false, busqueda: "" });
         }}
         onCerrar={() => setModalContrapartes({ abierto: false, busqueda: "" })}
+        loading={personasLoading}
+        pagination={{
+          currentPage: personasPagina,
+          totalPages: personasTotalPaginas,
+          onPageChange: setPersonasPagina,
+          pageSize: personasTamano,
+          onPageSizeChange: (size) => {
+            setPersonasTamano(size);
+            setPersonasPagina(1);
+          },
+          pageSizeOptions: [10, 20, 50],
+          totalItems: personasTotalElementos,
+        }}
         seleccionados={form.contrapartesIds}
         renderItem={renderPersona}
       />

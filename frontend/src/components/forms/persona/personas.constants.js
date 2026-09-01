@@ -1,4 +1,4 @@
-/** Constantes y catálogos locales del listado de personas. */
+/** List and table handling.*/
 export const FORM_INICIAL = {
   tipoPersonaId: "",
   tipoDocumento: "",

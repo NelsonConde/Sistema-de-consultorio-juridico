@@ -2,10 +2,10 @@
 
 import { apiClient } from "@/lib/apiClient";
 /**
- * Formulario de gestión de tipos de consulta jurídica.
+ * Form handling.
  *
- * Permite crear, editar y desactivar tipos agrupados por tema.
- * Requiere permiso `GESTIONAR_CATALOGOS`.
+ * Implementation detail.
+ * Permission and authorization handling.
  *
  * @module components/forms/catalogos/TipoForm
  */
@@ -29,8 +29,8 @@ import Pagination from "@/components/ui/Pagination";
 import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils";
 
 /**
- * Formulario para gestionar tipos en el catálogo.
- * @returns {JSX.Element} Componente de formulario de tipos.
+ * Form handling.
+ * @returns {JSX.Element} Result value.
  */
 export function TipoForm() {
   const router = useRouter();

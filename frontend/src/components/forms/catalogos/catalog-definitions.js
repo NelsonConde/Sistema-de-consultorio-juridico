@@ -3,15 +3,15 @@ import { PERMISOS } from "@/lib/permission";
 const GESTIONAR_CATALOGOS = PERMISOS.GESTIONAR_CATALOGOS;
 
 /**
- * Catálogos administrables expuestos por el backend.
+ * Implementation detail.
  *
- * `listEndpoint` siempre apunta a la vista administrativa cuando existe,
- * para que la tabla pueda mostrar registros activos e inactivos.
- * `endpoint` se usa para crear/editar/cambiar estado.
+ * Implementation detail.
+ * List and table handling.
+ * State handling.
  *
- * Los catálogos dependientes cargan dos listas del padre:
- * - `activeEndpoint`: opciones válidas para crear/actualizar.
- * - `adminEndpoint`: todos los padres, únicamente para resolver etiquetas.
+ * List and table handling.
+ * Implementation detail.
+ * Implementation detail.
  */
 export const CATALOG_DEFINITIONS = [
   {
@@ -66,8 +66,8 @@ export const CATALOG_DEFINITIONS = [
     singular: "Tipo de documento",
     plural: "tipos de documento",
     endpoint: "/tipos-documento",
-    // Este controlador usa GET /tipos-documento para administración y
-    // GET /tipos-documento/activos para formularios normales.
+    // Role handling.
+    // Form handling.
     listEndpoint: "/tipos-documento",
     maxLength: 100,
     requiredPermission: GESTIONAR_CATALOGOS,

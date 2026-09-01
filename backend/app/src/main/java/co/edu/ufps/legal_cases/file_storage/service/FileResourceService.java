@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.beans.factory.annotation.Value;
 
+import co.edu.ufps.legal_cases.audit.aop.log.Auditable;
 import co.edu.ufps.legal_cases.file_storage.dto.FileDownloadResponse;
 import co.edu.ufps.legal_cases.file_storage.dto.FileResponse;
 import co.edu.ufps.legal_cases.file_storage.dto.FileUploadRequest;
@@ -125,6 +126,18 @@ public class FileResourceService {
         }
     }
 
+    public void discardStoredAsset(FileAsset asset) {
+        if (asset == null || asset.getObjectKey() == null) {
+            return;
+        }
+
+        storageProvider.delete(asset.getObjectKey());
+
+        if (asset.getUploadId() != null) {
+            fileAssetService.markUploadFailed(asset.getUploadId());
+        }
+    }
+
     @Transactional
     public FileResponse complete(UUID uploadId, Long parentId) {
         FileAsset asset = fileAssetService.findByUploadId(uploadId);
@@ -171,6 +184,11 @@ public class FileResourceService {
     }
 
     @Transactional(readOnly = true)
+    @Auditable(
+            action = "READ_FILE_LIST",
+            entityName = "FileResource",
+            entityId = "#resourceId",
+            metadata = {"resourceType=#type", "parentId=#parentId"})
     public List<FileResponse> list(FileResourceType type, Long resourceId, Long parentId) {
         authorizationService.authorizeRead(type, resourceId, parentId);
         return fileAssetService.listReady(type, resourceId).stream()
@@ -179,6 +197,11 @@ public class FileResourceService {
     }
 
     @Transactional(readOnly = true)
+    @Auditable(
+            action = "DOWNLOAD_FILE",
+            entityName = "FileAsset",
+            entityId = "#fileId",
+            metadata = "parentId=#parentId")
     public FileDownloadResponse prepareDownload(Long fileId, Long parentId) {
         FileAsset asset = fileAssetService.findReady(fileId);
         authorizationService.authorizeRead(asset, parentId);

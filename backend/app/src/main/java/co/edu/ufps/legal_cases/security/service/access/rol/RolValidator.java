@@ -13,6 +13,7 @@ import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.security.dto.access.RolDTO;
 import co.edu.ufps.legal_cases.security.model.access.Permiso;
 import co.edu.ufps.legal_cases.security.model.access.Rol;
+import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
 
 // Valida reglas locales de Rol.
 // Las consultas a base de datos quedan en RolService.
@@ -24,6 +25,14 @@ public class RolValidator {
 
         if (dto.getId() != null) {
             throw new BusinessException("El id no debe enviarse en la creación");
+        }
+
+        validarTipoPerfilObligatorio(dto.getTipoPerfil());
+    }
+
+    public void validarTipoPerfilObligatorio(TipoPerfilUsuario tipoPerfil) {
+        if (tipoPerfil == null) {
+            throw new BusinessException("El tipo de perfil del rol es obligatorio");
         }
     }
 
@@ -56,6 +65,13 @@ public class RolValidator {
         if (dto.getId() != null && !Objects.equals(dto.getId(), rol.getId())) {
             throw new BusinessException("No se permite cambiar el id del rol");
         }
+
+        if (dto.getTipoPerfil() != null
+                && dto.getTipoPerfil() != rol.getTipoPerfil()) {
+            throw new BusinessException("No se permite cambiar el tipo de perfil de un rol");
+        }
+
+        validarRolBasePermaneceActivo(rol, dto.getActivo());
     }
 
     public String normalizarNombre(String nombre) {
@@ -79,6 +95,14 @@ public class RolValidator {
 
         if (Objects.equals(rol.getActivo(), activo)) {
             throw new BusinessException("El rol ya tiene ese estado");
+        }
+
+        validarRolBasePermaneceActivo(rol, activo);
+    }
+
+    private void validarRolBasePermaneceActivo(Rol rol, Boolean activoSolicitado) {
+        if (rol.getCodigoBase() != null && Boolean.FALSE.equals(activoSolicitado)) {
+            throw new BusinessException("No se puede desactivar un rol base del sistema");
         }
     }
 

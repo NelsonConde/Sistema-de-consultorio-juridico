@@ -1,13 +1,13 @@
 "use client"
 
 /**
- * Formulario de inicio de sesión del sistema jurídico.
+ * Form handling.
  *
- * Al montarse verifica si ya existe sesión activa mediante `/api/auth/me`
- * y redirige a `/inicio` si el usuario ya está autenticado.
+ * Implementation detail.
+ * User flow detail.
  *
- * Valida el formato del correo electrónico con `requiredEmailRule()` y
- * deshabilita el botón de envío mientras la petición está en curso.
+ * Validation rule.
+ * Implementation detail.
  *
  * @module components/auth/LoginForm
  */
@@ -25,7 +25,7 @@ import { getApiErrorTitle, readResponseBody } from "@/lib/api"
 import { requiredEmailRule } from "@/lib/form-validation"
 
 /**
- * Formulario de inicio de sesión.
+ * Form handling.
  *
  * @returns {JSX.Element}
  */
@@ -56,7 +56,7 @@ export function LoginForm() {
           return
         }
       } catch {
-        // Si no existe sesión o el backend no responde, se muestra el login.
+        // Implementation detail.
       } finally {
         setCheckingSession(false)
       }

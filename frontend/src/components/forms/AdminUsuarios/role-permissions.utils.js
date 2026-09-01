@@ -28,17 +28,17 @@ export function nombreRol(rol) {
   return rol?.nombre || rol?.rolNombre || rol?.name || "";
 }
 
+const CLAVE_CONFIG_POR_TIPO = {
+  ADMINISTRATIVO: "ADMINISTRADOR",
+  ASESOR: "ASESOR",
+  ESTUDIANTE: "ESTUDIANTE",
+  MONITOR: "MONITOR",
+  CONCILIADOR: "CONCILIADOR",
+};
+
 export function claveRol(rol) {
-  const nombre = normalizar(nombreRol(rol));
-
-  if (!nombre) return "";
-  if (nombre.includes("ESTUDIANTE")) return "ESTUDIANTE";
-  if (nombre.includes("CONCILIADOR")) return "CONCILIADOR";
-  if (nombre.includes("ASESOR")) return "ASESOR";
-  if (nombre.includes("MONITOR")) return "MONITOR";
-  if (nombre.includes("ADMIN") || nombre.includes("DIRECTOR")) return "ADMINISTRADOR";
-
-  return nombre;
+  const tipo = normalizar(rol?.tipoPerfil);
+  return CLAVE_CONFIG_POR_TIPO[tipo] || "DEFAULT";
 }
 
 export function permisosAsignarPagina(page, rol) {

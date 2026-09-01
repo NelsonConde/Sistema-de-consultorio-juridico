@@ -14,6 +14,8 @@ public class SeguimientoResponseDTO {
 
     private Long id;
 
+    private Long version;
+
     private String descripcion;
 
     private LocalDate fechaEntrega;

@@ -13,6 +13,7 @@ public class ProcesoMapper {
     public ProcesoDTO convertirADTO(Proceso proceso) {
         return new ProcesoDTO(
                 proceso.getId(),
+                proceso.getVersion(),
                 proceso.getNumeroRadicado(),
                 proceso.getDepartamento().getId(),
                 proceso.getConsulta().getId(),

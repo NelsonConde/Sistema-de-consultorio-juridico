@@ -1,4 +1,4 @@
-/** Constantes del módulo de conciliaciones. */
+/** Conciliation workflow detail.*/
 export const ESTADOS_NO_FINALES = [
   { value: "ESPERANDO_REUNION", label: "Esperando reunión" },
 ];

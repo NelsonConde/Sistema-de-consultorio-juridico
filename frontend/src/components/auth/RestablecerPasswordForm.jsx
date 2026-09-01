@@ -9,7 +9,7 @@ import { apiClient } from "@/lib/apiClient"
 import { getApiErrorTitle, readResponseBody } from "@/lib/api"
 
 /**
- * Formulario para restablecer la contraseña con token.
+ * Form handling.
  *
  * @param {{token:string}} props
  * @returns {JSX.Element}

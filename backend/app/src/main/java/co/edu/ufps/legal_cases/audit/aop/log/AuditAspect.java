@@ -1,109 +1,159 @@
 package co.edu.ufps.legal_cases.audit.aop.log;
 
-import co.edu.ufps.legal_cases.audit.service.log.AuditLogService;
-import lombok.RequiredArgsConstructor;
-import org.aspectj.lang.JoinPoint;
-import org.aspectj.lang.annotation.AfterReturning;
+import java.lang.reflect.Method;
+import java.time.Instant;
+import java.util.Map;
+
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
-import java.lang.reflect.Method;
-import java.util.Arrays;
+import co.edu.ufps.legal_cases.audit.model.log.AuditEvent;
+import co.edu.ufps.legal_cases.audit.model.log.AuditOutcome;
+import co.edu.ufps.legal_cases.audit.service.log.AuditLogService;
+import co.edu.ufps.legal_cases.audit.service.log.AuditRequestContext;
+import co.edu.ufps.legal_cases.audit.service.log.AuditRequestContext.Snapshot;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
- * Aspecto (AOP) que intercepta de forma transparente la ejecución de métodos marcados
- * con la anotación @Auditable. Su función es extraer el usuario autenticado del
- * contexto de seguridad y recolectar la información del evento para enviarla al
- * servicio de auditoría, sin acoplar la lógica de negocio a la de trazabilidad.
+ * Convierte una operación anotada en un evento estructurado. Nunca serializa los
+ * argumentos completos ni usa la representación {@code toString()} de objetos.
  */
 @Aspect
 @Component
-@RequiredArgsConstructor
+@Order(Ordered.LOWEST_PRECEDENCE - 100)
 public class AuditAspect {
 
     private final AuditLogService auditLogService;
+    private final AuditRequestContext requestContext;
+    private final AuditExpressionEvaluator expressionEvaluator;
+    private final AuditStateSnapshotService snapshotService;
 
-    @AfterReturning(pointcut = "@annotation(auditable)", returning = "result")
-    public void registrarActividadAuditoria(JoinPoint joinPoint, Auditable auditable, Object result) {
-        String nombreUsuario = obtenerNombreUsuario();
-        String accion = auditable.action();
-        String nombreEntidad = auditable.entityName();
-        
-        // Intentar extraer el ID de la entidad si es posible
-        String idEntidad = extraerIdEntidad(result, joinPoint);
-        
-        String detalles = "Método ejecutado: " + joinPoint.getSignature().getName() + 
-                          ". Argumentos: " + Arrays.toString(joinPoint.getArgs());
-
-        auditLogService.logAction(nombreUsuario, accion, nombreEntidad, idEntidad, detalles);
+    public AuditAspect(
+            AuditLogService auditLogService,
+            AuditRequestContext requestContext,
+            AuditExpressionEvaluator expressionEvaluator,
+            AuditStateSnapshotService snapshotService) {
+        this.auditLogService = auditLogService;
+        this.requestContext = requestContext;
+        this.expressionEvaluator = expressionEvaluator;
+        this.snapshotService = snapshotService;
     }
 
-    private String obtenerNombreUsuario() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated()) {
-            return authentication.getName();
-        }
-        return "SISTEMA";
-    }
+    @Around("@annotation(auditable)")
+    public Object audit(ProceedingJoinPoint joinPoint, Auditable auditable) throws Throwable {
+        Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
+        Object[] arguments = joinPoint.getArgs();
+        Snapshot context = requestContext.capture();
+        String attemptedEntityId = evaluateOptional(auditable.entityId(), method, arguments, null);
+        Map<String, String> beforeState = snapshotService.captureEntity(
+                auditable.entityName(), attemptedEntityId, auditable.trackedFields());
 
-    private String extraerIdEntidad(Object result, JoinPoint joinPoint) {
-        // Lógica heurística para intentar sacar el ID de la entidad afectada.
-        // 1. El resultado puede ser un DTO con getId() o con getters que terminan en "Id".
-        if (result != null) {
-            String idDesdeResultado = extraerIdDeObjeto(result);
-            if (idDesdeResultado != null) {
-                return idDesdeResultado;
-            }
-        }
-
-        // 2. Si no hay id en el resultado, intentar tomarlo de los argumentos del método.
-        for (Object arg : joinPoint.getArgs()) {
-            if (arg == null) {
-                continue;
-            }
-            if (arg instanceof Long || arg instanceof String) {
-                return arg.toString();
-            }
-            String idDesdeArgumento = extraerIdDeObjeto(arg);
-            if (idDesdeArgumento != null) {
-                return idDesdeArgumento;
-            }
-        }
-
-        return null;
-    }
-
-    private String extraerIdDeObjeto(Object objeto) {
         try {
-            Method getIdMethod = objeto.getClass().getMethod("getId");
-            Object id = getIdMethod.invoke(objeto);
-            if (id != null) {
-                return id.toString();
+            Object result = joinPoint.proceed();
+            String entityId = evaluateOptional(auditable.entityId(), method, arguments, result);
+            if (entityId == null) {
+                entityId = attemptedEntityId;
             }
-        } catch (Exception ignored) {
-            // Continuar si no existe getId().
+            Map<String, String> afterState = snapshotService.captureResult(result, auditable.trackedFields());
+            if (afterState.isEmpty()) {
+                afterState = snapshotService.captureEntity(
+                        auditable.entityName(), entityId, auditable.trackedFields());
+            }
+            AuditEvent event = buildEvent(
+                    auditable,
+                    method,
+                    arguments,
+                    result,
+                    context,
+                    entityId,
+                    beforeState,
+                    afterState,
+                    AuditOutcome.SUCCESS,
+                    null);
+            auditLogService.recordSuccess(event);
+            return result;
+        } catch (Throwable original) {
+            AuditOutcome outcome = original instanceof AccessDeniedException
+                    ? AuditOutcome.DENIED
+                    : AuditOutcome.FAILURE;
+            if (outcome == AuditOutcome.DENIED) {
+                markDenialRecorded();
+            }
+            try {
+                auditLogService.recordFailure(buildEvent(
+                        auditable,
+                        method,
+                        arguments,
+                        null,
+                        context,
+                        attemptedEntityId,
+                        beforeState,
+                        Map.of(),
+                        outcome,
+                        original.getClass().getSimpleName()));
+            } catch (RuntimeException auditFailure) {
+                original.addSuppressed(auditFailure);
+            }
+            throw original;
         }
+    }
 
-        for (Method method : objeto.getClass().getMethods()) {
-            if (method.getParameterCount() != 0) {
-                continue;
-            }
-            String nombreMetodo = method.getName();
-            if (nombreMetodo.startsWith("get") && nombreMetodo.endsWith("Id")
-                    && !"getClass".equals(nombreMetodo)) {
-                try {
-                    Object id = method.invoke(objeto);
-                    if (id != null) {
-                        return id.toString();
-                    }
-                } catch (Exception ignored) {
-                    // Ignorar invocaciones fallidas.
-                }
-            }
+    private AuditEvent buildEvent(
+            Auditable auditable,
+            Method method,
+            Object[] arguments,
+            Object result,
+            Snapshot context,
+            String entityId,
+            Map<String, String> beforeState,
+            Map<String, String> afterState,
+            AuditOutcome outcome,
+            String reasonCode) {
+        String reason = evaluateOptional(auditable.reason(), method, arguments, result);
+        Map<String, String> metadata = expressionEvaluator.evaluateMetadata(
+                auditable.metadata(), method, arguments, result);
+
+        return AuditEvent.builder()
+                .actorUsername(context.actorUsername())
+                .action(auditable.action())
+                .entityName(auditable.entityName())
+                .entityId(entityId)
+                .outcome(outcome)
+                .occurredAt(Instant.now())
+                .source(context.source())
+                .correlationId(context.correlationId())
+                .ipAddress(context.ipAddress())
+                .userAgent(context.userAgent())
+                .reasonCode(reasonCode)
+                .reason(reason)
+                .beforeState(beforeState)
+                .afterState(afterState)
+                .metadata(metadata)
+                .build();
+    }
+
+    private String evaluateOptional(
+            String expression,
+            Method method,
+            Object[] arguments,
+            Object result) {
+        try {
+            return expressionEvaluator.evaluateText(expression, method, arguments, result);
+        } catch (RuntimeException ignored) {
+            return null;
         }
+    }
 
-        return null;
+    private void markDenialRecorded() {
+        HttpServletRequest request = requestContext.currentRequest();
+        if (request != null) {
+            request.setAttribute(AuditRequestContext.DENIAL_RECORDED_ATTRIBUTE, Boolean.TRUE);
+        }
     }
 }

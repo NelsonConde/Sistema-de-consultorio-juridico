@@ -3,13 +3,13 @@
 import { apiClient } from "@/lib/apiClient";
 import { apiResponse, readResponseBody } from "@/lib/api";
 /**
- * Formulario de creación de usuarios del sistema jurídico.
+ * Form handling.
  *
- * Permite crear asesores, monitores, estudiantes, conciliadores y administrativos.
- * Cuando el tipo seleccionado es "Estudiante", muestra un Tabs con dos modos:
- * creación individual y cargue masivo desde Excel.
+ * Conciliation workflow detail.
+ * Selection behavior.
+ * Data loading behavior.
  *
- * Requiere permiso `CREAR_USUARIOS` o `GESTIONAR_ADMINISTRADORES`.
+ * Permission and authorization handling.
  *
  * @module components/forms/AdminUsuarios/UsuarioSistemaForm
  */
@@ -79,8 +79,8 @@ function puedeVerCatalogosUsuario(usuario) {
 }
 
 /**
- * Formulario para gestionar usuarios del sistema.
- * @returns {JSX.Element} Componente de administración de usuarios.
+ * Form handling.
+ * @returns {JSX.Element} Result value.
  */
 export function UsuarioSistemaForm() {
   const router = useRouter();

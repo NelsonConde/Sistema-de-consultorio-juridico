@@ -10,31 +10,31 @@ import {
 } from '@/components/ui/select';
 
 /**
- * Selector múltiple para agregar y quitar opciones seleccionadas.
- * @param {Object} props - Propiedades del componente.
- * @param {string} props.label - Etiqueta principal del selector.
- * @param {string} [props.placeholder] - Texto cuando no hay selección.
- * @param {Array<{value:string,label:string}>} [props.selectedItems] - Items seleccionados.
- * @param {Array<{value:string,label:string}>} [props.availableItems] - Items disponibles.
- * @param {function} props.onSelectionChange - Callback cuando cambia la selección.
- * @param {string} [props.itemLabel] - Etiqueta para la lista de seleccionados.
- * @param {string} [props.addButtonText] - Texto del botón de agregar.
- * @returns {JSX.Element} Componente de selección múltiple.
+ * Selection behavior.
+ * @param {Object} props - Parameter description.
+ * @param {string} props.label - Parameter description.
+ * @param {string} [props.placeholder] - Parameter description.
+ * Selection behavior.
+ * @param {Array<{value:string,label:string}>} [props.availableItems] - Parameter description.
+ * @param {function} props.onSelectionChange - Parameter description.
+ * @param {string} [props.itemLabel] - Item to process.
+ * @param {string} [props.addButtonText] - Parameter description.
+ * @returns {JSX.Element} Result value.
  */
 export function FormMultiSelect({
   label,
   placeholder = "Selecciona una opción para agregar",
   selectedItems = [],
   availableItems = [],
-  onSelectionChange,   // TODO: CREEEEOOOO que es mejor revisar la documentación de react
-  // sobre el tema de pasar funciones como prop o callbacks, creo que debería ser un hook built-in
-  // o un hook personalizado? no recuerdo bien eso, borrar el todo si estaba bien ya
+  onSelectionChange,   // Implementation detail.
+  // Implementation detail.
+  // Consider extracting this behavior into a custom hook if it becomes reusable.
   itemLabel = "opciones seleccionadas",
   addButtonText = "Agregar"
 }) {
   const [currentSelection, setCurrentSelection] = useState('');
 
-  // Para no repetir elementos
+  // Implementation detail.
   const filteredAvailableItems = availableItems.filter(item =>
     !selectedItems.some(selected => selected.value === item.value)
   );
@@ -58,7 +58,7 @@ export function FormMultiSelect({
     <div className="space-y-4">
       <label className="text-sm font-medium">{label}</label>
 
-      {/* Selector de item */}
+      {/* Implementation detail.*/}
       <div className="flex gap-2">
         <Select value={currentSelection} onValueChange={setCurrentSelection}>
           <SelectTrigger className="w-full">
@@ -81,7 +81,7 @@ export function FormMultiSelect({
         </Button>
       </div>
 
-      {/* Lista con items seleccionados */}
+      {/* List and table handling.*/}
       {selectedItems.length > 0 && (
         <div className="space-y-2">
           <h4 className="text-sm font-medium">{itemLabel}:</h4>
@@ -96,7 +96,7 @@ export function FormMultiSelect({
                   className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
                   onClick={() => removeItem(item.value)}
                 >
-                  x {/* TODO: Buscar algun iconito de Lucid para la X? jsjs */}
+                  x {/* Implementation detail.*/}
                 </Button> 
               </Badge>
             ))}

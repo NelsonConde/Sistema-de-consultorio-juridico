@@ -7,45 +7,45 @@ export function puedeAccederProcesos(user) {
 }
 
 /**
- * Verifica si el usuario puede ver (listar) procesos.
- * @param {Object} user - Objeto del usuario
- * @returns {boolean} True si tiene permiso VER_PROCESOS o GESTIONAR_PROCESOS
+ * List and table handling.
+ * @param {Object} user - Authenticated user object.
+ * @returns {boolean} Result value.
  */
 export function puedeVerProcesos(user) {
   return tieneAlgunPermiso(user, [PERMISOS_PROCESOS.VER_PROCESOS, PERMISOS_PROCESOS.GESTIONAR_PROCESOS]);
 }
 
 /**
- * Verifica si el usuario puede crear/editar/eliminar procesos.
- * @param {Object} user - Objeto del usuario
- * @returns {boolean} True si tiene permiso GESTIONAR_PROCESOS
+ * Process workflow detail.
+ * @param {Object} user - Authenticated user object.
+ * @returns {boolean} Result value.
  */
 export function puedeGestionarProcesos(user) {
   return tieneAlgunPermiso(user, [PERMISOS_PROCESOS.GESTIONAR_PROCESOS]);
 }
 
 /**
- * Verifica si el usuario puede cargar catálogos (departamentos, órganos, etc).
- * @param {Object} user - Objeto del usuario
- * @returns {boolean} True si tiene permiso VER_CATALOGOS o GESTIONAR_CATALOGOS
+ * Data loading behavior.
+ * @param {Object} user - Authenticated user object.
+ * @returns {boolean} Result value.
  */
 export function puedeCargarCatalogos(user) {
   return tieneAlgunPermiso(user, [PERMISOS.VER_CATALOGOS, PERMISOS.GESTIONAR_CATALOGOS]);
 }
 
 /**
- * Verifica si el usuario puede cargar consultas para asociar a procesos.
- * @param {Object} user - Objeto del usuario
- * @returns {boolean} True si tiene permiso VER_CONSULTAS o GESTIONAR_CONSULTAS_LEGACY
+ * Data loading behavior.
+ * @param {Object} user - Authenticated user object.
+ * @returns {boolean} Result value.
  */
 export function puedeCargarConsultas(user) {
   return tieneAlgunPermiso(user, [PERMISOS.VER_CONSULTAS, PERMISOS_PROCESOS.GESTIONAR_CONSULTAS_LEGACY]);
 }
 
 /**
- * Ordena una lista de items, colocando los activos primero y luego los inactivos.
- * Dentro de cada grupo, ordena alfabéticamente por nombre o descripción.
+ * List and table handling.
+ * Implementation detail.
  * 
- * @param {Array<Object>} lista - Lista a ordenar
- * @returns {Array<Object>} Nueva lista ordenada
+ * @param {Array<Object>} lista - Parameter description.
+ * @returns {Array<Object>} Result value.
  */

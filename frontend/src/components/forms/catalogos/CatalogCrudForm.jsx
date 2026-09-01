@@ -34,12 +34,12 @@ function asArray(value) {
 }
 
 /**
- * CRUD visual reutilizable para catálogos de nombre + estado y para catálogos
- * con una relación padre obligatoria (tema-área, municipio-departamento, etc.).
+ * State handling.
+ * Implementation detail.
  *
- * Mantiene el diseño de AreaForm/TemaForm/TipoForm y replica en frontend las
- * validaciones deterministas del backend: requerido, longitud, relación padre,
- * duplicados visibles y actualización sin cambios.
+ * Implementation detail.
+ * Validation rule.
+ * Implementation detail.
  */
 export function CatalogCrudForm({ config }) {
   const router = useRouter();
@@ -123,8 +123,8 @@ export function CatalogCrudForm({ config }) {
           if (allResult.response.ok) {
             setParentAll(sortByIdAsc(asArray(allResult.data)));
           } else {
-            // Si /todos no estuviera disponible por contrato, al menos las
-            // opciones activas permiten crear y actualizar de forma segura.
+            // If `/todos` is unavailable by contract, at least the
+            // Implementation detail.
             setParentAll(sortByIdAsc(asArray(activeResult.data)));
           }
         }

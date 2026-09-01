@@ -57,7 +57,7 @@ public class ConciliadorCommandService {
     }
 
     @Transactional
-    @Auditable(action = "CREAR_PERFIL", entityName = "Conciliador")
+    @Auditable(action = "CREAR_PERFIL", entityName = "Conciliador", entityId = "#result.id")
     public ConciliadorDTO crear(ConciliadorDTO dto) {
         conciliadorAccessService.validarPuedeGestionarConciliadores();
         conciliadorValidator.validarIdNoEnviadoEnCreacion(dto.getId());
@@ -88,7 +88,7 @@ public class ConciliadorCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ACTUALIZAR_PERFIL", entityName = "Conciliador")
+    @Auditable(action = "ACTUALIZAR_PERFIL", entityName = "Conciliador", entityId = "#id")
     public ConciliadorDTO actualizar(Long id, ConciliadorDTO dto) {
         conciliadorAccessService.validarPuedeGestionarConciliadores();
 
@@ -117,7 +117,12 @@ public class ConciliadorCommandService {
     }
 
     @Transactional
-    @Auditable(action = "DESACTIVAR/REACTIVAR_PERFIL", entityName = "Conciliador")
+    @Auditable(
+            action = "CAMBIAR_ESTADO_PERFIL",
+            entityName = "Conciliador",
+            entityId = "#id",
+            trackedFields = "activo",
+            metadata = "requestedActive=#activo")
     public ConciliadorDTO cambiarEstado(Long id, Boolean activo) {
         conciliadorAccessService.validarPuedeGestionarConciliadores();
 
@@ -139,7 +144,7 @@ public class ConciliadorCommandService {
     }
 
     @Transactional
-    @Auditable(action = "ELIMINAR_PERFIL", entityName = "Conciliador")
+    @Auditable(action = "ELIMINAR_PERFIL", entityName = "Conciliador", entityId = "#id")
     public void eliminar(Long id) {
         conciliadorAccessService.validarPuedeGestionarConciliadores();
 

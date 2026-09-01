@@ -12,7 +12,7 @@ import { getApiErrorTitle, readResponseBody } from "@/lib/api"
 import { requiredEmailRule } from "@/lib/form-validation"
 
 /**
- * Formulario para solicitar recuperación de contraseña.
+ * Form handling.
  *
  * @returns {JSX.Element}
  */

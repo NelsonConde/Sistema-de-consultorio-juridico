@@ -9,9 +9,9 @@ import { Separator } from "@/components/ui/separator";
 import { API_URL_BASE } from "@/lib/config";
 
 /**
- * Formulario para crear o editar conciliadores.
- * @param {{onSuccess:function, initialValues:Object}} props - Props del componente.
- * @returns {JSX.Element} Componente de formulario de conciliador.
+ * Form handling.
+ * @param {{onSuccess:function, initialValues:Object}} props - Parameter description.
+ * @returns {JSX.Element} Result value.
  */
 export function ConciliadorForm({ onSuccess, initialValues = {} }) {
   const defaultFormValues = {
@@ -38,7 +38,7 @@ export function ConciliadorForm({ onSuccess, initialValues = {} }) {
 
   const REQUIRED_MESSAGE = "El campo es obligatorio";
 
-  // ── Opciones de selects ──────────────────────────────────────────────────
+  // ── Select options ───────────────────────────────────────────────────────
 
   const tipoDocumentoOptions = [
     { value: "CC", label: "Cédula de Ciudadanía" },
@@ -175,7 +175,7 @@ export function ConciliadorForm({ onSuccess, initialValues = {} }) {
   return (
   <div className="space-y-8">
 
-    {/* HEADER VISUAL */}
+    {/* VISUAL HEADER */}
     <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-r from-blue-600/10 via-indigo-500/10 to-purple-500/10 p-6">
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600" />
 
@@ -189,10 +189,10 @@ export function ConciliadorForm({ onSuccess, initialValues = {} }) {
       </p>
     </div>
 
-    {/* CONTENEDOR PRINCIPAL */}
+    {/* MAIN CONTAINER */}
     <div className="space-y-6">
 
-      {/* ───────────── SECCIÓN ───────────── */}
+      {/* Implementation detail.*/}
       <section className="rounded-xl border bg-card p-6 shadow-sm space-y-6">
         <h3 className="text-lg font-semibold flex items-center gap-2">
           Información Básica
@@ -389,7 +389,7 @@ export function ConciliadorForm({ onSuccess, initialValues = {} }) {
 
       <Separator />
 
-      {/* ── Sección 2: Información de Vivienda ── */}
+      {/* Implementation detail.*/}
       <section className="space-y-4">
         <h3 className="text-lg font-semibold border-b pb-2">
           Información de Vivienda
@@ -525,7 +525,7 @@ export function ConciliadorForm({ onSuccess, initialValues = {} }) {
 
       <Separator />
 
-      {/* ── Sección 3: Aspectos Económicos ── */}
+      {/* Implementation detail.*/}
       <section className="space-y-4">
         <h3 className="text-lg font-semibold border-b pb-2">
           Aspectos Económicos
@@ -589,7 +589,7 @@ export function ConciliadorForm({ onSuccess, initialValues = {} }) {
 
       <Separator />
 
-      {/* ── Sección 4: Datos del Acudiente ── */}
+      {/* Implementation detail.*/}
       <section className="space-y-4">
         <h3 className="text-lg font-semibold border-b pb-2">
           Datos del Acudiente u Otro Contacto
@@ -637,7 +637,7 @@ export function ConciliadorForm({ onSuccess, initialValues = {} }) {
 
       <Separator />
 
-      {/* ── Sección 5: Información del Servicio ── */}
+      {/* Implementation detail.*/}
       <section className="space-y-4">
         <h3 className="text-lg font-semibold border-b pb-2">
           Información del Servicio
@@ -663,7 +663,7 @@ export function ConciliadorForm({ onSuccess, initialValues = {} }) {
         </div>
       </section>
 
-      {/* ── Acciones ── */}
+      {/* ── Actions ── */}
       <div className="flex justify-end gap-3 pt-2">
         <Button
           type="button"

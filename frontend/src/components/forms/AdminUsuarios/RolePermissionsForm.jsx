@@ -1,16 +1,16 @@
 "use client"
 
 /**
- * Formulario de gestión de permisos por página para roles del sistema.
+ * Form for managing page permissions for system roles.
  *
- * Permite seleccionar qué páginas puede ver un rol, asignando y revocando
- * automáticamente los permisos necesarios para acceder a cada página.
+ * Allows selecting which pages a role can access by assigning and revoking
+ * the permissions required to access each page.
  *
- * Protecciones implementadas:
- * - No permite quitarle a tu propio rol el acceso a Administración.
- * - Las acciones sin permiso muestran un toast en lugar de redirigir.
- * - El algoritmo de diff solo revoca permisos gestionados por este form,
- *   preservando permisos asignados por otros medios.
+ * Implemented safeguards:
+ * - Prevents removing Administration access from your own role.
+ * - Unauthorized actions show a toast instead of redirecting.
+ * - The diff algorithm only revokes permissions managed by this form,
+ *   preserving permissions assigned through other mechanisms.
  *
  * @module components/forms/AdminUsuarios/RolePermissionsForm
  */
@@ -33,7 +33,6 @@ import {
   leerRespuesta,
   nombrePermiso,
   nombreRol,
-  normalizar,
   paginaMarcada,
   permisosAsignarPagina,
   permisosGestionadosPagina,
@@ -59,7 +58,13 @@ export function RolePermissionsForm() {
     PERMISOS.ASIGNAR_PERMISOS_ROLES
   );
 
-  const paginasConfigurables = useMemo(() => PAGINAS, []);
+  // Administration is intentionally excluded from this form.
+  // Its existing permissions remain untouched because this form only manages
+  // permissions associated with the pages included in paginasConfigurables.
+  const paginasConfigurables = useMemo(
+    () => PAGINAS.filter((page) => page.path !== "/admin"),
+    []
+  );
 
   const paginaAdministracion = "/admin";
 
@@ -69,24 +74,9 @@ export function RolePermissionsForm() {
   );
 
   const rolSeleccionadoEsPropio = useMemo(() => {
-    if (!me || !rolId) return false;
-
-    const roleById = rolSeleccionado;
-    if (roleById && me?.rolId != null) {
-      return String(me.rolId) === String(roleById.id);
-    }
-
-    if (roleById && me?.rolNombre) {
-      return normalizar(nombreRol(roleById)) === normalizar(me.rolNombre);
-    }
-
-    if (me?.rolNombre) {
-      return normalizar(nombreRol({ nombre: me.rolNombre })) ===
-        normalizar(me.rolNombre);
-    }
-
-    return false;
-  }, [me, rolId, rolSeleccionado]);
+    if (!me || !rolId || me?.rolId == null) return false;
+    return String(me.rolId) === String(rolId);
+  }, [me, rolId]);
 
   useEffect(() => {
     cargarDatosIniciales();
@@ -334,11 +324,11 @@ export function RolePermissionsForm() {
   }
 
   /**
-   * Alterna la selección de una página en el formulario de permisos.
-   * Muestra toast si el usuario no tiene permiso para asignar permisos.
-   * Muestra error en UI si intenta quitarse acceso a Administración.
+   * Toggles a page selection in the permissions form.
+   * Shows a toast when the user cannot assign permissions.
+   * Shows a UI error when attempting to remove Administration access from the current role.
    *
-   * @param {string} path - Ruta de la página a togglear.
+   * @param {string} path - Page route to toggle.
    */
   function togglePagina(path) {
     if (!puedeAsignarPermisos) {

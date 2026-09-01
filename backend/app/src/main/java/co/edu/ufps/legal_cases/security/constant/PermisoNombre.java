@@ -15,6 +15,7 @@ public final class PermisoNombre {
     public static final String GESTIONAR_PERSONAS = "Gestionar personas";
     public static final String GESTIONAR_CONSULTAS = "Gestionar consultas";
     public static final String VER_REPORTES = "Ver reportes";
+    public static final String VER_AUDITORIA = "Ver auditoría";
 
     // Navegación.
     public static final String ACCEDER_INICIO = "Acceder inicio";

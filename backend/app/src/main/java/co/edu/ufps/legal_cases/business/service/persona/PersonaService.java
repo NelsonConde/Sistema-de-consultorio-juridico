@@ -43,11 +43,11 @@ public class PersonaService {
         return personaCommandService.actualizar(id, personaDTO);
     }
 
-    public void desactivar(Long id) {
-        personaCommandService.desactivar(id);
+    public void desactivar(Long id, Long version) {
+        personaCommandService.desactivar(id, version);
     }
 
-    public void reactivar(Long id) {
-        personaCommandService.reactivar(id);
+    public void reactivar(Long id, Long version) {
+        personaCommandService.reactivar(id, version);
     }
 }
