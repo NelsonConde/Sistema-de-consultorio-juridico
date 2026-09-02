@@ -25,10 +25,10 @@ import co.edu.ufps.legal_cases.common.exception.AdministracionInvariantException
 import co.edu.ufps.legal_cases.audit.service.log.AuditSecurityService;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.common.exception.dto.ErrorResponseDTO;
-import co.edu.ufps.legal_cases.common.observability.CorrelationIdContext;
 import co.edu.ufps.legal_cases.file_storage.exception.FileStorageException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import java.util.UUID;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -55,7 +55,7 @@ public class GlobalExceptionHandler {
                         "La operación compromete la continuidad administrativa"),
                 request);
 
-        return responder(HttpStatus.CONFLICT, error);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
         @ExceptionHandler({
@@ -99,7 +99,7 @@ public class GlobalExceptionHandler {
                 mensajeSeguro(ex.getMessage(), "La solicitud no cumple una regla de negocio"),
                 request);
 
-        return responder(HttpStatus.BAD_REQUEST, error);
+        return ResponseEntity.badRequest().body(error);
     }
 
     // Maneja errores de validación en DTOs con @Valid:
@@ -121,7 +121,7 @@ public class GlobalExceptionHandler {
                 request,
                 detalles);
 
-        return responder(HttpStatus.BAD_REQUEST, respuesta);
+        return ResponseEntity.badRequest().body(respuesta);
     }
 
     // Maneja validaciones aplicadas sobre parámetros o path variables,
@@ -144,7 +144,7 @@ public class GlobalExceptionHandler {
                 request,
                 detalles);
 
-        return responder(HttpStatus.BAD_REQUEST, respuesta);
+        return ResponseEntity.badRequest().body(respuesta);
     }
 
     // Maneja parámetros con tipo inválido, por ejemplo:
@@ -160,7 +160,7 @@ public class GlobalExceptionHandler {
                 construirMensajeParametroInvalido(ex),
                 request);
 
-        return responder(HttpStatus.BAD_REQUEST, error);
+        return ResponseEntity.badRequest().body(error);
     }
 
     // Maneja parámetros obligatorios que no fueron enviados.
@@ -175,7 +175,7 @@ public class GlobalExceptionHandler {
                 "El parámetro obligatorio '" + ex.getParameterName() + "' no fue enviado",
                 request);
 
-        return responder(HttpStatus.BAD_REQUEST, error);
+        return ResponseEntity.badRequest().body(error);
     }
 
     // Maneja errores en el cuerpo JSON:
@@ -191,7 +191,7 @@ public class GlobalExceptionHandler {
                 "El cuerpo de la solicitud no es válido",
                 request);
 
-        return responder(HttpStatus.BAD_REQUEST, error);
+        return ResponseEntity.badRequest().body(error);
     }
 
     // Maneja métodos HTTP no soportados para un endpoint.
@@ -206,7 +206,7 @@ public class GlobalExceptionHandler {
                 "El método HTTP usado no está permitido para este recurso",
                 request);
 
-        return responder(HttpStatus.METHOD_NOT_ALLOWED, error);
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(error);
     }
 
     // Maneja usuarios autenticados que no tienen permisos suficientes.
@@ -225,7 +225,7 @@ public class GlobalExceptionHandler {
                 "No tiene permisos para acceder a este recurso",
                 request);
 
-        return responder(HttpStatus.FORBIDDEN, error);
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
     }
 
     @ExceptionHandler(FileStorageException.class)
@@ -233,7 +233,7 @@ public class GlobalExceptionHandler {
             FileStorageException ex,
             HttpServletRequest request) {
 
-        String correlationId = CorrelationIdContext.getOrCreate(request);
+        String correlationId = obtenerCorrelationId(request);
         log.error("Error de almacenamiento [{}] en {}", correlationId, request.getRequestURI(), ex);
 
         ErrorResponseDTO error = construirError(
@@ -242,7 +242,7 @@ public class GlobalExceptionHandler {
                 "No se pudo completar la operación de archivos",
                 request);
 
-        return responder(HttpStatus.SERVICE_UNAVAILABLE, error);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
     }
 
     // Maneja cualquier excepción no controlada.
@@ -260,7 +260,7 @@ public class GlobalExceptionHandler {
                 "Ocurrió un error inesperado",
                 request);
 
-        return responder(HttpStatus.INTERNAL_SERVER_ERROR, error);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
 
     private ErrorResponseDTO construirError(
@@ -275,7 +275,7 @@ public class GlobalExceptionHandler {
                 .error(error)
                 .mensaje(mensaje)
                 .ruta(request.getRequestURI())
-                .correlacionId(CorrelationIdContext.getOrCreate(request))
+                .correlacionId(obtenerCorrelationId(request))
                 .build();
     }
 
@@ -292,18 +292,23 @@ public class GlobalExceptionHandler {
                 .error(error)
                 .mensaje(mensaje)
                 .ruta(request.getRequestURI())
-                .correlacionId(CorrelationIdContext.getOrCreate(request))
+                .correlacionId(obtenerCorrelationId(request))
                 .detalles(detalles)
                 .build();
     }
 
-    private ResponseEntity<ErrorResponseDTO> responder(
-            HttpStatus status,
-            ErrorResponseDTO error) {
-
-        return ResponseEntity.status(status)
-                .header(CorrelationIdContext.HEADER_NAME, error.getCorrelacionId())
-                .body(error);
+    private String obtenerCorrelationId(HttpServletRequest request) {
+        String header = request.getHeader("X-Request-ID");
+        if (header != null && !header.isBlank()) {
+            return header;
+        }
+        Object current = request.getAttribute("correlacionId");
+        if (current != null) {
+            return current.toString();
+        }
+        String generated = UUID.randomUUID().toString();
+        request.setAttribute("correlacionId", generated);
+        return generated;
     }
 
     private String construirMensajeParametroInvalido(MethodArgumentTypeMismatchException ex) {

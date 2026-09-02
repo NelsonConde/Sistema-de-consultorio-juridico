@@ -51,7 +51,7 @@ export default function ArchivoForm({ resource }) {
         toast.error("No se pudieron subir los archivos");
       }
     } catch (error) {
-      console.error(error);
+
       toast.error(error.message || "No se pudieron subir los archivos");
     } finally {
       setIsUploading(false);

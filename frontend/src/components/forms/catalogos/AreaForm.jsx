@@ -77,8 +77,8 @@ export function AreaForm() {
         }
 
         await cargarAreas()
-      } catch (error) {
-        console.error(error)
+      } catch {
+
         router.push("/")
       } finally {
         setChecking(false)
@@ -116,7 +116,7 @@ export function AreaForm() {
       const data = await res.json()
       setAreas(sortByIdAsc(Array.isArray(data) ? data : []))
     } catch (error) {
-      console.error("Error de red al cargar áreas:", error)
+
       toast.error("Error de conexión al cargar áreas")
     }
   }
@@ -160,7 +160,7 @@ export function AreaForm() {
         })
       }
     } catch (error) {
-      console.error(error)
+
       toast.error("Error de conexión")
     } finally {
       setConfirmLoading(false)
@@ -232,7 +232,7 @@ export function AreaForm() {
         })
       }
     } catch (error) {
-      console.error("Error de red al guardar área:", error)
+
       toast.error("Error de conexión al guardar")
     } finally {
       setIsSubmitting(false)

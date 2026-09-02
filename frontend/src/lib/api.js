@@ -1,5 +1,7 @@
 import { apiClient } from "@/lib/apiClient";
 
+const REQUEST_ID_HEADER = "X-Request-ID";
+
 /**
  * Implementation detail.
  *
@@ -28,6 +30,29 @@ export async function readResponseBody(response) {
   } catch {
     return text;
   }
+}
+
+/**
+ * Returns the canonical correlation identifier for a completed HTTP response.
+ * The response header is authoritative; the backend error payload is a fallback.
+ */
+export function getResponseCorrelationId(response, payload = null) {
+  const fromHeader = response?.headers?.get?.(REQUEST_ID_HEADER);
+  if (fromHeader) return fromHeader;
+
+  if (payload && typeof payload === "object") {
+    return payload.correlacionId || null;
+  }
+
+  return null;
+}
+
+/**
+ * Appends a support reference without exposing backend payloads or internal data.
+ */
+export function withErrorReference(description, correlationId) {
+  if (!correlationId) return description;
+  return `${description}\nReferencia: ${correlationId}`;
 }
 
 /**
@@ -150,7 +175,15 @@ export function getApiErrorDescription(payload, fallback = "Verifica la informac
  * Implementation detail.
  */
 export class ApiError extends Error {
-  constructor(message, { status = 0, payload = null, response = null } = {}) {
+  constructor(
+    message,
+    {
+      status = 0,
+      payload = null,
+      response = null,
+      correlationId = null,
+    } = {}
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
@@ -159,6 +192,7 @@ export class ApiError extends Error {
     // different transport wrappers while preserving the same backend payload.
     this.body = payload;
     this.response = response;
+    this.correlationId = correlationId;
   }
 }
 
@@ -192,7 +226,7 @@ export function toConcurrencyConflict(error) {
       payload?.message ||
       error?.message ||
       "El recurso fue modificado por otro usuario.",
-    correlationId: payload?.correlacionId ?? null,
+    correlationId: error?.correlationId ?? payload?.correlacionId ?? null,
     path: payload?.ruta ?? null,
   };
 }
@@ -229,7 +263,8 @@ export function withResourceVersion(path, resource, label = "recurso") {
 export async function apiResponse(path, options = {}) {
   const response = await apiClient.request(path, options);
   const data = await readResponseBody(response);
-  return { response, data };
+  const correlationId = getResponseCorrelationId(response, data);
+  return { response, data, correlationId };
 }
 
 /**
@@ -246,7 +281,7 @@ export async function apiRequestData(
     statusMessages = {},
   } = {}
 ) {
-  const { response, data } = await apiResponse(path, options);
+  const { response, data, correlationId } = await apiResponse(path, options);
 
   if (response.ok) {
     return data;
@@ -260,6 +295,7 @@ export async function apiRequestData(
     status: response.status,
     payload: data,
     response,
+    correlationId,
   });
 }
 
@@ -270,3 +306,14 @@ export function getApiErrorStatus(error) {
   return Number(error?.status || 0);
 }
 
+/**
+ * Reads an already-normalized correlation reference from an error.
+ */
+export function getApiErrorCorrelationId(error) {
+  return (
+    error?.correlationId ||
+    error?.payload?.correlacionId ||
+    error?.body?.correlacionId ||
+    null
+  );
+}

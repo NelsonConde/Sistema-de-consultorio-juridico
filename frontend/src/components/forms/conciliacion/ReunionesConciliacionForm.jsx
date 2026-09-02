@@ -15,7 +15,11 @@ import {
 import { Button } from "@/components/ui/button";
 import Pagination from "@/components/ui/Pagination";
 import { API_URL_BASE } from "@/lib/config";
-import { isConcurrencyConflict, requireResourceVersion } from "@/lib/api";
+import {
+  isConcurrencyConflict,
+  requireResourceVersion,
+  withErrorReference,
+} from "@/lib/api";
 import { PERMISOS } from "@/lib/permission";
 import { esEstudiante, tienePermiso } from "@/lib/authz";
 import { requestConciliacion } from "./conciliaciones.service";
@@ -230,8 +234,12 @@ export function ReunionesConciliacionForm() {
       setUsuario(me);
       await Promise.all([cargarConciliaciones(), cargarSedes()]);
     } catch (err) {
-      console.error(err);
-      setError(err.message || "No se pudo cargar la información de reuniones");
+      setError(
+        withErrorReference(
+          err?.message || "No se pudo cargar la información de reuniones",
+          err?.correlationId || null
+        )
+      );
     } finally {
       setLoading(false);
     }
@@ -251,8 +259,7 @@ export function ReunionesConciliacionForm() {
     try {
       const data = await apiFetch("/sedes", { method: "GET" }, "No se pudieron cargar las sedes");
       setSedes(ordenarPorIdAsc(extraerLista(data)));
-    } catch (err) {
-      console.warn(err);
+    } catch {
       setSedes([]);
     }
   }
@@ -286,8 +293,12 @@ export function ReunionesConciliacionForm() {
         reunion: data?.reunion?.version ?? null,
       });
     } catch (err) {
-      console.error(err);
-      setError(err.message || "No se pudo cargar el detalle de la conciliación");
+      setError(
+        withErrorReference(
+          err?.message || "No se pudo cargar el detalle de la conciliación",
+          err?.correlationId || null
+        )
+      );
     } finally {
       setLoadingDetalle(false);
     }
@@ -348,11 +359,18 @@ export function ReunionesConciliacionForm() {
 
       await refrescar(reunionActual ? "La reunión fue reprogramada correctamente." : "La reunión fue programada correctamente.");
     } catch (err) {
-      console.error(err);
       if (isConcurrencyConflict(err) && detalle?.id) {
-        setError("La conciliación o su reunión cambió mientras editabas. El formulario se conserva.");
+        setError(
+          withErrorReference(
+            "La conciliación o su reunión cambió mientras editabas. El formulario se conserva.",
+            err?.correlationId || null
+          )
+        );
         toast.error("La reunión cambió mientras la estabas editando", {
-          description: "No hubo reintento automático. Se cargará la versión actual sin borrar tus campos.",
+          description: withErrorReference(
+            "No hubo reintento automático. Se cargará la versión actual sin borrar tus campos.",
+            err?.correlationId || null
+          ),
         });
         try {
           const latest = await apiFetch(
@@ -368,13 +386,20 @@ export function ReunionesConciliacionForm() {
             `La versión actual del servidor se cargó sin reemplazar tus campos. ` +
               `Reunión actual: ${formatearFecha(latest?.reunion?.fechaReunion)}.`
           );
-        } catch (refreshError) {
-          console.error("Could not refresh meeting versions after a concurrency conflict", refreshError);
+        } catch {
+          // Keep the form untouched when the current server version cannot be refreshed.
         }
         return;
       }
-      setError(err.message || "No se pudo guardar la reunión");
-      toast.error(err.message || "No se pudo guardar la reunión");
+
+      const message = withErrorReference(
+        err?.message || "No se pudo guardar la reunión",
+        err?.correlationId || null
+      );
+      setError(message);
+      toast.error("No se pudo guardar la reunión", {
+        description: message,
+      });
     } finally {
       setSaving(false);
     }

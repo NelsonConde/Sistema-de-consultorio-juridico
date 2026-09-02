@@ -16,6 +16,26 @@
 import { API_URL_BASE } from "@/lib/config";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const REQUEST_ID_HEADER = "X-Request-ID";
+
+function createRequestId() {
+  const cryptoApi = globalThis.crypto;
+
+  if (typeof cryptoApi?.randomUUID === "function") {
+    return cryptoApi.randomUUID();
+  }
+
+  return null;
+}
+
+function addRequestId(headers) {
+  if (headers.has(REQUEST_ID_HEADER)) return;
+
+  const requestId = createRequestId();
+  if (requestId) {
+    headers.set(REQUEST_ID_HEADER, requestId);
+  }
+}
 
 let csrfToken = null;
 let csrfRequest = null;
@@ -60,12 +80,16 @@ async function getCsrfToken({ force = false } = {}) {
   }
 
   csrfRequest = (async () => {
+    const headers = new Headers();
+    addRequestId(headers);
+
     const response = await fetch(
       `${API_URL_BASE}/auth/csrf`,
       {
         method: "GET",
         credentials: "include",
         cache: "no-store",
+        headers,
       }
     );
 
@@ -136,6 +160,8 @@ async function request(
     new Headers(
       extraHeaders || {}
     );
+
+  addRequestId(headers);
 
   const url =
     resolveUrl(path);

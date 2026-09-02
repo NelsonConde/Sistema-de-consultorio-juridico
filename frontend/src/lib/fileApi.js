@@ -7,6 +7,12 @@
  */
 
 import { apiClient } from "@/lib/apiClient";
+import {
+  ApiError,
+  getApiErrorTitle,
+  getResponseCorrelationId,
+  readResponseBody,
+} from "@/lib/api";
 
 const RESOURCE_PATHS = {
   consulta: (resource) => `/consultas/${resource.id}/archivos`,
@@ -24,13 +30,16 @@ function resourcePath(resource) {
   return builder(resource);
 }
 
-async function readError(response, fallback) {
-  try {
-    const data = await response.json();
-    return data?.message || data?.mensaje || fallback;
-  } catch {
-    return fallback;
-  }
+async function buildApiError(response, fallback) {
+  const payload = await readResponseBody(response);
+  const correlationId = getResponseCorrelationId(response, payload);
+
+  return new ApiError(getApiErrorTitle(payload, fallback), {
+    status: response.status,
+    payload,
+    response,
+    correlationId,
+  });
 }
 
 async function initiate(resource, file) {
@@ -41,8 +50,9 @@ async function initiate(resource, file) {
   });
 
   if (!response.ok) {
-    throw new Error(
-      await readError(response, "No se pudo iniciar la carga del archivo"),
+    throw await buildApiError(
+      response,
+      "No se pudo iniciar la carga del archivo"
     );
   }
 
@@ -50,6 +60,8 @@ async function initiate(resource, file) {
 }
 
 async function uploadToStorage(upload, file) {
+  // Presigned storage URLs are external to the backend API and must not receive
+  // cookies, CSRF headers, or backend correlation headers from apiClient.
   const response = await fetch(upload.uploadUrl, {
     method: "PUT",
     headers: {
@@ -76,11 +88,9 @@ export async function upload(resource, file) {
     );
 
     if (!completion.ok) {
-      throw new Error(
-        await readError(
-          completion,
-          "No se pudo confirmar la carga del archivo",
-        ),
+      throw await buildApiError(
+        completion,
+        "No se pudo confirmar la carga del archivo"
       );
     }
 
@@ -112,8 +122,9 @@ export async function uploadMany(resource, files) {
 export async function list(resource) {
   const response = await apiClient.get(resourcePath(resource));
   if (!response.ok) {
-    throw new Error(
-      await readError(response, "No se pudieron listar los archivos"),
+    throw await buildApiError(
+      response,
+      "No se pudieron listar los archivos"
     );
   }
   const data = await response.json();
@@ -126,12 +137,14 @@ export async function download(file, resource = null) {
   const response = await apiClient.get(`/archivos/${file.id}/download${query}`);
 
   if (!response.ok) {
-    throw new Error(
-      await readError(response, "No se pudo preparar la descarga"),
+    throw await buildApiError(
+      response,
+      "No se pudo preparar la descarga"
     );
   }
 
   const descriptor = await response.json();
+  // The actual file download uses the external presigned storage URL.
   const fileResponse = await fetch(descriptor.downloadUrl);
   if (!fileResponse.ok) {
     throw new Error("No se pudo descargar el archivo");
@@ -153,8 +166,9 @@ export async function remove(file, resource = null) {
   const query = parentId ? `?parentId=${encodeURIComponent(parentId)}` : "";
   const response = await apiClient.delete(`/archivos/${file.id}${query}`);
   if (!response.ok) {
-    throw new Error(
-      await readError(response, "No se pudo eliminar el archivo"),
+    throw await buildApiError(
+      response,
+      "No se pudo eliminar el archivo"
     );
   }
 }

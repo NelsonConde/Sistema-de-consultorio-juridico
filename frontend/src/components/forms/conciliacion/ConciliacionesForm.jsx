@@ -21,7 +21,11 @@ import {
 import { Button } from "@/components/ui/button";
 import Pagination from "@/components/ui/Pagination";
 import { API_URL_BASE } from "@/lib/config";
-import { isConcurrencyConflict, requireResourceVersion } from "@/lib/api";
+import {
+  isConcurrencyConflict,
+  requireResourceVersion,
+  withErrorReference,
+} from "@/lib/api";
 import { PERMISOS } from "@/lib/permission";
 import {
   esConciliador,
@@ -188,8 +192,12 @@ export function ConciliacionesForm() {
       setUsuario(me);
       await Promise.all([cargarConciliaciones(), cargarAuxiliares(me)]);
     } catch (err) {
-      console.error(err);
-      setError(err.message || "Error cargando conciliaciones");
+      setError(
+        withErrorReference(
+          err?.message || "Error cargando conciliaciones",
+          err?.correlationId || null
+        )
+      );
     } finally {
       setLoading(false);
     }
@@ -283,8 +291,12 @@ export function ConciliacionesForm() {
       setEstudianteId(String(data?.estudianteId || ""));
       setConciliadorId(String(data?.conciliadorId || ""));
     } catch (err) {
-      console.error(err);
-      setError(err.message || "Error cargando detalle");
+      setError(
+        withErrorReference(
+          err?.message || "Error cargando detalle",
+          err?.correlationId || null
+        )
+      );
     } finally {
       setLoadingDetalle(false);
     }
@@ -344,8 +356,12 @@ export function ConciliacionesForm() {
         await cargarDetalle(creada.id);
       }
     } catch (err) {
-      console.error(err);
-      setError(err.message || "Error creando conciliación");
+      setError(
+        withErrorReference(
+          err?.message || "Error creando conciliación",
+          err?.correlationId || null
+        )
+      );
     } finally {
       setSaving(false);
     }
@@ -514,11 +530,17 @@ export function ConciliacionesForm() {
       setMensaje("");
       await action();
     } catch (err) {
-      console.error(err);
       if (isConcurrencyConflict(err) && detalle?.id) {
-        setError("La conciliación cambió mientras realizabas la operación. Tus selecciones y archivos se conservaron.");
+        const conflictMessage = withErrorReference(
+          "La conciliación cambió mientras realizabas la operación. Tus selecciones y archivos se conservaron.",
+          err?.correlationId || null
+        );
+        setError(conflictMessage);
         toast.error("Este registro cambió mientras realizabas la operación", {
-          description: "No hubo reintento automático. Se cargará la versión actual como nueva base.",
+          description: withErrorReference(
+            "No hubo reintento automático. Se cargará la versión actual como nueva base.",
+            err?.correlationId || null
+          ),
         });
 
         try {
@@ -532,13 +554,20 @@ export function ConciliacionesForm() {
           setDetalle(latest);
           setEstudianteId(selectedStudent);
           setConciliadorId(selectedConciliator);
-        } catch (refreshError) {
-          console.error("Could not refresh the conciliation after a concurrency conflict", refreshError);
+        } catch {
+          // The draft remains intact even if the refresh cannot be completed.
         }
         return;
       }
-      setError(err.message || "No se pudo completar la acción");
-      toast.error(err.message || "No se pudo completar la acción");
+
+      const message = withErrorReference(
+        err?.message || "No se pudo completar la acción",
+        err?.correlationId || null
+      );
+      setError(message);
+      toast.error("No se pudo completar la acción", {
+        description: message,
+      });
     } finally {
       setSaving(false);
     }
@@ -553,8 +582,12 @@ export function ConciliacionesForm() {
       if (!file) throw new Error("El documento ya no está disponible");
       await fileApi.download(file, { type: "conciliacion", id: conciliacionId });
     } catch (err) {
-      console.error(err);
-      setError(err.message || "No se pudo descargar el documento");
+      setError(
+        withErrorReference(
+          err?.message || "No se pudo descargar el documento",
+          err?.correlationId || null
+        )
+      );
     }
   }
 

@@ -84,7 +84,6 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
                 .error(error)
                 .mensaje(mensaje)
                 .ruta(request.getRequestURI())
-                .correlacionId(CorrelationIdContext.getOrCreate(request))
                 .build();
     }
 
@@ -94,7 +93,6 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
             ErrorResponseDTO error) throws IOException {
 
         response.setStatus(status.value());
-        response.setHeader(CorrelationIdContext.HEADER_NAME, error.getCorrelacionId());
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
 

@@ -99,8 +99,8 @@ export function AsesoresYMonitoresForm() {
 
         setAsesores(sortByIdAsc(Array.isArray(asesoresData) ? asesoresData : []));
         setMonitores(sortByIdAsc(Array.isArray(monitoresData) ? monitoresData : []));
-      } catch (err) {
-        console.error(err);
+      } catch {
+
         toast.error("Error cargando usuarios");
       } finally {
         setCargando(false);
@@ -162,7 +162,7 @@ export function AsesoresYMonitoresForm() {
         toast.error("Error al desactivar");
       }
     } catch (error) {
-      console.error(error);
+
       toast.error("Error de conexión");
     } finally {
       setConfirmLoading(false);

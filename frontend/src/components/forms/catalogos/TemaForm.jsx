@@ -116,8 +116,8 @@ export function TemaForm() {
       }
 
       await cargarTemas();
-    } catch (error) {
-      console.error(error);
+    } catch {
+
       router.push("/");
     } finally {
       setChecking(false);
@@ -199,7 +199,7 @@ export function TemaForm() {
         });
       }
     } catch (error) {
-      console.error(error);
+
       toast.error("Error de conexión");
     } finally {
       setDesactivando(false);

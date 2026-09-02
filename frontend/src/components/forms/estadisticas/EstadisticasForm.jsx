@@ -22,7 +22,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 /**
  * Date handling.
  * Semestre 1: enero-mayo (meses 0-5), Semestre 2: junio-diciembre (meses 6-11)
- * 
+ *
  * @returns {Object} Result value.
  */
 function calcularSemestreActual() {
@@ -32,7 +32,7 @@ function calcularSemestreActual() {
 
 /**
  * State handling.
- * 
+ *
  * @param {string} nombre - Parameter description.
  * @returns {string} Result value.
  */
@@ -49,7 +49,7 @@ function etiquetaEstado(nombre) {
 /**
  * Returns today's date in ISO format (yyyy-MM-dd).
  * Selection behavior.
- * 
+ *
  * @returns {string} Result value.
  */
 function hoyStr() { return new Date().toISOString().slice(0, 10); }
@@ -435,8 +435,8 @@ export function EstadisticasForm() {
           const found  = lista.find((s) => s.año === actual.año && s.semestre === actual.semestre);
           setSemSel(found ? found.etiqueta : lista[lista.length - 1]?.etiqueta ?? null);
         }
-      } catch (err) {
-        console.error(err);
+      } catch {
+
         setError("Error al cargar la página.");
       } finally {
         setChecking(false);
@@ -445,7 +445,7 @@ export function EstadisticasForm() {
     init();
   }, [router]);
 
-  
+
   const cargarPorSemestre = useCallback(async () => {
     if (!semSel || modoRango) return;
     const sem = semestres.find((s) => s.etiqueta === semSel);
@@ -463,7 +463,7 @@ export function EstadisticasForm() {
     finally { setCargando(false); }
   }, [semSel, semestres, modoRango]);
 
-  
+
   const cargarPorRango = useCallback(async () => {
     if (!modoRango) return;
     if (!fechaInicio || !fechaFin) { setError("Selecciona fechas de inicio y fin."); return; }
@@ -486,7 +486,7 @@ export function EstadisticasForm() {
 
   useEffect(() => { if (!modoRango) cargarPorSemestre(); }, [cargarPorSemestre, modoRango]);
 
-  
+
   async function descargarPDF() {
     setDescargando(true);
     try {
@@ -512,7 +512,7 @@ export function EstadisticasForm() {
     finally { setDescargando(false); }
   }
 
-  
+
   if (checking)
     return <div className="p-8 text-muted-foreground animate-pulse text-sm">Cargando...</div>;
 

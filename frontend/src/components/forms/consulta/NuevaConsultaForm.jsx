@@ -25,7 +25,12 @@ import { API_URL_BASE } from "@/lib/config";
 import ArchivosConsultaForm from "../parts/ArchivosConsultaForm";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
-import { getApiErrorDescription, getApiErrorTitle, readResponseBody } from "@/lib/api";
+import {
+  apiResponse,
+  getApiErrorDescription,
+  getApiErrorTitle,
+  withErrorReference,
+} from "@/lib/api";
 import { buscarPersonasActivas } from "@/lib/personasApi";
 
 import { VACIOS } from "./nueva-consulta.constants";
@@ -355,8 +360,7 @@ export function NuevaConsultaForm() {
         setPuedeAsignarResponsables(puedeAsignar);
 
         await cargarCatalogos(puedeAsignar);
-      } catch (error) {
-        console.error("Error verificando permisos:", error);
+      } catch {
         router.replace("/");
       } finally {
         setChecking(false);
@@ -472,8 +476,7 @@ export function NuevaConsultaForm() {
         setMonitores([]);
         setEstudiantes([]);
       }
-    } catch (e) {
-      console.error("Error catálogos:", e);
+    } catch {
       toast.error("Error cargando datos");
     }
   }
@@ -519,15 +522,26 @@ export function NuevaConsultaForm() {
         return true;
       }
 
-      toast.warning(
+      const correlationId =
+        failed.find((result) => result.error?.correlationId)?.error?.correlationId ||
+        null;
+
+      const warning =
         failed.length === archivos.length
           ? "La consulta se creó, pero no se pudieron subir los archivos"
-          : `La consulta se creó; ${failed.length} archivo(s) no pudieron subirse`
-      );
+          : `La consulta se creó; ${failed.length} archivo(s) no pudieron subirse`;
+
+      toast.warning(warning, {
+        description: withErrorReference(
+          "Revisa los archivos e intenta cargarlos nuevamente.",
+          correlationId
+        ),
+      });
       return false;
-    } catch (error) {
-      console.error("Error subiendo archivos:", error);
-      toast.warning("La consulta se creó, pero falló la conexión al subir archivos");
+    } catch {
+      toast.warning("La consulta se creó, pero falló la conexión al subir archivos", {
+        description: "Los archivos seleccionados no se registraron. Intenta cargarlos nuevamente.",
+      });
       return false;
     }
   }
@@ -635,14 +649,17 @@ export function NuevaConsultaForm() {
     };
 
     try {
-      const res = await apiClient.request(`${API_URL_BASE}/consultas`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      const { response: res, data, correlationId } = await apiResponse(
+        `${API_URL_BASE}/consultas`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
 
       if (res.status === 401) {
         router.replace("/");
@@ -654,11 +671,12 @@ export function NuevaConsultaForm() {
         return;
       }
 
-      const data = await readResponseBody(res);
-
       if (!res.ok) {
         toast.error(getApiErrorTitle(data, "Error al crear"), {
-          description: getApiErrorDescription(data),
+          description: withErrorReference(
+            getApiErrorDescription(data),
+            correlationId
+          ),
         });
         return;
       }
@@ -666,7 +684,13 @@ export function NuevaConsultaForm() {
       const consultaId = data?.id;
 
       if (!consultaId) {
-        throw new Error("No se recibió el id de la consulta");
+        toast.error("No se pudo completar la creación", {
+          description: withErrorReference(
+            "El servidor no devolvió el identificador de la consulta creada.",
+            correlationId
+          ),
+        });
+        return;
       }
 
       toast.success("Consulta creada");
@@ -674,9 +698,10 @@ export function NuevaConsultaForm() {
       await subirArchivosConsulta(consultaId);
 
       router.push(`/consultasjuridicas?refresh=${Date.now()}`);
-    } catch (error) {
-      console.error(error);
-      toast.error(error.message || "Error de conexión");
+    } catch {
+      toast.error("Error de conexión", {
+        description: "No se pudo completar la creación de la consulta. Verifica la conexión e intenta nuevamente.",
+      });
     } finally {
       setGuardando(false);
     }

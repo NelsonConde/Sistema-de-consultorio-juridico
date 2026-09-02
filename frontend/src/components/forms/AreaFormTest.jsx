@@ -10,17 +10,14 @@ export function AreaFormTest() {
 
   /**
    * Form handling.
-   * @param {Object} data - Parameter description.
    * @returns {void}
    */
-  const onSubmit = (data) => {
-    console.log(data);
-  };
-  
+  const onSubmit = () => {};
+
   return (
     <div>
         <form onSubmit={handleSubmit(onSubmit)}>
-        
+
         <label>Nombre del area</label>
         <input type="text" placeholder="area" {...register("area", {required: true})} />
 

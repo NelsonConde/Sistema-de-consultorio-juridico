@@ -333,7 +333,7 @@ export function NuevoProcesoForm() {
         .filter((r) => r.status === "rejected").map((r) => r.reason?.message).filter(Boolean);
       if (errores.length > 0) toast.error(errores[0]);
     } catch (error) {
-      console.error(error);
+
       if (error.status === 401) { router.push("/"); return; }
       toast.error(error.message || "No se pudo cargar el formulario");
       router.push("/inicio");
@@ -396,7 +396,7 @@ export function NuevoProcesoForm() {
       toast.success("Proceso creado correctamente");
       router.push("/procesos");
     } catch (error) {
-      console.error(error);
+
       if (error.status === 401) { router.push("/"); return; }
       toast.error(error.message || "No se pudo crear el proceso");
     } finally {

@@ -110,7 +110,7 @@ export function ProcesosForm() {
       }
       await cargarDatos(usuarioActual);
     } catch (error) {
-      console.error(error);
+
       if (error.status === 401) { router.push("/"); return; }
       toast.error(error.message || "No se pudo cargar procesos");
       router.push("/inicio");
@@ -265,7 +265,7 @@ export function ProcesosForm() {
       cerrarCambioEstado();
       await cargarDatos();
     } catch (error) {
-      console.error(error);
+
       if (error.status === 401) {
         router.push("/");
         return;
@@ -302,7 +302,7 @@ export function ProcesosForm() {
         cerrarEdicion();
         await cargarDatos();
       } catch (error) {
-        console.error(error);
+
         if (error.status === 401) { router.push("/"); return; }
         if (isConcurrencyConflict(error)) {
           toast.error("Este proceso cambió mientras lo estabas editando", {
@@ -313,8 +313,8 @@ export function ProcesosForm() {
             if (latest?.version != null) {
               setForm((prev) => ({ ...prev, version: latest.version }));
             }
-          } catch (refreshError) {
-            console.error("Could not refresh the process after a concurrency conflict", refreshError);
+          } catch {
+            // Keep the current draft when the fresh version cannot be loaded.
           }
           return;
         }
@@ -341,7 +341,7 @@ export function ProcesosForm() {
         toast.success("Proceso eliminado correctamente");
         await cargarDatos();
       } catch (error) {
-        console.error(error);
+
         if (error.status === 401) { router.push("/"); return; }
         if (isConcurrencyConflict(error)) {
           toast.error("El proceso cambió antes de eliminarlo", {

@@ -234,7 +234,7 @@ export function UsuarioSistemaForm() {
         }))
       );
     } catch (error) {
-      console.error(error);
+
       toast.error("Error cargando el formulario");
       router.push("/");
     } finally {
@@ -329,7 +329,7 @@ export function UsuarioSistemaForm() {
       toast.success("Usuario creado correctamente");
       reset();
     } catch (error) {
-      console.error(error);
+
       toast.error(error.message || "Error al crear usuario");
     } finally {
       setGuardando(false);

@@ -129,7 +129,7 @@ export function CatalogCrudForm({ config }) {
           }
         }
       } catch (error) {
-        console.error(`Error cargando ${config.id}:`, error);
+
         toast.error("Error de conexión al cargar el catálogo");
       } finally {
         if (mounted) setLoading(false);
@@ -148,8 +148,8 @@ export function CatalogCrudForm({ config }) {
       if (response.ok) {
         setRecords(sortByIdAsc(asArray(data)));
       }
-    } catch (error) {
-      console.error(`Error recargando ${config.id}:`, error);
+    } catch {
+      // Keep the current catalog state when a background refresh fails.
     }
   }
 
@@ -282,7 +282,7 @@ export function CatalogCrudForm({ config }) {
       reset(defaultValues);
       await reload();
     } catch (error) {
-      console.error(`Error guardando ${config.id}:`, error);
+
       toast.error("Error de conexión al guardar");
     } finally {
       setSaving(false);
@@ -325,7 +325,7 @@ export function CatalogCrudForm({ config }) {
       setStateDialog(null);
       await reload();
     } catch (error) {
-      console.error(`Error cambiando estado de ${config.id}:`, error);
+
       toast.error("Error de conexión");
     } finally {
       setStateLoading(false);

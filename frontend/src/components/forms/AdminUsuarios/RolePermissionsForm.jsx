@@ -132,7 +132,7 @@ export function RolePermissionsForm() {
       setRoles(rolesData);
       setPermisos(permisosData);
     } catch (err) {
-      console.error(err);
+
       setError(err.message || "Error cargando datos");
     } finally {
       setLoading(false);
@@ -314,7 +314,7 @@ export function RolePermissionsForm() {
       setPermisosActualesRol(permisosRol);
       setPaginasSeleccionadas(paginas);
     } catch (err) {
-      console.error(err);
+
       setPermisosActualesRol([]);
       setPaginasSeleccionadas([]);
       setError(err.message || "Error cargando rol");
@@ -479,7 +479,7 @@ export function RolePermissionsForm() {
     setMensaje("Permisos actualizados correctamente");
     await cargarRol(rolId);
   } catch (err) {
-    console.error(err);
+
     setError(err.message || "Error guardando permisos");
   } finally {
     setSaving(false);

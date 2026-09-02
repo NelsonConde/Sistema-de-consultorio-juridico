@@ -236,7 +236,7 @@ export function CambiarRolUsuarioForm() {
         }))
       );
     } catch (error) {
-      console.error(error);
+
       toast.error("Error cargando datos");
     } finally {
       setLoading(false);
@@ -264,8 +264,8 @@ export function CambiarRolUsuarioForm() {
 
       const datos = await res.json();
       precargarDatosPerfil(datos);
-    } catch (error) {
-      console.error("Error cargando datos actuales:", error);
+    } catch {
+
       setValue("usuario", usuario.username || "");
     }
   }
@@ -434,7 +434,7 @@ export function CambiarRolUsuarioForm() {
 
       setAvisoPerfil(null);
     } catch (error) {
-      console.error(error);
+
       toast.error(error.message || "Error cambiando perfil");
     } finally {
       setGuardando(false);

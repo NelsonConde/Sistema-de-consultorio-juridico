@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { RefreshCw, LayoutDashboard, FileText, ClipboardList, MessageSquare, ChevronRight, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { API_URL_BASE } from "@/lib/config"
-import { apiResponse } from "@/lib/api"
+import { apiResponse, withErrorReference } from "@/lib/api"
 import { PERMISOS } from "@/lib/permission"
 import {
   tienePermiso, esAdministrativo, esAsesor, esMonitor, esEstudiante,
@@ -15,7 +15,7 @@ import {
 /**
  * Date handling.
  * Semestre 1: enero-mayo (meses 0-5), Semestre 2: junio-diciembre (meses 6-11)
- * 
+ *
  * @returns {Object} Result value.
  */
 function calcularSemestreActual() {
@@ -25,7 +25,7 @@ function calcularSemestreActual() {
 
 /**
  * State handling.
- * 
+ *
  * @param {string} nombre - Parameter description.
  * @returns {string} Result value.
  */
@@ -39,7 +39,7 @@ function etiquetaEstado(nombre) {
 
 /**
  * Date handling.
- * 
+ *
  * @param {string|Date} str - Value to format.
  * @returns {string} Result value.
  */
@@ -53,7 +53,7 @@ function formatFecha(str) {
 /**
  * Implementation detail.
  * Implementation detail.
- * 
+ *
  * @param {*} payload - Parameter description.
  * @returns {Array} Result value.
  */
@@ -81,7 +81,7 @@ const METRIC_CARDS = [
 /**
  * Implementation detail.
  * Implementation detail.
- * 
+ *
  * @component
  * @param {Object} props - Component properties.
  * @param {string} props.label - Descriptive label.
@@ -101,7 +101,7 @@ function MetricCard({ label, value, cls }) {
 /**
  * Consultation flow detail.
  * Implementation detail.
- * 
+ *
  * @component
  * @param {Object} props - Component properties.
  * @param {number} props.finalizadas - Number of completed consultations.
@@ -156,7 +156,7 @@ function DonutChart({ finalizadas, pendientes }) {
 /**
  * Consultation flow detail.
  * Implementation detail.
- * 
+ *
  * @component
  * @param {Object} props - Component properties.
  * @param {Array<{nombre: string, cantidad: number}>} props.areas - Parameter description.
@@ -217,7 +217,7 @@ function BarChartAreas({ areas }) {
 /**
  * Implementation detail.
  * Implementation detail.
- * 
+ *
  * @component
  * @param {Object} props - Component properties.
  * @param {string} props.title - Panel title.
@@ -249,7 +249,7 @@ function Panel({ title, icon: Icon, count, children, className = "" }) {
 /**
  * Data loading behavior.
  * User flow detail.
- * 
+ *
  * @component
  * @param {Object} props - Component properties.
  * @param {string} [props.className] - Additional CSS classes.
@@ -263,7 +263,7 @@ function Skeleton({ className = "h-20" }) {
 /**
  * List and table handling.
  * State handling.
- * 
+ *
  * @component
  * @param {Object} props - Component properties.
  * @param {Array<Object>} props.items - Item to process.
@@ -313,7 +313,7 @@ function ConsultasPendientesLista({ items, cargando }) {
 /**
  * List and table handling.
  * State handling.
- * 
+ *
  * @component
  * @param {Object} props - Component properties.
  * @param {Array<Object>} props.items - Item to process.
@@ -364,7 +364,7 @@ function TareasPendientesLista({ items, cargando }) {
 /**
  * List and table handling.
  * Implementation detail.
- * 
+ *
  * @component
  * @param {Object} props - Component properties.
  * @param {Array<Object>} props.items - Item to process.
@@ -416,10 +416,10 @@ function RespuestasPendientesLista({ items, cargando }) {
  * Implementation detail.
  * Consultation flow detail.
  * Role handling.
- * 
+ *
  * @component
  * @returns {JSX.Element} Result value.
- * 
+ *
  * @description
  * Role handling.
  * Consultation flow detail.
@@ -459,17 +459,26 @@ export function InicioForm() {
         else if (esEstudiante(u)) url = `${API_URL_BASE}/estadisticas/${año}/semestre/${semestre}/estudiante/${pid}`
       }
       if (!url) { setStats(null); return }
-      const { response: res, data } = await apiResponse(url, { method: "GET" })
-      if (!res.ok) { setStats(null); return }
+      const { response: res, data, correlationId } = await apiResponse(url, { method: "GET" })
+      if (!res.ok) {
+        setStats(null)
+        setError(
+          withErrorReference(
+            "No se pudieron cargar las estadísticas.",
+            correlationId
+          )
+        )
+        return
+      }
       setStats(data)
-    } catch (err) {
-      console.error(err); setError("No se pudieron cargar las estadísticas.")
+    } catch {
+      setError("No se pudieron cargar las estadísticas.")
     } finally {
       setCargandoStats(false)
     }
   }, [año, semestre])
 
-  
+
   const cargarConsultasPendientes = React.useCallback(async () => {
     setCargandoConsultas(true)
     try {
@@ -483,14 +492,14 @@ export function InicioForm() {
         })
         .slice(0, 10)
       setConsultasPendientes(pendientes)
-    } catch (err) {
-      console.error("consultas pendientes:", err)
+    } catch {
+      setConsultasPendientes([])
     } finally {
       setCargandoConsultas(false)
     }
   }, [])
 
-  
+
   const cargarTareasPendientes = React.useCallback(async () => {
     setCargandoTareas(true)
     try {
@@ -518,15 +527,14 @@ export function InicioForm() {
         .slice(0, 10)
 
       setTareasPendientes(pendientes)
-    } catch (err) {
-      console.error("tareas pendientes:", err)
+    } catch {
       setTareasPendientes([])
     } finally {
       setCargandoTareas(false)
     }
   }, [])
 
-  
+
   const cargarRespuestasPendientes = React.useCallback(async () => {
     setCargandoRespuestas(true)
     try {
@@ -534,14 +542,14 @@ export function InicioForm() {
       if (!res.ok) return
       const lista = obtenerArrayDesdeRespuesta(payload)
       setRespuestasPendientes(lista.slice(0, 10))
-    } catch (err) {
-      console.error("respuestas pendientes:", err)
+    } catch {
+      setRespuestasPendientes([])
     } finally {
       setCargandoRespuestas(false)
     }
   }, [])
 
-  
+
   React.useEffect(() => {
     async function init() {
       try {
@@ -560,8 +568,9 @@ export function InicioForm() {
             ? cargarRespuestasPendientes()
             : Promise.resolve(),
         ])
-      } catch (err) {
-        console.error(err); setCargandoStats(false)
+      } catch {
+        setCargandoStats(false)
+        setError("No se pudo cargar la información de inicio.")
       }
     }
     init()
@@ -576,7 +585,7 @@ export function InicioForm() {
       cargarRespuestasPendientes()
   }, [user, cargarStats, cargarConsultasPendientes, cargarTareasPendientes, cargarRespuestasPendientes])
 
-  
+
   const nombreRol = user?.tipoPerfil
     ? user.tipoPerfil.charAt(0) + user.tipoPerfil.slice(1).toLowerCase()
     : null

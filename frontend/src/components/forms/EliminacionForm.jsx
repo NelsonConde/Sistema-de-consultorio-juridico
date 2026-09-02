@@ -276,8 +276,8 @@ export function EliminacionForm() {
       }
 
       await cargarTodo();
-    } catch (error) {
-      console.error("Error verificando permisos de eliminación", error);
+    } catch {
+
       router.replace("/");
     } finally {
       setLoading(false);
@@ -319,16 +319,14 @@ export function EliminacionForm() {
               // Pagination handling.
               // Pagination handling.
               // List and table handling.
-              console.warn(
-                "SEC-07: reactivación de Personas pendiente de endpoint backend para inactivas"
-              );
+
               resultados[item.id] = [];
               return;
             }
 
             resultados[item.id] = Array.isArray(json) ? json : [];
-          } catch (error) {
-            console.error(`Error cargando ${item.titulo}`, error);
+          } catch {
+
             resultados[item.id] = [];
           }
         })
@@ -369,7 +367,7 @@ export function EliminacionForm() {
       );
       await cargarTodo();
     } catch (error) {
-      console.error(error);
+
       if (isConcurrencyConflict(error)) {
         toast.error("El registro cambió antes de reactivarlo", {
           description: "La lista se actualizará. Confirma nuevamente la acción sobre la versión actual.",

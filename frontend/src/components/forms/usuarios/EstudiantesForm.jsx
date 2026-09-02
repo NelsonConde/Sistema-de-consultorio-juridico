@@ -114,8 +114,8 @@ export function EstudiantesForm() {
           setEstudiantes([]);
           toast.error("La API no devolvió una lista");
         }
-      } catch (e) {
-        console.error(e);
+      } catch {
+
         toast.error("Error cargando estudiantes");
       } finally {
         setCargando(false);
@@ -188,7 +188,7 @@ export function EstudiantesForm() {
         toast.error("Error al desactivar");
       }
     } catch (error) {
-      console.error(error);
+
       toast.error("Error de conexión");
     } finally {
       setConfirmLoading(false);
