@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
@@ -22,18 +22,19 @@ import { apiClient } from '@/lib/apiClient'
  */
 export default function Calendar({ onEventClick }) {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
 
-  const fetchEvents = async (fetchInfo, successCallback, failureCallback) => {
+  const fetchEvents = useCallback(async (fetchInfo, successCallback, failureCallback) => {
     try {
-      setLoading(true)
       const params = new URLSearchParams({
         from: fetchInfo.startStr.slice(0, 10),
         to: fetchInfo.endStr.slice(0, 10),
       })
       const response = await apiClient.get(`/agenda?${params.toString()}`)
 
-      if (!response.ok) throw new Error(`No se pudo obtener la agenda (${response.status})`)
+      if (!response.ok) {
+        throw new Error(`No se pudo obtener la agenda (${response.status})`)
+      }
 
       const agenda = await response.json()
       successCallback(agenda.map(event => ({
@@ -51,10 +52,8 @@ export default function Calendar({ onEventClick }) {
         description: "No se pudo obtener la agenda para el rango seleccionado."
       })
       failureCallback(error)
-    } finally {
-      setLoading(false)
     }
-  }
+  }, [])
 
   return (
     <Card className="w-full border-border bg-card shadow-sm">
@@ -69,7 +68,7 @@ export default function Calendar({ onEventClick }) {
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-[1px]">
               <div className="flex flex-col items-center gap-2">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                <p className="text-sm font-medium text-muted-foreground">Cargando seguimientos...</p>
+                <p className="text-sm font-medium text-muted-foreground">Cargando agenda...</p>
               </div>
             </div>
           )}
@@ -77,6 +76,7 @@ export default function Calendar({ onEventClick }) {
             plugins={[dayGridPlugin, listPlugin]}
             initialView="dayGridMonth"
             events={fetchEvents}
+            loading={setLoading}
             timeZone="America/Bogota"
             locale="es"
             headerToolbar={{
