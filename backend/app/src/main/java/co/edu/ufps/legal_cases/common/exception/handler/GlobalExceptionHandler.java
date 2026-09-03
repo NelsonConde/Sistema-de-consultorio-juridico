@@ -23,6 +23,7 @@ import co.edu.ufps.legal_cases.audit.service.log.AuditSecurityService;
 import co.edu.ufps.legal_cases.common.exception.AdministracionInvariantException;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.common.exception.ConcurrenciaOptimistaException;
+import co.edu.ufps.legal_cases.common.exception.ResourceNotFoundException;
 import co.edu.ufps.legal_cases.common.exception.dto.ErrorResponseDTO;
 import co.edu.ufps.legal_cases.common.observability.CorrelationIdContext;
 import co.edu.ufps.legal_cases.file_storage.exception.FileStorageException;
@@ -103,6 +104,20 @@ public class GlobalExceptionHandler {
                 request);
 
         return construirRespuesta(HttpStatus.BAD_REQUEST, error);
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponseDTO> manejarResourceNotFoundException(
+            ResourceNotFoundException ex,
+            HttpServletRequest request) {
+
+        ErrorResponseDTO error = construirError(
+                HttpStatus.NOT_FOUND,
+                "Recurso no encontrado",
+                mensajeSeguro(ex.getMessage(), "El recurso solicitado no fue encontrado"),
+                request);
+
+        return construirRespuesta(HttpStatus.NOT_FOUND, error);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
