@@ -7,6 +7,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -17,35 +18,38 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.dao.OptimisticLockingFailureException;
 
-import co.edu.ufps.legal_cases.common.exception.ConcurrenciaOptimistaException;
-import jakarta.persistence.OptimisticLockException;
-import co.edu.ufps.legal_cases.common.exception.AdministracionInvariantException;
 import co.edu.ufps.legal_cases.audit.service.log.AuditSecurityService;
+import co.edu.ufps.legal_cases.common.exception.AdministracionInvariantException;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import co.edu.ufps.legal_cases.common.exception.ConcurrenciaOptimistaException;
 import co.edu.ufps.legal_cases.common.exception.dto.ErrorResponseDTO;
+import co.edu.ufps.legal_cases.common.observability.CorrelationIdContext;
 import co.edu.ufps.legal_cases.file_storage.exception.FileStorageException;
+import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
-import java.util.UUID;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final Logger log =
+            LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     private AuditSecurityService auditSecurityService;
 
     @Autowired(required = false)
-    void setAuditSecurityService(AuditSecurityService auditSecurityService) {
+    void setAuditSecurityService(
+            AuditSecurityService auditSecurityService) {
+
         this.auditSecurityService = auditSecurityService;
     }
 
     @ExceptionHandler(AdministracionInvariantException.class)
     public ResponseEntity<ErrorResponseDTO>
-            manejarAdministracionInvariantException(
-                    AdministracionInvariantException ex,
-                    HttpServletRequest request) {
+    manejarAdministracionInvariantException(
+            AdministracionInvariantException ex,
+            HttpServletRequest request) {
 
         ErrorResponseDTO error = construirError(
                 HttpStatus.CONFLICT,
@@ -55,10 +59,10 @@ public class GlobalExceptionHandler {
                         "La operación compromete la continuidad administrativa"),
                 request);
 
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+        return construirRespuesta(HttpStatus.CONFLICT, error);
     }
 
-        @ExceptionHandler({
+    @ExceptionHandler({
             ConcurrenciaOptimistaException.class,
             OptimisticLockingFailureException.class,
             OptimisticLockException.class
@@ -82,12 +86,9 @@ public class GlobalExceptionHandler {
                         + "Recargue la información y revise sus cambios.",
                 request);
 
-        return ResponseEntity
-                .status(HttpStatus.CONFLICT)
-                .body(error);
+        return construirRespuesta(HttpStatus.CONFLICT, error);
     }
 
-    // Maneja reglas de negocio controladas por los services.
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponseDTO> manejarBusinessException(
             BusinessException ex,
@@ -96,14 +97,14 @@ public class GlobalExceptionHandler {
         ErrorResponseDTO error = construirError(
                 HttpStatus.BAD_REQUEST,
                 "Error de negocio",
-                mensajeSeguro(ex.getMessage(), "La solicitud no cumple una regla de negocio"),
+                mensajeSeguro(
+                        ex.getMessage(),
+                        "La solicitud no cumple una regla de negocio"),
                 request);
 
-        return ResponseEntity.badRequest().body(error);
+        return construirRespuesta(HttpStatus.BAD_REQUEST, error);
     }
 
-    // Maneja errores de validación en DTOs con @Valid:
-    // @NotNull, @NotBlank, @Email, @Size, etc.
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponseDTO> manejarErroresValidacion(
             MethodArgumentNotValidException ex,
@@ -111,8 +112,11 @@ public class GlobalExceptionHandler {
 
         Map<String, String> detalles = new LinkedHashMap<>();
 
-        ex.getBindingResult().getFieldErrors()
-                .forEach(error -> detalles.put(error.getField(), error.getDefaultMessage()));
+        ex.getBindingResult()
+                .getFieldErrors()
+                .forEach(error -> detalles.put(
+                        error.getField(),
+                        error.getDefaultMessage()));
 
         ErrorResponseDTO respuesta = construirErrorConDetalles(
                 HttpStatus.BAD_REQUEST,
@@ -121,21 +125,23 @@ public class GlobalExceptionHandler {
                 request,
                 detalles);
 
-        return ResponseEntity.badRequest().body(respuesta);
+        return construirRespuesta(
+                HttpStatus.BAD_REQUEST,
+                respuesta);
     }
 
-    // Maneja validaciones aplicadas sobre parámetros o path variables,
-    // cuando se usa validación directa fuera de un DTO.
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ErrorResponseDTO> manejarViolacionesDeRestriccion(
+    public ResponseEntity<ErrorResponseDTO>
+    manejarViolacionesDeRestriccion(
             ConstraintViolationException ex,
             HttpServletRequest request) {
 
         Map<String, String> detalles = new LinkedHashMap<>();
 
-        ex.getConstraintViolations().forEach(violation -> detalles.put(
-                violation.getPropertyPath().toString(),
-                violation.getMessage()));
+        ex.getConstraintViolations()
+                .forEach(violation -> detalles.put(
+                        violation.getPropertyPath().toString(),
+                        violation.getMessage()));
 
         ErrorResponseDTO respuesta = construirErrorConDetalles(
                 HttpStatus.BAD_REQUEST,
@@ -144,11 +150,11 @@ public class GlobalExceptionHandler {
                 request,
                 detalles);
 
-        return ResponseEntity.badRequest().body(respuesta);
+        return construirRespuesta(
+                HttpStatus.BAD_REQUEST,
+                respuesta);
     }
 
-    // Maneja parámetros con tipo inválido, por ejemplo:
-    // ?id=abc, ?activo=texto, ?estado=valor_no_valido
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponseDTO> manejarParametroInvalido(
             MethodArgumentTypeMismatchException ex,
@@ -160,26 +166,26 @@ public class GlobalExceptionHandler {
                 construirMensajeParametroInvalido(ex),
                 request);
 
-        return ResponseEntity.badRequest().body(error);
+        return construirRespuesta(HttpStatus.BAD_REQUEST, error);
     }
 
-    // Maneja parámetros obligatorios que no fueron enviados.
     @ExceptionHandler(MissingServletRequestParameterException.class)
-    public ResponseEntity<ErrorResponseDTO> manejarParametroObligatorioFaltante(
+    public ResponseEntity<ErrorResponseDTO>
+    manejarParametroObligatorioFaltante(
             MissingServletRequestParameterException ex,
             HttpServletRequest request) {
 
         ErrorResponseDTO error = construirError(
                 HttpStatus.BAD_REQUEST,
                 "Solicitud inválida",
-                "El parámetro obligatorio '" + ex.getParameterName() + "' no fue enviado",
+                "El parámetro obligatorio '"
+                        + ex.getParameterName()
+                        + "' no fue enviado",
                 request);
 
-        return ResponseEntity.badRequest().body(error);
+        return construirRespuesta(HttpStatus.BAD_REQUEST, error);
     }
 
-    // Maneja errores en el cuerpo JSON:
-    // JSON mal formado, enum inválido en body o estructura incompatible.
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponseDTO> manejarCuerpoNoValido(
             HttpMessageNotReadableException ex,
@@ -191,10 +197,9 @@ public class GlobalExceptionHandler {
                 "El cuerpo de la solicitud no es válido",
                 request);
 
-        return ResponseEntity.badRequest().body(error);
+        return construirRespuesta(HttpStatus.BAD_REQUEST, error);
     }
 
-    // Maneja métodos HTTP no soportados para un endpoint.
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponseDTO> manejarMetodoNoSoportado(
             HttpRequestMethodNotSupportedException ex,
@@ -206,17 +211,21 @@ public class GlobalExceptionHandler {
                 "El método HTTP usado no está permitido para este recurso",
                 request);
 
-        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(error);
+        return construirRespuesta(
+                HttpStatus.METHOD_NOT_ALLOWED,
+                error);
     }
 
-    // Maneja usuarios autenticados que no tienen permisos suficientes.
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponseDTO> manejarAccessDeniedException(
             AccessDeniedException ex,
             HttpServletRequest request) {
 
         if (auditSecurityService != null) {
-            auditSecurityService.recordDenied(request, "ACCESS_DENIED", "INSUFFICIENT_AUTHORITY");
+            auditSecurityService.recordDenied(
+                    request,
+                    "ACCESS_DENIED",
+                    "INSUFFICIENT_AUTHORITY");
         }
 
         ErrorResponseDTO error = construirError(
@@ -225,7 +234,7 @@ public class GlobalExceptionHandler {
                 "No tiene permisos para acceder a este recurso",
                 request);
 
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+        return construirRespuesta(HttpStatus.FORBIDDEN, error);
     }
 
     @ExceptionHandler(FileStorageException.class)
@@ -234,7 +243,12 @@ public class GlobalExceptionHandler {
             HttpServletRequest request) {
 
         String correlationId = obtenerCorrelationId(request);
-        log.error("Error de almacenamiento [{}] en {}", correlationId, request.getRequestURI(), ex);
+
+        log.error(
+                "Error de almacenamiento [{}] en {}",
+                correlationId,
+                request.getRequestURI(),
+                ex);
 
         ErrorResponseDTO error = construirError(
                 HttpStatus.SERVICE_UNAVAILABLE,
@@ -242,17 +256,23 @@ public class GlobalExceptionHandler {
                 "No se pudo completar la operación de archivos",
                 request);
 
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
+        return construirRespuesta(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                error);
     }
 
-    // Maneja cualquier excepción no controlada.
-    // El detalle técnico queda en logs, pero no se expone al cliente.
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponseDTO> manejarExceptionGeneral(
             Exception ex,
             HttpServletRequest request) {
 
-        log.error("Error no controlado en la ruta {}", request.getRequestURI(), ex);
+        String correlationId = obtenerCorrelationId(request);
+
+        log.error(
+                "Error no controlado [{}] en la ruta {}",
+                correlationId,
+                request.getRequestURI(),
+                ex);
 
         ErrorResponseDTO error = construirError(
                 HttpStatus.INTERNAL_SERVER_ERROR,
@@ -260,7 +280,9 @@ public class GlobalExceptionHandler {
                 "Ocurrió un error inesperado",
                 request);
 
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        return construirRespuesta(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                error);
     }
 
     private ErrorResponseDTO construirError(
@@ -297,31 +319,41 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    private String obtenerCorrelationId(HttpServletRequest request) {
-        String header = request.getHeader("X-Request-ID");
-        if (header != null && !header.isBlank()) {
-            return header;
-        }
-        Object current = request.getAttribute("correlacionId");
-        if (current != null) {
-            return current.toString();
-        }
-        String generated = UUID.randomUUID().toString();
-        request.setAttribute("correlacionId", generated);
-        return generated;
+    private ResponseEntity<ErrorResponseDTO> construirRespuesta(
+            HttpStatus status,
+            ErrorResponseDTO error) {
+
+        return ResponseEntity.status(status)
+                .header(
+                        CorrelationIdContext.HEADER_NAME,
+                        error.getCorrelacionId())
+                .body(error);
     }
 
-    private String construirMensajeParametroInvalido(MethodArgumentTypeMismatchException ex) {
+    private String obtenerCorrelationId(
+            HttpServletRequest request) {
+
+        return CorrelationIdContext.getOrCreate(request);
+    }
+
+    private String construirMensajeParametroInvalido(
+            MethodArgumentTypeMismatchException ex) {
+
         String nombreParametro = ex.getName();
 
         if (nombreParametro == null || nombreParametro.isBlank()) {
             return "Uno de los parámetros enviados no es válido";
         }
 
-        return "El valor enviado para el parámetro '" + nombreParametro + "' no es válido";
+        return "El valor enviado para el parámetro '"
+                + nombreParametro
+                + "' no es válido";
     }
 
-    private String mensajeSeguro(String mensaje, String mensajePorDefecto) {
+    private String mensajeSeguro(
+            String mensaje,
+            String mensajePorDefecto) {
+
         if (mensaje == null || mensaje.isBlank()) {
             return mensajePorDefecto;
         }
