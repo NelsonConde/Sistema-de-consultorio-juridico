@@ -45,10 +45,10 @@ class PersonaServiceCommandRegressionTest {
 
     @Test
     void desactivarYReactivarDebenConservarDelegacionAlCommandService() {
-        personaService.desactivar(3L);
-        personaService.reactivar(3L);
+        personaService.desactivar(3L, 11L);
+        personaService.reactivar(3L, 12L);
 
-        verify(personaCommandService).desactivar(3L);
-        verify(personaCommandService).reactivar(3L);
+        verify(personaCommandService).desactivar(3L, 11L);
+        verify(personaCommandService).reactivar(3L, 12L);
     }
 }
