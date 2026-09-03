@@ -3,6 +3,7 @@ package co.edu.ufps.legal_cases.business.repository.conciliacion;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDate;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -46,33 +47,32 @@ public interface ConciliacionRepository extends JpaRepository<Conciliacion, Long
                         Long conciliadorId,
                         Collection<String> codigosEstado);
 
-        // Total de conciliaciones en el semestre.
+        // Total de conciliaciones dentro del periodo estadístico configurado.
         @Query(value = """
-                        SELECT COUNT(c.id) AS total
-                        FROM "DB_consultorioJuridico".conciliacion c
-                        WHERE c.fecha_creacion >=
-                            CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                        AND c.fecha_creacion <
-                            CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
-                        AND c.activo = true
-                        """, nativeQuery = true)
-        List<Object[]> contarConciliacionesPorSemestre(
-                        @Param("year") int year, @Param("semester") int semester);
+        SELECT COUNT(c.id) AS total
+        FROM "DB_consultorioJuridico".conciliacion c
+        WHERE c.fecha_creacion >= :fechaInicio
+        AND c.fecha_creacion < (:fechaFin + INTERVAL '1 day')
+        AND c.activo = true
+        """, nativeQuery = true)
+        List<Object[]> contarConciliacionesPorPeriodo(
+                @Param("fechaInicio") LocalDate fechaInicio,
+                @Param("fechaFin") LocalDate fechaFin);
 
-        // Conciliaciones agrupadas por estado en el semestre.
+        // Conciliaciones agrupadas por estado dentro del periodo estadístico configurado.
         @Query(value = """
-                        SELECT ec.nombre, COUNT(c.id) AS total
-                        FROM "DB_consultorioJuridico".conciliacion c
-                        JOIN "DB_consultorioJuridico".estado_conciliacion ec ON ec.id = c.estado_id
-                        WHERE c.fecha_creacion >=
-                            CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                        AND c.fecha_creacion <
-                            CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
-                        AND c.activo = true
-                        GROUP BY ec.nombre, ec.orden ORDER BY ec.orden
-                        """, nativeQuery = true)
-        List<Object[]> contarConciliacionesPorEstadoPorSemestre(
-                        @Param("year") int year, @Param("semester") int semester);
+        SELECT ec.nombre, COUNT(c.id) AS total
+        FROM "DB_consultorioJuridico".conciliacion c
+        JOIN "DB_consultorioJuridico".estado_conciliacion ec ON ec.id = c.estado_id
+        WHERE c.fecha_creacion >= :fechaInicio
+        AND c.fecha_creacion < (:fechaFin + INTERVAL '1 day')
+        AND c.activo = true
+        GROUP BY ec.nombre, ec.orden
+        ORDER BY ec.orden
+        """, nativeQuery = true)
+        List<Object[]> contarConciliacionesPorEstadoPorPeriodo(
+                @Param("fechaInicio") LocalDate fechaInicio,
+                @Param("fechaFin") LocalDate fechaFin);
 
         @Query(value = """
                         SELECT COUNT(c.id) AS total

@@ -28,6 +28,7 @@ public class EstadisticasPerfilQueryService {
             ConsultaRepository consultaRepository,
             ProcesoRepository procesoRepository,
             PeriodoEstadisticoService periodoEstadisticoService) {
+
         this.consultaRepository = consultaRepository;
         this.procesoRepository = procesoRepository;
         this.periodoEstadisticoService = periodoEstadisticoService;
@@ -44,25 +45,25 @@ public class EstadisticasPerfilQueryService {
 
         List<Object[]> consultas =
                 consultaRepository
-                        .contarFinalizadasYPendientesPorSemestreYEstudiante(
-                                año,
-                                semestre,
+                        .contarFinalizadasYPendientesPorPeriodoYEstudiante(
+                                periodo.inicio(),
+                                periodo.fin(),
                                 estudianteId);
 
         long[] conteos = extraerConteos(consultas);
 
         List<Object[]> personas =
                 consultaRepository
-                        .contarPersonasAtendidasPorSemestreYEstudiante(
-                                año,
-                                semestre,
+                        .contarPersonasAtendidasPorPeriodoYEstudiante(
+                                periodo.inicio(),
+                                periodo.fin(),
                                 estudianteId);
 
         List<Object[]> procesos =
                 procesoRepository
-                        .contarProcesosPorEstadoPorSemestreYEstudiante(
-                                año,
-                                semestre,
+                        .contarProcesosPorEstadoPorPeriodoYEstudiante(
+                                periodo.inicio(),
+                                periodo.fin(),
                                 estudianteId);
 
         return construir(
@@ -83,25 +84,25 @@ public class EstadisticasPerfilQueryService {
 
         List<Object[]> consultas =
                 consultaRepository
-                        .contarFinalizadasYPendientesPorSemestreYAsesor(
-                                año,
-                                semestre,
+                        .contarFinalizadasYPendientesPorPeriodoYAsesor(
+                                periodo.inicio(),
+                                periodo.fin(),
                                 asesorId);
 
         long[] conteos = extraerConteos(consultas);
 
         List<Object[]> personas =
                 consultaRepository
-                        .contarPersonasAtendidasPorSemestreYAsesor(
-                                año,
-                                semestre,
+                        .contarPersonasAtendidasPorPeriodoYAsesor(
+                                periodo.inicio(),
+                                periodo.fin(),
                                 asesorId);
 
         List<Object[]> procesos =
                 procesoRepository
-                        .contarProcesosPorEstadoPorSemestreYAsesor(
-                                año,
-                                semestre,
+                        .contarProcesosPorEstadoPorPeriodoYAsesor(
+                                periodo.inicio(),
+                                periodo.fin(),
                                 asesorId);
 
         return construir(
@@ -122,25 +123,25 @@ public class EstadisticasPerfilQueryService {
 
         List<Object[]> consultas =
                 consultaRepository
-                        .contarFinalizadasYPendientesPorSemestreYMonitor(
-                                año,
-                                semestre,
+                        .contarFinalizadasYPendientesPorPeriodoYMonitor(
+                                periodo.inicio(),
+                                periodo.fin(),
                                 monitorId);
 
         long[] conteos = extraerConteos(consultas);
 
         List<Object[]> personas =
                 consultaRepository
-                        .contarPersonasAtendidasPorSemestreYMonitor(
-                                año,
-                                semestre,
+                        .contarPersonasAtendidasPorPeriodoYMonitor(
+                                periodo.inicio(),
+                                periodo.fin(),
                                 monitorId);
 
         List<Object[]> procesos =
                 procesoRepository
-                        .contarProcesosPorEstadoPorSemestreYMonitor(
-                                año,
-                                semestre,
+                        .contarProcesosPorEstadoPorPeriodoYMonitor(
+                                periodo.inicio(),
+                                periodo.fin(),
                                 monitorId);
 
         return construir(
@@ -163,8 +164,7 @@ public class EstadisticasPerfilQueryService {
                 personasResult != null
                         && !personasResult.isEmpty()
                         && personasResult.getFirst()[0] != null
-                        ? ((Number) personasResult.getFirst()[0])
-                        .longValue()
+                        ? ((Number) personasResult.getFirst()[0]).longValue()
                         : 0L;
 
         List<ConteoDTO> procesosPorEstado =
@@ -185,6 +185,7 @@ public class EstadisticasPerfilQueryService {
     }
 
     private long[] extraerConteos(List<Object[]> resultado) {
+
         Object[] fila =
                 resultado != null && !resultado.isEmpty()
                         ? resultado.getFirst()
@@ -200,36 +201,48 @@ public class EstadisticasPerfilQueryService {
                         ? ((Number) fila[1]).longValue()
                         : 0L;
 
-        return new long[] { finalizadas, pendientes };
+        return new long[] {
+                finalizadas,
+                pendientes
+        };
     }
 
     private List<ConteoDTO> mapearConteo(List<Object[]> filas) {
-        List<ConteoDTO> resultado = new ArrayList<>();
+
+        List<ConteoDTO> resultado =
+                new ArrayList<>();
 
         if (filas == null) {
             return resultado;
         }
 
         for (Object[] fila : filas) {
-            boolean tresColumnas = fila.length >= 3;
 
-            String nombre = tresColumnas
-                    ? fila[1] != null
-                    ? fila[1].toString()
-                    : "Sin nombre"
-                    : fila[0] != null
-                    ? fila[0].toString()
-                    : "Sin nombre";
+            boolean tresColumnas =
+                    fila.length >= 3;
 
-            long cantidad = tresColumnas
-                    ? fila[2] != null
-                    ? ((Number) fila[2]).longValue()
-                    : 0L
-                    : fila[1] != null
-                    ? ((Number) fila[1]).longValue()
-                    : 0L;
+            String nombre =
+                    tresColumnas
+                            ? fila[1] != null
+                            ? fila[1].toString()
+                            : "Sin nombre"
+                            : fila[0] != null
+                            ? fila[0].toString()
+                            : "Sin nombre";
 
-            resultado.add(new ConteoDTO(nombre, cantidad));
+            long cantidad =
+                    tresColumnas
+                            ? fila[2] != null
+                            ? ((Number) fila[2]).longValue()
+                            : 0L
+                            : fila[1] != null
+                            ? ((Number) fila[1]).longValue()
+                            : 0L;
+
+            resultado.add(
+                    new ConteoDTO(
+                            nombre,
+                            cantidad));
         }
 
         return resultado;
@@ -246,6 +259,7 @@ public class EstadisticasPerfilQueryService {
                     "El id de " + tipo + " es obligatorio");
         }
 
-        return periodoEstadisticoService.obtener(año, semestre);
+        return periodoEstadisticoService
+                .obtener(año, semestre);
     }
 }
