@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
@@ -36,19 +37,18 @@ import co.edu.ufps.legal_cases.business.model.persona.TipoPersona;
 import co.edu.ufps.legal_cases.business.repository.persona.PersonaConsultaScopeRepository;
 import co.edu.ufps.legal_cases.business.repository.persona.PersonaRepository;
 import co.edu.ufps.legal_cases.business.repository.persona.PersonaResumenProjection;
+import co.edu.ufps.legal_cases.support.PostgreSqlIntegrationTest;
 import jakarta.persistence.EntityManager;
 
 @DataJpaTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:sec07;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.datasource.username=sa",
-        "spring.datasource.password=",
-        "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
         "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.jpa.properties.hibernate.default_schema=PUBLIC",
+        "spring.jpa.properties.hibernate.default_schema=\"DB_consultorioJuridico\"",
+        "spring.jpa.properties.hibernate.hbm2ddl.create_namespaces=true",
         "spring.jpa.show-sql=false"
 })
-class PersonaRepositoryJpaTest {
+@AutoConfigureTestDatabase(
+        replace = AutoConfigureTestDatabase.Replace.NONE)
+class PersonaRepositoryJpaTest extends PostgreSqlIntegrationTest {
 
     @Autowired
     private PersonaRepository personaRepository;
