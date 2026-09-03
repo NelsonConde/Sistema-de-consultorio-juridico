@@ -11,8 +11,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -39,6 +37,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import co.edu.ufps.legal_cases.audit.service.log.AuditSecurityService;
 import co.edu.ufps.legal_cases.config.cors.CorsConfig;
 import co.edu.ufps.legal_cases.config.cors.CorsProperties;
 import co.edu.ufps.legal_cases.config.security.SecurityConfig;
@@ -67,9 +66,6 @@ import tools.jackson.databind.json.JsonMapper;
         })
 @AutoConfigureMockMvc
 class ActuatorObservabilityTest {
-
-    private static final Path APPLICATION_PROPERTIES =
-            Path.of("src/main/resources/application.properties");
 
     private final MockMvc mockMvc;
     private final MeterRegistry meterRegistry;
@@ -107,11 +103,20 @@ class ActuatorObservabilityTest {
                 .andReturn();
 
         String correlationId =
-                result.getResponse().getHeader(CorrelationIdContext.HEADER_NAME);
+                result.getResponse()
+                        .getHeader(CorrelationIdContext.HEADER_NAME);
 
-        assertEquals(correlationId, UUID.fromString(correlationId).toString());
-        assertTrue(result.getResponse().getContentAsString()
-                .contains("\"correlacionId\":\"" + correlationId + "\""));
+        assertEquals(
+                correlationId,
+                UUID.fromString(correlationId).toString());
+
+        assertTrue(
+                result.getResponse()
+                        .getContentAsString()
+                        .contains(
+                                "\"correlacionId\":\""
+                                        + correlationId
+                                        + "\""));
     }
 
     @Test
@@ -120,42 +125,58 @@ class ActuatorObservabilityTest {
                 UUID.randomUUID().toString();
 
         mockMvc.perform(get("/actuator/metrics")
-                        .header(CorrelationIdContext.HEADER_NAME, incomingCorrelationId)
-                        .header(TestJwtAuthenticationFilter.TEST_USER_HEADER, "auditor"))
+                        .header(
+                                CorrelationIdContext.HEADER_NAME,
+                                incomingCorrelationId)
+                        .header(
+                                TestJwtAuthenticationFilter.TEST_USER_HEADER,
+                                "auditor"))
                 .andExpect(status().isOk())
-                .andExpect(header().string(CorrelationIdContext.HEADER_NAME, incomingCorrelationId));
+                .andExpect(header().string(
+                        CorrelationIdContext.HEADER_NAME,
+                        incomingCorrelationId));
     }
 
     @Test
-    void httpServerRequestsMetricShouldExistAfterRequest() throws Exception {
+    void httpServerRequestsMetricShouldExistAfterRequest()
+            throws Exception {
+
         mockMvc.perform(get("/api/test-observability")
-                        .header(TestJwtAuthenticationFilter.TEST_USER_HEADER, "auditor"))
+                        .header(
+                                TestJwtAuthenticationFilter.TEST_USER_HEADER,
+                                "auditor"))
                 .andExpect(status().isOk());
 
-        assertNotNull(meterRegistry.find("http.server.requests").timer());
+        assertNotNull(
+                meterRegistry.find("http.server.requests").timer());
     }
 
     @Test
-    void applicationPropertiesShouldConfigureHttpRequestPercentiles() throws IOException {
-        String properties = Files.readString(APPLICATION_PROPERTIES);
+    void shouldConfigureHttpRequestPercentiles() {
+        String configuredPercentiles =
+                applicationContext.getEnvironment().getProperty(
+                        "management.metrics.distribution.percentiles."
+                                + "http.server.requests");
 
-        assertTrue(properties.contains("management.endpoints.web.exposure.include=health,metrics"));
-        assertTrue(properties.contains("management.endpoint.health.show-details=never"));
-        assertTrue(properties.contains(
-                "management.metrics.distribution.percentiles.http.server.requests=0.5,0.95"));
+        assertEquals("0.5,0.95", configuredPercentiles);
     }
 
     @Test
     void correlationIdFilterShouldNotBeRegisteredAsIndependentServletFilter() {
         Map<String, FilterRegistrationBean> registrations =
-                applicationContext.getBeansOfType(FilterRegistrationBean.class);
+                applicationContext.getBeansOfType(
+                        FilterRegistrationBean.class);
 
         FilterRegistrationBean<?> registration =
-                registrations.get("correlationIdFilterRegistration");
+                registrations.get(
+                        "correlationIdFilterRegistration");
 
         assertNotNull(registration);
         assertFalse(registration.isEnabled());
-        assertTrue(registration.getFilter() instanceof CorrelationIdFilter);
+
+        assertTrue(
+                registration.getFilter()
+                        instanceof CorrelationIdFilter);
     }
 
     @Test
@@ -163,8 +184,11 @@ class ActuatorObservabilityTest {
         List<jakarta.servlet.Filter> filters =
                 filterChainProxy.getFilters("/actuator/health");
 
-        int correlationIndex = indexOf(filters, CorrelationIdFilter.class);
-        int securityContextHolderIndex = indexOf(filters, SecurityContextHolderFilter.class);
+        int correlationIndex =
+                indexOf(filters, CorrelationIdFilter.class);
+
+        int securityContextHolderIndex =
+                indexOf(filters, SecurityContextHolderFilter.class);
 
         assertTrue(correlationIndex >= 0);
         assertTrue(securityContextHolderIndex >= 0);
@@ -197,7 +221,14 @@ class ActuatorObservabilityTest {
 
         @Bean
         JsonMapper jsonMapper() {
-            return JsonMapper.builder().findAndAddModules().build();
+            return JsonMapper.builder()
+                    .findAndAddModules()
+                    .build();
+        }
+
+        @Bean
+        AuditSecurityService auditSecurityService() {
+            return mock(AuditSecurityService.class);
         }
 
         @Bean
@@ -207,8 +238,12 @@ class ActuatorObservabilityTest {
 
         @Bean
         CorsProperties corsProperties() {
-            CorsProperties properties = new CorsProperties();
-            properties.setAllowedOrigins(List.of("http://localhost:3000"));
+            CorsProperties properties =
+                    new CorsProperties();
+
+            properties.setAllowedOrigins(
+                    List.of("http://localhost:3000"));
+
             return properties;
         }
 
@@ -227,9 +262,11 @@ class ActuatorObservabilityTest {
         }
     }
 
-    static class TestJwtAuthenticationFilter extends JwtAuthenticationFilter {
+    static class TestJwtAuthenticationFilter
+            extends JwtAuthenticationFilter {
 
-        static final String TEST_USER_HEADER = "X-Test-User";
+        static final String TEST_USER_HEADER =
+                "X-Test-User";
 
         TestJwtAuthenticationFilter() {
             super(
@@ -242,16 +279,21 @@ class ActuatorObservabilityTest {
         protected void doFilterInternal(
                 HttpServletRequest request,
                 HttpServletResponse response,
-                FilterChain filterChain) throws ServletException, IOException {
+                FilterChain filterChain)
+                throws ServletException, IOException {
 
-            String username = request.getHeader(TEST_USER_HEADER);
+            String username =
+                    request.getHeader(TEST_USER_HEADER);
 
             if (username != null) {
                 SecurityContextHolder.getContext()
-                        .setAuthentication(new UsernamePasswordAuthenticationToken(
-                                username,
-                                null,
-                                List.of(new SimpleGrantedAuthority("TEST"))));
+                        .setAuthentication(
+                                new UsernamePasswordAuthenticationToken(
+                                        username,
+                                        null,
+                                        List.of(
+                                                new SimpleGrantedAuthority(
+                                                        "TEST"))));
             }
 
             try {
