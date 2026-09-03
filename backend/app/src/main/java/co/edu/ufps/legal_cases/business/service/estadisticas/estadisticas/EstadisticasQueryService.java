@@ -142,7 +142,10 @@ public class EstadisticasQueryService {
                                         año,
                                         semestre)))
                 .procesosPorEstado(mapper.mapear2(
-                        procesoRepository.contarProcesosPorEstado()))
+                        procesoRepository
+                                .contarProcesosPorEstadoPorSemestre(
+                                        año,
+                                        semestre)))
                 .totalConciliaciones(totalConciliaciones)
                 .conciliacionesPorEstado(mapper.mapear2(
                         conciliacionRepository

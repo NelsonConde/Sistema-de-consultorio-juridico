@@ -60,7 +60,10 @@ public class EstadisticasPerfilQueryService {
 
         List<Object[]> procesos =
                 procesoRepository
-                        .contarProcesosPorEstadoYEstudiante(estudianteId);
+                        .contarProcesosPorEstadoPorSemestreYEstudiante(
+                                año,
+                                semestre,
+                                estudianteId);
 
         return construir(
                 periodo,
@@ -96,7 +99,10 @@ public class EstadisticasPerfilQueryService {
 
         List<Object[]> procesos =
                 procesoRepository
-                        .contarProcesosPorEstadoYAsesor(asesorId);
+                        .contarProcesosPorEstadoPorSemestreYAsesor(
+                                año,
+                                semestre,
+                                asesorId);
 
         return construir(
                 periodo,
@@ -132,7 +138,10 @@ public class EstadisticasPerfilQueryService {
 
         List<Object[]> procesos =
                 procesoRepository
-                        .contarProcesosPorEstadoYMonitor(monitorId);
+                        .contarProcesosPorEstadoPorSemestreYMonitor(
+                                año,
+                                semestre,
+                                monitorId);
 
         return construir(
                 periodo,
