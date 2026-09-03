@@ -23,12 +23,22 @@ public class PersonaService {
 
     // Fachada del módulo: el controller sigue entrando por aquí,
     // pero la lectura y escritura quedan separadas por responsabilidad.
-    public PageResponseDTO<PersonaResumenDTO> listar(String search, int page, int size) {
-        return personaQueryService.listar(search, page, size);
+    public PageResponseDTO<PersonaResumenDTO> listar(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction) {
+        return personaQueryService.listar(search, page, size, sortBy, direction);
     }
 
-    public PageResponseDTO<PersonaResumenDTO> listarActivos(String search, int page, int size) {
-        return personaQueryService.listarActivos(search, page, size);
+    public PageResponseDTO<PersonaResumenDTO> listarActivos(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction) {
+        return personaQueryService.listarActivos(search, page, size, sortBy, direction);
     }
 
     public PersonaDTO obtenerPorId(Long id) {

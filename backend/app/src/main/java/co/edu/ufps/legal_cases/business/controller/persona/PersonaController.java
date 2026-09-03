@@ -31,8 +31,10 @@ public class PersonaController {
     public PageResponseDTO<PersonaResumenDTO> listar(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return personaService.listar(search, page, size);
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "nombres") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction) {
+        return personaService.listar(search, page, size, sortBy, direction);
     }
 
     @GetMapping("/{id}")
@@ -61,8 +63,10 @@ public class PersonaController {
     public PageResponseDTO<PersonaResumenDTO> listarActivos(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return personaService.listarActivos(search, page, size);
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "nombres") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction) {
+        return personaService.listarActivos(search, page, size, sortBy, direction);
     }
 
     @PatchMapping("/{id}/desactivar")

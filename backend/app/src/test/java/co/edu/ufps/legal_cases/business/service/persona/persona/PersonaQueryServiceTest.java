@@ -1,8 +1,11 @@
 package co.edu.ufps.legal_cases.business.service.persona.persona;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -20,15 +23,16 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 
 import co.edu.ufps.legal_cases.business.dto.persona.PersonaDTO;
-import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import co.edu.ufps.legal_cases.business.dto.persona.PersonaResumenDTO;
 import co.edu.ufps.legal_cases.business.model.persona.Persona;
 import co.edu.ufps.legal_cases.business.repository.persona.PersonaRepository;
 import co.edu.ufps.legal_cases.business.repository.persona.PersonaResumenProjection;
 import co.edu.ufps.legal_cases.business.service.acceso.persona.PersonaAccessService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.common.exception.ResourceNotFoundException;
 
@@ -64,13 +68,16 @@ class PersonaQueryServiceTest {
                 "******3456",
                 "Solicitante",
                 true);
-        PageRequest interno = PageRequest.of(1, 10);
+        Sort sortEsperado = Sort.by(
+                Sort.Order.asc("nombres").ignoreCase(),
+                Sort.Order.asc("id"));
+        PageRequest interno = PageRequest.of(1, 10, sortEsperado);
 
         when(personaRepository.buscarResumen("Ana Perez", null, interno))
                 .thenReturn(new PageImpl<>(List.of(projection), interno, 21));
         when(personaResumenMapper.convertirAResumen(projection)).thenReturn(resumen);
 
-        PageResponseDTO<PersonaResumenDTO> resultado = personaQueryService.listar("  Ana   Perez ", 2, 10);
+        PageResponseDTO<PersonaResumenDTO> resultado = personaQueryService.listar("  Ana   Perez ", 2, 10, "nombres", "asc");
 
         assertEquals(List.of(resumen), resultado.content());
         assertEquals(2, resultado.page());
@@ -83,22 +90,28 @@ class PersonaQueryServiceTest {
 
     @Test
     void debeTratarBusquedaVaciaComoAusenciaDeFiltro() {
-        PageRequest interno = PageRequest.of(0, 10);
+        Sort sortEsperado = Sort.by(
+                Sort.Order.asc("nombres").ignoreCase(),
+                Sort.Order.asc("id"));
+        PageRequest interno = PageRequest.of(0, 10, sortEsperado);
         when(personaRepository.buscarResumen(isNull(), isNull(), any(PageRequest.class)))
                 .thenReturn(new PageImpl<>(List.of(), interno, 0));
 
-        personaQueryService.listar("   ", 1, 10);
+        personaQueryService.listar("   ", 1, 10, "nombres", "asc");
 
         verify(personaRepository).buscarResumen(null, null, interno);
     }
 
     @Test
     void debeAplicarFiltroActivoEnEndpointDeActivos() {
-        PageRequest interno = PageRequest.of(0, 50);
+        Sort sortEsperado = Sort.by(
+                Sort.Order.asc("nombres").ignoreCase(),
+                Sort.Order.asc("id"));
+        PageRequest interno = PageRequest.of(0, 50, sortEsperado);
         when(personaRepository.buscarResumen(null, true, interno))
                 .thenReturn(new PageImpl<>(List.of(), interno, 0));
 
-        personaQueryService.listarActivos(null, 1, 50);
+        personaQueryService.listarActivos(null, 1, 50, "nombres", "asc");
 
         verify(personaRepository).buscarResumen(null, true, interno);
     }
@@ -107,7 +120,7 @@ class PersonaQueryServiceTest {
     void debeRechazarPaginaMenorAUno() {
         BusinessException error = assertThrows(
                 BusinessException.class,
-                () -> personaQueryService.listar(null, 0, 10));
+                () -> personaQueryService.listar(null, 0, 10, "nombres", "asc"));
 
         assertEquals("La página debe ser mayor o igual a 1", error.getMessage());
         verify(personaRepository, never()).buscarResumen(any(), any(), any());
@@ -115,8 +128,8 @@ class PersonaQueryServiceTest {
 
     @Test
     void debeRechazarTamanoFueraDelLimite() {
-        assertThrows(BusinessException.class, () -> personaQueryService.listar(null, 1, 0));
-        assertThrows(BusinessException.class, () -> personaQueryService.listar(null, 1, 51));
+        assertThrows(BusinessException.class, () -> personaQueryService.listar(null, 1, 0, "nombres", "asc"));
+        assertThrows(BusinessException.class, () -> personaQueryService.listar(null, 1, 51, "nombres", "asc"));
 
         verify(personaRepository, never()).buscarResumen(any(), any(), any());
     }
@@ -125,9 +138,133 @@ class PersonaQueryServiceTest {
     void debeRechazarBusquedaExcesivamenteLarga() {
         assertThrows(
                 BusinessException.class,
-                () -> personaQueryService.listar("x".repeat(101), 1, 10));
+                () -> personaQueryService.listar("x".repeat(101), 1, 10, "nombres", "asc"));
 
         verify(personaRepository, never()).buscarResumen(any(), any(), any());
+    }
+
+    @Test
+    void debeConstruirSortConNombresAscYDesempateIdAsc() {
+        when(personaRepository.buscarResumen(isNull(), isNull(), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+
+        personaQueryService.listar(null, 1, 10, "nombres", "asc");
+
+        ArgumentCaptor<PageRequest> captor = ArgumentCaptor.forClass(PageRequest.class);
+        verify(personaRepository).buscarResumen(isNull(), isNull(), captor.capture());
+        Sort sort = captor.getValue().getSort();
+        List<Sort.Order> ordenes = sort.stream().toList();
+        assertEquals(2, ordenes.size());
+        assertEquals("nombres", ordenes.get(0).getProperty());
+        assertEquals(Sort.Direction.ASC, ordenes.get(0).getDirection());
+        assertTrue(ordenes.get(0).isIgnoreCase());
+        assertEquals("id", ordenes.get(1).getProperty());
+        assertEquals(Sort.Direction.ASC, ordenes.get(1).getDirection());
+    }
+
+    @Test
+    void debeConstruirSortDescendenteConDesempateIdAsc() {
+        when(personaRepository.buscarResumen(isNull(), isNull(), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+
+        personaQueryService.listar(null, 1, 10, "apellidos", "desc");
+
+        ArgumentCaptor<PageRequest> captor = ArgumentCaptor.forClass(PageRequest.class);
+        verify(personaRepository).buscarResumen(isNull(), isNull(), captor.capture());
+        Sort sort = captor.getValue().getSort();
+        List<Sort.Order> ordenes = sort.stream().toList();
+        assertEquals(2, ordenes.size());
+        assertEquals("apellidos", ordenes.get(0).getProperty());
+        assertEquals(Sort.Direction.DESC, ordenes.get(0).getDirection());
+        assertTrue(ordenes.get(0).isIgnoreCase());
+        assertEquals("id", ordenes.get(1).getProperty());
+        assertEquals(Sort.Direction.ASC, ordenes.get(1).getDirection());
+    }
+
+    @Test
+    void debePermitirOtrosCamposValidosDeLaWhitelistComoTipoPersonaYActivo() {
+        when(personaRepository.buscarResumen(isNull(), isNull(), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+
+        personaQueryService.listar(null, 1, 10, "tipoPersona", "asc");
+
+        ArgumentCaptor<PageRequest> captor = ArgumentCaptor.forClass(PageRequest.class);
+        verify(personaRepository).buscarResumen(isNull(), isNull(), captor.capture());
+        Sort.Order ordenTipoPersona = captor.getValue().getSort().getOrderFor("tipoPersona.nombre");
+        assertNotNull(ordenTipoPersona);
+        assertEquals(Sort.Direction.ASC, ordenTipoPersona.getDirection());
+
+        personaQueryService.listar(null, 1, 10, "activo", "desc");
+        verify(personaRepository, org.mockito.Mockito.atLeastOnce()).buscarResumen(isNull(), isNull(), captor.capture());
+        Sort.Order ordenActivo = captor.getValue().getSort().getOrderFor("activo");
+        assertNotNull(ordenActivo);
+        assertEquals(Sort.Direction.DESC, ordenActivo.getDirection());
+        assertFalse(ordenActivo.isIgnoreCase());
+    }
+
+    @Test
+    void debeRechazarSortByInvalidoOIdDirecto() {
+        BusinessException errorInvalido = assertThrows(
+                BusinessException.class,
+                () -> personaQueryService.listar(null, 1, 10, "invalido", "asc"));
+        assertEquals("El campo de ordenamiento 'invalido' no es válido", errorInvalido.getMessage());
+
+        BusinessException errorId = assertThrows(
+                BusinessException.class,
+                () -> personaQueryService.listar(null, 1, 10, "id", "asc"));
+        assertEquals("El campo de ordenamiento 'id' no es válido", errorId.getMessage());
+
+        verify(personaRepository, never()).buscarResumen(any(), any(), any());
+    }
+
+    @Test
+    void debeRechazarSortByVacioONulo() {
+        BusinessException errorVacio = assertThrows(
+                BusinessException.class,
+                () -> personaQueryService.listar(null, 1, 10, "   ", "asc"));
+        assertEquals("El campo de ordenamiento no puede estar vacío", errorVacio.getMessage());
+
+        BusinessException errorNulo = assertThrows(
+                BusinessException.class,
+                () -> personaQueryService.listar(null, 1, 10, null, "asc"));
+        assertEquals("El campo de ordenamiento no puede estar vacío", errorNulo.getMessage());
+
+        verify(personaRepository, never()).buscarResumen(any(), any(), any());
+    }
+
+    @Test
+    void debeRechazarDirectionInvalidaOVacia() {
+        BusinessException errorInvalido = assertThrows(
+                BusinessException.class,
+                () -> personaQueryService.listar(null, 1, 10, "nombres", "lateral"));
+        assertEquals("La dirección de ordenamiento debe ser 'asc' o 'desc'", errorInvalido.getMessage());
+
+        BusinessException errorVacio = assertThrows(
+                BusinessException.class,
+                () -> personaQueryService.listar(null, 1, 10, "nombres", "   "));
+        assertEquals("La dirección de ordenamiento no puede estar vacía", errorVacio.getMessage());
+
+        verify(personaRepository, never()).buscarResumen(any(), any(), any());
+    }
+
+    @Test
+    void debeNormalizarMayusculasYEspaciosEnDirectionYSortBy() {
+        when(personaRepository.buscarResumen(isNull(), isNull(), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+
+        personaQueryService.listar(null, 1, 10, "  nombres  ", "  ASC  ");
+
+        ArgumentCaptor<PageRequest> captor = ArgumentCaptor.forClass(PageRequest.class);
+        verify(personaRepository).buscarResumen(isNull(), isNull(), captor.capture());
+        Sort.Order orden = captor.getValue().getSort().getOrderFor("nombres");
+        assertNotNull(orden);
+        assertEquals(Sort.Direction.ASC, orden.getDirection());
+
+        personaQueryService.listar(null, 1, 10, "apellidos", "DeSc");
+        verify(personaRepository, org.mockito.Mockito.atLeastOnce()).buscarResumen(isNull(), isNull(), captor.capture());
+        Sort.Order ordenDesc = captor.getValue().getSort().getOrderFor("apellidos");
+        assertNotNull(ordenDesc);
+        assertEquals(Sort.Direction.DESC, ordenDesc.getDirection());
     }
 
     @Test
@@ -176,19 +313,22 @@ class PersonaQueryServiceTest {
 
         assertThrows(
                 AccessDeniedException.class,
-                () -> personaQueryService.listar("Ana", 1, 10));
+                () -> personaQueryService.listar("Ana", 1, 10, "nombres", "asc"));
 
         verify(personaRepository, never()).buscarResumen(any(), any(), any());
     }
 
     @Test
     void debePropagarPageableSinOrdenClientePorqueLaQueryDefineOrdenDeterminista() {
-        PageRequest interno = PageRequest.of(2, 25);
+        Sort sortEsperado = Sort.by(
+                Sort.Order.asc("nombres").ignoreCase(),
+                Sort.Order.asc("id"));
+        PageRequest interno = PageRequest.of(2, 25, sortEsperado);
 
         when(personaRepository.buscarResumen("1090", null, interno))
                 .thenReturn(new PageImpl<>(List.of(), interno, 60));
 
-        personaQueryService.listar("1090", 3, 25);
+        personaQueryService.listar("1090", 3, 25, "nombres", "asc");
 
         ArgumentCaptor<PageRequest> captor = ArgumentCaptor.forClass(PageRequest.class);
 
@@ -199,6 +339,6 @@ class PersonaQueryServiceTest {
 
         assertEquals(2, captor.getValue().getPageNumber());
         assertEquals(25, captor.getValue().getPageSize());
-        assertEquals(false, captor.getValue().getSort().isSorted());
+        assertEquals(sortEsperado, captor.getValue().getSort());
     }
 }

@@ -15,6 +15,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import co.edu.ufps.legal_cases.business.model.catalogo.Area;
 import co.edu.ufps.legal_cases.business.model.catalogo.Barrio;
@@ -125,17 +126,21 @@ class PersonaRepositoryJpaTest extends PostgreSqlIntegrationTest {
 
     @Test
     void debePaginarContarYOrdenarDeterministicamenteEnBaseDeDatos() {
+        Sort sort = Sort.by(
+                Sort.Order.asc("nombres").ignoreCase(),
+                Sort.Order.asc("id"));
+
         Page<PersonaResumenProjection> primeraPagina =
                 personaRepository.buscarResumen(
                         null,
                         null,
-                        PageRequest.of(0, 2));
+                        PageRequest.of(0, 2, sort));
 
         Page<PersonaResumenProjection> segundaPagina =
                 personaRepository.buscarResumen(
                         null,
                         null,
-                        PageRequest.of(1, 2));
+                        PageRequest.of(1, 2, sort));
 
         assertEquals(6, primeraPagina.getTotalElements());
         assertEquals(3, primeraPagina.getTotalPages());
@@ -147,6 +152,68 @@ class PersonaRepositoryJpaTest extends PostgreSqlIntegrationTest {
         assertEquals(
                 List.of("Carla", "Elena"),
                 nombres(segundaPagina));
+    }
+
+    @Test
+    void debeOrdenarPorCampoAscDescYDesempatarPorId() {
+        Persona zoe1 = crearPersona("Zoe", "Zapata", "1090999001", true);
+        Persona zoe2 = crearPersona("Zoe", "Alvarez", "1090999002", true);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertTrue(zoe1.getId() < zoe2.getId());
+
+        // 1. Orden ASC de un campo
+        Sort sortAsc = Sort.by(
+                Sort.Order.asc("nombres").ignoreCase(),
+                Sort.Order.asc("id"));
+        Page<PersonaResumenProjection> paginaAsc = personaRepository.buscarResumen(
+                null,
+                null,
+                PageRequest.of(0, 2, sortAsc));
+
+        assertEquals(List.of("Ana", "Bruno"), nombres(paginaAsc));
+
+        // 2. Orden DESC de un campo
+        Sort sortDesc = Sort.by(
+                Sort.Order.desc("nombres").ignoreCase(),
+                Sort.Order.asc("id"));
+        Page<PersonaResumenProjection> paginaDesc = personaRepository.buscarResumen(
+                null,
+                null,
+                PageRequest.of(0, 2, sortDesc));
+
+        assertEquals(List.of("Zoe", "Zoe"), nombres(paginaDesc));
+
+        // 3. Desempate estable por id ASC entre dos registros con el mismo valor
+        assertEquals(zoe1.getId(), paginaDesc.getContent().get(0).getId());
+        assertEquals(zoe2.getId(), paginaDesc.getContent().get(1).getId());
+    }
+
+    @Test
+    void debeOrdenarPorPropiedadRelacionadaTipoPersonaNombre() {
+        TipoPersona tipoApoderado = new TipoPersona();
+        tipoApoderado.setNombre("Apoderado");
+        entityManager.persist(tipoApoderado);
+
+        Persona apoderado = crearPersona("Zack", "Zuniga", "1090999888", true);
+        apoderado.setTipoPersona(tipoApoderado);
+        entityManager.persist(apoderado);
+        entityManager.flush();
+        entityManager.clear();
+
+        Sort sort = Sort.by(
+                Sort.Order.asc("tipoPersona.nombre"),
+                Sort.Order.asc("id"));
+
+        Page<PersonaResumenProjection> pagina = personaRepository.buscarResumen(
+                null,
+                null,
+                PageRequest.of(0, 10, sort));
+
+        assertEquals("Apoderado", pagina.getContent().getFirst().getTipoPersona());
+        assertEquals("Zack", pagina.getContent().getFirst().getNombres());
+        assertEquals("Solicitante", pagina.getContent().get(1).getTipoPersona());
     }
 
     @Test

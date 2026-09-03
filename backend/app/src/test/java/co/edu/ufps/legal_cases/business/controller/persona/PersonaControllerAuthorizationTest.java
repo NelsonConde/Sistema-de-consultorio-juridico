@@ -35,7 +35,7 @@ class PersonaControllerAuthorizationTest {
         context = new AnnotationConfigApplicationContext(TestConfiguration.class);
         personaController = context.getBean(PersonaController.class);
         personaService = context.getBean(PersonaService.class);
-        when(personaService.listar(null, 1, 10))
+        when(personaService.listar(null, 1, 10, "nombres", "asc"))
                 .thenReturn(new PageResponseDTO<>(List.of(), 1, 10, 0, 0));
     }
 
@@ -49,14 +49,14 @@ class PersonaControllerAuthorizationTest {
     void usuarioConVerPersonasPuedeBuscar() {
         autenticarCon(VER_PERSONAS);
 
-        assertDoesNotThrow(() -> personaController.listar(null, 1, 10));
+        assertDoesNotThrow(() -> personaController.listar(null, 1, 10, "nombres", "asc"));
     }
 
     @Test
     void usuarioConGestionarPersonasPuedeBuscar() {
         autenticarCon(GESTIONAR_PERSONAS);
 
-        assertDoesNotThrow(() -> personaController.listar(null, 1, 10));
+        assertDoesNotThrow(() -> personaController.listar(null, 1, 10, "nombres", "asc"));
     }
 
     @Test
@@ -65,7 +65,7 @@ class PersonaControllerAuthorizationTest {
 
         assertThrows(
                 AccessDeniedException.class,
-                () -> personaController.listar(null, 1, 10));
+                () -> personaController.listar(null, 1, 10, "nombres", "asc"));
     }
 
     private void autenticarCon(String authority) {

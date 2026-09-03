@@ -52,7 +52,7 @@ class PersonaControllerTest {
                 10,
                 21,
                 3);
-        when(personaService.listar("Ana", 2, 10)).thenReturn(respuesta);
+        when(personaService.listar("Ana", 2, 10, "nombres", "asc")).thenReturn(respuesta);
 
         mockMvc.perform(get("/api/personas")
                         .param("search", "Ana")
@@ -77,7 +77,21 @@ class PersonaControllerTest {
                 .andExpect(jsonPath("$.totalElements").value(21))
                 .andExpect(jsonPath("$.totalPages").value(3));
 
-        verify(personaService).listar("Ana", 2, 10);
+        verify(personaService).listar("Ana", 2, 10, "nombres", "asc");
+    }
+
+    @Test
+    void listadoDebePropagarSortByYDirectionCuandoSonSuministrados() throws Exception {
+        when(personaService.listar("Ana", 1, 10, "apellidos", "desc"))
+                .thenReturn(new PageResponseDTO<>(List.of(), 1, 10, 0, 0));
+
+        mockMvc.perform(get("/api/personas")
+                        .param("search", "Ana")
+                        .param("sortBy", "apellidos")
+                        .param("direction", "desc"))
+                .andExpect(status().isOk());
+
+        verify(personaService).listar("Ana", 1, 10, "apellidos", "desc");
     }
 
     @Test
@@ -90,18 +104,20 @@ class PersonaControllerTest {
                 "******3456",
                 "Solicitante",
                 true);
-        when(personaService.listar(null, 1, 10))
+        when(personaService.listar(null, 1, 10, "nombres", "asc"))
                 .thenReturn(new PageResponseDTO<>(List.of(persona), 1, 10, 1, 1));
 
         mockMvc.perform(get("/api/personas"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("1090123456"))));
+
+        verify(personaService).listar(null, 1, 10, "nombres", "asc");
     }
 
     @Test
     void activosDebeDelegarBusquedaYPaginacionConElMismoContrato() throws Exception {
-        when(personaService.listarActivos("Perez", 1, 50))
+        when(personaService.listarActivos("Perez", 1, 50, "nombres", "asc"))
                 .thenReturn(new PageResponseDTO<>(List.of(), 1, 50, 0, 0));
 
         mockMvc.perform(get("/api/personas/activos")
@@ -112,7 +128,7 @@ class PersonaControllerTest {
                 .andExpect(jsonPath("$.content").isArray())
                 .andExpect(jsonPath("$.size").value(50));
 
-        verify(personaService).listarActivos("Perez", 1, 50);
+        verify(personaService).listarActivos("Perez", 1, 50, "nombres", "asc");
     }
 
     @Test

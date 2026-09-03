@@ -43,7 +43,6 @@ public interface PersonaRepository extends JpaRepository<Persona, Long> {
                         LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
                     OR LOWER(p.numeroDocumento) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
               )
-            ORDER BY LOWER(p.nombres), LOWER(p.apellidos), p.id
             """, countQuery = """
             SELECT COUNT(p.id)
             FROM Persona p
