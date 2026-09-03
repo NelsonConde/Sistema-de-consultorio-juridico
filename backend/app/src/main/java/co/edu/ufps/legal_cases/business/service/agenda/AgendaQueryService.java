@@ -92,6 +92,10 @@ public class AgendaQueryService {
                 .filter(reunion -> reunion.getConciliacion() != null)
                 .filter(reunion -> reunion.getConciliacion().getConsulta() != null)
                 .filter(reunion -> reunion.getConciliacion().getConsulta().getEstado() != EstadoConsulta.ARCHIVADO)
+                .filter(reunion -> {
+                    LocalDate fecha = reunion.getFechaReunion().toLocalDate();
+                    return !fecha.isBefore(from) && fecha.isBefore(to);
+                })
                 .filter(reunion -> conciliacionAlcanceService.puedeVerConciliacion(reunion.getConciliacion()))
                 .map(reunion -> {
                     Conciliacion conciliacion = reunion.getConciliacion();
@@ -108,8 +112,6 @@ public class AgendaQueryService {
                             conciliacion.getEstado() != null ? conciliacion.getEstado().getCodigo() : null,
                             start.isBefore(OffsetDateTime.now(institutionalTimeZone)));
                 })
-                .filter(event -> !event.start().toLocalDate().isBefore(from)
-                        && event.start().toLocalDate().isBefore(to))
                 .toList();
     }
 
