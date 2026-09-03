@@ -17,6 +17,9 @@ public class SeguimientoRequestDTO {
 
     private Long id;
 
+    // Versión que tenía el seguimiento cuando el cliente lo consultó.
+    private Long version;
+
     @NotBlank(message = "La descripción del seguimiento es obligatoria")
     @Size(max = 200, message = "La descripción del seguimiento no puede superar 200 caracteres")
     private String descripcion;

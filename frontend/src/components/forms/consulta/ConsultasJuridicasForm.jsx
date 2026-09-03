@@ -1,6 +1,12 @@
 "use client"
 
 import { apiClient } from "@/lib/apiClient";
+import {
+  apiResponse,
+  getResponseCorrelationId,
+  requireResourceVersion,
+  withErrorReference,
+} from "@/lib/api";
 import { fileApi } from "@/lib/fileApi";
   /**
    * List and table handling.
@@ -95,7 +101,7 @@ export function ConsultasJuridicasForm() {
   const [modalPartesAdicionales, setModalPartesAdicionales] = useState({ abierto: false, busqueda: "" });
   const [modalContrapartes, setModalContrapartes] = useState({ abierto: false, busqueda: "" });
 
-  // Seleccionados
+  // Selected items
   const areaSeleccionadaId = useMemo(
     () => idNormalizado(form.areaId),
     [form.areaId]
@@ -469,8 +475,7 @@ export function ConsultasJuridicasForm() {
         setUser(usuarioActual);
         await cargarConsultas();
         await cargarCatalogos();
-      } catch (error) {
-        console.error("Error verificando permisos:", error);
+      } catch {
         router.replace("/");
       } finally {
         setCheckingPermisos(false);
@@ -506,17 +511,10 @@ export function ConsultasJuridicasForm() {
     const url = construirUrlConsultas(search);
 
     try {
-      console.log("[CONSULTAS] Consultando:", url);
-
-      const res = await apiClient.request(url, {
+      const { response: res, data: payload, correlationId } = await apiResponse(url, {
         method: "GET",
         credentials: "include",
       });
-
-      const payload = await leerJsonSeguro(res);
-
-      console.log("[CONSULTAS] Status:", res.status);
-      console.log("[CONSULTAS] Payload:", payload);
 
       if (res.status === 401) {
         router.replace("/");
@@ -524,7 +522,12 @@ export function ConsultasJuridicasForm() {
       }
 
       if (res.status === 403) {
-        toast.error("No tienes permisos para ver estas consultas.");
+        toast.error("No tienes permisos para ver estas consultas.", {
+          description: withErrorReference(
+            "El acceso a este listado fue denegado.",
+            correlationId
+          ),
+        });
         router.replace("/inicio");
         return;
       }
@@ -535,15 +538,8 @@ export function ConsultasJuridicasForm() {
           "Error cargando consultas"
         );
 
-        console.log("[CONSULTAS] Falló backend:", {
-          url,
-          status: res.status,
-          statusText: res.statusText,
-          payload,
-        });
-
         toast.error(`Error ${res.status} cargando consultas`, {
-          description: mensaje,
+          description: withErrorReference(mensaje, correlationId),
         });
 
         setRows([]);
@@ -560,11 +556,9 @@ export function ConsultasJuridicasForm() {
         );
 
       setRows(ordenarConsultasPorIdAscendente(consultas));
-    } catch (error) {
-      console.log("[CONSULTAS] Error de conexión o parsing:", error);
-
+    } catch {
       toast.error("Error de conexión cargando consultas", {
-        description: error?.message || "No se pudo conectar con el servidor",
+        description: "No se pudo conectar con el servidor.",
       });
 
       setRows([]);
@@ -588,12 +582,10 @@ export function ConsultasJuridicasForm() {
         }
 
         if (res.status === 403) {
-          console.warn("Catálogo no permitido para el usuario actual:", url);
           return [];
         }
 
         if (!res.ok) {
-          console.warn("No se pudo cargar catálogo:", url, payload);
           return [];
         }
 
@@ -613,8 +605,8 @@ export function ConsultasJuridicasForm() {
       setAsesores(asR);
       setMonitores(moR);
       setEstudiantes(esR);
-    } catch (error) {
-      console.error("Error catálogos:", error);
+    } catch {
+      // Catalog failures are already represented by empty option lists.
     }
   }
 
@@ -652,6 +644,7 @@ export function ConsultasJuridicasForm() {
     try {
       const res = await apiClient.request(`${API_URL_BASE}/consultas/${id}`, { credentials: "include" });
       const payload = await leerJsonSeguro(res);
+      const correlationId = getResponseCorrelationId(res, payload);
 
       if (res.status === 401) {
         router.push("/");
@@ -659,12 +652,22 @@ export function ConsultasJuridicasForm() {
       }
 
       if (res.status === 403) {
-        toast.error("No tienes permisos para abrir esta consulta.");
+        toast.error("No tienes permisos para abrir esta consulta.", {
+          description: withErrorReference(
+            "El acceso al detalle fue denegado.",
+            correlationId
+          ),
+        });
         return;
       }
 
       if (!res.ok) {
-        toast.error(mensajeErrorDesdeRespuesta(payload, "Error al cargar la consulta"));
+        toast.error("Error al cargar la consulta", {
+          description: withErrorReference(
+            mensajeErrorDesdeRespuesta(payload, "No se pudo cargar la consulta"),
+            correlationId
+          ),
+        });
         return;
       }
 
@@ -704,6 +707,7 @@ export function ConsultasJuridicasForm() {
         estudianteId: data.estudianteId ?? data.estudiante?.id ?? "",
         partesIds: Array.isArray(data.partesIds) ? data.partesIds.map(Number) : [],
         contrapartesIds: Array.isArray(data.contrapartesIds) ? data.contrapartesIds.map(Number) : [],
+        version: data.version ?? null,
       });
 
       setResultadoGuardado(data.resultado ?? "");
@@ -712,7 +716,7 @@ export function ConsultasJuridicasForm() {
       setMostrarFormEdicion(true);
       cargarArchivosCaso(id);
     } catch (error) {
-      console.error(error);
+
       toast.error("Error al cargar la consulta");
     }
   }
@@ -721,8 +725,8 @@ export function ConsultasJuridicasForm() {
     setCargandoArchivos(true);
     try {
       setArchivosCaso(await fileApi.list({ type: "consulta", id: consultaId }));
-    } catch (error) {
-      console.error(error);
+    } catch {
+
       setArchivosCaso([]);
     } finally {
       setCargandoArchivos(false);
@@ -733,7 +737,12 @@ export function ConsultasJuridicasForm() {
     try {
       await fileApi.download(file, { type: "consulta", id: idEditando });
     } catch (error) {
-      console.error(error);
+      toast.error("No se pudo descargar el archivo", {
+        description: withErrorReference(
+          error?.message || "Intenta nuevamente.",
+          error?.correlationId || null
+        ),
+      });
     }
   };
 
@@ -782,6 +791,7 @@ export function ConsultasJuridicasForm() {
       contrapartesIds: Array.isArray(form.contrapartesIds)
         ? form.contrapartesIds.map(Number)
         : [],
+      version: requireResourceVersion(form, "consulta"),
     };
 
 
@@ -800,6 +810,7 @@ export function ConsultasJuridicasForm() {
       });
 
       const respuesta = await leerJsonSeguro(res);
+      const correlationId = getResponseCorrelationId(res, respuesta);
 
       if (res.status === 401) {
         router.push("/");
@@ -811,6 +822,30 @@ export function ConsultasJuridicasForm() {
         return;
       }
 
+      if (res.status === 409) {
+        toast.error("Este registro cambió mientras lo estabas editando", {
+          description: withErrorReference(
+            "Tus cambios se conservaron. Se consultará la versión actual antes de un reintento manual.",
+            correlationId
+          ),
+        });
+
+        try {
+          const latestRes = await apiClient.request(`${API_URL_BASE}/consultas/${idEditando}`, {
+            method: "GET",
+            credentials: "include",
+          });
+          const latestPayload = await leerJsonSeguro(latestRes);
+          const latest = latestPayload?.data || latestPayload?.consulta || latestPayload;
+          if (latestRes.ok && latest?.version != null) {
+            setForm((prev) => ({ ...prev, version: latest.version }));
+          }
+        } catch {
+          // Keep the current draft when the fresh version cannot be loaded.
+        }
+        return;
+      }
+
       if (res.ok) {
         setResultadoGuardado(form.resultado ?? "");
         toast.success("Consulta actualizada");
@@ -818,12 +853,16 @@ export function ConsultasJuridicasForm() {
         cargarConsultas(searchText);
       } else {
         toast.error("Error al guardar", {
-          description: mensajeErrorDesdeRespuesta(respuesta, "No se pudo guardar la consulta"),
+          description: withErrorReference(
+            mensajeErrorDesdeRespuesta(respuesta, "No se pudo guardar la consulta"),
+            correlationId
+          ),
         });
       }
-    } catch (error) {
-      console.error(error);
-      toast.error("Error de conexión");
+    } catch {
+      toast.error("Error de conexión", {
+        description: "No se pudo completar la actualización de la consulta.",
+      });
     } finally {
       setGuardando(false);
     }
@@ -856,7 +895,7 @@ export function ConsultasJuridicasForm() {
 
     try {
       const res = await apiClient.request(
-        `${API_URL_BASE}/consultas/${id}/estado?estado=${encodeURIComponent(estadoNormalizado)}`,
+        `${API_URL_BASE}/consultas/${id}/estado?estado=${encodeURIComponent(estadoNormalizado)}&version=${encodeURIComponent(String(requireResourceVersion(form, "consulta")))}`,
         {
           method: "PATCH",
           credentials: "include",
@@ -864,6 +903,7 @@ export function ConsultasJuridicasForm() {
       );
 
       const payload = await leerJsonSeguro(res);
+      const correlationId = getResponseCorrelationId(res, payload);
 
       if (res.status === 401) {
         router.push("/");
@@ -875,16 +915,42 @@ export function ConsultasJuridicasForm() {
         return;
       }
 
+      if (res.status === 409) {
+        toast.error("La consulta cambió antes de actualizar su estado", {
+          description: withErrorReference(
+            "El cambio no se reintentó automáticamente y el formulario permanece abierto.",
+            correlationId
+          ),
+        });
+        try {
+          const latestRes = await apiClient.request(`${API_URL_BASE}/consultas/${id}`, { method: "GET", credentials: "include" });
+          const latestPayload = await leerJsonSeguro(latestRes);
+          const latest = latestPayload?.data || latestPayload?.consulta || latestPayload;
+          if (latestRes.ok && latest?.version != null) {
+            setForm((prev) => ({ ...prev, version: latest.version }));
+          }
+        } catch {
+          // Keep the draft unchanged if the fresh version cannot be loaded.
+        }
+        return;
+      }
+
       if (res.ok) {
         toast.success("Estado de la consulta actualizado");
         setMostrarFormEdicion(false);
         cargarConsultas(searchText);
       } else {
-        toast.error(mensajeErrorDesdeRespuesta(payload, "Error al cambiar el estado"));
+        toast.error("Error al cambiar el estado", {
+          description: withErrorReference(
+            mensajeErrorDesdeRespuesta(payload, "No se pudo cambiar el estado"),
+            correlationId
+          ),
+        });
       }
-    } catch (error) {
-      console.error(error);
-      toast.error("Error de conexión");
+    } catch {
+      toast.error("Error de conexión", {
+        description: "No se pudo cambiar el estado de la consulta.",
+      });
     }
   }
 
@@ -904,12 +970,18 @@ export function ConsultasJuridicasForm() {
     setConfirmArchivar((s) => ({ ...s, loading: true }));
 
     try {
-      const res = await apiClient.request(`${API_URL_BASE}/consultas/${id}/archivar`, {
-        method: "PATCH",
-        credentials: "include",
-      });
+      const row = rows.find((item) => String(item?.id) === String(id));
+      const version = requireResourceVersion(row, "consulta");
+      const res = await apiClient.request(
+        `${API_URL_BASE}/consultas/${id}/archivar?version=${encodeURIComponent(String(version))}`,
+        {
+          method: "PATCH",
+          credentials: "include",
+        }
+      );
 
       const payload = await leerJsonSeguro(res);
+      const correlationId = getResponseCorrelationId(res, payload);
 
       if (res.status === 401) {
         router.push("/");
@@ -921,15 +993,32 @@ export function ConsultasJuridicasForm() {
         return;
       }
 
+      if (res.status === 409) {
+        toast.error("La consulta cambió antes de archivarla", {
+          description: withErrorReference(
+            "La lista se actualizará. Confirma nuevamente la acción sobre la versión actual.",
+            correlationId
+          ),
+        });
+        await cargarConsultas(searchText);
+        return;
+      }
+
       if (res.ok) {
         toast.success("Consulta archivada");
         cargarConsultas(searchText);
       } else {
-        toast.error(mensajeErrorDesdeRespuesta(payload, "Error al archivar"));
+        toast.error("Error al archivar", {
+          description: withErrorReference(
+            mensajeErrorDesdeRespuesta(payload, "No se pudo archivar la consulta"),
+            correlationId
+          ),
+        });
       }
-    } catch (error) {
-      console.error(error);
-      toast.error("Error de conexión");
+    } catch {
+      toast.error("Error de conexión", {
+        description: "No se pudo archivar la consulta.",
+      });
     } finally {
       setConfirmArchivar({ abierto: false, id: null, loading: false });
     }

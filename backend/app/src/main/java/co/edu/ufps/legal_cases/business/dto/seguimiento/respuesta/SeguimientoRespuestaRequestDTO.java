@@ -12,6 +12,9 @@ public class SeguimientoRespuestaRequestDTO {
 
     private Long id;
 
+    // Versión que tenía la respuesta cuando el cliente la consultó.
+    private Long version;
+
     @NotBlank(message = "La respuesta del seguimiento es obligatoria")
     @Size(max = 1000, message = "La respuesta del seguimiento no puede superar 1000 caracteres")
     private String contenido;

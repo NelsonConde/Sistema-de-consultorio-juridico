@@ -12,7 +12,7 @@ public class TipoDocumentoDTO {
     private Long id;
 
     @NotBlank(message = "El nombre es obligatorio")
-    @Size(max = 100, message = "El nombre no puede superar los 100 caracteres")
+    @Size(max = 10, message = "El nombre no puede tener más de 10 caracteres")
     private String nombre;
 
     private Boolean activo;

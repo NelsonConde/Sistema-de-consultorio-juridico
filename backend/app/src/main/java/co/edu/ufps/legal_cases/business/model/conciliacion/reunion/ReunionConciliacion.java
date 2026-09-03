@@ -15,6 +15,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -27,6 +28,10 @@ public class ReunionConciliacion {
     @Id
     @Column(name = "conciliacion_id")
     private Long conciliacionId;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     // La reunión es inherente a una conciliación y usa su mismo id.
     @OneToOne(fetch = FetchType.LAZY, optional = false)

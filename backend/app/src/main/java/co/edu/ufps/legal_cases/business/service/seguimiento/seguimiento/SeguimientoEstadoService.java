@@ -11,7 +11,9 @@ import co.edu.ufps.legal_cases.business.repository.seguimiento.SeguimientoReposi
 import co.edu.ufps.legal_cases.business.repository.seguimiento.respuesta.SeguimientoRespuestaRepository;
 import co.edu.ufps.legal_cases.business.service.consulta.consulta.ConsultaEstadoService;
 import co.edu.ufps.legal_cases.business.service.seguimiento.SeguimientoNotificacionService;
+import co.edu.ufps.legal_cases.common.concurrency.ConcurrenciaOptimistaValidator;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import jakarta.persistence.EntityManager;
 import lombok.AllArgsConstructor;
 
 @Service
@@ -23,10 +25,21 @@ public class SeguimientoEstadoService {
     private final SeguimientoNotificacionService seguimientoNotificacionService;
     private final SeguimientoValidator seguimientoValidator;
     private final ConsultaEstadoService consultaEstadoService;
+    private final ConcurrenciaOptimistaValidator concurrenciaOptimistaValidator;
+    private final EntityManager entityManager;
 
     @Transactional
-    public Seguimiento cambiarEstado(Long seguimientoId, EstadoSeguimiento estado) {
+    public Seguimiento cambiarEstado(
+            Long seguimientoId,
+            EstadoSeguimiento estado,
+            Long versionEsperada) {
+
         Seguimiento seguimiento = obtenerSeguimientoActivo(seguimientoId);
+
+        concurrenciaOptimistaValidator.validarVersion(
+                versionEsperada,
+                seguimiento.getVersion(),
+                "seguimiento");
 
         consultaEstadoService.validarPermiteOperacionOperativa(seguimiento.getConsulta());
 
@@ -36,6 +49,9 @@ public class SeguimientoEstadoService {
         seguimiento.setEstado(estado);
 
         Seguimiento seguimientoGuardado = seguimientoRepository.save(seguimiento);
+
+        // Confirma el UPDATE versionado antes de ejecutar efectos derivados.
+        entityManager.flush();
 
         aplicarEfectosPorEstado(seguimientoGuardado);
 
@@ -61,6 +77,8 @@ public class SeguimientoEstadoService {
         seguimiento.setEstado(EstadoSeguimiento.COMPLETADO);
 
         Seguimiento seguimientoGuardado = seguimientoRepository.save(seguimiento);
+
+        entityManager.flush();
 
         aplicarEfectosPorEstado(seguimientoGuardado);
 

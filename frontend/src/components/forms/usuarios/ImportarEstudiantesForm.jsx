@@ -119,8 +119,8 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
 
       // File handling.
       setArchivoSeleccionado(null);
-    } catch (err) {
-      console.error(err);
+    } catch {
+
       toast.error("Error de conexión al importar.");
     } finally {
       setImportando(false);

@@ -1,7 +1,7 @@
 "use client"
 
 import { apiClient } from "@/lib/apiClient";
-import { readResponseBody } from "@/lib/api";
+import { ApiError, isConcurrencyConflict, readResponseBody, requireResourceVersion } from "@/lib/api";
 /**
  * Form handling.
  *
@@ -276,8 +276,8 @@ export function EliminacionForm() {
       }
 
       await cargarTodo();
-    } catch (error) {
-      console.error("Error verificando permisos de eliminación", error);
+    } catch {
+
       router.replace("/");
     } finally {
       setLoading(false);
@@ -319,16 +319,14 @@ export function EliminacionForm() {
               // Pagination handling.
               // Pagination handling.
               // List and table handling.
-              console.warn(
-                "SEC-07: reactivación de Personas pendiente de endpoint backend para inactivas"
-              );
+
               resultados[item.id] = [];
               return;
             }
 
             resultados[item.id] = Array.isArray(json) ? json : [];
-          } catch (error) {
-            console.error(`Error cargando ${item.titulo}`, error);
+          } catch {
+
             resultados[item.id] = [];
           }
         })
@@ -359,7 +357,7 @@ export function EliminacionForm() {
       if (seccion.reactivar === "consulta") {
         await reactivarConsulta(itemAReactivar);
       } else {
-        await reactivarActivo(seccion.endpoint, itemAReactivar.id);
+        await reactivarActivo(seccion.endpoint, itemAReactivar);
       }
 
       toast.success(
@@ -369,7 +367,14 @@ export function EliminacionForm() {
       );
       await cargarTodo();
     } catch (error) {
-      console.error(error);
+
+      if (isConcurrencyConflict(error)) {
+        toast.error("El registro cambió antes de reactivarlo", {
+          description: "La lista se actualizará. Confirma nuevamente la acción sobre la versión actual.",
+        });
+        await cargarTodo();
+        return;
+      }
       toast.error(error.message || "No se pudo reactivar el registro");
     } finally {
       setReactivando("");
@@ -377,9 +382,10 @@ export function EliminacionForm() {
     }
   }
 
-  async function reactivarActivo(endpoint, id) {
+  async function reactivarActivo(endpoint, item) {
+    const id = item?.id;
     const url = endpoint === "/personas"
-      ? `${API_URL_BASE}${endpoint}/${id}/reactivar`
+      ? `${API_URL_BASE}${endpoint}/${id}/reactivar?version=${encodeURIComponent(String(requireResourceVersion(item, "registro de persona")))}`
       : `${API_URL_BASE}${endpoint}/${id}/activo?activo=true`;
 
     const res = await apiClient.request(url, {
@@ -390,14 +396,16 @@ export function EliminacionForm() {
     const data = await leerRespuesta(res);
 
     if (!res.ok) {
-      throw new Error(
-        data?.mensaje || data?.message || "No se pudo cambiar el estado"
+      throw new ApiError(
+        data?.mensaje || data?.message || "No se pudo cambiar el estado",
+        { status: res.status, payload: data, response: res }
       );
     }
   }
 
   async function reactivarConsulta(item) {
-    const res = await apiClient.request(`${API_URL_BASE}/consultas/${item.id}/desarchivar`, {
+    const version = requireResourceVersion(item, "consulta");
+    const res = await apiClient.request(`${API_URL_BASE}/consultas/${item.id}/desarchivar?version=${encodeURIComponent(String(version))}`, {
       method: "PATCH",
       credentials: "include",
     });
@@ -405,8 +413,9 @@ export function EliminacionForm() {
     const data = await leerRespuesta(res);
 
     if (!res.ok) {
-      throw new Error(
-        data?.mensaje || data?.message || "No se pudo desarchivar la consulta"
+      throw new ApiError(
+        data?.mensaje || data?.message || "No se pudo desarchivar la consulta",
+        { status: res.status, payload: data, response: res }
       );
     }
   }

@@ -15,6 +15,7 @@ import {
   apiResponse,
   getApiErrorDescription,
   getApiErrorTitle,
+  withErrorReference,
 } from "@/lib/api";
 
 /**
@@ -66,7 +67,7 @@ export function useApiForm({ endpoint, method = "POST", successMessage = "Regist
     setIsSubmitting(true);
 
     try {
-      const { response, data: payload } = await apiResponse(endpoint, {
+      const { response, data: payload, correlationId } = await apiResponse(endpoint, {
         method,
         headers: {
           "Content-Type": "application/json",
@@ -80,7 +81,7 @@ export function useApiForm({ endpoint, method = "POST", successMessage = "Regist
         });
 
         router.replace("/");
-        return { success: false, error: payload };
+        return { success: false, error: payload, correlationId };
       }
 
       if (response.status === 403) {
@@ -88,27 +89,28 @@ export function useApiForm({ endpoint, method = "POST", successMessage = "Regist
           description: "No tiene permisos para esta acción",
         });
 
-        return { success: false, error: payload };
+        return { success: false, error: payload, correlationId };
       }
 
       if (response.ok) {
         toast.success(successMessage);
-        return { success: true, data: payload };
+        return { success: true, data: payload, correlationId };
       }
 
       toast.error(getApiErrorTitle(payload, "Error en la operación"), {
-        description: getApiErrorDescription(payload),
+        description: withErrorReference(
+          getApiErrorDescription(payload),
+          correlationId
+        ),
       });
 
-      return { success: false, error: payload };
-    } catch (error) {
-      console.error("Error de red:", error);
-
+      return { success: false, error: payload, correlationId };
+    } catch {
       toast.error("Error de conexión", {
         description: "Verifique que el backend esté disponible",
       });
 
-      return { success: false, error };
+      return { success: false, error: null, correlationId: null };
     } finally {
       setIsSubmitting(false);
     }

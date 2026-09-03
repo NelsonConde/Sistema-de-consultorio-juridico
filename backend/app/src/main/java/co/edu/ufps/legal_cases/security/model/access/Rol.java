@@ -48,4 +48,8 @@ public class Rol {
     @Enumerated(EnumType.STRING)
     @Column(name = "tipo_perfil", length = 30, nullable = false)
     private TipoPerfilUsuario tipoPerfil;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "codigo_base", length = 30, unique = true)
+    private CodigoRolBase codigoBase;
 }

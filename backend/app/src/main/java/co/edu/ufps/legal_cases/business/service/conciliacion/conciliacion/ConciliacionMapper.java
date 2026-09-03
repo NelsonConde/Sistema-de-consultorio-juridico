@@ -23,6 +23,7 @@ public class ConciliacionMapper {
         ConciliacionResponseDTO dto = new ConciliacionResponseDTO();
 
         dto.setId(conciliacion.getId());
+        dto.setVersion(conciliacion.getVersion());
         dto.setConsultaId(obtenerConsultaId(conciliacion));
 
         dto.setEstudianteId(conciliacion.getEstudiante() != null
@@ -66,6 +67,7 @@ public class ConciliacionMapper {
         ConciliacionDetalleResponseDTO dto = new ConciliacionDetalleResponseDTO();
 
         dto.setId(conciliacion.getId());
+        dto.setVersion(conciliacion.getVersion());
         dto.setConsultaId(obtenerConsultaId(conciliacion));
 
         dto.setEstudianteId(conciliacion.getEstudiante() != null

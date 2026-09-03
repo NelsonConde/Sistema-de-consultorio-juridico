@@ -3,6 +3,7 @@ package co.edu.ufps.legal_cases.config.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -10,10 +11,12 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
+import co.edu.ufps.legal_cases.common.observability.CorrelationIdFilter;
 import co.edu.ufps.legal_cases.security.filter.jwt.JwtAuthenticationFilter;
 
 @Configuration
@@ -38,8 +41,21 @@ public class SecurityConfig {
 };
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final CorrelationIdFilter correlationIdFilter;
     private final SecurityExceptionHandler securityExceptionHandler;
     private final CsrfTokenRepository csrfTokenRepository;      // Interfaz para almacenar y recuperar tokens CSRF de la cookie.
+
+    @Bean
+    public FilterRegistrationBean<CorrelationIdFilter> correlationIdFilterRegistration(
+            CorrelationIdFilter correlationIdFilter) {
+
+        FilterRegistrationBean<CorrelationIdFilter> registration =
+                new FilterRegistrationBean<>(correlationIdFilter);
+
+        registration.setEnabled(false);
+
+        return registration;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -72,6 +88,12 @@ public class SecurityConfig {
                         // Permite preflight de CORS.
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
+                        // Health publico para verificaciones de infraestructura.
+                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+
+                        // Metricas operativas protegidas por autenticacion.
+                        .requestMatchers(HttpMethod.GET, "/actuator/metrics", "/actuator/metrics/**").authenticated()
+
                         // Endpoints públicos de autenticación.
                         .requestMatchers(HttpMethod.POST, PUBLIC_POST_ENDPOINTS).permitAll()
 
@@ -84,6 +106,11 @@ public class SecurityConfig {
 
                         // Todo lo demás requiere autenticación.
                         .anyRequest().authenticated())
+
+                // La correlacion debe existir antes de autenticacion/autorizacion.
+                .addFilterBefore(
+                        correlationIdFilter,
+                        SecurityContextHolderFilter.class)
 
                 // El filtro JWT valida el token antes del filtro estándar de usuario/password.
                 .addFilterBefore(

@@ -13,6 +13,7 @@ import { apiClient } from "@/lib/apiClient";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { API_URL_BASE } from "@/lib/config";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
@@ -20,7 +21,13 @@ import Pagination from "@/components/ui/Pagination";
 import { useRouter } from "next/navigation";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
-import { getApiErrorDescription, getApiErrorTitle } from "@/lib/api";
+import {
+  getApiErrorDescription,
+  getApiErrorTitle,
+  getResponseCorrelationId,
+  requireResourceVersion,
+  withErrorReference,
+} from "@/lib/api";
 import { buscarPersonasActivas, obtenerPersonaDetalle } from "@/lib/personasApi";
 import { DIGITS_PATTERN, EMAIL_PATTERN } from "@/lib/form-validation";
 
@@ -208,7 +215,7 @@ export function PersonasForm() {
 
       await cargarCatalogosBase();
     } catch (err) {
-      console.error(err);
+
       setError(err.message || "Error cargando personas");
     } finally {
       setLoading(false);
@@ -599,7 +606,11 @@ export function PersonasForm() {
       setError("");
       setMensaje("");
 
-      const payload = construirPayload(form, personaEditando.id);
+      const payload = construirPayload(
+        form,
+        personaEditando.id,
+        requireResourceVersion(personaEditando, "registro de persona")
+      );
 
       const res = await apiClient.request(`${API_URL_BASE}/personas/${personaEditando.id}`, {
         method: "PUT",
@@ -611,6 +622,7 @@ export function PersonasForm() {
       });
 
       const data = await leerRespuesta(res);
+      const correlationId = getResponseCorrelationId(res, data);
 
       if (res.status === 401) {
         router.replace("/");
@@ -622,20 +634,52 @@ export function PersonasForm() {
         return;
       }
 
-      if (!res.ok) {
-        throw new Error(
-          getApiErrorDescription(
-            data,
-            getApiErrorTitle(data, "No se pudo actualizar la persona")
+      if (res.status === 409) {
+        const message = getApiErrorDescription(
+          data,
+          "La persona fue modificada por otro usuario."
+        );
+
+        try {
+          const latest = await obtenerPersonaDetalle(personaEditando.id);
+          setPersonaEditando((prev) => ({ ...prev, version: latest.version }));
+        } catch {
+          // Keep the current draft when the fresh version cannot be loaded.
+        }
+
+        setError(
+          withErrorReference(
+            `${message} Tus cambios siguen en el formulario. Revisa la información y vuelve a intentar.`,
+            correlationId
           )
         );
+        toast.error("Este registro cambió mientras lo estabas editando", {
+          description: withErrorReference(
+            "Tus cambios se conservaron. Se cargó la versión actual como nueva base para un reintento manual.",
+            correlationId
+          ),
+        });
+        return;
+      }
+
+      if (!res.ok) {
+        setError(
+          withErrorReference(
+            getApiErrorDescription(
+              data,
+              getApiErrorTitle(data, "No se pudo actualizar la persona")
+            ),
+            correlationId
+          )
+        );
+        return;
       }
 
       setMensaje("Persona actualizada correctamente");
       cerrarEdicion();
       await cargarPersonas();
     } catch (err) {
-      console.error(err);
+
       setError(err.message || "Error actualizando persona");
     } finally {
       setSaving(false);
@@ -656,8 +700,9 @@ export function PersonasForm() {
       setError("");
       setMensaje("");
 
+      const version = requireResourceVersion(personaADesactivar, "registro de persona");
       const res = await apiClient.request(
-        `${API_URL_BASE}/personas/${personaADesactivar.id}/desactivar`,
+        `${API_URL_BASE}/personas/${personaADesactivar.id}/desactivar?version=${encodeURIComponent(String(version))}`,
         {
           method: "PATCH",
           credentials: "include",
@@ -665,6 +710,7 @@ export function PersonasForm() {
       );
 
       const data = await leerRespuesta(res);
+      const correlationId = getResponseCorrelationId(res, data);
 
       if (res.status === 401) {
         router.replace("/");
@@ -676,20 +722,45 @@ export function PersonasForm() {
         return;
       }
 
-      if (!res.ok) {
-        throw new Error(
-          getApiErrorDescription(
-            data,
-            getApiErrorTitle(data, "No se pudo desactivar la persona")
+      if (res.status === 409) {
+        const message = getApiErrorDescription(
+          data,
+          "La persona fue modificada por otro usuario."
+        );
+        setError(
+          withErrorReference(
+            `${message} La lista se actualizará para que confirmes nuevamente la acción.`,
+            correlationId
           )
         );
+        toast.error("No se pudo desactivar porque el registro cambió", {
+          description: withErrorReference(
+            "La acción no se reintentó automáticamente.",
+            correlationId
+          ),
+        });
+        await cargarPersonas();
+        return;
+      }
+
+      if (!res.ok) {
+        setError(
+          withErrorReference(
+            getApiErrorDescription(
+              data,
+              getApiErrorTitle(data, "No se pudo desactivar la persona")
+            ),
+            correlationId
+          )
+        );
+        return;
       }
 
       setMensaje("Persona desactivada correctamente");
       setPersonaADesactivar(null);
       await cargarPersonas();
     } catch (err) {
-      console.error(err);
+
       setError(err.message || "Error desactivando persona");
     } finally {
       setDesactivando(false);

@@ -110,8 +110,8 @@ export function TipoForm() {
         }
 
         await cargarTipos();
-      } catch (error) {
-        console.error("Error:", error);
+      } catch {
+
         router.push("/");
       } finally {
         setChecking(false);
@@ -177,7 +177,7 @@ export function TipoForm() {
         });
       }
     } catch (error) {
-      console.error(error);
+
       toast.error("Error de conexión");
     } finally {
       setDesactivando(false);

@@ -1,10 +1,5 @@
-import { esAdministrativo, tieneRol } from "@/lib/authz";
+import { esAdministrativo } from "@/lib/authz";
 
 export function esRolAdministrador(usuario) {
-  return (
-    esAdministrativo(usuario) ||
-    tieneRol(usuario, "Administrador") ||
-    tieneRol(usuario, "Administrativo") ||
-    tieneRol(usuario, "Director")
-  );
+  return esAdministrativo(usuario);
 }

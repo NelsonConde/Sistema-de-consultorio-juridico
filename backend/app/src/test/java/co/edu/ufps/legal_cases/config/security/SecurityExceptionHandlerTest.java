@@ -3,6 +3,8 @@ package co.edu.ufps.legal_cases.config.security;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -10,6 +12,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 
+import co.edu.ufps.legal_cases.common.observability.CorrelationIdContext;
 import tools.jackson.databind.json.JsonMapper;
 
 class SecurityExceptionHandlerTest {
@@ -36,6 +39,8 @@ class SecurityExceptionHandlerTest {
                 new BadCredentialsException("Sin autenticación"));
 
         assertEquals(401, response.getStatus());
+        assertTrue(UUID.fromString(response.getHeader(CorrelationIdContext.HEADER_NAME)).toString()
+                .equals(response.getHeader(CorrelationIdContext.HEADER_NAME)));
         assertTrue(response.getContentType().startsWith("application/json"));
         assertEquals("UTF-8", response.getCharacterEncoding());
         String body = response.getContentAsString();
@@ -43,6 +48,8 @@ class SecurityExceptionHandlerTest {
         assertTrue(body.contains("\"estado\":401"));
         assertTrue(body.contains("No autenticado"));
         assertTrue(body.contains("/api/protegido"));
+        assertTrue(body.contains("\"correlacionId\""));
+        assertTrue(body.contains(response.getHeader(CorrelationIdContext.HEADER_NAME)));
     }
 
     @Test
@@ -61,6 +68,8 @@ class SecurityExceptionHandlerTest {
                 new AccessDeniedException("Sin permiso"));
 
         assertEquals(403, response.getStatus());
+        assertTrue(UUID.fromString(response.getHeader(CorrelationIdContext.HEADER_NAME)).toString()
+                .equals(response.getHeader(CorrelationIdContext.HEADER_NAME)));
         assertTrue(response.getContentType().startsWith("application/json"));
         assertEquals("UTF-8", response.getCharacterEncoding());
 
@@ -69,5 +78,7 @@ class SecurityExceptionHandlerTest {
         assertTrue(body.contains("\"estado\":403"));
         assertTrue(body.contains("No autorizado"));
         assertTrue(body.contains("/api/restringido"));
+        assertTrue(body.contains("\"correlacionId\""));
+        assertTrue(body.contains(response.getHeader(CorrelationIdContext.HEADER_NAME)));
     }
 }

@@ -48,7 +48,11 @@ public class FileAssetReconciliationService {
                 storageProvider.delete(asset.getObjectKey());
                 fileAssetService.markFailedByObjectKey(asset.getObjectKey());
             } catch (RuntimeException ex) {
-                log.error("No se pudo reconciliar el objeto documental {}", asset.getObjectKey(), ex);
+                log.error(
+                        "No se pudo reconciliar objeto documental. assetId={}, status={}, tipoExcepcion={}",
+                        asset.getId(),
+                        asset.getStatus(),
+                        ex.getClass().getName());
             }
         }
     }
@@ -62,8 +66,11 @@ public class FileAssetReconciliationService {
                 // El objeto ya no existe: la eliminación física sí terminó.
                 fileAssetService.markDeleted(asset.getId());
             } catch (RuntimeException ex) {
-                log.error("No se pudo reconciliar la eliminación del objeto documental {}",
-                        asset.getObjectKey(), ex);
+                log.error(
+                        "No se pudo reconciliar eliminacion de objeto documental. assetId={}, status={}, tipoExcepcion={}",
+                        asset.getId(),
+                        asset.getStatus(),
+                        ex.getClass().getName());
             }
         }
     }

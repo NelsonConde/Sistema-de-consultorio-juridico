@@ -7,6 +7,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import co.edu.ufps.legal_cases.common.observability.CorrelationIdContext;
+
 // Configuración global de CORS para la API.
 // Los valores se leen desde app.cors.* para evitar dominios quemados en código.
 @Configuration
@@ -27,6 +29,8 @@ public class CorsConfig {
         configuration.setAllowedOrigins(corsProperties.getAllowedOrigins());
         configuration.setAllowedMethods(corsProperties.getAllowedMethods());
         configuration.setAllowedHeaders(corsProperties.getAllowedHeaders());
+        configuration.addAllowedHeader(CorrelationIdContext.HEADER_NAME);
+        configuration.addExposedHeader(CorrelationIdContext.HEADER_NAME);
         configuration.setAllowCredentials(corsProperties.getAllowCredentials());
         configuration.setMaxAge(corsProperties.getMaxAge());
 

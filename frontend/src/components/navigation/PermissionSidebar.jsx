@@ -127,7 +127,7 @@ const SIDEBAR_PAGES = [
 /**
  * User flow detail.
  * Permission and authorization handling.
- * 
+ *
  * @param {Object} page - Parameter description.
  * @param {Object} user - Authenticated user object.
  * @returns {boolean} Result value.
@@ -153,7 +153,7 @@ function puedeVerPagina(page, user) {
 /**
  * List and table handling.
  * User flow detail.
- * 
+ *
  * @param {Array<Object>} pages - Parameter description.
  * @param {Object} user - Authenticated user object.
  * @returns {Array<Object>} Result value.
@@ -186,8 +186,8 @@ export function PermissionSidebar() {
         }
 
         setUser(data);
-      } catch (error) {
-        console.error("Error cargando permisos del usuario", error);
+      } catch {
+
         setUser(null);
       } finally {
         setLoading(false);

@@ -13,6 +13,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 
+import co.edu.ufps.legal_cases.common.observability.CorrelationIdContext;
+
 class CorsConfigTest {
 
     private static final String ALLOWED_ORIGIN = "http://localhost:3000";
@@ -53,5 +55,13 @@ class CorsConfigTest {
     @Test
     void shouldAllowCredentials() {
         assertTrue(Boolean.TRUE.equals(corsConfiguration.getAllowCredentials()));
+    }
+
+    @Test
+    void shouldAllowAndExposeCorrelationHeader() {
+        assertTrue(corsConfiguration.getAllowedHeaders()
+                .contains(CorrelationIdContext.HEADER_NAME));
+        assertTrue(corsConfiguration.getExposedHeaders()
+                .contains(CorrelationIdContext.HEADER_NAME));
     }
 }

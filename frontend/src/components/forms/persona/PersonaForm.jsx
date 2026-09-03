@@ -240,8 +240,8 @@ export function PersonaForm({ onSubmit, initialValues }) {
       }
 
       await cargarCatalogos();
-    } catch (error) {
-      console.error("Error verificando sesión", error);
+    } catch {
+
       router.replace("/");
     } finally {
       setChecking(false);
@@ -296,8 +296,8 @@ export function PersonaForm({ onSubmit, initialValues }) {
           "Algunos catálogos no se pudieron cargar. Verifica permisos o disponibilidad del backend antes de guardar."
         );
       }
-    } catch (error) {
-      console.error("Error cargando catálogos", error);
+    } catch {
+
       setCatalogoMensaje(
         "No se pudieron cargar todos los catálogos necesarios para persona."
       );
@@ -654,7 +654,7 @@ export function PersonaForm({ onSubmit, initialValues }) {
           {pasoActualNombre === "Contacto" && (
             <Seccion
               titulo="Contacto"
-              descripcion="Datos de comunicación. Si no hay correo, déjalo vacío para enviar null."
+              descripcion="Datos de comunicación."
             >
               <FormInput
                 name="telefono"

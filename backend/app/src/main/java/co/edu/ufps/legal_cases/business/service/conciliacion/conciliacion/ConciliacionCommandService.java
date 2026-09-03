@@ -17,12 +17,14 @@ import co.edu.ufps.legal_cases.business.model.perfil.Estudiante;
 import co.edu.ufps.legal_cases.business.repository.conciliacion.ConciliacionRepository;
 import co.edu.ufps.legal_cases.business.service.acceso.conciliacion.ConciliacionAccessService;
 import co.edu.ufps.legal_cases.business.service.conciliacion.reunion.notificacion.ReunionConciliacionNotificacionService;
+import co.edu.ufps.legal_cases.common.concurrency.ConcurrenciaOptimistaValidator;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.file_storage.model.FileAsset;
 import co.edu.ufps.legal_cases.file_storage.model.FileResourceType;
 import co.edu.ufps.legal_cases.file_storage.service.FileResourceService;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
 import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaRepository;
+import jakarta.persistence.EntityManager;
 import lombok.AllArgsConstructor;
 
 // Maneja cambios de escritura del módulo de conciliación.
@@ -39,6 +41,8 @@ public class ConciliacionCommandService {
     private final ConciliacionValidator conciliacionValidator;
     private final ConciliacionMapper conciliacionMapper;
     private final ReunionConciliacionNotificacionService reunionConciliacionNotificacionService;
+    private final ConcurrenciaOptimistaValidator concurrenciaOptimistaValidator;
+    private final EntityManager entityManager;
 
     @Transactional
     @Auditable(
@@ -75,6 +79,8 @@ public class ConciliacionCommandService {
 
         Conciliacion conciliacionGuardada = conciliacionRepository.save(conciliacion);
 
+        entityManager.flush();
+
         FileAsset solicitudAsset = fileResourceService.storeMultipartAfterAuthorization(
                 FileResourceType.CONCILIACION,
                 conciliacionGuardada.getId(),
@@ -82,8 +88,11 @@ public class ConciliacionCommandService {
                 solicitud);
         conciliacionGuardada.setDocumentoSolicitud(solicitudAsset);
 
-        return conciliacionMapper.convertirAResponseDTO(
-                conciliacionRepository.save(conciliacionGuardada));
+        conciliacionGuardada = conciliacionRepository.save(conciliacionGuardada);
+
+        entityManager.flush();
+
+        return conciliacionMapper.convertirAResponseDTO(conciliacionGuardada);
     }
 
     @Transactional
@@ -92,10 +101,16 @@ public class ConciliacionCommandService {
             entityName = "Conciliacion",
             entityId = "#id",
             metadata = "assignedStudentId=#estudianteId")
-    public ConciliacionResponseDTO asignarEstudiante(Long id, Long estudianteId) {
+    public ConciliacionResponseDTO asignarEstudiante(Long id, Long estudianteId, Long versionEsperada) {
         conciliacionAccessService.validarPuedeAsignarEstudiante(id);
 
         Conciliacion conciliacion = conciliacionRelacionService.obtenerConciliacionActiva(id);
+
+        concurrenciaOptimistaValidator.validarVersion(
+                versionEsperada,
+                conciliacion.getVersion(),
+                "conciliación");
+
         conciliacionValidator.validarConciliacionNoFinalizada(conciliacion);
         conciliacionValidator.validarConsultaPermiteOperacionConciliacion(conciliacion.getConsulta());
 
@@ -108,8 +123,11 @@ public class ConciliacionCommandService {
         // Si no existe reunión, el estado depende de los responsables asignados.
         aplicarEstadoSegunAsignacion(conciliacion);
 
-        return conciliacionMapper.convertirAResponseDTO(
-                conciliacionRepository.save(conciliacion));
+        Conciliacion guardada = conciliacionRepository.save(conciliacion);
+
+        entityManager.flush();
+
+        return conciliacionMapper.convertirAResponseDTO(guardada);
     }
 
     @Transactional
@@ -118,10 +136,16 @@ public class ConciliacionCommandService {
             entityName = "Conciliacion",
             entityId = "#id",
             metadata = "assignedConciliatorId=#conciliadorId")
-    public ConciliacionResponseDTO asignarConciliador(Long id, Long conciliadorId) {
+    public ConciliacionResponseDTO asignarConciliador(Long id, Long conciliadorId, Long versionEsperada) {
         conciliacionAccessService.validarPuedeAsignarConciliador(id);
 
         Conciliacion conciliacion = conciliacionRelacionService.obtenerConciliacionActiva(id);
+
+        concurrenciaOptimistaValidator.validarVersion(
+                versionEsperada,
+                conciliacion.getVersion(),
+                "conciliación");
+
         conciliacionValidator.validarConciliacionNoFinalizada(conciliacion);
         conciliacionValidator.validarConsultaPermiteOperacionConciliacion(conciliacion.getConsulta());
 
@@ -134,8 +158,11 @@ public class ConciliacionCommandService {
         // Si no existe reunión, el estado depende de los responsables asignados.
         aplicarEstadoSegunAsignacion(conciliacion);
 
-        return conciliacionMapper.convertirAResponseDTO(
-                conciliacionRepository.save(conciliacion));
+        Conciliacion guardada = conciliacionRepository.save(conciliacion);
+
+        entityManager.flush();
+
+        return conciliacionMapper.convertirAResponseDTO(guardada);
     }
 
     @Transactional
@@ -144,18 +171,27 @@ public class ConciliacionCommandService {
             entityName = "Conciliacion",
             entityId = "#id",
             metadata = "requestedState=#estadoCodigo")
-    public ConciliacionResponseDTO cambiarEstado(Long id, String estadoCodigo) {
+    public ConciliacionResponseDTO cambiarEstado(Long id, String estadoCodigo, Long versionEsperada) {
         conciliacionAccessService.validarPuedeCambiarEstado(id, estadoCodigo);
 
         Conciliacion conciliacion = conciliacionRelacionService.obtenerConciliacionActiva(id);
+
+        concurrenciaOptimistaValidator.validarVersion(
+                versionEsperada,
+                conciliacion.getVersion(),
+                "conciliación");
+
         EstadoConciliacion estadoNuevo = conciliacionRelacionService.obtenerEstadoActivoPorCodigo(estadoCodigo);
 
         conciliacionValidator.validarCambioEstado(conciliacion, estadoNuevo);
 
         conciliacion.setEstado(estadoNuevo);
 
-        return conciliacionMapper.convertirAResponseDTO(
-                conciliacionRepository.save(conciliacion));
+        Conciliacion guardada = conciliacionRepository.save(conciliacion);
+
+        entityManager.flush();
+
+        return conciliacionMapper.convertirAResponseDTO(guardada);
     }
 
     @Transactional
@@ -164,10 +200,16 @@ public class ConciliacionCommandService {
             entityName = "Conciliacion",
             entityId = "#id",
             metadata = "requestedState=#estadoCodigo")
-    public ConciliacionResponseDTO finalizar(Long id, String estadoCodigo, MultipartFile acta) {
+    public ConciliacionResponseDTO finalizar(Long id, String estadoCodigo, MultipartFile acta, Long versionEsperada) {
         conciliacionAccessService.validarPuedeFinalizar(id);
 
         Conciliacion conciliacion = conciliacionRelacionService.obtenerConciliacionActiva(id);
+
+        concurrenciaOptimistaValidator.validarVersion(
+                versionEsperada,
+                conciliacion.getVersion(),
+                "conciliación");
+
         EstadoConciliacion estadoFinal = conciliacionRelacionService.obtenerEstadoActivoPorCodigo(estadoCodigo);
 
         conciliacionValidator.validarFinalizacion(conciliacion, estadoFinal);
@@ -177,32 +219,60 @@ public class ConciliacionCommandService {
         FileAsset actaAsset = fileResourceService.storeMultipartAfterAuthorization(
                 FileResourceType.CONCILIACION, id, null, acta);
 
-        conciliacion.setEstado(estadoFinal);
-        conciliacion.setActa(actaAsset);
-        conciliacion.setFechaFinalizacion(LocalDateTime.now());
+        Conciliacion guardada;
+        try {
+            conciliacion.setEstado(estadoFinal);
+            conciliacion.setActa(actaAsset);
+            conciliacion.setFechaFinalizacion(LocalDateTime.now());
+
+            guardada = conciliacionRepository.save(conciliacion);
+
+            /*
+             * Confirmamos primero la escritura versionada.
+             * No ejecutamos efectos posteriores si existe un conflicto.
+             */
+            entityManager.flush();
+        } catch (RuntimeException ex) {
+            compensarArchivoAlmacenado(actaAsset, ex);
+            throw ex;
+        }
 
         // Al finalizar la conciliación ya no deben salir recordatorios de reunión pendientes.
         reunionConciliacionNotificacionService.cancelarPendientesPorConciliacion(id);
 
-        return conciliacionMapper.convertirAResponseDTO(
-                conciliacionRepository.save(conciliacion));
+        return conciliacionMapper.convertirAResponseDTO(guardada);
     }
 
     @Transactional
     @Auditable(action = "ACTUALIZAR_SOLICITUD", entityName = "Conciliacion", entityId = "#id")
-    public ConciliacionResponseDTO reemplazarSolicitud(Long id, MultipartFile solicitud) {
+    public ConciliacionResponseDTO reemplazarSolicitud(Long id, MultipartFile solicitud, Long versionEsperada) {
         conciliacionAccessService.validarPuedeReemplazarSolicitud(id);
 
         Conciliacion conciliacion = conciliacionRelacionService.obtenerConciliacionActiva(id);
+
+        concurrenciaOptimistaValidator.validarVersion(
+                versionEsperada,
+                conciliacion.getVersion(),
+                "conciliación");
+
         conciliacionValidator.validarConciliacionNoFinalizada(conciliacion);
         conciliacionValidator.validarConsultaPermiteOperacionConciliacion(conciliacion.getConsulta());
 
         FileAsset solicitudAsset = fileResourceService.storeMultipartAfterAuthorization(
                 FileResourceType.CONCILIACION, id, null, solicitud);
-        conciliacion.setDocumentoSolicitud(solicitudAsset);
+        Conciliacion guardada;
+        try {
+            conciliacion.setDocumentoSolicitud(solicitudAsset);
 
-        return conciliacionMapper.convertirAResponseDTO(
-                conciliacionRepository.save(conciliacion));
+            guardada = conciliacionRepository.save(conciliacion);
+
+            entityManager.flush();
+        } catch (RuntimeException ex) {
+            compensarArchivoAlmacenado(solicitudAsset, ex);
+            throw ex;
+        }
+
+        return conciliacionMapper.convertirAResponseDTO(guardada);
     }
 
     @Transactional
@@ -211,20 +281,27 @@ public class ConciliacionCommandService {
             entityName = "Conciliacion",
             entityId = "#id",
             trackedFields = "activo")
-    public void desactivar(Long id) {
+    public void desactivar(Long id, Long versionEsperada) {
         conciliacionAccessService.validarPuedeDesactivarConciliacion(id);
 
         Conciliacion conciliacion = conciliacionRelacionService.obtenerConciliacionActiva(id);
+
+        concurrenciaOptimistaValidator.validarVersion(
+                versionEsperada,
+                conciliacion.getVersion(),
+                "conciliación");
+
         conciliacionValidator.validarConciliacionNoFinalizada(conciliacion);
         conciliacionValidator.validarConsultaPermiteOperacionConciliacion(conciliacion.getConsulta());
 
         // Desactivación lógica. No representa finalización de la conciliación.
         conciliacion.setActivo(false);
 
+        conciliacionRepository.save(conciliacion);
+        entityManager.flush();
+
         // Una conciliación desactivada no debe conservar recordatorios pendientes.
         reunionConciliacionNotificacionService.cancelarPendientesPorConciliacion(id);
-
-        conciliacionRepository.save(conciliacion);
     }
 
     private void aplicarEstadoSegunAsignacion(Conciliacion conciliacion) {
@@ -239,5 +316,13 @@ public class ConciliacionCommandService {
         return usuarioSistemaRepository.findById(usuarioActualId)
                 .orElseThrow(() -> new BusinessException(
                         "Usuario solicitante no encontrado con id: " + usuarioActualId));
+    }
+
+    private void compensarArchivoAlmacenado(FileAsset asset, RuntimeException causaOriginal) {
+        try {
+            fileResourceService.discardStoredAsset(asset);
+        } catch (RuntimeException cleanup) {
+            causaOriginal.addSuppressed(cleanup);
+        }
     }
 }
