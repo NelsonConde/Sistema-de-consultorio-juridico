@@ -36,12 +36,12 @@ public interface PersonaRepository extends JpaRepository<Persona, Long> {
             JOIN p.tipoPersona tipoPersona
             WHERE (:activo IS NULL OR p.activo = :activo)
               AND (
-                    :search IS NULL
-                    OR LOWER(p.nombres) LIKE LOWER(CONCAT('%', :search, '%'))
-                    OR LOWER(p.apellidos) LIKE LOWER(CONCAT('%', :search, '%'))
+                    CAST(:search AS String) IS NULL
+                    OR LOWER(p.nombres) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(p.apellidos) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
                     OR LOWER(CONCAT(CONCAT(p.nombres, ' '), p.apellidos))
-                        LIKE LOWER(CONCAT('%', :search, '%'))
-                    OR LOWER(p.numeroDocumento) LIKE LOWER(CONCAT('%', :search, '%'))
+                        LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(p.numeroDocumento) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
               )
             ORDER BY LOWER(p.nombres), LOWER(p.apellidos), p.id
             """, countQuery = """
@@ -49,12 +49,12 @@ public interface PersonaRepository extends JpaRepository<Persona, Long> {
             FROM Persona p
             WHERE (:activo IS NULL OR p.activo = :activo)
               AND (
-                    :search IS NULL
-                    OR LOWER(p.nombres) LIKE LOWER(CONCAT('%', :search, '%'))
-                    OR LOWER(p.apellidos) LIKE LOWER(CONCAT('%', :search, '%'))
+                    CAST(:search AS String) IS NULL
+                    OR LOWER(p.nombres) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(p.apellidos) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
                     OR LOWER(CONCAT(CONCAT(p.nombres, ' '), p.apellidos))
-                        LIKE LOWER(CONCAT('%', :search, '%'))
-                    OR LOWER(p.numeroDocumento) LIKE LOWER(CONCAT('%', :search, '%'))
+                        LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(p.numeroDocumento) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
               )
             """)
     Page<PersonaResumenProjection> buscarResumen(
