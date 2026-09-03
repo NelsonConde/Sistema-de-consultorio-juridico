@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import co.edu.ufps.legal_cases.business.dto.estadisticas.EstadisticasSemestreDTO;
 import co.edu.ufps.legal_cases.business.dto.estadisticas.SemestreDTO;
+import co.edu.ufps.legal_cases.business.service.estadisticas.estadisticas.EstadisticasPerfilActualQueryService;
 import co.edu.ufps.legal_cases.business.service.estadisticas.estadisticas.EstadisticasPerfilQueryService;
 import co.edu.ufps.legal_cases.business.service.estadisticas.estadisticas.EstadisticasQueryService;
 import co.edu.ufps.legal_cases.business.service.estadisticas.estadisticas.EstadisticasRangoQueryService;
@@ -18,16 +19,20 @@ public class EstadisticasService {
 
     private final EstadisticasQueryService estadisticasQueryService;
     private final EstadisticasRangoQueryService estadisticasRangoQueryService;
+    private final EstadisticasPerfilActualQueryService estadisticasPerfilActualQueryService;
     private final EstadisticasPerfilQueryService estadisticasPerfilQueryService;
     private final EstadisticasPdfService estadisticasPdfService;
 
     public EstadisticasService(
             EstadisticasQueryService estadisticasQueryService,
             EstadisticasRangoQueryService estadisticasRangoQueryService,
+            EstadisticasPerfilActualQueryService estadisticasPerfilActualQueryService,
             EstadisticasPerfilQueryService estadisticasPerfilQueryService,
             EstadisticasPdfService estadisticasPdfService) {
         this.estadisticasQueryService = estadisticasQueryService;
         this.estadisticasRangoQueryService = estadisticasRangoQueryService;
+        this.estadisticasPerfilActualQueryService =
+                estadisticasPerfilActualQueryService;
         this.estadisticasPerfilQueryService = estadisticasPerfilQueryService;
         this.estadisticasPdfService = estadisticasPdfService;
     }
@@ -36,33 +41,71 @@ public class EstadisticasService {
         return estadisticasQueryService.listarSemestresDisponibles();
     }
 
-    public EstadisticasSemestreDTO obtenerEstadisticasSemestre(int año, int semestre) {
-        return estadisticasQueryService.obtenerEstadisticasSemestre(año, semestre);
+    public EstadisticasSemestreDTO obtenerEstadisticasSemestre(
+            int año,
+            int semestre) {
+        return estadisticasQueryService.obtenerEstadisticasSemestre(
+                año,
+                semestre);
     }
 
-    public EstadisticasSemestreDTO obtenerPorRango(LocalDate fechaInicio, LocalDate fechaFin) {
-        return estadisticasRangoQueryService.obtenerPorRango(fechaInicio, fechaFin);
+    public EstadisticasSemestreDTO obtenerPorRango(
+            LocalDate fechaInicio,
+            LocalDate fechaFin) {
+        return estadisticasRangoQueryService.obtenerPorRango(
+                fechaInicio,
+                fechaFin);
     }
 
     public byte[] generarPdfSemestre(int año, int semestre) {
         return estadisticasPdfService.generarReporteSemestral(
-                estadisticasQueryService.obtenerEstadisticasSemestre(año, semestre));
+                estadisticasQueryService.obtenerEstadisticasSemestre(
+                        año,
+                        semestre));
     }
 
-    public byte[] generarPdfRango(LocalDate fechaInicio, LocalDate fechaFin) {
+    public byte[] generarPdfRango(
+            LocalDate fechaInicio,
+            LocalDate fechaFin) {
         return estadisticasPdfService.generarReporteSemestral(
-                estadisticasRangoQueryService.obtenerPorRango(fechaInicio, fechaFin));
+                estadisticasRangoQueryService.obtenerPorRango(
+                        fechaInicio,
+                        fechaFin));
     }
 
-    public EstadisticasSemestreDTO obtenerPorEstudiante(int año, int semestre, Long id) {
-        return estadisticasPerfilQueryService.obtenerPorEstudiante(año, semestre, id);
+    public EstadisticasSemestreDTO obtenerPorPerfilActual(
+            int año,
+            int semestre) {
+        return estadisticasPerfilActualQueryService.obtener(año, semestre);
     }
 
-    public EstadisticasSemestreDTO obtenerPorAsesor(int año, int semestre, Long id) {
-        return estadisticasPerfilQueryService.obtenerPorAsesor(año, semestre, id);
+    public EstadisticasSemestreDTO obtenerPorEstudiante(
+            int año,
+            int semestre,
+            Long id) {
+        return estadisticasPerfilQueryService.obtenerPorEstudiante(
+                año,
+                semestre,
+                id);
     }
 
-    public EstadisticasSemestreDTO obtenerPorMonitor(int año, int semestre, Long id) {
-        return estadisticasPerfilQueryService.obtenerPorMonitor(año, semestre, id);
+    public EstadisticasSemestreDTO obtenerPorAsesor(
+            int año,
+            int semestre,
+            Long id) {
+        return estadisticasPerfilQueryService.obtenerPorAsesor(
+                año,
+                semestre,
+                id);
+    }
+
+    public EstadisticasSemestreDTO obtenerPorMonitor(
+            int año,
+            int semestre,
+            Long id) {
+        return estadisticasPerfilQueryService.obtenerPorMonitor(
+                año,
+                semestre,
+                id);
     }
 }
