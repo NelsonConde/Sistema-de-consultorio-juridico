@@ -1,5 +1,6 @@
 package co.edu.ufps.legal_cases.business.service.estadisticas.estadisticas;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 
@@ -25,6 +26,7 @@ public class EstadisticasRangoQueryService {
     private final SeguimientoRepository seguimientoRepository;
     private final EstudianteRepository estudianteRepository;
     private final EstadisticasMapperService mapper;
+    private final Clock clock;
 
     public EstadisticasRangoQueryService(
             ConsultaRepository consultaRepository,
@@ -32,13 +34,15 @@ public class EstadisticasRangoQueryService {
             ConciliacionRepository conciliacionRepository,
             SeguimientoRepository seguimientoRepository,
             EstudianteRepository estudianteRepository,
-            EstadisticasMapperService mapper) {
+            EstadisticasMapperService mapper,
+            Clock clock) {
         this.consultaRepository = consultaRepository;
         this.procesoRepository = procesoRepository;
         this.conciliacionRepository = conciliacionRepository;
         this.seguimientoRepository = seguimientoRepository;
         this.estudianteRepository = estudianteRepository;
         this.mapper = mapper;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -94,7 +98,7 @@ public class EstadisticasRangoQueryService {
                 .personasPorCondicion(mapper.mapear2(
                         consultaRepository.contarPersonasPorCondicionPorRango(inicio, fin)))
                 .procesosPorEstado(mapper.mapear2(
-                        procesoRepository.contarProcesosPorEstado()))
+                        procesoRepository.contarProcesosPorEstadoPorRango(inicio, fin)))
                 .totalConciliaciones(totalConciliaciones)
                 .conciliacionesPorEstado(mapper.mapear2(
                         conciliacionRepository.contarConciliacionesPorEstadoPorRango(inicio, fin)))
@@ -113,7 +117,10 @@ public class EstadisticasRangoQueryService {
             throw new BusinessException("La fecha de inicio no puede ser posterior a la fecha fin");
         if (fechaInicio.getYear() < 2024)
             throw new BusinessException("No hay datos disponibles antes del año 2024");
-        if (fechaInicio.isAfter(LocalDate.now()))
+        LocalDate hoy = LocalDate.now(clock);
+        if (fechaInicio.isAfter(hoy))
             throw new BusinessException("La fecha de inicio no puede ser futura");
+        if (fechaFin.isAfter(hoy))
+            throw new BusinessException("La fecha fin no puede ser futura");
     }
 }
