@@ -10,7 +10,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import co.edu.ufps.legal_cases.business.dto.persona.PersonaPageResponseDTO;
+import co.edu.ufps.legal_cases.business.dto.persona.PersonaResumenDTO;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import co.edu.ufps.legal_cases.business.dto.persona.PersonaDTO;
 import co.edu.ufps.legal_cases.business.service.persona.PersonaService;
 import jakarta.validation.Valid;
@@ -27,7 +28,7 @@ public class PersonaController {
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('" + VER_PERSONAS + "', '" + GESTIONAR_PERSONAS + "')")
-    public PersonaPageResponseDTO listar(
+    public PageResponseDTO<PersonaResumenDTO> listar(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -57,7 +58,7 @@ public class PersonaController {
 
     @GetMapping("/activos")
     @PreAuthorize("hasAnyAuthority('" + VER_PERSONAS + "', '" + GESTIONAR_PERSONAS + "')")
-    public PersonaPageResponseDTO listarActivos(
+    public PageResponseDTO<PersonaResumenDTO> listarActivos(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {

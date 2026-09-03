@@ -16,7 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import co.edu.ufps.legal_cases.business.dto.persona.PersonaPageResponseDTO;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import co.edu.ufps.legal_cases.business.dto.persona.PersonaResumenDTO;
 import co.edu.ufps.legal_cases.business.service.persona.PersonaService;
 import co.edu.ufps.legal_cases.common.exception.handler.GlobalExceptionHandler;
@@ -46,7 +46,7 @@ class PersonaControllerTest {
                 "******3456",
                 "Solicitante",
                 true);
-        PersonaPageResponseDTO respuesta = new PersonaPageResponseDTO(
+        PageResponseDTO<PersonaResumenDTO> respuesta = new PageResponseDTO<>(
                 List.of(persona),
                 2,
                 10,
@@ -91,7 +91,7 @@ class PersonaControllerTest {
                 "Solicitante",
                 true);
         when(personaService.listar(null, 1, 10))
-                .thenReturn(new PersonaPageResponseDTO(List.of(persona), 1, 10, 1, 1));
+                .thenReturn(new PageResponseDTO<>(List.of(persona), 1, 10, 1, 1));
 
         mockMvc.perform(get("/api/personas"))
                 .andExpect(status().isOk())
@@ -102,7 +102,7 @@ class PersonaControllerTest {
     @Test
     void activosDebeDelegarBusquedaYPaginacionConElMismoContrato() throws Exception {
         when(personaService.listarActivos("Perez", 1, 50))
-                .thenReturn(new PersonaPageResponseDTO(List.of(), 1, 50, 0, 0));
+                .thenReturn(new PageResponseDTO<>(List.of(), 1, 50, 0, 0));
 
         mockMvc.perform(get("/api/personas/activos")
                         .param("search", "Perez")

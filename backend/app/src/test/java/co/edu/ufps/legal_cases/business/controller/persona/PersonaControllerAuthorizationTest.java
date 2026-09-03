@@ -21,7 +21,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import co.edu.ufps.legal_cases.business.dto.persona.PersonaPageResponseDTO;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import co.edu.ufps.legal_cases.business.service.persona.PersonaService;
 
 class PersonaControllerAuthorizationTest {
@@ -36,7 +36,7 @@ class PersonaControllerAuthorizationTest {
         personaController = context.getBean(PersonaController.class);
         personaService = context.getBean(PersonaService.class);
         when(personaService.listar(null, 1, 10))
-                .thenReturn(new PersonaPageResponseDTO(List.of(), 1, 10, 0, 0));
+                .thenReturn(new PageResponseDTO<>(List.of(), 1, 10, 0, 0));
     }
 
     @AfterEach

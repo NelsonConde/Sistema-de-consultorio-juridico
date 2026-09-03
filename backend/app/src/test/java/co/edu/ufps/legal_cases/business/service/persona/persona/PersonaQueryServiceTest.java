@@ -23,7 +23,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.AccessDeniedException;
 
 import co.edu.ufps.legal_cases.business.dto.persona.PersonaDTO;
-import co.edu.ufps.legal_cases.business.dto.persona.PersonaPageResponseDTO;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import co.edu.ufps.legal_cases.business.dto.persona.PersonaResumenDTO;
 import co.edu.ufps.legal_cases.business.model.persona.Persona;
 import co.edu.ufps.legal_cases.business.repository.persona.PersonaRepository;
@@ -70,7 +70,7 @@ class PersonaQueryServiceTest {
                 .thenReturn(new PageImpl<>(List.of(projection), interno, 21));
         when(personaResumenMapper.convertirAResumen(projection)).thenReturn(resumen);
 
-        PersonaPageResponseDTO resultado = personaQueryService.listar("  Ana   Perez ", 2, 10);
+        PageResponseDTO<PersonaResumenDTO> resultado = personaQueryService.listar("  Ana   Perez ", 2, 10);
 
         assertEquals(List.of(resumen), resultado.content());
         assertEquals(2, resultado.page());

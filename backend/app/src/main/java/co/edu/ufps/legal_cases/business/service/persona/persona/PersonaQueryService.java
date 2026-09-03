@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import co.edu.ufps.legal_cases.audit.aop.log.Auditable;
-import co.edu.ufps.legal_cases.business.dto.persona.PersonaPageResponseDTO;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import co.edu.ufps.legal_cases.business.dto.persona.PersonaDTO;
 import co.edu.ufps.legal_cases.business.dto.persona.PersonaResumenDTO;
 import co.edu.ufps.legal_cases.business.model.persona.Persona;
@@ -43,12 +43,12 @@ public class PersonaQueryService {
     }
 
     @Transactional(readOnly = true)
-    public PersonaPageResponseDTO listar(String search, int page, int size) {
+    public PageResponseDTO<PersonaResumenDTO> listar(String search, int page, int size) {
         return buscarResumen(search, page, size, null);
     }
 
     @Transactional(readOnly = true)
-    public PersonaPageResponseDTO listarActivos(String search, int page, int size) {
+    public PageResponseDTO<PersonaResumenDTO> listarActivos(String search, int page, int size) {
         return buscarResumen(search, page, size, true);
     }
 
@@ -62,7 +62,7 @@ public class PersonaQueryService {
         return personaMapper.convertirADTO(persona);
     }
 
-    private PersonaPageResponseDTO buscarResumen(
+    private PageResponseDTO<PersonaResumenDTO> buscarResumen(
             String search,
             int page,
             int size,
@@ -82,7 +82,7 @@ public class PersonaQueryService {
                 .map(personaResumenMapper::convertirAResumen)
                 .toList();
 
-        return new PersonaPageResponseDTO(
+        return new PageResponseDTO<>(
                 contenido,
                 page,
                 size,
