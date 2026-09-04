@@ -1,11 +1,11 @@
 package co.edu.ufps.legal_cases.business.dto.perfil;
 
-import co.edu.ufps.legal_cases.business.model.perfil.TipoConciliador;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
-public class ConciliadorResumenDTO {
-
+@Getter
+@Setter
+public class EstudianteResumenDTO {
     private Long id;
     private String nombre;
     private String documento;
@@ -13,7 +13,9 @@ public class ConciliadorResumenDTO {
     private String usuario;
     private String codigo;
     private Boolean activo;
-    private TipoConciliador tipoConciliador;
     private Long sedeId;
     private String sedeNombre;
+    private Long asesorId;
+    private String asesorNombre;
+    private Boolean conciliacion;
 }

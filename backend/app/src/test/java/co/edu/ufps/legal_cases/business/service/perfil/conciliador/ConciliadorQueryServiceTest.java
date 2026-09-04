@@ -1,13 +1,16 @@
 package co.edu.ufps.legal_cases.business.service.perfil.conciliador;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -22,6 +25,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 import co.edu.ufps.legal_cases.business.dto.perfil.ConciliadorResumenDTO;
+import co.edu.ufps.legal_cases.business.dto.perfil.ConciliadorDTO;
+import co.edu.ufps.legal_cases.business.model.perfil.Conciliador;
 import co.edu.ufps.legal_cases.business.model.perfil.TipoConciliador;
 import co.edu.ufps.legal_cases.business.repository.perfil.ConciliadorRepository;
 import co.edu.ufps.legal_cases.business.repository.perfil.ConciliadorResumenProjection;
@@ -73,10 +78,30 @@ class ConciliadorQueryServiceTest {
         assertThrows(BusinessException.class,
                 () -> conciliadorQueryService.buscar(null, 1, 10, "telefono", "desc", null, null));
         assertThrows(BusinessException.class,
+                () -> conciliadorQueryService.buscar(null, 1, 10, null, "desc", null, null));
+        assertThrows(BusinessException.class,
+                () -> conciliadorQueryService.buscar(null, 1, 10, "   ", "desc", null, null));
+        assertThrows(BusinessException.class,
                 () -> conciliadorQueryService.buscar(null, 1, 10, "id", "lateral", null, null));
+        assertThrows(BusinessException.class,
+                () -> conciliadorQueryService.buscar(null, 1, 10, "id", null, null, null));
+        assertThrows(BusinessException.class,
+                () -> conciliadorQueryService.buscar(null, 1, 10, "id", "   ", null, null));
 
         verify(conciliadorRepository, never()).buscarResumenPaginado(
                 any(), any(), any(), any(Pageable.class));
+    }
+
+    @Test
+    void autorizacionDebeOcurrirAntesDeConsultarRepository() {
+        doThrow(new org.springframework.security.access.AccessDeniedException("denegado"))
+                .when(conciliadorAccessService).validarPuedeListarConciliadores();
+
+        assertThrows(
+                org.springframework.security.access.AccessDeniedException.class,
+                () -> conciliadorQueryService.buscar(null, 1, 10, "id", "desc", null, null));
+
+        verify(conciliadorRepository, never()).buscarResumenPaginado(any(), any(), any(), any());
     }
 
     @Test
@@ -99,7 +124,7 @@ class ConciliadorQueryServiceTest {
         conciliadorQueryService.buscar(null, 1, 10, "nombre", "ASC", null, null);
         conciliadorQueryService.buscar(null, 1, 10, "sedeNombre", "desc", null, null);
 
-        List<PageRequest> pageables = capturarDosPageables();
+        List<PageRequest> pageables = capturarPageables(2);
         List<Sort.Order> nombreAsc = pageables.get(0).getSort().stream().toList();
         assertEquals("nombre", nombreAsc.get(0).getProperty());
         assertEquals(Sort.Direction.ASC, nombreAsc.get(0).getDirection());
@@ -110,6 +135,28 @@ class ConciliadorQueryServiceTest {
         assertEquals("sede.nombre", sedeDesc.get(0).getProperty());
         assertEquals(Sort.Direction.DESC, sedeDesc.get(0).getDirection());
         assertEquals("id", sedeDesc.get(1).getProperty());
+    }
+
+    @Test
+    void sortNoTextoNuncaDebeAplicarIgnoreCase() {
+        stubEmpty();
+
+        conciliadorQueryService.buscar(null, 1, 10, "id", "asc", null, null);
+        conciliadorQueryService.buscar(null, 1, 10, "activo", "desc", null, null);
+        conciliadorQueryService.buscar(null, 1, 10, "tipoConciliador", "asc", null, null);
+
+        List<PageRequest> pageables = capturarPageables(3);
+        List<Sort.Order> id = pageables.get(0).getSort().stream().toList();
+        assertEquals(1, id.size());
+        assertFalse(id.get(0).isIgnoreCase());
+
+        List<Sort.Order> activo = pageables.get(1).getSort().stream().toList();
+        assertFalse(activo.get(0).isIgnoreCase());
+        assertEquals(Sort.Order.asc("id"), activo.get(1));
+
+        List<Sort.Order> tipo = pageables.get(2).getSort().stream().toList();
+        assertFalse(tipo.get(0).isIgnoreCase());
+        assertEquals(Sort.Order.asc("id"), tipo.get(1));
     }
 
     @Test
@@ -174,14 +221,27 @@ class ConciliadorQueryServiceTest {
         assertEquals("Principal", dto.getSedeNombre());
     }
 
+    @Test
+    void listarLegadoDebePreservarContratoYPasarPorSeguridad() {
+        Conciliador conciliador = mock(Conciliador.class);
+        ConciliadorDTO dto = new ConciliadorDTO();
+        when(conciliadorRepository.findAll()).thenReturn(List.of(conciliador));
+        when(conciliadorMapper.convertirADTO(conciliador)).thenReturn(dto);
+
+        assertEquals(List.of(dto), conciliadorQueryService.listar());
+
+        verify(conciliadorAccessService).validarPuedeListarConciliadores();
+        verify(conciliadorRepository).findAll();
+    }
+
     private void stubEmpty() {
         when(conciliadorRepository.buscarResumenPaginado(any(), any(), any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
     }
 
-    private List<PageRequest> capturarDosPageables() {
+    private List<PageRequest> capturarPageables(int cantidad) {
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-        verify(conciliadorRepository, org.mockito.Mockito.times(2))
+        verify(conciliadorRepository, times(cantidad))
                 .buscarResumenPaginado(any(), any(), any(), captor.capture());
         return captor.getAllValues().stream()
                 .map(PageRequest.class::cast)

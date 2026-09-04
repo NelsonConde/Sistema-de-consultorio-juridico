@@ -37,6 +37,10 @@ public class ConciliadorService {
         return conciliadorQueryService.buscar(search, page, size, sortBy, direction, activo, tipoConciliador);
     }
 
+    public List<ConciliadorDTO> listar() {
+        return conciliadorQueryService.listar();
+    }
+
     public List<ConciliadorDTO> listarActivos() {
         return conciliadorQueryService.listarActivos();
     }

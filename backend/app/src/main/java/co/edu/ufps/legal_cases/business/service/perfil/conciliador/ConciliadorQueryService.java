@@ -95,6 +95,16 @@ public class ConciliadorQueryService {
     }
 
     @Transactional(readOnly = true)
+    public List<ConciliadorDTO> listar() {
+        conciliadorAccessService.validarPuedeListarConciliadores();
+
+        return conciliadorRepository.findAll()
+                .stream()
+                .map(conciliadorMapper::convertirADTO)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<ConciliadorDTO> listarActivos() {
         conciliadorAccessService.validarPuedeListarConciliadoresActivos();
 
