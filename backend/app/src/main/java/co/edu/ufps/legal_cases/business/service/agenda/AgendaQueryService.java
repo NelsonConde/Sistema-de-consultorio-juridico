@@ -4,6 +4,7 @@ import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_CONCIL
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_SEGUIMIENTOS;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -15,13 +16,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import co.edu.ufps.legal_cases.business.dto.agenda.AgendaEventDTO;
-import co.edu.ufps.legal_cases.business.model.conciliacion.Conciliacion;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.business.repository.conciliacion.reunion.ReunionConciliacionRepository;
 import co.edu.ufps.legal_cases.business.service.acceso.conciliacion.ConciliacionAccessService;
-import co.edu.ufps.legal_cases.business.service.acceso.conciliacion.ConciliacionAlcanceService;
 import co.edu.ufps.legal_cases.business.service.seguimiento.SeguimientoService;
 import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoResponseDTO;
+import co.edu.ufps.legal_cases.security.dto.account.PerfilUsuarioActual;
 import co.edu.ufps.legal_cases.security.service.context.UsuarioActualService;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +36,6 @@ public class AgendaQueryService {
     private final SeguimientoService seguimientoService;
     private final ReunionConciliacionRepository reunionRepository;
     private final ConciliacionAccessService conciliacionAccessService;
-    private final ConciliacionAlcanceService conciliacionAlcanceService;
     private final UsuarioActualService usuarioActualService;
     private final ZoneId institutionalTimeZone;
 
@@ -87,19 +86,33 @@ public class AgendaQueryService {
     }
 
     private List<AgendaEventDTO> mapReuniones(LocalDate from, LocalDate to) {
-        return reunionRepository.findAll().stream()
-                .filter(reunion -> reunion.getFechaReunion() != null)
-                .filter(reunion -> reunion.getConciliacion() != null)
-                .filter(reunion -> reunion.getConciliacion().getConsulta() != null)
-                .filter(reunion -> reunion.getConciliacion().getConsulta().getEstado() != EstadoConsulta.ARCHIVADO)
-                .filter(reunion -> {
-                    LocalDate fecha = reunion.getFechaReunion().toLocalDate();
-                    return !fecha.isBefore(from) && fecha.isBefore(to);
-                })
-                .filter(reunion -> conciliacionAlcanceService.puedeVerConciliacion(reunion.getConciliacion()))
+        boolean alcanceGlobal = conciliacionAccessService.usuarioEsAdministrador();
+        String tipoPerfil = null;
+        Long perfilId = null;
+
+        if (!alcanceGlobal) {
+            PerfilUsuarioActual perfil = conciliacionAccessService.obtenerPerfilActual();
+            if (perfil != null) {
+                tipoPerfil = perfil.getTipoPerfil() != null ? perfil.getTipoPerfil().name() : null;
+                perfilId = perfil.getPerfilId();
+            }
+        }
+
+        LocalDateTime desde = from.atStartOfDay();
+        LocalDateTime hastaExclusiva = to.atStartOfDay();
+
+        return reunionRepository.buscarParaAgenda(
+                        desde,
+                        hastaExclusiva,
+                        alcanceGlobal,
+                        tipoPerfil,
+                        perfilId,
+                        EstadoConsulta.ARCHIVADO)
+                .stream()
                 .map(reunion -> {
-                    Conciliacion conciliacion = reunion.getConciliacion();
-                    OffsetDateTime start = reunion.getFechaReunion().atZone(institutionalTimeZone).toOffsetDateTime();
+                    OffsetDateTime start = reunion.getFechaReunion()
+                            .atZone(institutionalTimeZone)
+                            .toOffsetDateTime();
                     return new AgendaEventDTO(
                             "reunion-" + reunion.getConciliacionId(),
                             CONCILIATION_MEETING,
@@ -108,8 +121,8 @@ public class AgendaQueryService {
                             start.plusHours(1),
                             false,
                             reunion.getConciliacionId(),
-                            conciliacion.getConsulta().getId(),
-                            conciliacion.getEstado() != null ? conciliacion.getEstado().getCodigo() : null,
+                            reunion.getConsultaId(),
+                            reunion.getEstadoCodigo(),
                             start.isBefore(OffsetDateTime.now(institutionalTimeZone)));
                 })
                 .toList();

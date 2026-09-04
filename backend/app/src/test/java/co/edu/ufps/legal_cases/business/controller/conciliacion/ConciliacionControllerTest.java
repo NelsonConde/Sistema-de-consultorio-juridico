@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import co.edu.ufps.legal_cases.business.dto.conciliacion.ConciliacionResumenDTO;
+import co.edu.ufps.legal_cases.business.dto.conciliacion.reunion.ReunionConciliacionResumenDTO;
 import co.edu.ufps.legal_cases.business.service.conciliacion.ConciliacionService;
 import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
@@ -146,5 +147,115 @@ class ConciliacionControllerTest {
                 .andExpect(jsonPath("$.mensaje")
                         .value("No tiene permisos para acceder a este recurso"))
                 .andExpect(jsonPath("$.ruta").value("/api/conciliaciones"));
+    }
+
+    @Test
+    void buscarReunionesSinParametrosDebePropagarDefaultsYResponderPageResponseDTO() throws Exception {
+        ReunionConciliacionResumenDTO reunion = new ReunionConciliacionResumenDTO(
+                5L,
+                1L,
+                2L,
+                3L,
+                "REUNION_PROGRAMADA",
+                "Reunion programada",
+                4L,
+                "Principal",
+                LocalDateTime.of(2026, 9, 4, 10, 30),
+                "Audiencia",
+                6L,
+                "Estudiante A",
+                7L,
+                "Conciliador A",
+                LocalDateTime.of(2026, 9, 1, 9, 0),
+                null);
+        PageResponseDTO<ReunionConciliacionResumenDTO> respuesta = new PageResponseDTO<>(
+                List.of(reunion),
+                1,
+                10,
+                1,
+                1);
+        when(conciliacionService.buscarReunionesParaUsuarioActual(
+                null, 1, 10, "id", "desc", null, null, null))
+                .thenReturn(respuesta);
+
+        mockMvc.perform(get("/api/conciliaciones/reuniones"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.content[0].conciliacionId").value(5))
+                .andExpect(jsonPath("$.content[0].version").value(1))
+                .andExpect(jsonPath("$.content[0].conciliacionVersion").value(2))
+                .andExpect(jsonPath("$.content[0].consultaId").value(3))
+                .andExpect(jsonPath("$.content[0].estadoCodigo").value("REUNION_PROGRAMADA"))
+                .andExpect(jsonPath("$.content[0].estadoNombre").value("Reunion programada"))
+                .andExpect(jsonPath("$.content[0].sedeId").value(4))
+                .andExpect(jsonPath("$.content[0].sedeNombre").value("Principal"))
+                .andExpect(jsonPath("$.content[0].fechaReunion").value("2026-09-04T10:30:00"))
+                .andExpect(jsonPath("$.content[0].observaciones").value("Audiencia"))
+                .andExpect(jsonPath("$.content[0].estudianteId").value(6))
+                .andExpect(jsonPath("$.content[0].conciliadorId").value(7))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
+
+        verify(conciliacionService).buscarReunionesParaUsuarioActual(
+                null, 1, 10, "id", "desc", null, null, null);
+    }
+
+    @Test
+    void buscarReunionesConParametrosExplicitosDebePropagarlosAlService() throws Exception {
+        when(conciliacionService.buscarReunionesParaUsuarioActual(
+                "audiencia", 2, 20, "fechaReunion", "asc", "REUNION_PROGRAMADA",
+                LocalDate.of(2026, 9, 1),
+                LocalDate.of(2026, 9, 30)))
+                .thenReturn(new PageResponseDTO<>(List.of(), 2, 20, 0, 0));
+
+        mockMvc.perform(get("/api/conciliaciones/reuniones")
+                        .param("search", "audiencia")
+                        .param("page", "2")
+                        .param("size", "20")
+                        .param("sortBy", "fechaReunion")
+                        .param("direction", "asc")
+                        .param("estado", "REUNION_PROGRAMADA")
+                        .param("fechaDesde", "2026-09-01")
+                        .param("fechaHasta", "2026-09-30"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.page").value(2))
+                .andExpect(jsonPath("$.size").value(20));
+
+        verify(conciliacionService).buscarReunionesParaUsuarioActual(
+                "audiencia", 2, 20, "fechaReunion", "asc", "REUNION_PROGRAMADA",
+                LocalDate.of(2026, 9, 1),
+                LocalDate.of(2026, 9, 30));
+    }
+
+    @Test
+    void businessExceptionEnListadoDeReunionesDebeResponder400() throws Exception {
+        when(conciliacionService.buscarReunionesParaUsuarioActual(
+                null, 1, 51, "id", "desc", null, null, null))
+                .thenThrow(new BusinessException("El tamano de pagina debe estar entre 1 y 50"));
+
+        mockMvc.perform(get("/api/conciliaciones/reuniones")
+                        .param("size", "51"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.estado").value(400))
+                .andExpect(jsonPath("$.error").value("Error de negocio"))
+                .andExpect(jsonPath("$.mensaje").value("El tamano de pagina debe estar entre 1 y 50"));
+    }
+
+    @Test
+    void accessDeniedEnListadoDeReunionesDebeResponder403() throws Exception {
+        when(conciliacionService.buscarReunionesParaUsuarioActual(
+                null, 1, 10, "id", "desc", null, null, null))
+                .thenThrow(new AccessDeniedException("Acceso denegado"));
+
+        mockMvc.perform(get("/api/conciliaciones/reuniones"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.estado").value(403))
+                .andExpect(jsonPath("$.error").value("No autorizado"))
+                .andExpect(jsonPath("$.mensaje")
+                        .value("No tiene permisos para acceder a este recurso"))
+                .andExpect(jsonPath("$.ruta").value("/api/conciliaciones/reuniones"));
     }
 }

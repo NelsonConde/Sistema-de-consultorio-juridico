@@ -39,6 +39,9 @@ class ConciliacionControllerAuthorizationTest {
         when(conciliacionService.buscarParaUsuarioActual(
                 null, 1, 10, "id", "desc", null, null, null))
                 .thenReturn(new PageResponseDTO<>(List.of(), 1, 10, 0, 0));
+        when(conciliacionService.buscarReunionesParaUsuarioActual(
+                null, 1, 10, "id", "desc", null, null, null))
+                .thenReturn(new PageResponseDTO<>(List.of(), 1, 10, 0, 0));
     }
 
     @AfterEach
@@ -72,6 +75,34 @@ class ConciliacionControllerAuthorizationTest {
         assertThrows(
                 AccessDeniedException.class,
                 () -> conciliacionController.buscar(
+                        null, 1, 10, "id", "desc", null, null, null));
+    }
+
+    @Test
+    void usuarioConVerConciliacionesPuedeBuscarReuniones() {
+        autenticarCon(VER_CONCILIACIONES);
+
+        assertDoesNotThrow(() -> conciliacionController.buscarReuniones(
+                null, 1, 10, "id", "desc", null, null, null));
+    }
+
+    @Test
+    void usuarioSoloConGestionarConciliacionesNoPuedeBuscarReuniones() {
+        autenticarCon(GESTIONAR_CONCILIACIONES);
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> conciliacionController.buscarReuniones(
+                        null, 1, 10, "id", "desc", null, null, null));
+    }
+
+    @Test
+    void usuarioSinPermisoNoPuedeBuscarReuniones() {
+        autenticarCon("Acceder conciliaciones");
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> conciliacionController.buscarReuniones(
                         null, 1, 10, "id", "desc", null, null, null));
     }
 

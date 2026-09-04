@@ -11,6 +11,7 @@ import co.edu.ufps.legal_cases.business.dto.conciliacion.ConciliacionResponseDTO
 import co.edu.ufps.legal_cases.business.dto.conciliacion.ConciliacionResumenDTO;
 import co.edu.ufps.legal_cases.business.dto.conciliacion.reunion.ReunionConciliacionRequestDTO;
 import co.edu.ufps.legal_cases.business.dto.conciliacion.reunion.ReunionConciliacionResponseDTO;
+import co.edu.ufps.legal_cases.business.dto.conciliacion.reunion.ReunionConciliacionResumenDTO;
 import co.edu.ufps.legal_cases.business.service.conciliacion.conciliacion.ConciliacionCommandService;
 import co.edu.ufps.legal_cases.business.service.conciliacion.conciliacion.ConciliacionQueryService;
 import co.edu.ufps.legal_cases.business.service.conciliacion.reunion.ReunionConciliacionService;
@@ -49,6 +50,26 @@ public class ConciliacionService {
 
     public List<ConciliacionResponseDTO> listarPorConsulta(Long consultaId) {
         return conciliacionQueryService.listarPorConsulta(consultaId);
+    }
+
+    public PageResponseDTO<ReunionConciliacionResumenDTO> buscarReunionesParaUsuarioActual(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction,
+            String estado,
+            LocalDate fechaDesde,
+            LocalDate fechaHasta) {
+        return reunionConciliacionService.buscarParaUsuarioActual(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                estado,
+                fechaDesde,
+                fechaHasta);
     }
 
     public ConciliacionDetalleResponseDTO obtenerDetalle(Long id) {

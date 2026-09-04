@@ -30,6 +30,7 @@ import co.edu.ufps.legal_cases.business.dto.conciliacion.ConciliacionResponseDTO
 import co.edu.ufps.legal_cases.business.dto.conciliacion.ConciliacionResumenDTO;
 import co.edu.ufps.legal_cases.business.dto.conciliacion.reunion.ReunionConciliacionRequestDTO;
 import co.edu.ufps.legal_cases.business.dto.conciliacion.reunion.ReunionConciliacionResponseDTO;
+import co.edu.ufps.legal_cases.business.dto.conciliacion.reunion.ReunionConciliacionResumenDTO;
 import co.edu.ufps.legal_cases.business.service.conciliacion.ConciliacionService;
 import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import jakarta.validation.Valid;
@@ -54,6 +55,28 @@ public class ConciliacionController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta) {
         return conciliacionService.buscarParaUsuarioActual(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                estado,
+                fechaDesde,
+                fechaHasta);
+    }
+
+    @GetMapping("/reuniones")
+    @PreAuthorize("hasAuthority('" + VER_CONCILIACIONES + "')")
+    public PageResponseDTO<ReunionConciliacionResumenDTO> buscarReuniones(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) String estado,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta) {
+        return conciliacionService.buscarReunionesParaUsuarioActual(
                 search,
                 page,
                 size,
