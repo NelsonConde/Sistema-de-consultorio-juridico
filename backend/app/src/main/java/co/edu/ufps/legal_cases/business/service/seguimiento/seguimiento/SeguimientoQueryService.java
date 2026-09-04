@@ -2,7 +2,6 @@ package co.edu.ufps.legal_cases.business.service.seguimiento.seguimiento;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -21,6 +20,7 @@ import co.edu.ufps.legal_cases.business.model.seguimiento.EstadoSeguimiento;
 import co.edu.ufps.legal_cases.business.model.seguimiento.Seguimiento;
 import co.edu.ufps.legal_cases.business.repository.seguimiento.SeguimientoRepository;
 import co.edu.ufps.legal_cases.business.repository.seguimiento.SeguimientoResumenProjection;
+import co.edu.ufps.legal_cases.business.repository.seguimiento.SeguimientoAgendaProjection;
 import co.edu.ufps.legal_cases.business.service.acceso.seguimiento.AlcanceAlertasDisciplinarias;
 import co.edu.ufps.legal_cases.business.service.acceso.seguimiento.SeguimientoAccessService;
 import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
@@ -64,6 +64,7 @@ public class SeguimientoQueryService {
                 this.seguimientoValidator = seguimientoValidator;
         }
 
+        // Listado paginado principal – Bloque A (SCRUM-269).
         @Transactional(readOnly = true)
         public PageResponseDTO<SeguimientoResumenDTO> buscarParaUsuarioActual(
                         String search,
@@ -125,27 +126,49 @@ public class SeguimientoQueryService {
                                 resultado.getTotalPages());
         }
 
+        // Calendario por rango – Bloque B (SCRUM-269).
+        // Reemplaza listarParaCalendario() que usaba findAll() + filtros en memoria.
+        // El endpoint GET /api/seguimientos/calendario ahora requiere from y to.
         @Transactional(readOnly = true)
-        public List<SeguimientoResponseDTO> listarParaCalendario() {
-                // Valida que el usuario tenga el permiso de ver seguimientos.
+        public List<SeguimientoResponseDTO> listarCalendarioPorRango(LocalDate from, LocalDate to) {
                 seguimientoAccessService.validarTienePermisoVerSeguimientos();
 
-                // Se buscan todos los seguimientos activos, se filtran por alcance
-                // con `puedeVerSeguimiento` y se ordenan por fecha de entrega.
-                return seguimientoRepository.findAll().stream()
-                                .filter(s -> Boolean.TRUE.equals(s.getActivo()))
-                                .filter(seguimientoAccessService::puedeVerSeguimiento)
-                                .sorted(Comparator.comparing(
-                                                // Ordenar por fechaEntrega, colocando nulos al final
-                                                s -> s.getFechaEntrega(),
-                                                Comparator.nullsLast(Comparator.naturalOrder())))
-                                .map(seguimientoMapper::convertirAResponseDTO)
-                                .toList();
+                if (from == null || to == null || !from.isBefore(to)) {
+                        throw new BusinessException("El rango debe ser válido y no vacío");
+                }
+                if (from.plusMonths(3).isBefore(to)) {
+                        throw new BusinessException("El rango no puede superar tres meses");
+                }
+
+                boolean alcanceGlobal = seguimientoAccessService.usuarioEsAdministrador();
+                String tipoPerfil = null;
+                Long perfilId = null;
+
+                if (!alcanceGlobal) {
+                        PerfilUsuarioActual perfil = seguimientoAccessService.obtenerPerfilActual();
+                        if (perfil == null || perfil.getTipoPerfil() == null) {
+                                // fail-closed: perfil no soportado no ve nada
+                                return List.of();
+                        }
+                        tipoPerfil = perfil.getTipoPerfil().name();
+                        perfilId = perfil.getPerfilId();
+                }
+
+                return seguimientoRepository
+                        .buscarParaCalendarioPorRangoConScope(
+                                from,
+                                to,
+                                alcanceGlobal,
+                                tipoPerfil,
+                                perfilId,
+                                ESTADO_ARCHIVADO)
+                        .stream()
+                        .map(seguimientoMapper::convertirAResponseDTO)
+                        .toList();
         }
 
         // Lista seguimientos activos de una consulta después de validar alcance sobre
-        // esa consulta.
-        // No expone seguimientos de consultas archivadas en flujos operativos.
+        // esa consulta. No expone seguimientos de consultas archivadas en flujos operativos.
         @Transactional(readOnly = true)
         public List<SeguimientoResponseDTO> listarPorConsulta(Long consultaId) {
                 seguimientoAccessService.validarPuedeListarSeguimientosDeConsulta(consultaId);
@@ -160,9 +183,9 @@ public class SeguimientoQueryService {
         }
 
         // Para estudiante solo se muestran los seguimientos marcados como visibles.
-        // Además se filtra por alcance para evitar exponer seguimientos de otra
-        // consulta.
+        // Además se filtra por alcance para evitar exponer seguimientos de otra consulta.
         // También se excluyen consultas archivadas para evitar contaminación visual.
+        // El post-filtrado puedeVerSeguimiento fue eliminado: la query ya garantiza scope.
         @Transactional(readOnly = true)
         public List<SeguimientoResponseDTO> listarVisiblesParaEstudiantePorConsulta(Long consultaId) {
                 seguimientoAccessService.validarPuedeListarSeguimientosVisiblesParaEstudiante(consultaId);
@@ -172,21 +195,37 @@ public class SeguimientoQueryService {
                                                 consultaId,
                                                 ESTADO_ARCHIVADO)
                                 .stream()
-                                .filter(seguimientoAccessService::puedeVerSeguimiento)
                                 .map(seguimientoMapper::convertirAResponseDTO)
                                 .toList();
         }
 
+        // Listar por autor con scope de consulta en SQL – Bloque B (SCRUM-269).
+        // La validación de autorId (ADMIN vs no-admin) se preserva en SeguimientoAccessService.
+        // El post-filtrado puedeVerSeguimiento fue eliminado: el scope está en la query.
         @Transactional(readOnly = true)
         public List<SeguimientoResponseDTO> listarPorAutor(Long autorId) {
                 seguimientoAccessService.validarPuedeListarSeguimientosPorAutor(autorId);
 
+                boolean alcanceGlobal = seguimientoAccessService.usuarioEsAdministrador();
+                String tipoPerfil = null;
+                Long perfilId = null;
+
+                if (!alcanceGlobal) {
+                        PerfilUsuarioActual perfil = seguimientoAccessService.obtenerPerfilActual();
+                        if (perfil != null && perfil.getTipoPerfil() != null) {
+                                tipoPerfil = perfil.getTipoPerfil().name();
+                                perfilId = perfil.getPerfilId();
+                        }
+                }
+
                 return seguimientoRepository
-                                .findByAutor_IdAndActivoTrueAndConsulta_EstadoNotOrderByFechaCreacionDesc(
-                                                autorId,
-                                                ESTADO_ARCHIVADO)
+                                .buscarPorAutorConScope(
+                                        autorId,
+                                        alcanceGlobal,
+                                        tipoPerfil,
+                                        perfilId,
+                                        ESTADO_ARCHIVADO)
                                 .stream()
-                                .filter(seguimientoAccessService::puedeVerSeguimiento)
                                 .map(seguimientoMapper::convertirAResponseDTO)
                                 .toList();
         }
@@ -214,19 +253,64 @@ public class SeguimientoQueryService {
                                 .toList();
         }
 
+        // Listar por fecha de entrega con scope en SQL – Bloque B (SCRUM-269).
+        // El post-filtrado puedeVerSeguimiento fue eliminado.
         @Transactional(readOnly = true)
         public List<SeguimientoResponseDTO> listarPorFechaEntrega(LocalDate fechaEntrega) {
                 seguimientoAccessService.validarPuedeListarSeguimientosPorFechaEntrega();
                 seguimientoValidator.validarFechaEntregaObligatoria(fechaEntrega);
 
+                boolean alcanceGlobal = seguimientoAccessService.usuarioEsAdministrador();
+                String tipoPerfil = null;
+                Long perfilId = null;
+
+                if (!alcanceGlobal) {
+                        PerfilUsuarioActual perfil = seguimientoAccessService.obtenerPerfilActual();
+                        if (perfil != null && perfil.getTipoPerfil() != null) {
+                                tipoPerfil = perfil.getTipoPerfil().name();
+                                perfilId = perfil.getPerfilId();
+                        }
+                }
+
                 return seguimientoRepository
-                                .findByFechaEntregaAndActivoTrueAndConsulta_EstadoNotOrderByFechaCreacionDesc(
-                                                fechaEntrega,
-                                                ESTADO_ARCHIVADO)
+                                .buscarPorFechaEntregaConScope(
+                                        fechaEntrega,
+                                        alcanceGlobal,
+                                        tipoPerfil,
+                                        perfilId,
+                                        ESTADO_ARCHIVADO)
                                 .stream()
-                                .filter(seguimientoAccessService::puedeVerSeguimiento)
                                 .map(seguimientoMapper::convertirAResponseDTO)
                                 .toList();
+        }
+
+        // Consulta para Agenda: rango y scope resueltos en SQL – Bloque B (SCRUM-269).
+        // AgendaQueryService llama este método; no filtra fechaEntrega en Java.
+        @Transactional(readOnly = true)
+        public List<SeguimientoAgendaProjection> buscarParaAgenda(LocalDate from, LocalDate to) {
+                seguimientoAccessService.validarTienePermisoVerSeguimientos();
+
+                boolean alcanceGlobal = seguimientoAccessService.usuarioEsAdministrador();
+                String tipoPerfil = null;
+                Long perfilId = null;
+
+                if (!alcanceGlobal) {
+                        PerfilUsuarioActual perfil = seguimientoAccessService.obtenerPerfilActual();
+                        if (perfil == null || perfil.getTipoPerfil() == null) {
+                                // fail-closed: perfil no soportado no ve nada en la agenda
+                                return List.of();
+                        }
+                        tipoPerfil = perfil.getTipoPerfil().name();
+                        perfilId = perfil.getPerfilId();
+                }
+
+                return seguimientoRepository.buscarParaAgenda(
+                        from,
+                        to,
+                        alcanceGlobal,
+                        tipoPerfil,
+                        perfilId,
+                        ESTADO_ARCHIVADO);
         }
 
         @Transactional(readOnly = true)

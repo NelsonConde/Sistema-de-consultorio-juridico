@@ -9,6 +9,7 @@ import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoRequestDTO;
 import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoResponseDTO;
 import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoResumenDTO;
 import co.edu.ufps.legal_cases.business.model.seguimiento.EstadoSeguimiento;
+import co.edu.ufps.legal_cases.business.repository.seguimiento.SeguimientoAgendaProjection;
 import co.edu.ufps.legal_cases.business.service.seguimiento.seguimiento.SeguimientoCommandService;
 import co.edu.ufps.legal_cases.business.service.seguimiento.seguimiento.SeguimientoQueryService;
 import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
@@ -64,8 +65,17 @@ public class SeguimientoService {
         return seguimientoQueryService.listarPorAutor(autorId);
     }
 
-    public List<SeguimientoResponseDTO> listarParaCalendario() {
-        return seguimientoQueryService.listarParaCalendario();
+    // Calendario por rango – Bloque B (SCRUM-269).
+    // Reemplaza listarParaCalendario() que usaba findAll() + filtros en memoria.
+    // El endpoint GET /api/seguimientos/calendario ahora requiere from y to.
+    public List<SeguimientoResponseDTO> listarCalendarioPorRango(LocalDate from, LocalDate to) {
+        return seguimientoQueryService.listarCalendarioPorRango(from, to);
+    }
+
+    // Para Agenda – Bloque B (SCRUM-269).
+    // Resuelve scope internamente; AgendaQueryService solo pasa el rango.
+    public List<SeguimientoAgendaProjection> buscarParaAgenda(LocalDate from, LocalDate to) {
+        return seguimientoQueryService.buscarParaAgenda(from, to);
     }
 
     public List<SeguimientoResponseDTO> listarAlertasDisciplinarias() {

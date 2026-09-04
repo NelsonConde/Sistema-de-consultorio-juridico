@@ -458,6 +458,113 @@ class SeguimientoQueryServiceTest {
                         org.mockito.ArgumentMatchers.any());
     }
 
+    @Test
+    void listarCalendarioPorRangoValidoPropagaRepository() {
+        LocalDate from = LocalDate.of(2026, 9, 1);
+        LocalDate to = LocalDate.of(2026, 9, 30);
+
+        when(seguimientoAccessService.usuarioEsAdministrador()).thenReturn(true);
+        when(seguimientoRepository.buscarParaCalendarioPorRangoConScope(
+                from, to, true, null, null, EstadoConsulta.ARCHIVADO))
+                .thenReturn(List.of());
+
+        seguimientoQueryService.listarCalendarioPorRango(from, to);
+
+        verify(seguimientoRepository).buscarParaCalendarioPorRangoConScope(
+                from, to, true, null, null, EstadoConsulta.ARCHIVADO);
+        verify(seguimientoRepository, never()).findAll();
+    }
+
+    @Test
+    void listarCalendarioPorRangoNullFromLanzaExcepcion() {
+        LocalDate to = LocalDate.of(2026, 9, 30);
+        assertThrows(BusinessException.class, () -> seguimientoQueryService.listarCalendarioPorRango(null, to));
+    }
+
+    @Test
+    void listarCalendarioPorRangoNullToLanzaExcepcion() {
+        LocalDate from = LocalDate.of(2026, 9, 1);
+        assertThrows(BusinessException.class, () -> seguimientoQueryService.listarCalendarioPorRango(from, null));
+    }
+
+    @Test
+    void listarCalendarioPorRangoFromMayorIgualToLanzaExcepcion() {
+        LocalDate from = LocalDate.of(2026, 9, 30);
+        LocalDate to = LocalDate.of(2026, 9, 1);
+        assertThrows(BusinessException.class, () -> seguimientoQueryService.listarCalendarioPorRango(from, to));
+        assertThrows(BusinessException.class, () -> seguimientoQueryService.listarCalendarioPorRango(from, from));
+    }
+
+    @Test
+    void listarCalendarioPorRangoMayor3MesesLanzaExcepcion() {
+        LocalDate from = LocalDate.of(2026, 1, 1);
+        LocalDate to = LocalDate.of(2026, 4, 2);
+        assertThrows(BusinessException.class, () -> seguimientoQueryService.listarCalendarioPorRango(from, to));
+    }
+
+    @Test
+    void listarCalendarioPorRangoPerfilNuloDevuelveVacioSinDelegar() {
+        LocalDate from = LocalDate.of(2026, 9, 1);
+        LocalDate to = LocalDate.of(2026, 9, 30);
+
+        when(seguimientoAccessService.usuarioEsAdministrador()).thenReturn(false);
+        when(seguimientoAccessService.obtenerPerfilActual()).thenReturn(null);
+
+        var result = seguimientoQueryService.listarCalendarioPorRango(from, to);
+        assertTrue(result.isEmpty());
+        verify(seguimientoRepository, never()).buscarParaCalendarioPorRangoConScope(any(), any(), anyBoolean(), any(), any(), any());
+    }
+
+    @Test
+    void listarCalendarioPorRangoScopeEstudiantePropagaRepository() {
+        LocalDate from = LocalDate.of(2026, 9, 1);
+        LocalDate to = LocalDate.of(2026, 9, 30);
+
+        stubPerfil(TipoPerfilUsuario.ESTUDIANTE, 55L);
+
+        seguimientoQueryService.listarCalendarioPorRango(from, to);
+
+        verify(seguimientoRepository).buscarParaCalendarioPorRangoConScope(
+                from, to, false, "ESTUDIANTE", 55L, EstadoConsulta.ARCHIVADO);
+    }
+
+    @Test
+    void buscarParaAgendaPropagaGlobal() {
+        LocalDate from = LocalDate.of(2026, 9, 1);
+        LocalDate to = LocalDate.of(2026, 9, 30);
+
+        when(seguimientoAccessService.usuarioEsAdministrador()).thenReturn(true);
+        seguimientoQueryService.buscarParaAgenda(from, to);
+
+        verify(seguimientoRepository).buscarParaAgenda(
+                from, to, true, null, null, EstadoConsulta.ARCHIVADO);
+    }
+
+    @Test
+    void buscarParaAgendaPropagaRestringido() {
+        LocalDate from = LocalDate.of(2026, 9, 1);
+        LocalDate to = LocalDate.of(2026, 9, 30);
+
+        stubPerfil(TipoPerfilUsuario.ASESOR, 10L);
+        seguimientoQueryService.buscarParaAgenda(from, to);
+
+        verify(seguimientoRepository).buscarParaAgenda(
+                from, to, false, "ASESOR", 10L, EstadoConsulta.ARCHIVADO);
+    }
+
+    @Test
+    void buscarParaAgendaPerfilNuloFailClosed() {
+        LocalDate from = LocalDate.of(2026, 9, 1);
+        LocalDate to = LocalDate.of(2026, 9, 30);
+
+        when(seguimientoAccessService.usuarioEsAdministrador()).thenReturn(false);
+        when(seguimientoAccessService.obtenerPerfilActual()).thenReturn(null);
+
+        var result = seguimientoQueryService.buscarParaAgenda(from, to);
+        assertTrue(result.isEmpty());
+        verify(seguimientoRepository, never()).buscarParaAgenda(any(), any(), anyBoolean(), any(), any(), any());
+    }
+
     private void stubEmpty() {
         when(seguimientoRepository.buscarResumenPaginado(
                 any(), any(), any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any(PageRequest.class)))

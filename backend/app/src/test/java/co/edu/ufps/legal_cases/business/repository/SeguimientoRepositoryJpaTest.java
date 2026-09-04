@@ -43,6 +43,7 @@ import co.edu.ufps.legal_cases.business.model.persona.TipoPersona;
 import co.edu.ufps.legal_cases.business.model.seguimiento.CategoriaSeguimiento;
 import co.edu.ufps.legal_cases.business.model.seguimiento.EstadoSeguimiento;
 import co.edu.ufps.legal_cases.business.model.seguimiento.Seguimiento;
+import co.edu.ufps.legal_cases.business.repository.seguimiento.SeguimientoAgendaProjection;
 import co.edu.ufps.legal_cases.business.repository.seguimiento.SeguimientoRepository;
 import co.edu.ufps.legal_cases.business.repository.seguimiento.SeguimientoResumenProjection;
 import co.edu.ufps.legal_cases.security.model.access.Rol;
@@ -737,5 +738,504 @@ class SeguimientoRepositoryJpaTest extends PostgreSqlIntegrationTest {
         persona.setActivo(true);
         entityManager.persist(persona);
         return persona;
+    }
+    // =========================================================================
+    // BLOQUE B – SCRUM-269: buscarParaAgenda, buscarPorAutorConScope,
+    //                        buscarPorFechaEntregaConScope,
+    //                        buscarParaCalendarioPorRangoConScope
+    // =========================================================================
+
+    // --- buscarParaAgenda ---
+
+    @Test
+    void agendaGlobalDebeIncluirSeguimientosConFechaEntregaEnRango() {
+        Seguimiento dentroRango = crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "agenda dentro rango",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 3, 15));
+        Seguimiento fueraRango = crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "agenda fuera rango",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 5, 1));
+        entityManager.flush();
+        entityManager.clear();
+
+        var resultado = seguimientoRepository.buscarParaAgenda(
+                LocalDate.of(2026, 3, 1),
+                LocalDate.of(2026, 4, 1),
+                true, null, null,
+                EstadoConsulta.ARCHIVADO);
+
+        var ids = resultado.stream()
+                .map(SeguimientoAgendaProjection::getId)
+                .toList();
+        assertTrue(ids.contains(dentroRango.getId()));
+        assertFalse(ids.contains(fueraRango.getId()));
+    }
+
+    @Test
+    void agendaGlobalDebeExcluirSeguimientosSinFechaEntrega() {
+        Seguimiento sinFecha = crearSeguimientoConFechaEntrega(
+                consultaAlpha,
+                categoriaAudiencia,
+                autorA,
+                "agenda sin fecha",
+                EstadoSeguimiento.PENDIENTE,
+                LocalDate.of(2026, 3, 15));
+
+        sinFecha.setFechaEntrega(null);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        var resultado = seguimientoRepository.buscarParaAgenda(
+                LocalDate.of(2026, 3, 1),
+                LocalDate.of(2026, 4, 1),
+                true,
+                null,
+                null,
+                EstadoConsulta.ARCHIVADO);
+
+        var ids = resultado.stream()
+                .map(SeguimientoAgendaProjection::getId)
+                .toList();
+
+        assertFalse(ids.contains(sinFecha.getId()));
+    }
+
+    @Test
+    void agendaScopeAsesorDebeVerSoloSusConsultas() {
+        Seguimiento suyoAsesorA = crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "agenda asesorA",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 3, 10));
+        Seguimiento ajenoAsesorB = crearSeguimientoConFechaEntrega(
+                consultaGamma, categoriaAudiencia, autorB, "agenda asesorB",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 3, 11));
+        entityManager.flush();
+        entityManager.clear();
+
+        var resultado = seguimientoRepository.buscarParaAgenda(
+                LocalDate.of(2026, 3, 1),
+                LocalDate.of(2026, 4, 1),
+                false, "ASESOR", asesorA.getId(),
+                EstadoConsulta.ARCHIVADO);
+
+        var ids = resultado.stream()
+                .map(SeguimientoAgendaProjection::getId)
+                .toList();
+        assertTrue(ids.contains(suyoAsesorA.getId()));
+        assertFalse(ids.contains(ajenoAsesorB.getId()));
+    }
+
+    @Test
+    void agendaProjectionExponeCamposMinimos() {
+        Seguimiento seg = crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "Descripcion agenda test",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 3, 5));
+        entityManager.flush();
+        entityManager.clear();
+
+        var resultado = seguimientoRepository.buscarParaAgenda(
+                LocalDate.of(2026, 3, 1),
+                LocalDate.of(2026, 3, 31),
+                true, null, null,
+                EstadoConsulta.ARCHIVADO);
+
+        var projection = resultado.stream()
+                .filter(p -> p.getId().equals(seg.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals(seg.getId(), projection.getId());
+        assertEquals(consultaAlpha.getId(), projection.getConsultaId());
+        assertEquals("Descripcion agenda test", projection.getDescripcion());
+        assertEquals(EstadoSeguimiento.PENDIENTE, projection.getEstado());
+        assertEquals(LocalDate.of(2026, 3, 5), projection.getFechaEntrega());
+    }
+
+    @Test
+    void agendaScopeEstudianteDebeVerSoloNotificarEstudianteTrue() {
+        Seguimiento visible = crearSeguimientoConFechaEntregaYNotificar(
+                consultaAlpha, categoriaAudiencia, autorA, "visible estudiante",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 3, 8), true);
+        Seguimiento noVisible = crearSeguimientoConFechaEntregaYNotificar(
+                consultaAlpha, categoriaAudiencia, autorA, "no visible estudiante",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 3, 9), false);
+        entityManager.flush();
+        entityManager.clear();
+
+        var resultado = seguimientoRepository.buscarParaAgenda(
+                LocalDate.of(2026, 3, 1),
+                LocalDate.of(2026, 4, 1),
+                false, "ESTUDIANTE", estudianteA.getId(),
+                EstadoConsulta.ARCHIVADO);
+
+        var ids = resultado.stream()
+                .map(SeguimientoAgendaProjection::getId)
+                .toList();
+        assertTrue(ids.contains(visible.getId()));
+        assertFalse(ids.contains(noVisible.getId()));
+    }
+
+    @Test
+    void agendaRangoExcluyeHastaExclusiva() {
+        LocalDate dentroRango = LocalDate.of(2026, 3, 31);
+        LocalDate hastaExclusiva = LocalDate.of(2026, 4, 1); // no incluido
+        Seguimiento dentro = crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "fecha limite dentro",
+                EstadoSeguimiento.PENDIENTE, dentroRango);
+        Seguimiento fuera = crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "fecha limite fuera",
+                EstadoSeguimiento.PENDIENTE, hastaExclusiva);
+        entityManager.flush();
+        entityManager.clear();
+
+        var resultado = seguimientoRepository.buscarParaAgenda(
+                LocalDate.of(2026, 3, 1),
+                hastaExclusiva,
+                true, null, null,
+                EstadoConsulta.ARCHIVADO);
+
+        var ids = resultado.stream()
+                .map(SeguimientoAgendaProjection::getId)
+                .toList();
+        assertTrue(ids.contains(dentro.getId()));
+        assertFalse(ids.contains(fuera.getId()));
+    }
+
+    @Test
+    void agendaExcluyeSeguimientoInactivo() {
+        Seguimiento inactivo = crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "agenda inactivo",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 3, 10));
+        inactivo.setActivo(false);
+        entityManager.persist(inactivo);
+        entityManager.flush();
+        entityManager.clear();
+
+        var resultado = seguimientoRepository.buscarParaAgenda(
+                LocalDate.of(2026, 3, 1),
+                LocalDate.of(2026, 4, 1),
+                true, null, null,
+                EstadoConsulta.ARCHIVADO);
+
+        var ids = resultado.stream()
+                .map(SeguimientoAgendaProjection::getId)
+                .toList();
+        assertFalse(ids.contains(inactivo.getId()));
+    }
+
+    @Test
+    void agendaExcluyeSeguimientoDeConsultaArchivada() {
+        Consulta consultaArchivada = crearConsulta(
+                crearPersona("Agenda", "Archivada", "DOC-AGENDA-ARCH"),
+                EstadoConsulta.ARCHIVADO,
+                asesorA,
+                estudianteA,
+                monitorA,
+                "consulta archivada agenda",
+                LocalDate.of(2026, 3, 1));
+
+        Seguimiento archivado = crearSeguimientoConFechaEntrega(
+                consultaArchivada, categoriaAudiencia, autorA, "agenda consulta archivada",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 3, 10));
+        entityManager.flush();
+        entityManager.clear();
+
+        var resultado = seguimientoRepository.buscarParaAgenda(
+                LocalDate.of(2026, 3, 1),
+                LocalDate.of(2026, 4, 1),
+                true, null, null,
+                EstadoConsulta.ARCHIVADO);
+
+        var ids = resultado.stream()
+                .map(SeguimientoAgendaProjection::getId)
+                .toList();
+        assertFalse(ids.contains(archivado.getId()));
+    }
+
+    @Test
+    void agendaScopeAsesorPorEstudianteDebeIncluirConsulta() {
+        // consultaBeta tiene asesor directo asesorB y estudianteA, cuyo asesor es asesorA.
+        Seguimiento indirecto = crearSeguimientoConFechaEntrega(
+                consultaBeta, categoriaAudiencia, autorB, "agenda asesor indirecto",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 3, 10));
+        entityManager.flush();
+        entityManager.clear();
+
+        var resultado = seguimientoRepository.buscarParaAgenda(
+                LocalDate.of(2026, 3, 1),
+                LocalDate.of(2026, 4, 1),
+                false, "ASESOR", asesorA.getId(),
+                EstadoConsulta.ARCHIVADO);
+
+        var ids = resultado.stream()
+                .map(SeguimientoAgendaProjection::getId)
+                .toList();
+        assertTrue(ids.contains(indirecto.getId()));
+    }
+
+    @Test
+    void agendaScopeMonitorDebeVerUnicamenteConsultasAsignadas() {
+        Seguimiento monitorSeg = crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "agenda monitor",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 3, 10));
+        Seguimiento ajenoSeg = crearSeguimientoConFechaEntrega(
+                consultaGamma, categoriaAudiencia, autorB, "agenda monitor ajeno",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 3, 11));
+        entityManager.flush();
+        entityManager.clear();
+
+        var resultado = seguimientoRepository.buscarParaAgenda(
+                LocalDate.of(2026, 3, 1),
+                LocalDate.of(2026, 4, 1),
+                false, "MONITOR", monitorA.getId(),
+                EstadoConsulta.ARCHIVADO);
+
+        var ids = resultado.stream()
+                .map(SeguimientoAgendaProjection::getId)
+                .toList();
+        assertTrue(ids.contains(monitorSeg.getId()));
+        assertFalse(ids.contains(ajenoSeg.getId()));
+    }
+
+    @Test
+    void agendaScopeConciliadorDebeSerFailClosed() {
+        var resultado = seguimientoRepository.buscarParaAgenda(
+                LocalDate.of(2026, 3, 1),
+                LocalDate.of(2026, 4, 1),
+                false, "CONCILIADOR", 999L,
+                EstadoConsulta.ARCHIVADO);
+
+        assertTrue(resultado.isEmpty());
+    }
+
+    @Test
+    void agendaPerfilNoSoportadoDebeSerFailClosed() {
+        var resultado = seguimientoRepository.buscarParaAgenda(
+                LocalDate.of(2026, 3, 1),
+                LocalDate.of(2026, 4, 1),
+                false, "ADMINISTRATIVO", 999L,
+                EstadoConsulta.ARCHIVADO);
+
+        assertTrue(resultado.isEmpty());
+    }
+
+    @Test
+    void agendaDebeOrdenarPorFechaEntregaAscEIdAsc() {
+        Seguimiento seg1 = crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "orden 1",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 3, 15));
+        Seguimiento seg3 = crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "orden 3",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 3, 20));
+        Seguimiento seg2 = crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "orden 2",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 3, 15));
+
+        // forzar ids si es necesario, pero el orden de persistencia ya garantiza que seg1.id < seg2.id
+        entityManager.flush();
+        entityManager.clear();
+
+        var resultado = seguimientoRepository.buscarParaAgenda(
+                LocalDate.of(2026, 3, 1),
+                LocalDate.of(2026, 4, 1),
+                true, null, null,
+                EstadoConsulta.ARCHIVADO);
+
+        assertEquals(3, resultado.size());
+        assertEquals(seg1.getId(), resultado.get(0).getId());
+        assertEquals(seg2.getId(), resultado.get(1).getId());
+        assertEquals(seg3.getId(), resultado.get(2).getId());
+    }
+
+    @Test
+    void accesoAGettersDeAgendaProjectionNoDebeGenerarNMasUno() {
+        crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "n+1 test 1",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 3, 10));
+        crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "n+1 test 2",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 3, 11));
+
+        SessionFactory sessionFactory = entityManager.getEntityManagerFactory()
+                .unwrap(SessionFactory.class);
+        Statistics statistics = sessionFactory.getStatistics();
+        statistics.setStatisticsEnabled(true);
+
+        entityManager.flush();
+        entityManager.clear();
+        statistics.clear();
+
+        var resultado = seguimientoRepository.buscarParaAgenda(
+                LocalDate.of(2026, 3, 1),
+                LocalDate.of(2026, 4, 1),
+                true, null, null,
+                EstadoConsulta.ARCHIVADO);
+
+        resultado.forEach(item -> {
+            item.getId();
+            item.getConsultaId();
+            item.getDescripcion();
+            item.getEstado();
+            item.getFechaEntrega();
+        });
+
+        assertEquals(1, statistics.getPrepareStatementCount());
+    }
+
+
+    // --- buscarPorAutorConScope ---
+
+    @Test
+    void buscarPorAutorConScopeGlobalRetornaTodasLasConsultas() {
+        var resultado = seguimientoRepository.buscarPorAutorConScope(
+                autorA.getId(), true, null, null, EstadoConsulta.ARCHIVADO);
+
+        var ids = resultado.stream().map(Seguimiento::getId).toList();
+        assertTrue(ids.contains(seguimientoAlpha.getId()));
+        assertTrue(ids.contains(seguimientoGamma.getId()));
+        assertFalse(ids.contains(seguimientoBeta.getId())); // autorB
+    }
+
+    @Test
+    void buscarPorAutorConScopeAsesorDebeExcluirConsultasAjenas() {
+        var resultado = seguimientoRepository.buscarPorAutorConScope(
+                autorA.getId(), false, "ASESOR", asesorB.getId(), EstadoConsulta.ARCHIVADO);
+
+        var ids = resultado.stream()
+                .map(Seguimiento::getId)
+                .toList();
+
+        assertFalse(ids.contains(seguimientoAlpha.getId()));
+        assertTrue(ids.contains(seguimientoGamma.getId()));
+    }
+
+    @Test
+    void buscarPorAutorConScopeAsesorRetornaConsultasPropias() {
+        var resultado = seguimientoRepository.buscarPorAutorConScope(
+                autorA.getId(), false, "ASESOR", asesorA.getId(), EstadoConsulta.ARCHIVADO);
+
+        var ids = resultado.stream().map(Seguimiento::getId).toList();
+        assertTrue(ids.contains(seguimientoAlpha.getId()));
+    }
+
+    // --- buscarPorFechaEntregaConScope ---
+
+    @Test
+    void buscarPorFechaEntregaConScopeGlobalRetornaCoincidentes() {
+        LocalDate fecha = LocalDate.of(2026, 4, 20);
+        Seguimiento seg = crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "fecha entrega exacta",
+                EstadoSeguimiento.PENDIENTE, fecha);
+        entityManager.flush();
+        entityManager.clear();
+
+        var resultado = seguimientoRepository.buscarPorFechaEntregaConScope(
+                fecha, true, null, null, EstadoConsulta.ARCHIVADO);
+
+        var ids = resultado.stream().map(Seguimiento::getId).toList();
+        assertTrue(ids.contains(seg.getId()));
+    }
+
+    @Test
+    void buscarPorFechaEntregaConScopeDebeExcluirFechaDistinta() {
+        LocalDate fecha = LocalDate.of(2026, 4, 20);
+        LocalDate otraFecha = LocalDate.of(2026, 4, 21);
+        Seguimiento segOtra = crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "fecha entrega otra",
+                EstadoSeguimiento.PENDIENTE, otraFecha);
+        entityManager.flush();
+        entityManager.clear();
+
+        var resultado = seguimientoRepository.buscarPorFechaEntregaConScope(
+                fecha, true, null, null, EstadoConsulta.ARCHIVADO);
+
+        var ids = resultado.stream().map(Seguimiento::getId).toList();
+        assertFalse(ids.contains(segOtra.getId()));
+    }
+
+    // --- buscarParaCalendarioPorRangoConScope ---
+
+    @Test
+    void buscarCalendarioRangoGlobalRetornaSeguimientosEnRango() {
+        Seguimiento dentro = crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "calendario dentro",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 5, 10));
+        Seguimiento fuera = crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "calendario fuera",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 7, 1));
+        entityManager.flush();
+        entityManager.clear();
+
+        var resultado = seguimientoRepository.buscarParaCalendarioPorRangoConScope(
+                LocalDate.of(2026, 5, 1),
+                LocalDate.of(2026, 6, 1),
+                true, null, null, EstadoConsulta.ARCHIVADO);
+
+        var ids = resultado.stream().map(Seguimiento::getId).toList();
+        assertTrue(ids.contains(dentro.getId()));
+        assertFalse(ids.contains(fuera.getId()));
+    }
+
+    @Test
+    void buscarCalendarioRangoScopeMonitorDebeVerSoloSusConsultas() {
+        Seguimiento suyo = crearSeguimientoConFechaEntrega(
+                consultaAlpha, categoriaAudiencia, autorA, "calendario monitor suyo",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 5, 15));
+        Seguimiento ajeno = crearSeguimientoConFechaEntrega(
+                consultaGamma, categoriaAudiencia, autorB, "calendario monitor ajeno",
+                EstadoSeguimiento.PENDIENTE, LocalDate.of(2026, 5, 16));
+        entityManager.flush();
+        entityManager.clear();
+
+        var resultado = seguimientoRepository.buscarParaCalendarioPorRangoConScope(
+                LocalDate.of(2026, 5, 1),
+                LocalDate.of(2026, 6, 1),
+                false, "MONITOR", monitorA.getId(), EstadoConsulta.ARCHIVADO);
+
+        var ids = resultado.stream().map(Seguimiento::getId).toList();
+        assertTrue(ids.contains(suyo.getId()));
+        assertFalse(ids.contains(ajeno.getId()));
+    }
+
+    // =========================================================================
+    // Helpers de creación para Bloque B
+    // =========================================================================
+
+    private Seguimiento crearSeguimientoConFechaEntrega(
+            Consulta consulta,
+            CategoriaSeguimiento categoria,
+            UsuarioSistema autor,
+            String descripcion,
+            EstadoSeguimiento estado,
+            LocalDate fechaEntrega) {
+        Seguimiento s = new Seguimiento();
+        s.setConsulta(consulta);
+        s.setCategoriaSeguimiento(categoria);
+        s.setAutor(autor);
+        s.setDescripcion(descripcion);
+        s.setEstado(estado);
+        s.setFechaEntrega(fechaEntrega);
+        s.setDiasNotificacion(1);
+        s.setNotificarPartes(false);
+        s.setNotificarEstudiante(false);
+        s.setAlertaDisciplinaria(false);
+        s.setActivo(true);
+        s.setFechaCreacion(LocalDateTime.of(2026, 1, 1, 8, 0));
+        entityManager.persist(s);
+        return s;
+    }
+
+    private Seguimiento crearSeguimientoConFechaEntregaYNotificar(
+            Consulta consulta,
+            CategoriaSeguimiento categoria,
+            UsuarioSistema autor,
+            String descripcion,
+            EstadoSeguimiento estado,
+            LocalDate fechaEntrega,
+            boolean notificarEstudiante) {
+        Seguimiento s = crearSeguimientoConFechaEntrega(
+                consulta, categoria, autor, descripcion, estado, fechaEntrega);
+        s.setNotificarEstudiante(notificarEstudiante);
+        return s;
     }
 }

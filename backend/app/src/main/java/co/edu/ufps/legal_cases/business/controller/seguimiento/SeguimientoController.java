@@ -38,6 +38,7 @@ public class SeguimientoController {
 
     private final SeguimientoService seguimientoService;
 
+    // Listado paginado principal – Bloque A (SCRUM-269).
     @GetMapping
     @PreAuthorize("hasAuthority('" + VER_SEGUIMIENTOS + "')")
     public PageResponseDTO<SeguimientoResumenDTO> buscar(
@@ -83,17 +84,21 @@ public class SeguimientoController {
     }
 
     /**
-     * Devuelve los seguimientos visibles para el usuario autenticado según su rol.
-     * Se usa para el calendario de actividades en el frontend.
-     * - Administrador: ve todos.
+     * Devuelve los seguimientos visibles para el usuario autenticado según su rol,
+     * acotados al rango [from, to) por fechaEntrega.
+     * - Administrador: ve todos dentro del rango.
      * - Asesor/Monitor: ve los de consultas dentro de su alcance.
      * - Estudiante: ve solo los marcados como notificarEstudiante = true.
      * Este endpoint se conserva por compatibilidad; la agenda usa /api/agenda.
+     * Rango máximo: 3 meses. from y to son obligatorios y from < to.
+     * Bloque B – SCRUM-269: reemplaza el antiguo no-arg con findAll() + filtros en memoria.
      */
     @GetMapping("/calendario")
     @PreAuthorize("hasAuthority('" + VER_SEGUIMIENTOS + "')")
-    public List<SeguimientoResponseDTO> listarParaCalendario() {
-        return seguimientoService.listarParaCalendario();
+    public List<SeguimientoResponseDTO> listarCalendarioPorRango(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return seguimientoService.listarCalendarioPorRango(from, to);
     }
 
     @GetMapping("/alertas-disciplinarias")

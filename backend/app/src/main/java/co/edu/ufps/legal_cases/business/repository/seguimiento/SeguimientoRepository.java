@@ -65,10 +65,10 @@ public interface SeguimientoRepository extends JpaRepository<Seguimiento, Long> 
         // Sirve para validar o consultar si una consulta tiene seguimientos.
         boolean existsByConsulta_Id(Long consultaId);
 
-        // Sirve para validar si la consulta ya tiene actividad operativa de
-        // seguimiento.
+        // Sirve para validar si la consulta ya tiene actividad operativa de seguimiento.
         boolean existsByConsulta_IdAndActivoTrue(Long consultaId);
 
+        // Listado paginado principal con scope en SQL (Bloque A – SCRUM-269).
         @Query(value = """
                         SELECT s.id AS id,
                                s.version AS version,
@@ -207,7 +207,7 @@ public interface SeguimientoRepository extends JpaRepository<Seguimiento, Long> 
         })
         List<Seguimiento> findByAlertaDisciplinariaTrueAndActivoTrueAndConsulta_EstadoNotOrderByFechaCreacionDesc(
                 EstadoConsulta estado);
-        
+
         // Filtra el alcance del asesor directamente en base de datos para no exponer
         // alertas de consultas ajenas. Las relaciones del EntityGraph son las necesarias
         // para construir el DTO sin depender de cargas LAZY posteriores.
@@ -349,5 +349,185 @@ public interface SeguimientoRepository extends JpaRepository<Seguimiento, Long> 
         List<Object[]> contarSeguimientosPorEstadoPorRango(
                         @Param("fechaInicio") String fechaInicio,
                         @Param("fechaFin") String fechaFin);
+
+        // Consulta directa para Agenda: filtra por rango de fechaEntrega [desde, hastaExclusiva)
+        // y scope de autorización en SQL. Devuelve projection ligera con los campos mínimos
+        // necesarios para construir AgendaEventDTO. Orden: fechaEntrega ASC, id ASC.
+        // Bloque B – SCRUM-269.
+        @Query("""
+                        SELECT s.id AS id,
+                               c.id AS consultaId,
+                               s.descripcion AS descripcion,
+                               s.estado AS estado,
+                               s.fechaEntrega AS fechaEntrega
+                        FROM Seguimiento s
+                        JOIN s.consulta c
+                        LEFT JOIN c.asesor asesorDirecto
+                        LEFT JOIN c.estudiante estudiante
+                        LEFT JOIN estudiante.asesor asesorEstudiante
+                        LEFT JOIN c.monitor monitor
+                        WHERE s.activo = true
+                          AND c.estado <> :estadoArchivado
+                          AND s.fechaEntrega IS NOT NULL
+                          AND s.fechaEntrega >= :desde
+                          AND s.fechaEntrega < :hastaExclusiva
+                          AND (
+                                :alcanceGlobal = true
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ASESOR'
+                                    AND (
+                                        asesorDirecto.id = :perfilId
+                                        OR asesorEstudiante.id = :perfilId
+                                    )
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'MONITOR'
+                                    AND monitor.id = :perfilId
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ESTUDIANTE'
+                                    AND estudiante.id = :perfilId
+                                    AND s.notificarEstudiante = true
+                                )
+                          )
+                        ORDER BY s.fechaEntrega ASC, s.id ASC
+                        """)
+        List<SeguimientoAgendaProjection> buscarParaAgenda(
+                        @Param("desde") LocalDate desde,
+                        @Param("hastaExclusiva") LocalDate hastaExclusiva,
+                        @Param("alcanceGlobal") boolean alcanceGlobal,
+                        @Param("tipoPerfil") String tipoPerfil,
+                        @Param("perfilId") Long perfilId,
+                        @Param("estadoArchivado") EstadoConsulta estadoArchivado);
+
+        // Busca seguimientos por fechaEntrega exacta con scope de autorización en BD.
+        // Elimina el post-filtrado puedeVerSeguimiento sobre resultados recuperados.
+        // Bloque B – SCRUM-269.
+        @Query("""
+                        SELECT s
+                        FROM Seguimiento s
+                        JOIN s.consulta c
+                        LEFT JOIN c.asesor asesorDirecto
+                        LEFT JOIN c.estudiante estudiante
+                        LEFT JOIN estudiante.asesor asesorEstudiante
+                        LEFT JOIN c.monitor monitor
+                        WHERE s.activo = true
+                          AND c.estado <> :estadoArchivado
+                          AND s.fechaEntrega = :fechaEntrega
+                          AND (
+                                :alcanceGlobal = true
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ASESOR'
+                                    AND (
+                                        asesorDirecto.id = :perfilId
+                                        OR asesorEstudiante.id = :perfilId
+                                    )
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'MONITOR'
+                                    AND monitor.id = :perfilId
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ESTUDIANTE'
+                                    AND estudiante.id = :perfilId
+                                    AND s.notificarEstudiante = true
+                                )
+                          )
+                        ORDER BY s.fechaCreacion DESC
+                        """)
+        List<Seguimiento> buscarPorFechaEntregaConScope(
+                        @Param("fechaEntrega") LocalDate fechaEntrega,
+                        @Param("alcanceGlobal") boolean alcanceGlobal,
+                        @Param("tipoPerfil") String tipoPerfil,
+                        @Param("perfilId") Long perfilId,
+                        @Param("estadoArchivado") EstadoConsulta estadoArchivado);
+
+        // Busca seguimientos por autor con scope de consulta en SQL.
+        // Preserva la regla: ADMIN puede consultar cualquier autor; no-admin solo el suyo.
+        // El scope de consulta (asesor/monitor/estudiante) se aplica en BD.
+        // Bloque B – SCRUM-269.
+        @Query("""
+                        SELECT s
+                        FROM Seguimiento s
+                        JOIN s.consulta c
+                        LEFT JOIN c.asesor asesorDirecto
+                        LEFT JOIN c.estudiante estudiante
+                        LEFT JOIN estudiante.asesor asesorEstudiante
+                        LEFT JOIN c.monitor monitor
+                        WHERE s.activo = true
+                          AND c.estado <> :estadoArchivado
+                          AND s.autor.id = :autorId
+                          AND (
+                                :alcanceGlobal = true
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ASESOR'
+                                    AND (
+                                        asesorDirecto.id = :perfilId
+                                        OR asesorEstudiante.id = :perfilId
+                                    )
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'MONITOR'
+                                    AND monitor.id = :perfilId
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ESTUDIANTE'
+                                    AND estudiante.id = :perfilId
+                                    AND s.notificarEstudiante = true
+                                )
+                          )
+                        ORDER BY s.fechaCreacion DESC
+                        """)
+        List<Seguimiento> buscarPorAutorConScope(
+                        @Param("autorId") Long autorId,
+                        @Param("alcanceGlobal") boolean alcanceGlobal,
+                        @Param("tipoPerfil") String tipoPerfil,
+                        @Param("perfilId") Long perfilId,
+                        @Param("estadoArchivado") EstadoConsulta estadoArchivado);
+
+        // Busca seguimientos para el calendario legacy por rango de fechaEntrega y scope.
+        // Reemplaza el findAll() + filtros en memoria del flujo de calendario.
+        // Bloque B – SCRUM-269.
+        @Query("""
+                        SELECT s
+                        FROM Seguimiento s
+                        JOIN s.consulta c
+                        LEFT JOIN c.asesor asesorDirecto
+                        LEFT JOIN c.estudiante estudiante
+                        LEFT JOIN estudiante.asesor asesorEstudiante
+                        LEFT JOIN c.monitor monitor
+                        WHERE s.activo = true
+                          AND c.estado <> :estadoArchivado
+                          AND s.fechaEntrega IS NOT NULL
+                          AND s.fechaEntrega >= :desde
+                          AND s.fechaEntrega < :hastaExclusiva
+                          AND (
+                                :alcanceGlobal = true
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ASESOR'
+                                    AND (
+                                        asesorDirecto.id = :perfilId
+                                        OR asesorEstudiante.id = :perfilId
+                                    )
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'MONITOR'
+                                    AND monitor.id = :perfilId
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ESTUDIANTE'
+                                    AND estudiante.id = :perfilId
+                                    AND s.notificarEstudiante = true
+                                )
+                          )
+                        ORDER BY s.fechaEntrega ASC, s.id ASC
+                        """)
+        List<Seguimiento> buscarParaCalendarioPorRangoConScope(
+                        @Param("desde") LocalDate desde,
+                        @Param("hastaExclusiva") LocalDate hastaExclusiva,
+                        @Param("alcanceGlobal") boolean alcanceGlobal,
+                        @Param("tipoPerfil") String tipoPerfil,
+                        @Param("perfilId") Long perfilId,
+                        @Param("estadoArchivado") EstadoConsulta estadoArchivado);
 
 }

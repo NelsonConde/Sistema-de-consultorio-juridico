@@ -26,10 +26,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
 
 import co.edu.ufps.legal_cases.business.dto.agenda.AgendaEventDTO;
-import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoResponseDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
+import co.edu.ufps.legal_cases.business.model.seguimiento.EstadoSeguimiento;
 import co.edu.ufps.legal_cases.business.repository.conciliacion.reunion.ReunionAgendaProjection;
 import co.edu.ufps.legal_cases.business.repository.conciliacion.reunion.ReunionConciliacionRepository;
+import co.edu.ufps.legal_cases.business.repository.seguimiento.SeguimientoAgendaProjection;
 import co.edu.ufps.legal_cases.business.service.acceso.conciliacion.ConciliacionAccessService;
 import co.edu.ufps.legal_cases.business.service.seguimiento.SeguimientoService;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
@@ -91,21 +92,24 @@ class AgendaQueryServiceTest {
         assertThrows(AccessDeniedException.class, () -> agendaQueryService.listar(from, to));
     }
 
+    // Bloque B (SCRUM-269): SeguimientoService.buscarParaAgenda(from, to) retorna
+    // SeguimientoAgendaProjection. El scope ya está resuelto dentro del servicio.
     @Test
-    void listaSeguimientosConPermisoDeSeguimientosSinModificarFlujoExistente() {
+    void listaSeguimientosConPermisoDeSeguimientos() {
         LocalDate from = LocalDate.of(2026, 9, 1);
         LocalDate to = LocalDate.of(2026, 9, 30);
 
         when(usuarioActualService.tienePermiso(VER_SEGUIMIENTOS)).thenReturn(true);
         when(usuarioActualService.tienePermiso(VER_CONCILIACIONES)).thenReturn(false);
 
-        SeguimientoResponseDTO seg = new SeguimientoResponseDTO();
-        seg.setId(10L);
-        seg.setConsultaId(100L);
-        seg.setDescripcion("Entrega de memorial");
-        seg.setFechaEntrega(LocalDate.of(2026, 9, 15));
+        SeguimientoAgendaProjection seg = seguimientoAgenda(
+                10L,
+                100L,
+                "Entrega de memorial",
+                EstadoSeguimiento.PENDIENTE,
+                LocalDate.of(2026, 9, 15));
 
-        when(seguimientoService.listarParaCalendario()).thenReturn(List.of(seg));
+        when(seguimientoService.buscarParaAgenda(from, to)).thenReturn(List.of(seg));
 
         List<AgendaEventDTO> eventos = agendaQueryService.listar(from, to);
 
@@ -119,17 +123,15 @@ class AgendaQueryServiceTest {
         assertEquals(10L, evento.resourceId());
         assertEquals(100L, evento.consultaId());
 
-        verify(seguimientoService).listarParaCalendario();
+        // Verifica que se llama la nueva API y NO la antigua listarParaCalendario
+        verify(seguimientoService).buscarParaAgenda(from, to);
         verify(reunionRepository, never()).findAll();
         verify(reunionRepository, never()).buscarParaAgenda(
-                any(),
-                any(),
-                anyBoolean(),
-                any(),
-                any(),
-                any());
+                any(), any(), anyBoolean(), any(), any(), any());
     }
 
+    // Bloque B (SCRUM-269): overdue se evalúa comparando fechaEntrega con LocalDate.now()
+    // dentro de AgendaQueryService — la projection solo expone fechaEntrega.
     @Test
     void evaluaOverdueCorrectamenteSegunZonaHoraria() {
         LocalDate from = LocalDate.of(2026, 1, 1);
@@ -138,11 +140,14 @@ class AgendaQueryServiceTest {
         when(usuarioActualService.tienePermiso(VER_SEGUIMIENTOS)).thenReturn(true);
         when(usuarioActualService.tienePermiso(VER_CONCILIACIONES)).thenReturn(false);
 
-        SeguimientoResponseDTO segPasado = new SeguimientoResponseDTO();
-        segPasado.setId(1L);
-        segPasado.setFechaEntrega(LocalDate.of(2026, 1, 10));
+        SeguimientoAgendaProjection segPasado = seguimientoAgenda(
+                1L,
+                50L,
+                "Seguimiento pasado",
+                EstadoSeguimiento.PENDIENTE,
+                LocalDate.of(2026, 1, 10));
 
-        when(seguimientoService.listarParaCalendario()).thenReturn(List.of(segPasado));
+        when(seguimientoService.buscarParaAgenda(from, to)).thenReturn(List.of(segPasado));
 
         List<AgendaEventDTO> eventos = agendaQueryService.listar(from, to);
 
@@ -224,6 +229,42 @@ class AgendaQueryServiceTest {
                 .map(AgendaEventDTO::id)
                 .toList());
         verify(reunionRepository, never()).findAll();
+    }
+
+    // Helper: construye un SeguimientoAgendaProjection anónimo con los campos
+    // que AgendaQueryService necesita para construir el AgendaEventDTO.
+    private SeguimientoAgendaProjection seguimientoAgenda(
+            Long id,
+            Long consultaId,
+            String descripcion,
+            EstadoSeguimiento estado,
+            LocalDate fechaEntrega) {
+        return new SeguimientoAgendaProjection() {
+            @Override
+            public Long getId() {
+                return id;
+            }
+
+            @Override
+            public Long getConsultaId() {
+                return consultaId;
+            }
+
+            @Override
+            public String getDescripcion() {
+                return descripcion;
+            }
+
+            @Override
+            public EstadoSeguimiento getEstado() {
+                return estado;
+            }
+
+            @Override
+            public LocalDate getFechaEntrega() {
+                return fechaEntrega;
+            }
+        };
     }
 
     private ReunionAgendaProjection reunionAgenda(

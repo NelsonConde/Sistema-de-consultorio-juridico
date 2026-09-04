@@ -18,9 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 import co.edu.ufps.legal_cases.business.dto.agenda.AgendaEventDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.business.repository.conciliacion.reunion.ReunionConciliacionRepository;
+import co.edu.ufps.legal_cases.business.repository.seguimiento.SeguimientoAgendaProjection;
 import co.edu.ufps.legal_cases.business.service.acceso.conciliacion.ConciliacionAccessService;
 import co.edu.ufps.legal_cases.business.service.seguimiento.SeguimientoService;
-import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoResponseDTO;
 import co.edu.ufps.legal_cases.security.dto.account.PerfilUsuarioActual;
 import co.edu.ufps.legal_cases.security.service.context.UsuarioActualService;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
@@ -51,7 +51,9 @@ public class AgendaQueryService {
 
         List<AgendaEventDTO> eventos = new ArrayList<>();
         if (puedeVerSeguimientos) {
-            eventos.addAll(mapSeguimientos(seguimientoService.listarParaCalendario(), from, to));
+            // Bloque B (SCRUM-269): scope y rango [from, to) resueltos en SQL.
+            // No hay recuperación masiva ni filtro de fechaEntrega en Java.
+            eventos.addAll(mapSeguimientos(from, to));
         }
         if (puedeVerConciliaciones) {
             conciliacionAccessService.validarPuedeListarConciliaciones();
@@ -63,11 +65,11 @@ public class AgendaQueryService {
                 .toList();
     }
 
-    private List<AgendaEventDTO> mapSeguimientos(
-            List<SeguimientoResponseDTO> seguimientos, LocalDate from, LocalDate to) {
+    // Bloque B (SCRUM-269): delega scope + rango a SeguimientoService.buscarParaAgenda.
+    // El mapping a AgendaEventDTO permanece en Java.
+    private List<AgendaEventDTO> mapSeguimientos(LocalDate from, LocalDate to) {
+        List<SeguimientoAgendaProjection> seguimientos = seguimientoService.buscarParaAgenda(from, to);
         return seguimientos.stream()
-                .filter(seg -> seg.getFechaEntrega() != null)
-                .filter(seg -> !seg.getFechaEntrega().isBefore(from) && seg.getFechaEntrega().isBefore(to))
                 .map(seg -> {
                     OffsetDateTime start = atStartOfDay(seg.getFechaEntrega());
                     return new AgendaEventDTO(

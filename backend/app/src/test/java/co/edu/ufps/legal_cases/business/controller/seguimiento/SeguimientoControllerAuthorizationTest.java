@@ -63,6 +63,24 @@ class SeguimientoControllerAuthorizationTest {
                         null, 1, 10, "id", "desc", null, null, null, null, null));
     }
 
+    @Test
+    void usuarioConVerSeguimientosPuedeListarCalendarioPorRango() {
+        autenticarCon(VER_SEGUIMIENTOS);
+
+        assertDoesNotThrow(() -> seguimientoController.listarCalendarioPorRango(
+                java.time.LocalDate.now(), java.time.LocalDate.now().plusDays(1)));
+    }
+
+    @Test
+    void usuarioSinPermisoNoPuedeListarCalendarioPorRango() {
+        autenticarCon("OTRO_PERMISO");
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> seguimientoController.listarCalendarioPorRango(
+                        java.time.LocalDate.now(), java.time.LocalDate.now().plusDays(1)));
+    }
+
     private void autenticarCon(String authority) {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(

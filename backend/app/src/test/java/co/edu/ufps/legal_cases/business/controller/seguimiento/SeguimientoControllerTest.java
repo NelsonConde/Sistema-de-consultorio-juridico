@@ -159,4 +159,32 @@ class SeguimientoControllerTest {
                         .value("No tiene permisos para acceder a este recurso"))
                 .andExpect(jsonPath("$.ruta").value("/api/seguimientos"));
     }
+
+    @Test
+    void calendarioConParametrosDebeResponder200YDelegarAlService() throws Exception {
+        LocalDate from = LocalDate.of(2026, 9, 1);
+        LocalDate to = LocalDate.of(2026, 9, 30);
+        when(seguimientoService.listarCalendarioPorRango(from, to)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/seguimientos/calendario")
+                        .param("from", "2026-09-01")
+                        .param("to", "2026-09-30"))
+                .andExpect(status().isOk());
+
+        verify(seguimientoService).listarCalendarioPorRango(from, to);
+    }
+
+    @Test
+    void calendarioSinFromDebeResponder400() throws Exception {
+        mockMvc.perform(get("/api/seguimientos/calendario")
+                        .param("to", "2026-09-30"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void calendarioSinToDebeResponder400() throws Exception {
+        mockMvc.perform(get("/api/seguimientos/calendario")
+                        .param("from", "2026-09-01"))
+                .andExpect(status().isBadRequest());
+    }
 }
