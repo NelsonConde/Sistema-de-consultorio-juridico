@@ -2,9 +2,11 @@ package co.edu.ufps.legal_cases.business.controller.perfil;
 
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.GESTIONAR_ADMINISTRADORES;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.GESTIONAR_ASESORES_MONITORES;
+import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.GESTIONAR_CONCILIADORES;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.GESTIONAR_USUARIOS;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_ADMINISTRADORES;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_ASESORES_MONITORES;
+import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_CONCILIADORES;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -26,6 +28,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import co.edu.ufps.legal_cases.business.service.perfil.AdministrativoService;
 import co.edu.ufps.legal_cases.business.service.perfil.AsesorService;
+import co.edu.ufps.legal_cases.business.service.perfil.ConciliadorService;
 import co.edu.ufps.legal_cases.business.service.perfil.MonitorService;
 import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
@@ -35,9 +38,11 @@ class PerfilPaginadoControllerAuthorizationTest {
     private AdministrativoController administrativoController;
     private AsesorController asesorController;
     private MonitorController monitorController;
+    private ConciliadorController conciliadorController;
     private AdministrativoService administrativoService;
     private AsesorService asesorService;
     private MonitorService monitorService;
+    private ConciliadorService conciliadorService;
 
     @BeforeEach
     void setUp() {
@@ -45,15 +50,19 @@ class PerfilPaginadoControllerAuthorizationTest {
         administrativoController = context.getBean(AdministrativoController.class);
         asesorController = context.getBean(AsesorController.class);
         monitorController = context.getBean(MonitorController.class);
+        conciliadorController = context.getBean(ConciliadorController.class);
         administrativoService = context.getBean(AdministrativoService.class);
         asesorService = context.getBean(AsesorService.class);
         monitorService = context.getBean(MonitorService.class);
+        conciliadorService = context.getBean(ConciliadorService.class);
 
         when(administrativoService.buscar(null, 1, 10, "id", "desc", null))
                 .thenReturn(new PageResponseDTO<>(List.of(), 1, 10, 0, 0));
         when(asesorService.buscar(null, 1, 10, "id", "desc", null))
                 .thenReturn(new PageResponseDTO<>(List.of(), 1, 10, 0, 0));
         when(monitorService.buscar(null, 1, 10, "id", "desc", null))
+                .thenReturn(new PageResponseDTO<>(List.of(), 1, 10, 0, 0));
+        when(conciliadorService.buscar(null, 1, 10, "id", "desc", null, null))
                 .thenReturn(new PageResponseDTO<>(List.of(), 1, 10, 0, 0));
     }
 
@@ -126,6 +135,27 @@ class PerfilPaginadoControllerAuthorizationTest {
                 () -> monitorController.listar(null, 1, 10, "id", "desc", null));
     }
 
+    @Test
+    void conciliadorPermiteAuthoritiesReales() {
+        autenticarCon(VER_CONCILIADORES);
+        assertDoesNotThrow(() -> conciliadorController.listar(null, 1, 10, "id", "desc", null, null));
+
+        autenticarCon(GESTIONAR_CONCILIADORES);
+        assertDoesNotThrow(() -> conciliadorController.listar(null, 1, 10, "id", "desc", null, null));
+
+        autenticarCon(GESTIONAR_USUARIOS);
+        assertDoesNotThrow(() -> conciliadorController.listar(null, 1, 10, "id", "desc", null, null));
+    }
+
+    @Test
+    void conciliadorRechazaAutoridadIrrelevante() {
+        autenticarCon("OTRO_PERMISO");
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> conciliadorController.listar(null, 1, 10, "id", "desc", null, null));
+    }
+
     private void autenticarCon(String authority) {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(
@@ -154,6 +184,11 @@ class PerfilPaginadoControllerAuthorizationTest {
         }
 
         @Bean
+        ConciliadorService conciliadorService() {
+            return mock(ConciliadorService.class);
+        }
+
+        @Bean
         AdministrativoController administrativoController(AdministrativoService administrativoService) {
             return new AdministrativoController(administrativoService);
         }
@@ -166,6 +201,11 @@ class PerfilPaginadoControllerAuthorizationTest {
         @Bean
         MonitorController monitorController(MonitorService monitorService) {
             return new MonitorController(monitorService);
+        }
+
+        @Bean
+        ConciliadorController conciliadorController(ConciliadorService conciliadorService) {
+            return new ConciliadorController(conciliadorService);
         }
     }
 }

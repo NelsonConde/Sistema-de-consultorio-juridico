@@ -22,11 +22,15 @@ import co.edu.ufps.legal_cases.business.model.catalogo.Sede;
 import co.edu.ufps.legal_cases.business.model.catalogo.TipoDocumento;
 import co.edu.ufps.legal_cases.business.model.perfil.Administrativo;
 import co.edu.ufps.legal_cases.business.model.perfil.Asesor;
+import co.edu.ufps.legal_cases.business.model.perfil.Conciliador;
 import co.edu.ufps.legal_cases.business.model.perfil.Monitor;
+import co.edu.ufps.legal_cases.business.model.perfil.TipoConciliador;
 import co.edu.ufps.legal_cases.business.repository.perfil.AdministrativoRepository;
 import co.edu.ufps.legal_cases.business.repository.perfil.AdministrativoResumenProjection;
 import co.edu.ufps.legal_cases.business.repository.perfil.AsesorRepository;
 import co.edu.ufps.legal_cases.business.repository.perfil.AsesorResumenProjection;
+import co.edu.ufps.legal_cases.business.repository.perfil.ConciliadorRepository;
+import co.edu.ufps.legal_cases.business.repository.perfil.ConciliadorResumenProjection;
 import co.edu.ufps.legal_cases.business.repository.perfil.MonitorRepository;
 import co.edu.ufps.legal_cases.business.repository.perfil.MonitorResumenProjection;
 import co.edu.ufps.legal_cases.security.model.access.Permiso;
@@ -56,6 +60,9 @@ class PerfilPaginadoRepositoryJpaTest extends PostgreSqlIntegrationTest {
     private MonitorRepository monitorRepository;
 
     @Autowired
+    private ConciliadorRepository conciliadorRepository;
+
+    @Autowired
     private EntityManager entityManager;
 
     private TipoDocumento tipoDocumento;
@@ -82,6 +89,12 @@ class PerfilPaginadoRepositoryJpaTest extends PostgreSqlIntegrationTest {
     private Monitor monitorDelta;
     private Monitor monitorEpsilon;
     private Monitor monitorZeta;
+    private Conciliador conciliadorAlpha;
+    private Conciliador conciliadorBeta;
+    private Conciliador conciliadorGamma;
+    private Conciliador conciliadorDelta;
+    private Conciliador conciliadorEpsilon;
+    private Conciliador conciliadorZeta;
 
     @BeforeEach
     void setUp() {
@@ -89,6 +102,7 @@ class PerfilPaginadoRepositoryJpaTest extends PostgreSqlIntegrationTest {
         crearAdministrativos();
         crearAsesores();
         crearMonitores();
+        crearConciliadores();
         entityManager.flush();
         entityManager.clear();
     }
@@ -299,6 +313,82 @@ class PerfilPaginadoRepositoryJpaTest extends PostgreSqlIntegrationTest {
         assertSinNMasUnoMonitor();
     }
 
+    @Test
+    void conciliadoresPaginaUnoPaginaDosYTotales() {
+        assertIdsConciliadores(
+                buscarConciliadores(null, null, null, PageRequest.of(0, 2, sortIdDesc())),
+                conciliadorZeta.getId(), conciliadorEpsilon.getId());
+
+        Page<ConciliadorResumenProjection> paginaDos = buscarConciliadores(
+                null, null, null, PageRequest.of(1, 2, sortIdDesc()));
+        assertIdsConciliadores(paginaDos, conciliadorDelta.getId(), conciliadorGamma.getId());
+        assertEquals(6, paginaDos.getTotalElements());
+        assertEquals(3, paginaDos.getTotalPages());
+    }
+
+    @Test
+    void conciliadoresFiltranActivoTrueYFalse() {
+        assertIdsConciliadores(
+                buscarConciliadores(null, true, null, PageRequest.of(0, 10, sortIdDesc())),
+                conciliadorZeta.getId(), conciliadorDelta.getId(), conciliadorBeta.getId(), conciliadorAlpha.getId());
+        assertIdsConciliadores(
+                buscarConciliadores(null, false, null, PageRequest.of(0, 10, sortIdDesc())),
+                conciliadorEpsilon.getId(), conciliadorGamma.getId());
+    }
+
+    @Test
+    void conciliadoresFiltranPorTipoConciliador() {
+        assertIdsConciliadores(
+                buscarConciliadores(null, null, TipoConciliador.INTERNO, PageRequest.of(0, 10, sortIdDesc())),
+                conciliadorZeta.getId(), conciliadorDelta.getId(), conciliadorBeta.getId(), conciliadorAlpha.getId());
+        assertIdsConciliadores(
+                buscarConciliadores(null, null, TipoConciliador.EXTERNO, PageRequest.of(0, 10, sortIdDesc())),
+                conciliadorEpsilon.getId(), conciliadorGamma.getId());
+    }
+
+    @Test
+    void conciliadoresBuscanPorNombreDocumentoYCaseInsensitive() {
+        assertIdsConciliadores(buscarConciliadores("empate", null, null, PageRequest.of(0, 10, sortIdDesc())),
+                conciliadorBeta.getId(), conciliadorAlpha.getId());
+        assertIdsConciliadores(buscarConciliadores("DOC-CON-G", null, null, PageRequest.of(0, 10, sortIdDesc())),
+                conciliadorGamma.getId());
+        assertIdsConciliadores(buscarConciliadores("CONCILIADOR.ZETA", null, null, PageRequest.of(0, 10, sortIdDesc())),
+                conciliadorZeta.getId());
+    }
+
+    @Test
+    void conciliadoresCombinanSearchActivoYTipoConciliador() {
+        Page<ConciliadorResumenProjection> resultado = buscarConciliadores(
+                "conciliador.beta", true, TipoConciliador.INTERNO, PageRequest.of(0, 10, sortIdDesc()));
+
+        assertIdsConciliadores(resultado, conciliadorBeta.getId());
+        assertEquals(1, resultado.getTotalElements());
+    }
+
+    @Test
+    void conciliadoresOrdenEstableProjectionYNMasUno() {
+        Page<ConciliadorResumenProjection> ordenado = buscarConciliadores(
+                null, null, null, PageRequest.of(0, 10, Sort.by(Sort.Order.asc("nombre"), Sort.Order.asc("id"))));
+
+        assertTrue(idsConciliadores(ordenado).indexOf(conciliadorAlpha.getId())
+                < idsConciliadores(ordenado).indexOf(conciliadorBeta.getId()));
+
+        ConciliadorResumenProjection projection = buscarConciliadores(
+                "conciliador.alpha", null, null, PageRequest.of(0, 10, sortIdDesc())).getContent().get(0);
+        assertEquals(conciliadorAlpha.getId(), projection.getId());
+        assertEquals("Nombre Empate Conciliador", projection.getNombre());
+        assertEquals("DOC-CON-A", projection.getDocumento());
+        assertEquals("conciliador.alpha@example.test", projection.getEmail());
+        assertEquals("conciliador.alpha", projection.getUsuario());
+        assertEquals("CON-A", projection.getCodigo());
+        assertEquals(true, projection.getActivo());
+        assertEquals(TipoConciliador.INTERNO, projection.getTipoConciliador());
+        assertEquals(sedePrincipal.getId(), projection.getSedeId());
+        assertEquals("Sede Principal", projection.getSedeNombre());
+
+        assertSinNMasUnoConciliador();
+    }
+
     private void assertSinNMasUnoAdministrativo() {
         Statistics statistics = statistics();
         statistics.setStatisticsEnabled(true);
@@ -386,6 +476,35 @@ class PerfilPaginadoRepositoryJpaTest extends PostgreSqlIntegrationTest {
         assertEquals(0, statistics.getCollectionFetchCount());
     }
 
+    private void assertSinNMasUnoConciliador() {
+        Statistics statistics = statistics();
+        statistics.setStatisticsEnabled(true);
+        entityManager.flush();
+        entityManager.clear();
+        statistics.clear();
+
+        Page<ConciliadorResumenProjection> resultado = buscarConciliadores(
+                null, null, null, PageRequest.of(0, 2, sortIdDesc()));
+        assertEquals(2, statistics.getPrepareStatementCount());
+
+        resultado.getContent().forEach(item -> {
+            item.getId();
+            item.getNombre();
+            item.getDocumento();
+            item.getEmail();
+            item.getUsuario();
+            item.getCodigo();
+            item.getActivo();
+            item.getTipoConciliador();
+            item.getSedeId();
+            item.getSedeNombre();
+        });
+
+        assertEquals(2, statistics.getPrepareStatementCount());
+        assertEquals(0, statistics.getCollectionLoadCount());
+        assertEquals(0, statistics.getCollectionFetchCount());
+    }
+
     private Page<AdministrativoResumenProjection> buscarAdministrativos(
             String search,
             Boolean activo,
@@ -405,6 +524,14 @@ class PerfilPaginadoRepositoryJpaTest extends PostgreSqlIntegrationTest {
             Boolean activo,
             PageRequest pageable) {
         return monitorRepository.buscarResumenPaginado(search, activo, pageable);
+    }
+
+    private Page<ConciliadorResumenProjection> buscarConciliadores(
+            String search,
+            Boolean activo,
+            TipoConciliador tipoConciliador,
+            PageRequest pageable) {
+        return conciliadorRepository.buscarResumenPaginado(search, activo, tipoConciliador, pageable);
     }
 
     private Sort sortIdDesc() {
@@ -429,6 +556,12 @@ class PerfilPaginadoRepositoryJpaTest extends PostgreSqlIntegrationTest {
                 .toList();
     }
 
+    private List<Long> idsConciliadores(Page<ConciliadorResumenProjection> page) {
+        return page.getContent().stream()
+                .map(ConciliadorResumenProjection::getId)
+                .toList();
+    }
+
     private void assertIdsAdministrativos(Page<AdministrativoResumenProjection> page, Long... expectedIds) {
         assertEquals(List.of(expectedIds), idsAdministrativos(page));
     }
@@ -439,6 +572,10 @@ class PerfilPaginadoRepositoryJpaTest extends PostgreSqlIntegrationTest {
 
     private void assertIdsMonitores(Page<MonitorResumenProjection> page, Long... expectedIds) {
         assertEquals(List.of(expectedIds), idsMonitores(page));
+    }
+
+    private void assertIdsConciliadores(Page<ConciliadorResumenProjection> page, Long... expectedIds) {
+        assertEquals(List.of(expectedIds), idsConciliadores(page));
     }
 
     private Statistics statistics() {
@@ -599,6 +736,46 @@ class PerfilPaginadoRepositoryJpaTest extends PostgreSqlIntegrationTest {
         monitor.setUsuarioSistema(crearUsuarioSistema("usuario." + usuario + "@example.test"));
         entityManager.persist(monitor);
         return monitor;
+    }
+
+    private void crearConciliadores() {
+        conciliadorAlpha = crearConciliador("Nombre Empate Conciliador", "DOC-CON-A",
+                "conciliador.alpha@example.test", "conciliador.alpha", "CON-A", true, TipoConciliador.INTERNO, sedePrincipal);
+        conciliadorBeta = crearConciliador("Nombre Empate Conciliador", "DOC-CON-B",
+                "conciliador.beta@example.test", "conciliador.beta", "CON-B", true, TipoConciliador.INTERNO, sedePrincipal);
+        conciliadorGamma = crearConciliador("Conciliador Gamma", "DOC-CON-G",
+                "conciliador.gamma@example.test", "conciliador.gamma", "CON-G", false, TipoConciliador.EXTERNO, sedeAlterna);
+        conciliadorDelta = crearConciliador("Conciliador Delta", "DOC-CON-D",
+                "conciliador.delta@example.test", "conciliador.delta", "CON-D", true, TipoConciliador.INTERNO, sedeAlterna);
+        conciliadorEpsilon = crearConciliador("Conciliador Epsilon", "DOC-CON-E",
+                "conciliador.epsilon@example.test", "conciliador.epsilon", "CON-E", false, TipoConciliador.EXTERNO, sedePrincipal);
+        conciliadorZeta = crearConciliador("Conciliador Zeta", "DOC-CON-Z",
+                "conciliador.zeta@example.test", "conciliador.zeta", "CON-Z", true, TipoConciliador.INTERNO, sedeAlterna);
+    }
+
+    private Conciliador crearConciliador(
+            String nombre,
+            String documento,
+            String email,
+            String usuario,
+            String codigo,
+            Boolean activo,
+            TipoConciliador tipoConciliador,
+            Sede sede) {
+        Conciliador conciliador = new Conciliador();
+        conciliador.setNombre(nombre);
+        conciliador.setTipoDocumento(tipoDocumento);
+        conciliador.setDocumento(documento);
+        conciliador.setEmail(email);
+        conciliador.setTelefono("330-" + documento);
+        conciliador.setUsuario(usuario);
+        conciliador.setCodigo(codigo);
+        conciliador.setTipoConciliador(tipoConciliador);
+        conciliador.setSede(sede);
+        conciliador.setActivo(activo);
+        conciliador.setUsuarioSistema(crearUsuarioSistema("usuario." + usuario + "@example.test"));
+        entityManager.persist(conciliador);
+        return conciliador;
     }
 
     private UsuarioSistema crearUsuarioSistema(String username) {

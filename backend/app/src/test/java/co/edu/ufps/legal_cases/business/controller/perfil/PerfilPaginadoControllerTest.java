@@ -18,9 +18,12 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import co.edu.ufps.legal_cases.business.dto.perfil.AdministrativoResumenDTO;
 import co.edu.ufps.legal_cases.business.dto.perfil.AsesorResumenDTO;
+import co.edu.ufps.legal_cases.business.dto.perfil.ConciliadorResumenDTO;
 import co.edu.ufps.legal_cases.business.dto.perfil.MonitorResumenDTO;
+import co.edu.ufps.legal_cases.business.model.perfil.TipoConciliador;
 import co.edu.ufps.legal_cases.business.service.perfil.AdministrativoService;
 import co.edu.ufps.legal_cases.business.service.perfil.AsesorService;
+import co.edu.ufps.legal_cases.business.service.perfil.ConciliadorService;
 import co.edu.ufps.legal_cases.business.service.perfil.MonitorService;
 import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
@@ -29,6 +32,7 @@ class PerfilPaginadoControllerTest {
     private AdministrativoService administrativoService;
     private AsesorService asesorService;
     private MonitorService monitorService;
+    private ConciliadorService conciliadorService;
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -36,11 +40,13 @@ class PerfilPaginadoControllerTest {
         administrativoService = mock(AdministrativoService.class);
         asesorService = mock(AsesorService.class);
         monitorService = mock(MonitorService.class);
+        conciliadorService = mock(ConciliadorService.class);
 
         mockMvc = MockMvcBuilders.standaloneSetup(
                 new AdministrativoController(administrativoService),
                 new AsesorController(asesorService),
-                new MonitorController(monitorService))
+                new MonitorController(monitorService),
+                new ConciliadorController(conciliadorService))
                 .build();
     }
 
@@ -110,6 +116,7 @@ class PerfilPaginadoControllerTest {
                 .andExpect(jsonPath("$.content[0].areaNombre").value("Civil"))
                 .andExpect(jsonPath("$.content[0].sedeId").value(10))
                 .andExpect(jsonPath("$.content[0].sedeNombre").value("Principal"))
+                .andExpect(jsonPath("$.content[0].password").doesNotExist())
                 .andExpect(jsonPath("$.content[0].passwordHash").doesNotExist())
                 .andExpect(jsonPath("$.content[0].permisos").doesNotExist())
                 .andExpect(jsonPath("$.content[0].token").doesNotExist())
@@ -152,6 +159,7 @@ class PerfilPaginadoControllerTest {
                 .andExpect(jsonPath("$.content[0].nombre").value("Monitor A"))
                 .andExpect(jsonPath("$.content[0].sedeId").value(10))
                 .andExpect(jsonPath("$.content[0].sedeNombre").value("Principal"))
+                .andExpect(jsonPath("$.content[0].password").doesNotExist())
                 .andExpect(jsonPath("$.content[0].passwordHash").doesNotExist())
                 .andExpect(jsonPath("$.content[0].permisos").doesNotExist())
                 .andExpect(jsonPath("$.content[0].token").doesNotExist())
@@ -179,6 +187,51 @@ class PerfilPaginadoControllerTest {
                 .andExpect(jsonPath("$.page").value(2));
 
         verify(monitorService).buscar("turno", 2, 20, "sedeNombre", "asc", true);
+    }
+
+    @Test
+    void conciliadoresSinParametrosDebePropagarDefaultsYResponderPageResponseDTO() throws Exception {
+        ConciliadorResumenDTO conciliador = conciliadorResumen();
+        when(conciliadorService.buscar(null, 1, 10, "id", "desc", null, null))
+                .thenReturn(new PageResponseDTO<>(List.of(conciliador), 1, 10, 1, 1));
+
+        mockMvc.perform(get("/api/conciliadores"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.content[0].id").value(4))
+                .andExpect(jsonPath("$.content[0].nombre").value("Conciliador A"))
+                .andExpect(jsonPath("$.content[0].sedeId").value(10))
+                .andExpect(jsonPath("$.content[0].sedeNombre").value("Principal"))
+                .andExpect(jsonPath("$.content[0].tipoConciliador").value("INTERNO"))
+                .andExpect(jsonPath("$.content[0].password").doesNotExist())
+                .andExpect(jsonPath("$.content[0].passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.content[0].permisos").doesNotExist())
+                .andExpect(jsonPath("$.content[0].token").doesNotExist())
+                .andExpect(jsonPath("$.content[0].secret").doesNotExist())
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
+
+        verify(conciliadorService).buscar(null, 1, 10, "id", "desc", null, null);
+    }
+
+    @Test
+    void conciliadoresConParametrosExplicitosDebeDelegar() throws Exception {
+        when(conciliadorService.buscar("turno", 2, 20, "sedeNombre", "asc", true, TipoConciliador.EXTERNO))
+                .thenReturn(new PageResponseDTO<>(List.of(), 2, 20, 0, 0));
+
+        mockMvc.perform(get("/api/conciliadores")
+                        .param("search", "turno")
+                        .param("page", "2")
+                        .param("size", "20")
+                        .param("sortBy", "sedeNombre")
+                        .param("direction", "asc")
+                        .param("activo", "true")
+                        .param("tipoConciliador", "EXTERNO"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.page").value(2));
+
+        verify(conciliadorService).buscar("turno", 2, 20, "sedeNombre", "asc", true, TipoConciliador.EXTERNO);
     }
 
     private AdministrativoResumenDTO administrativoResumen() {
@@ -221,6 +274,21 @@ class PerfilPaginadoControllerTest {
         dto.setUsuario("monitor.a");
         dto.setCodigo("MON-A");
         dto.setActivo(true);
+        dto.setSedeId(10L);
+        dto.setSedeNombre("Principal");
+        return dto;
+    }
+
+    private ConciliadorResumenDTO conciliadorResumen() {
+        ConciliadorResumenDTO dto = new ConciliadorResumenDTO();
+        dto.setId(4L);
+        dto.setNombre("Conciliador A");
+        dto.setDocumento("DOC-D");
+        dto.setEmail("conciliador@example.test");
+        dto.setUsuario("conciliador.a");
+        dto.setCodigo("CON-A");
+        dto.setActivo(true);
+        dto.setTipoConciliador(TipoConciliador.INTERNO);
         dto.setSedeId(10L);
         dto.setSedeNombre("Principal");
         return dto;

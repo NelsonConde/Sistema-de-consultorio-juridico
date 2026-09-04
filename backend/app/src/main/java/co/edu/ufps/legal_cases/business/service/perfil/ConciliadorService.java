@@ -5,8 +5,11 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import co.edu.ufps.legal_cases.business.dto.perfil.ConciliadorDTO;
+import co.edu.ufps.legal_cases.business.dto.perfil.ConciliadorResumenDTO;
+import co.edu.ufps.legal_cases.business.model.perfil.TipoConciliador;
 import co.edu.ufps.legal_cases.business.service.perfil.conciliador.ConciliadorCommandService;
 import co.edu.ufps.legal_cases.business.service.perfil.conciliador.ConciliadorQueryService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
 @Service
 public class ConciliadorService {
@@ -23,8 +26,15 @@ public class ConciliadorService {
 
     // Fachada del módulo de conciliadores.
     // El controller entra por aquí, pero lectura y escritura quedan separadas por responsabilidad.
-    public List<ConciliadorDTO> listar() {
-        return conciliadorQueryService.listar();
+    public PageResponseDTO<ConciliadorResumenDTO> buscar(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction,
+            Boolean activo,
+            TipoConciliador tipoConciliador) {
+        return conciliadorQueryService.buscar(search, page, size, sortBy, direction, activo, tipoConciliador);
     }
 
     public List<ConciliadorDTO> listarActivos() {
