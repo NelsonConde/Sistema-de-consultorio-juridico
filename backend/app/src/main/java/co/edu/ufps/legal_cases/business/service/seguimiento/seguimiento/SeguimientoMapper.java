@@ -3,7 +3,9 @@ package co.edu.ufps.legal_cases.business.service.seguimiento.seguimiento;
 import org.springframework.stereotype.Component;
 
 import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoResponseDTO;
+import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoResumenDTO;
 import co.edu.ufps.legal_cases.business.model.seguimiento.Seguimiento;
+import co.edu.ufps.legal_cases.business.repository.seguimiento.SeguimientoResumenProjection;
 
 @Component
 public class SeguimientoMapper {
@@ -34,6 +36,26 @@ public class SeguimientoMapper {
         dto.setFechaActualizacion(seguimiento.getFechaActualizacion());
 
         return dto;
+    }
+
+    public SeguimientoResumenDTO convertirAResumenDTO(SeguimientoResumenProjection seguimiento) {
+        return new SeguimientoResumenDTO(
+                seguimiento.getId(),
+                seguimiento.getVersion(),
+                seguimiento.getDescripcion(),
+                seguimiento.getFechaEntrega(),
+                seguimiento.getDiasNotificacion(),
+                seguimiento.getNotificarPartes(),
+                seguimiento.getNotificarEstudiante(),
+                seguimiento.getAlertaDisciplinaria(),
+                seguimiento.getEstado(),
+                seguimiento.getCategoriaSeguimientoId(),
+                seguimiento.getCategoriaSeguimientoNombre(),
+                seguimiento.getConsultaId(),
+                seguimiento.getAutorId(),
+                seguimiento.getAutorUsername(),
+                seguimiento.getFechaCreacion(),
+                seguimiento.getFechaActualizacion());
     }
 
     public void aplicarDatos(Seguimiento seguimiento, DatosSeguimiento datos) {

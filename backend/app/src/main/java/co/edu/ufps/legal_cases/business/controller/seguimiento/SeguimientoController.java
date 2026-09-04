@@ -24,8 +24,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoRequestDTO;
 import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoResponseDTO;
+import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoResumenDTO;
 import co.edu.ufps.legal_cases.business.model.seguimiento.EstadoSeguimiento;
 import co.edu.ufps.legal_cases.business.service.seguimiento.SeguimientoService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -35,6 +37,32 @@ import lombok.RequiredArgsConstructor;
 public class SeguimientoController {
 
     private final SeguimientoService seguimientoService;
+
+    @GetMapping
+    @PreAuthorize("hasAuthority('" + VER_SEGUIMIENTOS + "')")
+    public PageResponseDTO<SeguimientoResumenDTO> buscar(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) EstadoSeguimiento estado,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
+            @RequestParam(required = false) Long consultaId,
+            @RequestParam(required = false) Long autorId) {
+        return seguimientoService.buscarParaUsuarioActual(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                estado,
+                fechaDesde,
+                fechaHasta,
+                consultaId,
+                autorId);
+    }
 
     @GetMapping("/consulta/{consultaId}")
     @PreAuthorize("hasAuthority('" + VER_SEGUIMIENTOS + "')")

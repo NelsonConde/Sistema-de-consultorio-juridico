@@ -153,6 +153,16 @@ public class SeguimientoAccessService {
     }
 
     @Transactional(readOnly = true)
+    public boolean usuarioEsAdministrador() {
+        return usuarioActualService.esRolAdministrador();
+    }
+
+    @Transactional(readOnly = true)
+    public PerfilUsuarioActual obtenerPerfilActual() {
+        return usuarioActualService.obtenerPerfilActual();
+    }
+
+    @Transactional(readOnly = true)
     public boolean puedeVerSeguimiento(Seguimiento seguimiento) {
         if (seguimiento == null || !Boolean.TRUE.equals(seguimiento.getActivo())) {
             return false;

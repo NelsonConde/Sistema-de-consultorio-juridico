@@ -7,9 +7,11 @@ import org.springframework.stereotype.Service;
 
 import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoRequestDTO;
 import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoResponseDTO;
+import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoResumenDTO;
 import co.edu.ufps.legal_cases.business.model.seguimiento.EstadoSeguimiento;
 import co.edu.ufps.legal_cases.business.service.seguimiento.seguimiento.SeguimientoCommandService;
 import co.edu.ufps.legal_cases.business.service.seguimiento.seguimiento.SeguimientoQueryService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
 @Service
 public class SeguimientoService {
@@ -26,6 +28,30 @@ public class SeguimientoService {
 
     // Fachada del módulo: el controller sigue usando este service,
     // mientras la lectura y la escritura quedan separadas por dentro.
+    public PageResponseDTO<SeguimientoResumenDTO> buscarParaUsuarioActual(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction,
+            EstadoSeguimiento estado,
+            LocalDate fechaDesde,
+            LocalDate fechaHasta,
+            Long consultaId,
+            Long autorId) {
+        return seguimientoQueryService.buscarParaUsuarioActual(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                estado,
+                fechaDesde,
+                fechaHasta,
+                consultaId,
+                autorId);
+    }
+
     public List<SeguimientoResponseDTO> listarPorConsulta(Long consultaId) {
         return seguimientoQueryService.listarPorConsulta(consultaId);
     }
