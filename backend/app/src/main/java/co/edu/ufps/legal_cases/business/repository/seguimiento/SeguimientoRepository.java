@@ -171,32 +171,31 @@ public interface SeguimientoRepository extends JpaRepository<Seguimiento, Long> 
 
         boolean existsByConsulta_IdAndActivoTrueAndEstado(Long consultaId, EstadoSeguimiento estado);
 
-        // Total de seguimientos en el semestre.
+        // Total de seguimientos dentro del periodo estadístico configurado.
         @Query(value = """
-                        SELECT COUNT(s.id) AS total
-                        FROM "DB_consultorioJuridico".seguimiento s
-                        WHERE s.fecha_creacion >=
-                            CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                        AND s.fecha_creacion <
-                            CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
-                        AND s.activo = true
-                        """, nativeQuery = true)
-        List<Object[]> contarSeguimientosPorSemestre(
-                        @Param("year") int year, @Param("semester") int semester);
+        SELECT COUNT(s.id) AS total
+        FROM "DB_consultorioJuridico".seguimiento s
+        WHERE s.fecha_creacion >= :fechaInicio
+        AND s.fecha_creacion < (:fechaFin + INTERVAL '1 day')
+        AND s.activo = true
+        """, nativeQuery = true)
+        List<Object[]> contarSeguimientosPorPeriodo(
+                @Param("fechaInicio") LocalDate fechaInicio,
+                @Param("fechaFin") LocalDate fechaFin);
 
-        // Seguimientos agrupados por estado en el semestre.
+        // Seguimientos agrupados por estado dentro del periodo estadístico configurado.
         @Query(value = """
-                        SELECT s.estado, COUNT(s.id) AS total
-                        FROM "DB_consultorioJuridico".seguimiento s
-                        WHERE s.fecha_creacion >=
-                            CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                        AND s.fecha_creacion <
-                            CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
-                        AND s.activo = true
-                        GROUP BY s.estado ORDER BY total DESC
-                        """, nativeQuery = true)
-        List<Object[]> contarSeguimientosPorEstadoPorSemestre(
-                        @Param("year") int year, @Param("semester") int semester);
+        SELECT s.estado, COUNT(s.id) AS total
+        FROM "DB_consultorioJuridico".seguimiento s
+        WHERE s.fecha_creacion >= :fechaInicio
+        AND s.fecha_creacion < (:fechaFin + INTERVAL '1 day')
+        AND s.activo = true
+        GROUP BY s.estado
+        ORDER BY total DESC
+        """, nativeQuery = true)
+        List<Object[]> contarSeguimientosPorEstadoPorPeriodo(
+                @Param("fechaInicio") LocalDate fechaInicio,
+                @Param("fechaFin") LocalDate fechaFin);
 
         @Query(value = """
                         SELECT COUNT(s.id) AS total
