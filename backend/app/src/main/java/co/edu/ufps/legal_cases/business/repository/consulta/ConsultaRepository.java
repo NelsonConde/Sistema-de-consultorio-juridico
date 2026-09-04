@@ -4,6 +4,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -150,6 +152,113 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
             @Param("estudianteId") Long estudianteId,
             @Param("asesorId") Long asesorId,
             @Param("monitorId") Long monitorId);
+
+    @Query(value = """
+                        SELECT c.id AS id,
+                               c.version AS version,
+                               c.descripcion AS consulta,
+                               c.fecha AS fecha,
+                               p.nombres AS nombre,
+                               p.apellidos AS apellido,
+                               p.numeroDocumento AS cedula,
+                               c.estado AS estado
+                        FROM Consulta c
+                        JOIN c.persona p
+                        LEFT JOIN c.estudiante estudiante
+                        LEFT JOIN estudiante.asesor asesorEstudiante
+                        WHERE c.estado <> :estadoArchivado
+                          AND (
+                                CAST(:search AS String) IS NULL
+                                OR LOWER(c.descripcion)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(p.nombres)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(p.apellidos)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(CONCAT(CONCAT(p.nombres, ' '), p.apellidos))
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(p.numeroDocumento)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                          )
+                          AND (:areaId IS NULL OR c.area.id = :areaId)
+                          AND (:estado IS NULL OR c.estado = :estado)
+                          AND (:asesorId IS NULL OR c.asesor.id = :asesorId)
+                          AND (:monitorId IS NULL OR c.monitor.id = :monitorId)
+                          AND (:estudianteId IS NULL OR c.estudiante.id = :estudianteId)
+                          AND (
+                                :alcanceGlobal = true
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ESTUDIANTE'
+                                    AND c.estudiante.id = :perfilId
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ASESOR'
+                                    AND (
+                                        c.asesor.id = :perfilId
+                                        OR asesorEstudiante.id = :perfilId
+                                    )
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'MONITOR'
+                                    AND c.monitor.id = :perfilId
+                                )
+                          )
+                        """, countQuery = """
+                        SELECT COUNT(c.id)
+                        FROM Consulta c
+                        JOIN c.persona p
+                        LEFT JOIN c.estudiante estudiante
+                        LEFT JOIN estudiante.asesor asesorEstudiante
+                        WHERE c.estado <> :estadoArchivado
+                          AND (
+                                CAST(:search AS String) IS NULL
+                                OR LOWER(c.descripcion)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(p.nombres)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(p.apellidos)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(CONCAT(CONCAT(p.nombres, ' '), p.apellidos))
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(p.numeroDocumento)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                          )
+                          AND (:areaId IS NULL OR c.area.id = :areaId)
+                          AND (:estado IS NULL OR c.estado = :estado)
+                          AND (:asesorId IS NULL OR c.asesor.id = :asesorId)
+                          AND (:monitorId IS NULL OR c.monitor.id = :monitorId)
+                          AND (:estudianteId IS NULL OR c.estudiante.id = :estudianteId)
+                          AND (
+                                :alcanceGlobal = true
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ESTUDIANTE'
+                                    AND c.estudiante.id = :perfilId
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ASESOR'
+                                    AND (
+                                        c.asesor.id = :perfilId
+                                        OR asesorEstudiante.id = :perfilId
+                                    )
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'MONITOR'
+                                    AND c.monitor.id = :perfilId
+                                )
+                          )
+                        """)
+    Page<ConsultaResumenProjection> buscarResumenPaginado(
+            @Param("search") String search,
+            @Param("areaId") Long areaId,
+            @Param("estado") EstadoConsulta estado,
+            @Param("asesorId") Long asesorId,
+            @Param("monitorId") Long monitorId,
+            @Param("estudianteId") Long estudianteId,
+            @Param("alcanceGlobal") boolean alcanceGlobal,
+            @Param("tipoPerfil") String tipoPerfil,
+            @Param("perfilId") Long perfilId,
+            @Param("estadoArchivado") EstadoConsulta estadoArchivado,
+            Pageable pageable);
 
     // Destinatario principal de la consulta.
     @Query("""

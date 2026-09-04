@@ -17,6 +17,7 @@ import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaBusquedaDTO;
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.business.service.consulta.ConsultaService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import jakarta.validation.Valid;
 
 @RestController
@@ -36,9 +37,28 @@ public class ConsultaController {
      */
     @GetMapping
     @PreAuthorize("hasAnyAuthority('" + VER_CONSULTAS + "', '" + GESTIONAR_CONSULTAS + "')")
-    public List<ConsultaBusquedaDTO> buscar(
-            @RequestParam(required = false, defaultValue = "") String search) {
-        return consultaService.buscarParaUsuarioActual(search);
+    public PageResponseDTO<ConsultaBusquedaDTO> buscar(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "fecha") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) Long areaId,
+            @RequestParam(required = false) EstadoConsulta estado,
+            @RequestParam(required = false) Long asesorId,
+            @RequestParam(required = false) Long monitorId,
+            @RequestParam(required = false) Long estudianteId) {
+        return consultaService.buscarParaUsuarioActual(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                areaId,
+                estado,
+                asesorId,
+                monitorId,
+                estudianteId);
     }
 
     @GetMapping("/{id}")
