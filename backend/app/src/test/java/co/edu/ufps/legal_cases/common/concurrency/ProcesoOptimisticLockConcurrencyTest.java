@@ -77,6 +77,7 @@ class ProcesoOptimisticLockConcurrencyTest
                             consulta_id,
                             organo_control_id,
                             especialidad_id,
+                            fecha_creacion,
                             estado,
                             activo
                         )
@@ -88,6 +89,7 @@ class ProcesoOptimisticLockConcurrencyTest
                             900001,
                             NULL,
                             NULL,
+                            TIMESTAMP '2026-08-10 10:00:00',
                             'PENDIENTE',
                             TRUE
                         )
