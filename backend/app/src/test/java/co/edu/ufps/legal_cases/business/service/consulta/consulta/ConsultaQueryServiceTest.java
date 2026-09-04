@@ -15,6 +15,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ import co.edu.ufps.legal_cases.business.repository.consulta.ConsultaResumenProje
 import co.edu.ufps.legal_cases.business.service.acceso.consulta.ConsultaAccessService;
 import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import co.edu.ufps.legal_cases.common.exception.ResourceNotFoundException;
 import co.edu.ufps.legal_cases.security.dto.account.PerfilUsuarioActual;
 import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
 
@@ -357,6 +359,19 @@ class ConsultaQueryServiceTest {
         assertEquals("Gomez", dto.getApellido());
         assertEquals("1002", dto.getCedula());
         assertEquals(EstadoConsulta.ACTIVO, dto.getEstado());
+    }
+
+    @Test
+    void obtenerPorIdDebeRetornar404SiDesapareceDespuesDeValidarAcceso() {
+        when(consultaRepository.findByIdConPartes(99L)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException error = assertThrows(
+                ResourceNotFoundException.class,
+                () -> consultaQueryService.obtenerPorId(99L));
+
+        assertEquals("Consulta no encontrada", error.getMessage());
+        verify(consultaAccessService).validarPuedeVerConsulta(99L);
+        verify(consultaRepository, never()).findByIdConContrapartes(99L);
     }
 
     private void stubEmpty() {

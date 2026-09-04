@@ -14,6 +14,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -21,6 +22,8 @@ import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaBusquedaDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.business.service.consulta.ConsultaService;
 import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
+import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import co.edu.ufps.legal_cases.common.exception.ResourceNotFoundException;
 import co.edu.ufps.legal_cases.common.exception.handler.GlobalExceptionHandler;
 
 class ConsultaControllerTest {
@@ -104,5 +107,48 @@ class ConsultaControllerTest {
         verify(consultaService).buscarParaUsuarioActual(
                 "Ana", 2, 20, "nombre", "asc",
                 3L, EstadoConsulta.CERRADO, 4L, 5L, 6L);
+    }
+
+    @Test
+    void detalleNoDisponibleDebeResponder404SinRevelarExistencia() throws Exception {
+        when(consultaService.obtenerPorId(99L))
+                .thenThrow(new ResourceNotFoundException("Consulta no encontrada"));
+
+        mockMvc.perform(get("/api/consultas/99"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.estado").value(404))
+                .andExpect(jsonPath("$.error").value("Recurso no encontrado"))
+                .andExpect(jsonPath("$.mensaje").value("Consulta no encontrada"))
+                .andExpect(jsonPath("$.ruta").value("/api/consultas/99"));
+    }
+
+    @Test
+    void businessExceptionEnListadoDebeResponder400() throws Exception {
+        when(consultaService.buscarParaUsuarioActual(
+                null, 1, 51, "fecha", "desc", null, null, null, null, null))
+                .thenThrow(new BusinessException("El tamaño de página debe estar entre 1 y 50"));
+
+        mockMvc.perform(get("/api/consultas")
+                        .param("size", "51"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.estado").value(400))
+                .andExpect(jsonPath("$.error").value("Error de negocio"))
+                .andExpect(jsonPath("$.mensaje").value("El tamaño de página debe estar entre 1 y 50"));
+    }
+
+    @Test
+    void accessDeniedEnListadoDebeResponder403() throws Exception {
+        when(consultaService.buscarParaUsuarioActual(
+                null, 1, 10, "fecha", "desc",
+                null, null, null, null, null))
+                .thenThrow(new AccessDeniedException("Acceso denegado"));
+
+        mockMvc.perform(get("/api/consultas"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.estado").value(403))
+                .andExpect(jsonPath("$.error").value("No autorizado"))
+                .andExpect(jsonPath("$.mensaje")
+                        .value("No tiene permisos para acceder a este recurso"))
+                .andExpect(jsonPath("$.ruta").value("/api/consultas"));
     }
 }
