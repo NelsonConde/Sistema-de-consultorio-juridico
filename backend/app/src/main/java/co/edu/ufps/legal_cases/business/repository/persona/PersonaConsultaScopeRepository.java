@@ -101,4 +101,34 @@ public interface PersonaConsultaScopeRepository extends Repository<Consulta, Lon
             @Param("personaId") Long personaId,
             @Param("perfilId") Long perfilId,
             @Param("estadoArchivado") EstadoConsulta estadoArchivado);
+
+    @Query("""
+            SELECT CASE WHEN COUNT(conc.id) > 0 THEN true ELSE false END
+            FROM Conciliacion conc
+            JOIN conc.consulta c
+            WHERE conc.activo = true
+              AND conc.conciliador.id = :perfilId
+              AND c.estado <> :estadoArchivado
+              AND (
+                    c.persona.id = :personaId
+                    OR EXISTS (
+                        SELECT parte.id
+                        FROM Consulta consultaParte
+                        JOIN consultaParte.partes parte
+                        WHERE consultaParte.id = c.id
+                          AND parte.id = :personaId
+                    )
+                    OR EXISTS (
+                        SELECT contraparte.id
+                        FROM Consulta consultaContraparte
+                        JOIN consultaContraparte.contrapartes contraparte
+                        WHERE consultaContraparte.id = c.id
+                          AND contraparte.id = :personaId
+                    )
+              )
+            """)
+    boolean existsPersonaEnConciliacionDeConciliador(
+            @Param("personaId") Long personaId,
+            @Param("perfilId") Long perfilId,
+            @Param("estadoArchivado") EstadoConsulta estadoArchivado);
 }

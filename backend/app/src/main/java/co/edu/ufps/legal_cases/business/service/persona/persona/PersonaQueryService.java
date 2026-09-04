@@ -12,12 +12,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import co.edu.ufps.legal_cases.audit.aop.log.Auditable;
+import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import co.edu.ufps.legal_cases.business.dto.persona.PersonaDTO;
 import co.edu.ufps.legal_cases.business.dto.persona.PersonaResumenDTO;
 import co.edu.ufps.legal_cases.business.model.persona.Persona;
 import co.edu.ufps.legal_cases.business.repository.persona.PersonaRepository;
 import co.edu.ufps.legal_cases.business.repository.persona.PersonaResumenProjection;
+import co.edu.ufps.legal_cases.business.service.acceso.persona.AlcanceLecturaPersonas;
 import co.edu.ufps.legal_cases.business.service.acceso.persona.PersonaAccessService;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.common.exception.ResourceNotFoundException;
@@ -88,15 +90,22 @@ public class PersonaQueryService {
             String sortBy,
             String direction,
             Boolean activo) {
-        personaAccessService.validarPuedeBuscarPersonas();
+        AlcanceLecturaPersonas alcance = personaAccessService.obtenerAlcanceLecturaPersonas();
         validarPaginacion(page, size);
         Sort sort = construirSort(sortBy, direction);
 
         String termino = normalizarBusqueda(search);
         PageRequest pageable = PageRequest.of(page - 1, size, sort);
+
+        String tipoPerfil = alcance.tipoPerfil() != null ? alcance.tipoPerfil().name() : null;
+
         Page<PersonaResumenProjection> resultado = personaRepository.buscarResumen(
                 termino,
                 activo,
+                alcance.esGlobal(),
+                tipoPerfil,
+                alcance.perfilId(),
+                EstadoConsulta.ARCHIVADO,
                 pageable);
 
         List<PersonaResumenDTO> contenido = resultado.getContent()

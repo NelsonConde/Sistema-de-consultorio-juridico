@@ -25,11 +25,18 @@ import co.edu.ufps.legal_cases.business.model.catalogo.Nacionalidad;
 import co.edu.ufps.legal_cases.business.model.catalogo.Sede;
 import co.edu.ufps.legal_cases.business.model.catalogo.Tema;
 import co.edu.ufps.legal_cases.business.model.catalogo.TipoDocumento;
+import co.edu.ufps.legal_cases.business.model.conciliacion.Conciliacion;
+import co.edu.ufps.legal_cases.business.model.conciliacion.EstadoConciliacion;
+import co.edu.ufps.legal_cases.security.model.access.Rol;
+import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
+import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
 import co.edu.ufps.legal_cases.business.model.consulta.Consulta;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.business.model.perfil.Asesor;
+import co.edu.ufps.legal_cases.business.model.perfil.Conciliador;
 import co.edu.ufps.legal_cases.business.model.perfil.Estudiante;
 import co.edu.ufps.legal_cases.business.model.perfil.Monitor;
+import co.edu.ufps.legal_cases.business.model.perfil.TipoConciliador;
 import co.edu.ufps.legal_cases.business.model.persona.Condicion;
 import co.edu.ufps.legal_cases.business.model.persona.Empresa;
 import co.edu.ufps.legal_cases.business.model.persona.Ocupacion;
@@ -93,34 +100,27 @@ class PersonaRepositoryJpaTest extends PostgreSqlIntegrationTest {
         entityManager.clear();
     }
 
+    // =========================================================
+    // Tests históricos — usan alcance GLOBAL para conservar
+    // el mismo significado anterior a SCRUM-264
+    // =========================================================
+
     @Test
     void debeBuscarPorNombreApellidoNombreCompletoYDocumento() {
         assertIds(
-                personaRepository.buscarResumen(
-                        "ana",
-                        null,
-                        PageRequest.of(0, 10)),
+                buscarGlobal("ana", null, PageRequest.of(0, 10)),
                 principal.getId());
 
         assertIds(
-                personaRepository.buscarResumen(
-                        "Bermudez",
-                        null,
-                        PageRequest.of(0, 10)),
+                buscarGlobal("Bermudez", null, PageRequest.of(0, 10)),
                 parte.getId());
 
         assertIds(
-                personaRepository.buscarResumen(
-                        "Carla Contreras",
-                        null,
-                        PageRequest.of(0, 10)),
+                buscarGlobal("Carla Contreras", null, PageRequest.of(0, 10)),
                 contraparte.getId());
 
         assertIds(
-                personaRepository.buscarResumen(
-                        "1090123456",
-                        null,
-                        PageRequest.of(0, 10)),
+                buscarGlobal("1090123456", null, PageRequest.of(0, 10)),
                 principal.getId());
     }
 
@@ -131,16 +131,10 @@ class PersonaRepositoryJpaTest extends PostgreSqlIntegrationTest {
                 Sort.Order.asc("id"));
 
         Page<PersonaResumenProjection> primeraPagina =
-                personaRepository.buscarResumen(
-                        null,
-                        null,
-                        PageRequest.of(0, 2, sort));
+                buscarGlobal(null, null, PageRequest.of(0, 2, sort));
 
         Page<PersonaResumenProjection> segundaPagina =
-                personaRepository.buscarResumen(
-                        null,
-                        null,
-                        PageRequest.of(1, 2, sort));
+                buscarGlobal(null, null, PageRequest.of(1, 2, sort));
 
         assertEquals(6, primeraPagina.getTotalElements());
         assertEquals(3, primeraPagina.getTotalPages());
@@ -167,10 +161,8 @@ class PersonaRepositoryJpaTest extends PostgreSqlIntegrationTest {
         Sort sortAsc = Sort.by(
                 Sort.Order.asc("nombres").ignoreCase(),
                 Sort.Order.asc("id"));
-        Page<PersonaResumenProjection> paginaAsc = personaRepository.buscarResumen(
-                null,
-                null,
-                PageRequest.of(0, 2, sortAsc));
+        Page<PersonaResumenProjection> paginaAsc =
+                buscarGlobal(null, null, PageRequest.of(0, 2, sortAsc));
 
         assertEquals(List.of("Ana", "Bruno"), nombres(paginaAsc));
 
@@ -178,10 +170,8 @@ class PersonaRepositoryJpaTest extends PostgreSqlIntegrationTest {
         Sort sortDesc = Sort.by(
                 Sort.Order.desc("nombres").ignoreCase(),
                 Sort.Order.asc("id"));
-        Page<PersonaResumenProjection> paginaDesc = personaRepository.buscarResumen(
-                null,
-                null,
-                PageRequest.of(0, 2, sortDesc));
+        Page<PersonaResumenProjection> paginaDesc =
+                buscarGlobal(null, null, PageRequest.of(0, 2, sortDesc));
 
         assertEquals(List.of("Zoe", "Zoe"), nombres(paginaDesc));
 
@@ -206,10 +196,8 @@ class PersonaRepositoryJpaTest extends PostgreSqlIntegrationTest {
                 Sort.Order.asc("tipoPersona.nombre"),
                 Sort.Order.asc("id"));
 
-        Page<PersonaResumenProjection> pagina = personaRepository.buscarResumen(
-                null,
-                null,
-                PageRequest.of(0, 10, sort));
+        Page<PersonaResumenProjection> pagina =
+                buscarGlobal(null, null, PageRequest.of(0, 10, sort));
 
         assertEquals("Apoderado", pagina.getContent().getFirst().getTipoPersona());
         assertEquals("Zack", pagina.getContent().getFirst().getNombres());
@@ -219,10 +207,7 @@ class PersonaRepositoryJpaTest extends PostgreSqlIntegrationTest {
     @Test
     void projectionDebeContenerSoloColumnasDelResumen() {
         Page<PersonaResumenProjection> resultado =
-                personaRepository.buscarResumen(
-                        "1090123456",
-                        null,
-                        PageRequest.of(0, 10));
+                buscarGlobal("1090123456", null, PageRequest.of(0, 10));
 
         PersonaResumenProjection projection =
                 resultado.getContent().getFirst();
@@ -238,10 +223,7 @@ class PersonaRepositoryJpaTest extends PostgreSqlIntegrationTest {
     @Test
     void activosDebeExcluirPersonasInactivasAntesDeContarYPaginar() {
         Page<PersonaResumenProjection> resultado =
-                personaRepository.buscarResumen(
-                        null,
-                        true,
-                        PageRequest.of(0, 10));
+                buscarGlobal(null, true, PageRequest.of(0, 10));
 
         assertEquals(5, resultado.getTotalElements());
 
@@ -251,6 +233,10 @@ class PersonaRepositoryJpaTest extends PostgreSqlIntegrationTest {
                         .anyMatch(item ->
                                 item.getId().equals(inactiva.getId())));
     }
+
+    // =========================================================
+    // Tests históricos de scope via PersonaConsultaScopeRepository
+    // =========================================================
 
     @Test
     void estudianteDebeTenerAlcancePorPrincipalParteYContraparte() {
@@ -293,6 +279,409 @@ class PersonaRepositoryJpaTest extends PostgreSqlIntegrationTest {
                                 Long.MAX_VALUE,
                                 estudiante.getId(),
                                 EstadoConsulta.ARCHIVADO));
+    }
+
+    // =========================================================
+    // Tests nuevos — scope en buscarResumen (listado paginado)
+    // =========================================================
+
+    @Test
+    void busquedaConScopeEstudianteDebeExcluirPersonasFueraDeAlcance() {
+        // Persona fuera del scope del estudiante (sin consulta asociada)
+        Persona fueraDeAlcance = crearPersona("Ana", "Externa", "1090777001", true);
+        entityManager.flush();
+        entityManager.clear();
+
+        // Solo "principal" (nombre "Ana") pertenece al scope del estudiante.
+        // "fueraDeAlcance" también se llama "Ana" pero está fuera del scope.
+        Page<PersonaResumenProjection> resultado = personaRepository.buscarResumen(
+                "ana",
+                null,
+                false,
+                "ESTUDIANTE",
+                estudiante.getId(),
+                EstadoConsulta.ARCHIVADO,
+                PageRequest.of(0, 10));
+
+        assertEquals(1, resultado.getTotalElements());
+        assertEquals(principal.getId(), resultado.getContent().getFirst().getId());
+        assertFalse(resultado.getContent().stream()
+                .anyMatch(p -> p.getId().equals(fueraDeAlcance.getId())));
+    }
+
+    @Test
+    void activoConScopeEstudianteDebeExcluirPersonaInactivaAunqueEsteEnConsulta() {
+        // Persona inactiva que SÍ está en la consulta del estudiante como parte
+        Persona parteInactiva = crearPersona("Greta", "Garcia", "1090888001", false);
+        entityManager.flush();
+
+        Consulta consultaConInactiva = nuevaConsulta(
+                principal, EstadoConsulta.ACTIVO, "Consulta con parte inactiva");
+        consultaConInactiva.setEstudiante(estudiante);
+        consultaConInactiva.setPartes(new ArrayList<>(List.of(parteInactiva)));
+        entityManager.persist(consultaConInactiva);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonaResumenProjection> resultado = personaRepository.buscarResumen(
+                null,
+                true,
+                false,
+                "ESTUDIANTE",
+                estudiante.getId(),
+                EstadoConsulta.ARCHIVADO,
+                PageRequest.of(0, 20));
+
+        assertFalse(resultado.getContent().stream()
+                .anyMatch(p -> p.getId().equals(parteInactiva.getId())));
+        assertFalse(resultado.getContent().stream()
+                .anyMatch(p -> !p.getActivo()));
+    }
+
+    @Test
+    void paginacionConScopeEstudianteDebeContarSoloPersonasVisibles() {
+        // 3 personas visibles para el estudiante: principal, parte, contraparte
+        // Más personas fuera del scope no deben afectar totalElements ni totalPages
+        Persona externa1 = crearPersona("Hugo", "Herrera", "1090888100", true);
+        Persona externa2 = crearPersona("Irma", "Ibarra", "1090888200", true);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonaResumenProjection> resultado = personaRepository.buscarResumen(
+                null,
+                null,
+                false,
+                "ESTUDIANTE",
+                estudiante.getId(),
+                EstadoConsulta.ARCHIVADO,
+                PageRequest.of(0, 2));
+
+        assertEquals(2, resultado.getContent().size());
+        assertEquals(3, resultado.getTotalElements());
+        assertEquals(2, resultado.getTotalPages());
+
+        assertFalse(resultado.getContent().stream()
+                .anyMatch(p -> p.getId().equals(externa1.getId())));
+        assertFalse(resultado.getContent().stream()
+                .anyMatch(p -> p.getId().equals(externa2.getId())));
+    }
+
+    @Test
+    void scopeEstudianteDebeVerPrincipalParteYContraparteNoArchivadasYNoOtras() {
+        // principal, parte, contraparte → visibles
+        // asesorDirecto → no está en consulta del estudiante
+        // archivada → está en consulta ARCHIVADA del estudiante
+        Page<PersonaResumenProjection> resultado = personaRepository.buscarResumen(
+                null,
+                null,
+                false,
+                "ESTUDIANTE",
+                estudiante.getId(),
+                EstadoConsulta.ARCHIVADO,
+                PageRequest.of(0, 20));
+
+        List<Long> ids = resultado.getContent().stream()
+                .map(PersonaResumenProjection::getId).toList();
+
+        assertTrue(ids.contains(principal.getId()));
+        assertTrue(ids.contains(parte.getId()));
+        assertTrue(ids.contains(contraparte.getId()));
+        assertFalse(ids.contains(asesorDirecto.getId()));
+        assertFalse(ids.contains(archivada.getId()));
+        assertEquals(3, resultado.getTotalElements());
+    }
+
+    @Test
+    void scopeAsesorDebeVerPersonasDeConsultaDirectaYDeEstudianteAsociado() {
+        // asesorDirecto: principal de consultaAsesorDirecto donde asesor=asesor
+        // principal, parte, contraparte: de consultaOperativa donde estudiante.asesor=asesor
+        // archivada: NO visible (consulta archivada)
+        Page<PersonaResumenProjection> resultado = personaRepository.buscarResumen(
+                null,
+                null,
+                false,
+                "ASESOR",
+                asesor.getId(),
+                EstadoConsulta.ARCHIVADO,
+                PageRequest.of(0, 20));
+
+        List<Long> ids = resultado.getContent().stream()
+                .map(PersonaResumenProjection::getId).toList();
+
+        assertTrue(ids.contains(asesorDirecto.getId()));
+        assertTrue(ids.contains(principal.getId()));
+        assertTrue(ids.contains(parte.getId()));
+        assertTrue(ids.contains(contraparte.getId()));
+        assertFalse(ids.contains(archivada.getId()));
+    }
+
+    @Test
+    void scopeAsesorDistintoNoDebeVerPersonasDeOtroAsesor() {
+        Asesor otroAsesor = new Asesor();
+        otroAsesor.setNombre("Otro Asesor");
+        otroAsesor.setTipoDocumento(tipoDocumentoPerfil);
+        otroAsesor.setDocumento("A-999");
+        otroAsesor.setEmail("otro.asesor@example.com");
+        otroAsesor.setTelefono("3009999999");
+        otroAsesor.setUsuario("otro.asesor");
+        otroAsesor.setSede(sede);
+        otroAsesor.setCodigo("ASE-999");
+        otroAsesor.setArea(area);
+        entityManager.persist(otroAsesor);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonaResumenProjection> resultado = personaRepository.buscarResumen(
+                null,
+                null,
+                false,
+                "ASESOR",
+                otroAsesor.getId(),
+                EstadoConsulta.ARCHIVADO,
+                PageRequest.of(0, 20));
+
+        assertEquals(0, resultado.getTotalElements());
+    }
+
+    @Test
+    void scopeMonitorDebeVerPersonasDeConsultaNoArchivadasYNoOtros() {
+        // consultaOperativa tiene monitor=monitor: principal, parte, contraparte visibles
+        // asesorDirecto: NO en consulta del monitor
+        // archivada: en consulta archivada del monitor → NO visible
+        Page<PersonaResumenProjection> resultado = personaRepository.buscarResumen(
+                null,
+                null,
+                false,
+                "MONITOR",
+                monitor.getId(),
+                EstadoConsulta.ARCHIVADO,
+                PageRequest.of(0, 20));
+
+        List<Long> ids = resultado.getContent().stream()
+                .map(PersonaResumenProjection::getId).toList();
+
+        assertTrue(ids.contains(principal.getId()));
+        assertTrue(ids.contains(parte.getId()));
+        assertTrue(ids.contains(contraparte.getId()));
+        assertFalse(ids.contains(asesorDirecto.getId()));
+        assertFalse(ids.contains(archivada.getId()));
+    }
+
+    @Test
+    void scopeConciliadorDebeVerPersonasDeConsultaActivaYNoConciliacionInactivaOArchivada() {
+        // Fixtures locales para no contaminar históricos
+        Conciliador conciliador = crearConciliador("CON-01", "conc01");
+        Conciliador otroConciliador = crearConciliador("CON-02", "conc02");
+
+        Persona personaPrincipal = crearPersona("Julia", "Jimenez", "1090CC01", true);
+        Persona personaParte = crearPersona("Kevin", "Kline", "1090CC02", true);
+        Persona personaContraparte = crearPersona("Laura", "Linares", "1090CC03", true);
+        Persona personaOtroConciliador = crearPersona("Marco", "Mora", "1090CC04", true);
+        Persona personaConciliacionInactiva = crearPersona("Nora", "Nieto", "1090CC05", true);
+        Persona personaConsultaArchivada = crearPersona("Oscar", "Ortiz", "1090CC06", true);
+
+        entityManager.flush();
+
+        // Consulta activa con conciliacion activa para conciliador
+        Consulta consultaActiva = nuevaConsulta(personaPrincipal, EstadoConsulta.EN_PROCESO, "Consulta conciliador");
+        consultaActiva.setPartes(new ArrayList<>(List.of(personaParte)));
+        consultaActiva.setContrapartes(new ArrayList<>(List.of(personaContraparte)));
+        entityManager.persist(consultaActiva);
+        entityManager.flush();
+
+        Conciliacion conciliacionActiva = crearConciliacion(consultaActiva, conciliador, true);
+
+        // Mismo conciliador pero conciliacion inactiva
+        Consulta consultaConInactiva = nuevaConsulta(personaConciliacionInactiva, EstadoConsulta.EN_PROCESO, "Conciliacion inactiva");
+        entityManager.persist(consultaConInactiva);
+        entityManager.flush();
+
+        Conciliacion conciliacionInactiva = crearConciliacion(consultaConInactiva, conciliador, false);
+
+        // Consulta ARCHIVADA con conciliacion activa del conciliador
+        Consulta consultaArchivadaConciliador = nuevaConsulta(personaConsultaArchivada, EstadoConsulta.ARCHIVADO, "Consulta archivada conciliador");
+        entityManager.persist(consultaArchivadaConciliador);
+        entityManager.flush();
+
+        Conciliacion conciliacionDeArchivada = crearConciliacion(consultaArchivadaConciliador, conciliador, true);
+
+        // Otro conciliador
+        Consulta consultaOtroConciliador = nuevaConsulta(personaOtroConciliador, EstadoConsulta.ACTIVO, "Otro conciliador");
+        entityManager.persist(consultaOtroConciliador);
+        entityManager.flush();
+
+        Conciliacion conciliacionOtro = crearConciliacion(consultaOtroConciliador, otroConciliador, true);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonaResumenProjection> resultado = personaRepository.buscarResumen(
+                null,
+                null,
+                false,
+                "CONCILIADOR",
+                conciliador.getId(),
+                EstadoConsulta.ARCHIVADO,
+                PageRequest.of(0, 20));
+
+        List<Long> ids = resultado.getContent().stream()
+                .map(PersonaResumenProjection::getId).toList();
+
+        // Visibles: principal, parte y contraparte de conciliacion activa + consulta no archivada
+        assertTrue(ids.contains(personaPrincipal.getId()), "principal debe ser visible");
+        assertTrue(ids.contains(personaParte.getId()), "parte debe ser visible");
+        assertTrue(ids.contains(personaContraparte.getId()), "contraparte debe ser visible");
+
+        // No visibles
+        assertFalse(ids.contains(personaOtroConciliador.getId()), "otro conciliador no debe ser visible");
+        assertFalse(ids.contains(personaConciliacionInactiva.getId()), "conciliacion inactiva no debe ser visible");
+        assertFalse(ids.contains(personaConsultaArchivada.getId()), "consulta archivada no debe ser visible");
+
+        assertEquals(3, resultado.getTotalElements());
+    }
+
+    @Test
+    void conciliadorDebeVerPersonaPrincipalParteYContrapartePorScopeRepository() {
+        Conciliador conciliador = crearConciliador("CON-SC01", "concsc01");
+
+        Persona personaPrincipal = crearPersona("Rosa", "Rivas", "1090SC01", true);
+        Persona personaParte = crearPersona("Samuel", "Sosa", "1090SC02", true);
+        Persona personaContraparte = crearPersona("Teresa", "Torres", "1090SC03", true);
+        Persona personaOtroConciliador = crearPersona("Ulises", "Uribe", "1090SC04", true);
+        Persona personaConciliacionInactiva = crearPersona("Vera", "Vega", "1090SC05", true);
+        Persona personaConsultaArchivada = crearPersona("Walter", "Wolff", "1090SC06", true);
+
+        entityManager.flush();
+
+        Consulta consultaActiva = nuevaConsulta(personaPrincipal, EstadoConsulta.ACTIVO, "Scope conciliador principal");
+        consultaActiva.setPartes(new ArrayList<>(List.of(personaParte)));
+        consultaActiva.setContrapartes(new ArrayList<>(List.of(personaContraparte)));
+        entityManager.persist(consultaActiva);
+        entityManager.flush();
+
+        Conciliacion conciliacionActiva = crearConciliacion(consultaActiva, conciliador, true);
+
+        Conciliador otroConciliador = crearConciliador("CON-SC02", "concsc02");
+        Consulta consultaOtra = nuevaConsulta(personaOtroConciliador, EstadoConsulta.ACTIVO, "Otro conciliador scope");
+        entityManager.persist(consultaOtra);
+        entityManager.flush();
+
+        Conciliacion conciliacionOtra = crearConciliacion(consultaOtra, otroConciliador, true);
+
+        Consulta consultaInactiva = nuevaConsulta(personaConciliacionInactiva, EstadoConsulta.ACTIVO, "Conciliacion inactiva scope");
+        entityManager.persist(consultaInactiva);
+        entityManager.flush();
+
+        Conciliacion conciliacionInactiva = crearConciliacion(consultaInactiva, conciliador, false);
+
+        Consulta consultaArchivadaConciliador = nuevaConsulta(personaConsultaArchivada, EstadoConsulta.ARCHIVADO, "Archivada scope conciliador");
+        entityManager.persist(consultaArchivadaConciliador);
+        entityManager.flush();
+
+        Conciliacion conciliacionArchivada = crearConciliacion(consultaArchivadaConciliador, conciliador, true);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        // Persona principal → true
+        assertTrue(personaConsultaScopeRepository.existsPersonaEnConciliacionDeConciliador(
+                personaPrincipal.getId(), conciliador.getId(), EstadoConsulta.ARCHIVADO),
+                "principal debe ser visible");
+
+        // Persona parte → true
+        assertTrue(personaConsultaScopeRepository.existsPersonaEnConciliacionDeConciliador(
+                personaParte.getId(), conciliador.getId(), EstadoConsulta.ARCHIVADO),
+                "parte debe ser visible");
+
+        // Persona contraparte → true
+        assertTrue(personaConsultaScopeRepository.existsPersonaEnConciliacionDeConciliador(
+                personaContraparte.getId(), conciliador.getId(), EstadoConsulta.ARCHIVADO),
+                "contraparte debe ser visible");
+
+        // Otro conciliador → false
+        assertFalse(personaConsultaScopeRepository.existsPersonaEnConciliacionDeConciliador(
+                personaOtroConciliador.getId(), conciliador.getId(), EstadoConsulta.ARCHIVADO),
+                "otro conciliador no debe ser visible");
+
+        // Conciliacion inactiva → false
+        assertFalse(personaConsultaScopeRepository.existsPersonaEnConciliacionDeConciliador(
+                personaConciliacionInactiva.getId(), conciliador.getId(), EstadoConsulta.ARCHIVADO),
+                "conciliacion inactiva no debe ser visible");
+
+        // Consulta archivada → false
+        assertFalse(personaConsultaScopeRepository.existsPersonaEnConciliacionDeConciliador(
+                personaConsultaArchivada.getId(), conciliador.getId(), EstadoConsulta.ARCHIVADO),
+                "consulta archivada no debe ser visible");
+    }
+
+    // =========================================================
+    // Helpers de fixtures y assertions
+    // =========================================================
+
+    private Page<PersonaResumenProjection> buscarGlobal(
+            String search, Boolean activo, PageRequest pageable) {
+        return personaRepository.buscarResumen(
+                search, activo, true, null, null, EstadoConsulta.ARCHIVADO, pageable);
+    }
+
+    private EstadoConciliacion obtenerEstadoConciliacion() {
+        java.util.List<EstadoConciliacion> list = entityManager
+                .createQuery("SELECT e FROM EstadoConciliacion e", EstadoConciliacion.class)
+                .getResultList();
+        if (!list.isEmpty()) {
+            return list.get(0);
+        }
+        EstadoConciliacion estado = new EstadoConciliacion();
+        estado.setCodigo("EST_TRAMITE_TEST");
+        estado.setNombre("En Tramite Test");
+        entityManager.persist(estado);
+        return estado;
+    }
+
+    private UsuarioSistema obtenerUsuarioSistema() {
+        java.util.List<UsuarioSistema> list = entityManager
+                .createQuery("SELECT u FROM UsuarioSistema u", UsuarioSistema.class)
+                .getResultList();
+        if (!list.isEmpty()) {
+            return list.get(0);
+        }
+        Rol rol = new Rol();
+        rol.setNombre("ROL_SISTEMA_TEST");
+        rol.setTipoPerfil(TipoPerfilUsuario.ADMINISTRATIVO);
+        entityManager.persist(rol);
+
+        UsuarioSistema usuario = new UsuarioSistema();
+        usuario.setUsername("sistema_test@example.com");
+        usuario.setPasswordHash("hash");
+        usuario.setRol(rol);
+        entityManager.persist(usuario);
+        return usuario;
+    }
+
+    private Conciliacion crearConciliacion(Consulta consulta, Conciliador conciliador, boolean activo) {
+        Conciliacion conciliacion = new Conciliacion();
+        conciliacion.setConsulta(consulta);
+        conciliacion.setConciliador(conciliador);
+        conciliacion.setEstado(obtenerEstadoConciliacion());
+        conciliacion.setSolicitadoPor(obtenerUsuarioSistema());
+        conciliacion.setActivo(activo);
+        entityManager.persist(conciliacion);
+        return conciliacion;
+    }
+
+    private Conciliador crearConciliador(String codigo, String usuario) {
+        Conciliador conciliador = new Conciliador();
+        conciliador.setNombre("Conciliador " + codigo);
+        conciliador.setTipoDocumento(tipoDocumentoPerfil);
+        conciliador.setDocumento("C-" + codigo);
+        conciliador.setEmail(usuario + "@example.com");
+        conciliador.setTelefono("300-" + codigo);
+        conciliador.setUsuario(usuario);
+        conciliador.setSede(sede);
+        conciliador.setCodigo(codigo);
+        conciliador.setTipoConciliador(TipoConciliador.INTERNO);
+        entityManager.persist(conciliador);
+        return conciliador;
     }
 
     private void crearCatalogos() {

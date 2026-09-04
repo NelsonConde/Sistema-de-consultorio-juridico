@@ -4,7 +4,9 @@ import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.GESTIONAR_
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_PERSONAS;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -36,6 +38,10 @@ class PersonaAccessServiceTest {
                 personaConsultaScopeRepository);
     }
 
+    // =========================================================
+    // validarPuedeBuscarPersonas — tests históricos conservados
+    // =========================================================
+
     @Test
     void debePermitirBusquedaMinimaConPermisoSinExigirRelacionPrevia() {
         when(usuarioActualService.tieneAlgunPermiso(VER_PERSONAS, GESTIONAR_PERSONAS))
@@ -55,6 +61,64 @@ class PersonaAccessServiceTest {
                 AccessDeniedException.class,
                 personaAccessService::validarPuedeBuscarPersonas);
     }
+
+    // =========================================================
+    // obtenerAlcanceLecturaPersonas — tests nuevos (6.1–6.4)
+    // =========================================================
+
+    @Test
+    void sinPermisosObtenerAlcanceLanzaAccessDenied() {
+        when(usuarioActualService.tieneAlgunPermiso(VER_PERSONAS, GESTIONAR_PERSONAS))
+                .thenReturn(false);
+
+        assertThrows(
+                AccessDeniedException.class,
+                personaAccessService::obtenerAlcanceLecturaPersonas);
+    }
+
+    @Test
+    void conGestionarPersonasObtenerAlcanceEsGlobal() {
+        when(usuarioActualService.tieneAlgunPermiso(VER_PERSONAS, GESTIONAR_PERSONAS))
+                .thenReturn(true);
+        when(usuarioActualService.tienePermiso(GESTIONAR_PERSONAS)).thenReturn(true);
+
+        AlcanceLecturaPersonas alcance = personaAccessService.obtenerAlcanceLecturaPersonas();
+
+        assertTrue(alcance.esGlobal());
+        verify(usuarioActualService, never()).obtenerPerfilActual();
+    }
+
+    @Test
+    void administrativoConVerPersonasObtenerAlcanceEsGlobal() {
+        when(usuarioActualService.tieneAlgunPermiso(VER_PERSONAS, GESTIONAR_PERSONAS))
+                .thenReturn(true);
+        when(usuarioActualService.tienePermiso(GESTIONAR_PERSONAS)).thenReturn(false);
+        when(usuarioActualService.obtenerPerfilActual())
+                .thenReturn(new PerfilUsuarioActual(15L, TipoPerfilUsuario.ADMINISTRATIVO));
+
+        AlcanceLecturaPersonas alcance = personaAccessService.obtenerAlcanceLecturaPersonas();
+
+        assertTrue(alcance.esGlobal());
+    }
+
+    @Test
+    void estudianteConVerPersonasObtenerAlcanceEsRestringido() {
+        when(usuarioActualService.tieneAlgunPermiso(VER_PERSONAS, GESTIONAR_PERSONAS))
+                .thenReturn(true);
+        when(usuarioActualService.tienePermiso(GESTIONAR_PERSONAS)).thenReturn(false);
+        when(usuarioActualService.obtenerPerfilActual())
+                .thenReturn(new PerfilUsuarioActual(11L, TipoPerfilUsuario.ESTUDIANTE));
+
+        AlcanceLecturaPersonas alcance = personaAccessService.obtenerAlcanceLecturaPersonas();
+
+        assertFalse(alcance.esGlobal());
+        assertEquals(TipoPerfilUsuario.ESTUDIANTE, alcance.tipoPerfil());
+        assertEquals(11L, alcance.perfilId());
+    }
+
+    // =========================================================
+    // validarPuedeVerDetallePersona — tests históricos adaptados
+    // =========================================================
 
     @Test
     void debePermitirDetallePorCapacidadAdministrativaSinConsultarRolNiAlcance() {
@@ -160,34 +224,76 @@ class PersonaAccessServiceTest {
                 () -> personaAccessService.validarPuedeVerDetallePersona(97L));
     }
 
+    // =========================================================
+    // CONCILIADOR — tests nuevos (6.7)
+    // =========================================================
+
     @Test
-    void debeRechazarConciliadorAunqueTengaPermisoDeLectura() {
+    void debePermitirConciliadorRelacionadoConConciliacionActivaYConsultaNoArchivada() {
         habilitarPermisoDeLectura();
         when(usuarioActualService.obtenerPerfilActual())
                 .thenReturn(new PerfilUsuarioActual(14L, TipoPerfilUsuario.CONCILIADOR));
+        when(personaConsultaScopeRepository.existsPersonaEnConciliacionDeConciliador(
+                23L,
+                14L,
+                EstadoConsulta.ARCHIVADO))
+                .thenReturn(true);
 
-        ResourceNotFoundException error = assertThrows(
-                ResourceNotFoundException.class,
-                () -> personaAccessService.validarPuedeVerDetallePersona(23L));
-
-        assertEquals("Persona no encontrada", error.getMessage());
-        verify(personaConsultaScopeRepository, never())
-                .existsPersonaEnConsultaDeEstudiante(23L, 14L, EstadoConsulta.ARCHIVADO);
+        assertDoesNotThrow(() -> personaAccessService.validarPuedeVerDetallePersona(23L));
     }
 
     @Test
-    void administrativoSinGestionarPersonasNoObtieneExcepcionGlobal() {
+    void debeRechazarConciliadorNoRelacionadoConMensajeGenerico() {
+        habilitarPermisoDeLectura();
+        when(usuarioActualService.obtenerPerfilActual())
+                .thenReturn(new PerfilUsuarioActual(14L, TipoPerfilUsuario.CONCILIADOR));
+        when(personaConsultaScopeRepository.existsPersonaEnConciliacionDeConciliador(
+                96L,
+                14L,
+                EstadoConsulta.ARCHIVADO))
+                .thenReturn(false);
+
+        ResourceNotFoundException error = assertThrows(
+                ResourceNotFoundException.class,
+                () -> personaAccessService.validarPuedeVerDetallePersona(96L));
+
+        assertEquals("Persona no encontrada", error.getMessage());
+        verify(personaConsultaScopeRepository)
+                .existsPersonaEnConciliacionDeConciliador(96L, 14L, EstadoConsulta.ARCHIVADO);
+    }
+
+    // =========================================================
+    // ADMINISTRATIVO + VER_PERSONAS — test nuevo (6.3)
+    // =========================================================
+
+    @Test
+    void debePermitirAdministrativoConVerPersonasDeFormaGlobal() {
         habilitarPermisoDeLectura();
         when(usuarioActualService.obtenerPerfilActual())
                 .thenReturn(new PerfilUsuarioActual(15L, TipoPerfilUsuario.ADMINISTRATIVO));
 
+        assertDoesNotThrow(() -> personaAccessService.validarPuedeVerDetallePersona(24L));
+
+        verify(personaConsultaScopeRepository, never())
+                .existsPersonaEnConsultaDeEstudiante(24L, 15L, EstadoConsulta.ARCHIVADO);
+    }
+
+    // =========================================================
+    // Precedencia 403/404 — tests obligatorios (6.8)
+    // =========================================================
+
+    @Test
+    void sinPermisoYPersonaIdNullDebeResponderAccessDenied() {
+        when(usuarioActualService.tieneAlgunPermiso(VER_PERSONAS, GESTIONAR_PERSONAS))
+                .thenReturn(false);
+
         assertThrows(
-                ResourceNotFoundException.class,
-                () -> personaAccessService.validarPuedeVerDetallePersona(24L));
+                AccessDeniedException.class,
+                () -> personaAccessService.validarPuedeVerDetallePersona(null));
     }
 
     @Test
-    void idNuloUsaLaMismaRespuestaGenerica() {
+    void conPermisoYPersonaIdNullDebeResponderNotFoundGenerico() {
         habilitarPermisoDeLectura();
 
         ResourceNotFoundException error = assertThrows(
@@ -196,6 +302,10 @@ class PersonaAccessServiceTest {
 
         assertEquals("Persona no encontrada", error.getMessage());
     }
+
+    // =========================================================
+    // Helper
+    // =========================================================
 
     private void habilitarPermisoDeLectura() {
         when(usuarioActualService.tieneAlgunPermiso(VER_PERSONAS, GESTIONAR_PERSONAS))

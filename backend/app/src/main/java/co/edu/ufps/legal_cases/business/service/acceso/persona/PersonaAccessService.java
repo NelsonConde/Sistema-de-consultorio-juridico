@@ -40,22 +40,42 @@ public class PersonaAccessService {
         }
     }
 
+    public AlcanceLecturaPersonas obtenerAlcanceLecturaPersonas() {
+        validarPuedeBuscarPersonas();
+
+        if (usuarioActualService.tienePermiso(GESTIONAR_PERSONAS)) {
+            return AlcanceLecturaPersonas.global();
+        }
+
+        PerfilUsuarioActual perfil = usuarioActualService.obtenerPerfilActual();
+        if (perfil == null || perfil.getPerfilId() == null || perfil.getTipoPerfil() == null) {
+            // Fail closed: sin perfil válido no se expone ningún dato.
+            return AlcanceLecturaPersonas.restringido(null, null);
+        }
+
+        if (perfil.getTipoPerfil() == TipoPerfilUsuario.ADMINISTRATIVO) {
+            return AlcanceLecturaPersonas.global();
+        }
+
+        return AlcanceLecturaPersonas.restringido(perfil.getTipoPerfil(), perfil.getPerfilId());
+    }
+
     @Transactional(readOnly = true)
     public void validarPuedeVerDetallePersona(Long personaId) {
-        validarPuedeBuscarPersonas();
+        // Primero verificar permiso: garantiza 403 antes que 404,
+        // incluso cuando personaId es null.
+        AlcanceLecturaPersonas alcance = obtenerAlcanceLecturaPersonas();
 
         if (personaId == null) {
             throw personaNoDisponible();
         }
 
-        // La excepcion administrativa depende de una capacidad explicita, no del
-        // nombre textual de un rol.
-        if (usuarioActualService.tienePermiso(GESTIONAR_PERSONAS)) {
+        if (alcance.esGlobal()) {
             return;
         }
 
-        PerfilUsuarioActual perfil = usuarioActualService.obtenerPerfilActual();
-        boolean tieneAlcance = tieneAlcanceOperativo(perfil, personaId);
+        boolean tieneAlcance = tieneAlcanceOperativo(
+                alcance.tipoPerfil(), alcance.perfilId(), personaId);
 
         if (!tieneAlcance) {
             // Mismo resultado para un id inexistente y uno fuera de alcance. De esta
@@ -82,13 +102,13 @@ public class PersonaAccessService {
         }
     }
 
-    private boolean tieneAlcanceOperativo(PerfilUsuarioActual perfil, Long personaId) {
-        if (perfil == null || perfil.getPerfilId() == null || perfil.getTipoPerfil() == null) {
+    private boolean tieneAlcanceOperativo(
+            TipoPerfilUsuario tipoPerfil,
+            Long perfilId,
+            Long personaId) {
+        if (tipoPerfil == null || perfilId == null) {
             return false;
         }
-
-        Long perfilId = perfil.getPerfilId();
-        TipoPerfilUsuario tipoPerfil = perfil.getTipoPerfil();
 
         return switch (tipoPerfil) {
             case ESTUDIANTE -> personaConsultaScopeRepository.existsPersonaEnConsultaDeEstudiante(
@@ -103,7 +123,11 @@ public class PersonaAccessService {
                     personaId,
                     perfilId,
                     EstadoConsulta.ARCHIVADO);
-            case ADMINISTRATIVO, CONCILIADOR -> false;
+            case CONCILIADOR -> personaConsultaScopeRepository.existsPersonaEnConciliacionDeConciliador(
+                    personaId,
+                    perfilId,
+                    EstadoConsulta.ARCHIVADO);
+            case ADMINISTRATIVO -> true;
         };
     }
 
