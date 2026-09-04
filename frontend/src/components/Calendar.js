@@ -1,13 +1,13 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import listPlugin from '@fullcalendar/list'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
-import { API_URL_BASE } from '@/lib/config'
+import { apiClient } from '@/lib/apiClient'
 
 /**
  * Calendar component.
@@ -22,52 +22,37 @@ import { API_URL_BASE } from '@/lib/config'
  */
 export default function Calendar({ onEventClick }) {
   const router = useRouter()
-  const [events, setEvents] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        setLoading(true)
+  const fetchEvents = useCallback(async (fetchInfo, successCallback, failureCallback) => {
+    try {
+      const params = new URLSearchParams({
+        from: fetchInfo.startStr.slice(0, 10),
+        to: fetchInfo.endStr.slice(0, 10),
+      })
+      const response = await apiClient.get(`/agenda?${params.toString()}`)
 
-        const response = await fetch(`${API_URL_BASE}/seguimientos/calendario`, {
-          credentials: 'include'
-        })
-
-        if (!response.ok) throw new Error('No se pudo obtener los seguimientos')
-
-        const seguimientos = await response.json()
-
-        // Follow-up workflow detail.
-        const mappedEvents = seguimientos
-          .filter(seg => seg.fechaEntrega)
-          .map(seg => ({
-            id: seg.id.toString(),
-            title: seg.descripcion || seg.categoriaSeguimientoNombre || 'Seguimiento',
-            start: seg.fechaEntrega,
-            allDay: true,
-            classNames: [
-              seg.alertaDisciplinaria
-                ? 'bg-destructive text-destructive-foreground border-destructive'
-                : seg.categoriaSeguimientoNombre?.toLowerCase().includes('audiencia')
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-secondary text-secondary-foreground border-secondary'
-            ],
-            extendedProps: { ...seg }
-          }))
-
-        setEvents(mappedEvents)
-      } catch (error) {
-        console.error('Error cargando eventos:', error)
-        toast.error("Error al cargar eventos", {
-          description: "No se pudieron obtener los seguimientos del calendario."
-        })
-      } finally {
-        setLoading(false)
+      if (!response.ok) {
+        throw new Error(`No se pudo obtener la agenda (${response.status})`)
       }
-    }
 
-    fetchEvents()
+      const agenda = await response.json()
+      successCallback(agenda.map(event => ({
+        ...event,
+        classNames: [event.type === 'CONCILIATION_MEETING'
+          ? 'bg-primary text-primary-foreground border-primary'
+          : event.overdue
+            ? 'bg-destructive text-destructive-foreground border-destructive'
+            : 'bg-secondary text-secondary-foreground border-secondary'],
+        extendedProps: event,
+      })))
+    } catch (error) {
+      console.error('Error cargando agenda:', error)
+      toast.error("Error al cargar eventos", {
+        description: "No se pudo obtener la agenda para el rango seleccionado."
+      })
+      failureCallback(error)
+    }
   }, [])
 
   return (
@@ -83,14 +68,16 @@ export default function Calendar({ onEventClick }) {
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-[1px]">
               <div className="flex flex-col items-center gap-2">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                <p className="text-sm font-medium text-muted-foreground">Cargando seguimientos...</p>
+                <p className="text-sm font-medium text-muted-foreground">Cargando agenda...</p>
               </div>
             </div>
           )}
           <FullCalendar
             plugins={[dayGridPlugin, listPlugin]}
             initialView="dayGridMonth"
-            events={events}
+            events={fetchEvents}
+            loading={setLoading}
+            timeZone="America/Bogota"
             locale="es"
             headerToolbar={{
               left: 'prev,next today',
@@ -110,16 +97,16 @@ export default function Calendar({ onEventClick }) {
             eventDisplay="block"
             eventClick={(info) => {
               // Consultation flow detail.
-              const consultaId = info.event.extendedProps.consultaId;
+              const { consultaId, type, resourceId } = info.event.extendedProps;
               
               if (onEventClick) {
                 onEventClick();
               }
 
-              if (consultaId) {
-                // Follow-up workflow detail.
-                // Search behavior.
-                router.push(`/tareas?search=${consultaId}`); 
+              if (type === 'CONCILIATION_MEETING' && resourceId) {
+                router.push(`/conciliaciones/${resourceId}`)
+              } else if (consultaId) {
+                router.push(`/tareas?search=${consultaId}`)
               } else {
                 router.push('/tareas');
               }

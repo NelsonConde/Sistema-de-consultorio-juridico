@@ -60,7 +60,7 @@ public class SeguimientoController {
      * - Administrador: ve todos.
      * - Asesor/Monitor: ve los de consultas dentro de su alcance.
      * - Estudiante: ve solo los marcados como notificarEstudiante = true.
-     * - Conciliador: por ahora no ve ninguno.
+     * Este endpoint se conserva por compatibilidad; la agenda usa /api/agenda.
      */
     @GetMapping("/calendario")
     @PreAuthorize("hasAuthority('" + VER_SEGUIMIENTOS + "')")
