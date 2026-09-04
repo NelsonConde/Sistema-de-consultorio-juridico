@@ -9,6 +9,7 @@ import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.business.service.consulta.consulta.ConsultaCommandService;
 import co.edu.ufps.legal_cases.business.service.consulta.consulta.ConsultaQueryService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
 // Fachada del módulo de consultas.
 // El controller entra por aquí, pero lectura y escritura quedan separadas por responsabilidad.
@@ -25,8 +26,28 @@ public class ConsultaService {
         this.consultaCommandService = consultaCommandService;
     }
 
-    public List<ConsultaBusquedaDTO> buscarParaUsuarioActual(String search) {
-        return consultaQueryService.buscarParaUsuarioActual(search);
+    public PageResponseDTO<ConsultaBusquedaDTO> buscarParaUsuarioActual(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction,
+            Long areaId,
+            EstadoConsulta estado,
+            Long asesorId,
+            Long monitorId,
+            Long estudianteId) {
+        return consultaQueryService.buscarParaUsuarioActual(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                areaId,
+                estado,
+                asesorId,
+                monitorId,
+                estudianteId);
     }
 
     // Se conserva temporalmente para compatibilidad interna si alguna clase lo usa.
