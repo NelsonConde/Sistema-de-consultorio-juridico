@@ -2,6 +2,7 @@ package co.edu.ufps.legal_cases.business.repository.proceso;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDate;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -43,23 +44,21 @@ public interface ProcesoRepository extends JpaRepository<Proceso, Long> {
                 """, nativeQuery = true)
     List<Object[]> contarProcesosPorEstado();
 
-    // Procesos activos asociados a consultas del semestre estadístico.
+    // Procesos activos asociados a consultas dentro del periodo estadístico configurado.
     @Query(value = """
-                SELECT p.estado, COUNT(p.id) AS total_procesos
-                FROM "DB_consultorioJuridico".proceso p
-                JOIN "DB_consultorioJuridico".consulta c ON c.id = p.consulta_id
-                WHERE p.activo = true
-                AND c.estado <> 'ARCHIVADO'
-                AND c.fecha >=
-                    CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                AND c.fecha <
-                    CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
-                GROUP BY p.estado
-                ORDER BY total_procesos DESC
-                """, nativeQuery = true)
-    List<Object[]> contarProcesosPorEstadoPorSemestre(
-            @Param("year") int year,
-            @Param("semester") int semester);
+        SELECT p.estado, COUNT(p.id) AS total_procesos
+        FROM "DB_consultorioJuridico".proceso p
+        JOIN "DB_consultorioJuridico".consulta c ON c.id = p.consulta_id
+        WHERE p.activo = true
+        AND c.estado <> 'ARCHIVADO'
+        AND c.fecha >= :fechaInicio
+        AND c.fecha <= :fechaFin
+        GROUP BY p.estado
+        ORDER BY total_procesos DESC
+        """, nativeQuery = true)
+    List<Object[]> contarProcesosPorEstadoPorPeriodo(
+            @Param("fechaInicio") LocalDate fechaInicio,
+            @Param("fechaFin") LocalDate fechaFin);
 
     // Procesos activos asociados a consultas dentro de un rango libre.
     @Query(value = """
@@ -78,61 +77,58 @@ public interface ProcesoRepository extends JpaRepository<Proceso, Long> {
             @Param("fechaFin") String fechaFin);
 
 
-    // Procesos por estado y semestre filtrados por asesor.
+    // Procesos por estado y periodo filtrados por asesor.
     @Query(value = """
-                SELECT p.estado, COUNT(p.id) AS total_procesos
-                FROM "DB_consultorioJuridico".proceso p
-                JOIN "DB_consultorioJuridico".consulta c ON c.id = p.consulta_id
-                WHERE p.activo = true
-                AND c.estado <> 'ARCHIVADO'
-                AND c.fecha >=
-                    CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                AND c.fecha <
-                    CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
-                AND c.asesor_id = :asesorId
-                GROUP BY p.estado ORDER BY total_procesos DESC
-                """, nativeQuery = true)
-    List<Object[]> contarProcesosPorEstadoPorSemestreYAsesor(
-            @Param("year") int year,
-            @Param("semester") int semester,
+        SELECT p.estado, COUNT(p.id) AS total_procesos
+        FROM "DB_consultorioJuridico".proceso p
+        JOIN "DB_consultorioJuridico".consulta c ON c.id = p.consulta_id
+        WHERE p.activo = true
+        AND c.estado <> 'ARCHIVADO'
+        AND c.fecha >= :fechaInicio
+        AND c.fecha <= :fechaFin
+        AND c.asesor_id = :asesorId
+        GROUP BY p.estado
+        ORDER BY total_procesos DESC
+        """, nativeQuery = true)
+    List<Object[]> contarProcesosPorEstadoPorPeriodoYAsesor(
+            @Param("fechaInicio") LocalDate fechaInicio,
+            @Param("fechaFin") LocalDate fechaFin,
             @Param("asesorId") Long asesorId);
 
-    // Procesos por estado y semestre filtrados por estudiante.
+    // Procesos por estado y periodo filtrados por estudiante.
     @Query(value = """
-                SELECT p.estado, COUNT(p.id) AS total_procesos
-                FROM "DB_consultorioJuridico".proceso p
-                JOIN "DB_consultorioJuridico".consulta c ON c.id = p.consulta_id
-                WHERE p.activo = true
-                AND c.estado <> 'ARCHIVADO'
-                AND c.fecha >=
-                    CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                AND c.fecha <
-                    CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
-                AND c.estudiante_id = :estudianteId
-                GROUP BY p.estado ORDER BY total_procesos DESC
-                """, nativeQuery = true)
-    List<Object[]> contarProcesosPorEstadoPorSemestreYEstudiante(
-            @Param("year") int year,
-            @Param("semester") int semester,
+        SELECT p.estado, COUNT(p.id) AS total_procesos
+        FROM "DB_consultorioJuridico".proceso p
+        JOIN "DB_consultorioJuridico".consulta c ON c.id = p.consulta_id
+        WHERE p.activo = true
+        AND c.estado <> 'ARCHIVADO'
+        AND c.fecha >= :fechaInicio
+        AND c.fecha <= :fechaFin
+        AND c.estudiante_id = :estudianteId
+        GROUP BY p.estado
+        ORDER BY total_procesos DESC
+        """, nativeQuery = true)
+    List<Object[]> contarProcesosPorEstadoPorPeriodoYEstudiante(
+            @Param("fechaInicio") LocalDate fechaInicio,
+            @Param("fechaFin") LocalDate fechaFin,
             @Param("estudianteId") Long estudianteId);
 
-    // Procesos por estado y semestre filtrados por monitor.
+    // Procesos por estado y periodo filtrados por monitor.
     @Query(value = """
-                SELECT p.estado, COUNT(p.id) AS total_procesos
-                FROM "DB_consultorioJuridico".proceso p
-                JOIN "DB_consultorioJuridico".consulta c ON c.id = p.consulta_id
-                WHERE p.activo = true
-                AND c.estado <> 'ARCHIVADO'
-                AND c.fecha >=
-                    CASE WHEN :semester = 1 THEN make_date(:year, 1, 1) ELSE make_date(:year, 7, 1) END
-                AND c.fecha <
-                    CASE WHEN :semester = 1 THEN make_date(:year, 7, 1) ELSE make_date(:year + 1, 1, 1) END
-                AND c.monitor_id = :monitorId
-                GROUP BY p.estado ORDER BY total_procesos DESC
-                """, nativeQuery = true)
-    List<Object[]> contarProcesosPorEstadoPorSemestreYMonitor(
-            @Param("year") int year,
-            @Param("semester") int semester,
+        SELECT p.estado, COUNT(p.id) AS total_procesos
+        FROM "DB_consultorioJuridico".proceso p
+        JOIN "DB_consultorioJuridico".consulta c ON c.id = p.consulta_id
+        WHERE p.activo = true
+        AND c.estado <> 'ARCHIVADO'
+        AND c.fecha >= :fechaInicio
+        AND c.fecha <= :fechaFin
+        AND c.monitor_id = :monitorId
+        GROUP BY p.estado
+        ORDER BY total_procesos DESC
+        """, nativeQuery = true)
+    List<Object[]> contarProcesosPorEstadoPorPeriodoYMonitor(
+            @Param("fechaInicio") LocalDate fechaInicio,
+            @Param("fechaFin") LocalDate fechaFin,
             @Param("monitorId") Long monitorId);
 
 

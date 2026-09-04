@@ -15,7 +15,7 @@ import co.edu.ufps.legal_cases.business.repository.seguimiento.SeguimientoReposi
 import co.edu.ufps.legal_cases.business.service.estadisticas.periodo.PeriodoEstadistico;
 import co.edu.ufps.legal_cases.business.service.estadisticas.periodo.PeriodoEstadisticoService;
 
-// QueryService para estadísticas filtradas por semestre predefinido.
+// QueryService para estadísticas filtradas por periodo académico.
 // Para rango libre de fechas usar EstadisticasRangoQueryService.
 @Service
 public class EstadisticasQueryService {
@@ -36,6 +36,7 @@ public class EstadisticasQueryService {
             EstudianteRepository estudianteRepository,
             EstadisticasMapperService mapper,
             PeriodoEstadisticoService periodoEstadisticoService) {
+
         this.consultaRepository = consultaRepository;
         this.procesoRepository = procesoRepository;
         this.conciliacionRepository = conciliacionRepository;
@@ -55,27 +56,30 @@ public class EstadisticasQueryService {
 
         long[] conteos = mapper.extraerFinalizadasYPendientes(
                 consultaRepository
-                        .contarFinalizadasYPendientesPorSemestreRaw(
-                                año,
-                                semestre));
+                        .contarFinalizadasYPendientesPorPeriodoRaw(
+                                periodo.inicio(),
+                                periodo.fin()));
 
         long finalizadas = conteos[0];
         long pendientes = conteos[1];
 
         long totalPersonas = mapper.extraerEscalar(
-                consultaRepository.contarPersonasAtendidasPorSemestre(
-                        año,
-                        semestre));
+                consultaRepository
+                        .contarPersonasAtendidasPorPeriodo(
+                                periodo.inicio(),
+                                periodo.fin()));
 
         long totalConciliaciones = mapper.extraerEscalar(
-                conciliacionRepository.contarConciliacionesPorSemestre(
-                        año,
-                        semestre));
+                conciliacionRepository
+                        .contarConciliacionesPorPeriodo(
+                                periodo.inicio(),
+                                periodo.fin()));
 
         long totalSeguimientos = mapper.extraerEscalar(
-                seguimientoRepository.contarSeguimientosPorSemestre(
-                        año,
-                        semestre));
+                seguimientoRepository
+                        .contarSeguimientosPorPeriodo(
+                                periodo.inicio(),
+                                periodo.fin()));
 
         long totalEstudiantes =
                 estudianteRepository
@@ -97,67 +101,67 @@ public class EstadisticasQueryService {
                 .totalConsultas(finalizadas + pendientes)
                 .consultasPorEstado(mapper.mapear2(
                         consultaRepository
-                                .contarConsultasPorEstadoPorSemestre(
-                                        año,
-                                        semestre)))
+                                .contarConsultasPorEstadoPorPeriodo(
+                                        periodo.inicio(),
+                                        periodo.fin())))
                 .consultasPorArea(mapper.mapear3(
                         consultaRepository
-                                .contarConsultasPorAreaPorSemestre(
-                                        año,
-                                        semestre)))
+                                .contarConsultasPorAreaPorPeriodo(
+                                        periodo.inicio(),
+                                        periodo.fin())))
                 .consultasPorTipoViolencia(mapper.mapear2(
                         consultaRepository
-                                .contarConsultasPorTipoViolenciaPorSemestre(
-                                        año,
-                                        semestre)))
+                                .contarConsultasPorTipoViolenciaPorPeriodo(
+                                        periodo.inicio(),
+                                        periodo.fin())))
                 .totalPersonasAtendidas(totalPersonas)
                 .personasPorGenero(mapper.mapear2(
                         consultaRepository
-                                .contarPersonasPorGeneroPorSemestre(
-                                        año,
-                                        semestre)))
+                                .contarPersonasPorGeneroPorPeriodo(
+                                        periodo.inicio(),
+                                        periodo.fin())))
                 .personasPorEstrato(mapper.mapear2(
                         consultaRepository
-                                .contarPersonasPorEstratoPorSemestre(
-                                        año,
-                                        semestre)))
+                                .contarPersonasPorEstratoPorPeriodo(
+                                        periodo.inicio(),
+                                        periodo.fin())))
                 .personasPorZona(mapper.mapear2(
                         consultaRepository
-                                .contarPersonasPorZonaPorSemestre(
-                                        año,
-                                        semestre)))
+                                .contarPersonasPorZonaPorPeriodo(
+                                        periodo.inicio(),
+                                        periodo.fin())))
                 .personasPorGrupoEtnico(mapper.mapear2(
                         consultaRepository
-                                .contarPersonasPorGrupoEtnicoPorSemestre(
-                                        año,
-                                        semestre)))
+                                .contarPersonasPorGrupoEtnicoPorPeriodo(
+                                        periodo.inicio(),
+                                        periodo.fin())))
                 .personasPorMunicipio(mapper.mapear2(
                         consultaRepository
-                                .contarPersonasPorMunicipioPorSemestre(
-                                        año,
-                                        semestre)))
+                                .contarPersonasPorMunicipioPorPeriodo(
+                                        periodo.inicio(),
+                                        periodo.fin())))
                 .personasPorCondicion(mapper.mapear2(
                         consultaRepository
-                                .contarPersonasPorCondicionPorSemestre(
-                                        año,
-                                        semestre)))
+                                .contarPersonasPorCondicionPorPeriodo(
+                                        periodo.inicio(),
+                                        periodo.fin())))
                 .procesosPorEstado(mapper.mapear2(
                         procesoRepository
-                                .contarProcesosPorEstadoPorSemestre(
-                                        año,
-                                        semestre)))
+                                .contarProcesosPorEstadoPorPeriodo(
+                                        periodo.inicio(),
+                                        periodo.fin())))
                 .totalConciliaciones(totalConciliaciones)
                 .conciliacionesPorEstado(mapper.mapear2(
                         conciliacionRepository
-                                .contarConciliacionesPorEstadoPorSemestre(
-                                        año,
-                                        semestre)))
+                                .contarConciliacionesPorEstadoPorPeriodo(
+                                        periodo.inicio(),
+                                        periodo.fin())))
                 .totalSeguimientos(totalSeguimientos)
                 .seguimientosPorEstado(mapper.mapear2(
                         seguimientoRepository
-                                .contarSeguimientosPorEstadoPorSemestre(
-                                        año,
-                                        semestre)))
+                                .contarSeguimientosPorEstadoPorPeriodo(
+                                        periodo.inicio(),
+                                        periodo.fin())))
                 .totalEstudiantesActivos(totalEstudiantes)
                 .totalEstudiantesHabilitadosConciliacion(
                         totalEstudiantesConciliacion)
@@ -166,7 +170,9 @@ public class EstadisticasQueryService {
 
     @Transactional(readOnly = true)
     public List<SemestreDTO> listarSemestresDisponibles() {
-        return periodoEstadisticoService.listarDisponibles()
+
+        return periodoEstadisticoService
+                .listarDisponibles()
                 .stream()
                 .map(periodo -> new SemestreDTO(
                         periodo.año(),

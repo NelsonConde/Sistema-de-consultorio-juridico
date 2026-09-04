@@ -2,29 +2,40 @@ package co.edu.ufps.legal_cases.business.service.estadisticas.periodo;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import co.edu.ufps.legal_cases.business.model.estadisticas.PeriodoAcademico;
+import co.edu.ufps.legal_cases.business.repository.estadisticas.PeriodoAcademicoRepository;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 
 @Service
 public class PeriodoEstadisticoService {
 
-    static final int AÑO_MINIMO = 2024;
-
+    private final PeriodoAcademicoRepository periodoAcademicoRepository;
     private final Clock clock;
 
-    public PeriodoEstadisticoService(Clock clock) {
+    public PeriodoEstadisticoService(
+            PeriodoAcademicoRepository periodoAcademicoRepository,
+            Clock clock) {
+        this.periodoAcademicoRepository = periodoAcademicoRepository;
         this.clock = clock;
     }
 
     public PeriodoEstadistico obtener(int año, int semestre) {
         validarSemestre(semestre);
-        validarAño(año);
 
-        PeriodoEstadistico periodo = construir(año, semestre);
+        PeriodoAcademico periodoAcademico =
+                periodoAcademicoRepository
+                        .findByAnioAndSemestreAndActivoTrue(año, semestre)
+                        .orElseThrow(() -> new BusinessException(
+                                "No existe un periodo académico activo para "
+                                        + año
+                                        + "-"
+                                        + semestre));
+
+        PeriodoEstadistico periodo = mapear(periodoAcademico);
 
         if (periodo.inicio().isAfter(LocalDate.now(clock))) {
             throw new BusinessException(
@@ -36,43 +47,25 @@ public class PeriodoEstadisticoService {
 
     public List<PeriodoEstadistico> listarDisponibles() {
         LocalDate hoy = LocalDate.now(clock);
-        List<PeriodoEstadistico> periodos = new ArrayList<>();
 
-        for (int año = AÑO_MINIMO; año <= hoy.getYear(); año++) {
-            agregarSiInicio(año, 1, hoy, periodos);
-            agregarSiInicio(año, 2, hoy, periodos);
-        }
-
-        return List.copyOf(periodos);
+        return periodoAcademicoRepository
+                .findByActivoTrueOrderByAnioAscSemestreAsc()
+                .stream()
+                .map(this::mapear)
+                .filter(periodo -> !periodo.inicio().isAfter(hoy))
+                .toList();
     }
 
-    private void agregarSiInicio(
-            int año,
-            int semestre,
-            LocalDate hoy,
-            List<PeriodoEstadistico> periodos) {
+    private PeriodoEstadistico mapear(
+            PeriodoAcademico periodoAcademico) {
 
-        PeriodoEstadistico periodo = construir(año, semestre);
-
-        if (!periodo.inicio().isAfter(hoy)) {
-            periodos.add(periodo);
-        }
-    }
-
-    private PeriodoEstadistico construir(int año, int semestre) {
-        if (semestre == 1) {
-            return new PeriodoEstadistico(
-                    año,
-                    semestre,
-                    LocalDate.of(año, 1, 1),
-                    LocalDate.of(año, 6, 30));
-        }
+        validarFechas(periodoAcademico);
 
         return new PeriodoEstadistico(
-                año,
-                semestre,
-                LocalDate.of(año, 7, 1),
-                LocalDate.of(año, 12, 31));
+                periodoAcademico.getAnio(),
+                periodoAcademico.getSemestre(),
+                periodoAcademico.getFechaInicio(),
+                periodoAcademico.getFechaFin());
     }
 
     private void validarSemestre(int semestre) {
@@ -82,10 +75,20 @@ public class PeriodoEstadisticoService {
         }
     }
 
-    private void validarAño(int año) {
-        if (año < AÑO_MINIMO) {
+    private void validarFechas(
+            PeriodoAcademico periodoAcademico) {
+
+        if (periodoAcademico.getFechaInicio() == null
+                || periodoAcademico.getFechaFin() == null) {
             throw new BusinessException(
-                    "No hay datos disponibles antes del año " + AÑO_MINIMO);
+                    "El periodo académico tiene fechas incompletas");
+        }
+
+        if (periodoAcademico
+                .getFechaInicio()
+                .isAfter(periodoAcademico.getFechaFin())) {
+            throw new BusinessException(
+                    "La fecha de inicio del periodo académico no puede ser posterior a la fecha de fin");
         }
     }
 }

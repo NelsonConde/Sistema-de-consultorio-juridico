@@ -48,7 +48,7 @@ class SemanticaEstadisticaSemestralRepositoryTest {
         List<Method> metodos = Arrays.stream(
                         ConsultaRepository.class.getDeclaredMethods())
                 .filter(method -> method.getName().startsWith(
-                        "contarFinalizadasYPendientesPorSemestre"))
+                        "contarFinalizadasYPendientesPorPeriodo"))
                 .toList();
 
         assertEquals(4, metodos.size());
@@ -105,7 +105,7 @@ class SemanticaEstadisticaSemestralRepositoryTest {
 
         return Arrays.stream(repositoryType.getDeclaredMethods())
                 .filter(method ->
-                        method.getName().contains("PorSemestre"))
+                        method.getName().contains("PorPeriodo"))
                 .filter(method ->
                         method.isAnnotationPresent(Query.class))
                 .toList();
