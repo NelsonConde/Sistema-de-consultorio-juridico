@@ -6,8 +6,10 @@ import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.PROGRAMAR_
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.REPROGRAMAR_REUNIONES_CONCILIACION;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_CONCILIACIONES;
 
+import java.time.LocalDate;
 import java.util.List;
 
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -25,9 +27,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import co.edu.ufps.legal_cases.business.dto.conciliacion.ConciliacionDetalleResponseDTO;
 import co.edu.ufps.legal_cases.business.dto.conciliacion.ConciliacionResponseDTO;
+import co.edu.ufps.legal_cases.business.dto.conciliacion.ConciliacionResumenDTO;
 import co.edu.ufps.legal_cases.business.dto.conciliacion.reunion.ReunionConciliacionRequestDTO;
 import co.edu.ufps.legal_cases.business.dto.conciliacion.reunion.ReunionConciliacionResponseDTO;
 import co.edu.ufps.legal_cases.business.service.conciliacion.ConciliacionService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -40,8 +44,24 @@ public class ConciliacionController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('" + VER_CONCILIACIONES + "')")
-    public List<ConciliacionResponseDTO> listar() {
-        return conciliacionService.listar();
+    public PageResponseDTO<ConciliacionResumenDTO> buscar(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) String estado,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta) {
+        return conciliacionService.buscarParaUsuarioActual(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                estado,
+                fechaDesde,
+                fechaHasta);
     }
 
     @GetMapping("/consulta/{consultaId}")

@@ -15,6 +15,7 @@ import co.edu.ufps.legal_cases.business.model.consulta.Consulta;
 import co.edu.ufps.legal_cases.business.repository.conciliacion.ConciliacionRepository;
 import co.edu.ufps.legal_cases.business.repository.consulta.ConsultaRepository;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import co.edu.ufps.legal_cases.security.dto.account.PerfilUsuarioActual;
 import co.edu.ufps.legal_cases.security.service.context.UsuarioActualService;
 
 // Valida permisos funcionales y delega las reglas de alcance a ConciliacionAlcanceService.
@@ -159,6 +160,16 @@ public class ConciliacionAccessService {
     @Transactional(readOnly = true)
     public Long obtenerUsuarioActualId() {
         return usuarioActualService.obtenerUsuarioActualId();
+    }
+
+    @Transactional(readOnly = true)
+    public boolean usuarioEsAdministrador() {
+        return usuarioActualService.esRolAdministrador();
+    }
+
+    @Transactional(readOnly = true)
+    public PerfilUsuarioActual obtenerPerfilActual() {
+        return usuarioActualService.obtenerPerfilActual();
     }
 
     private Conciliacion obtenerConciliacionActiva(Long conciliacionId) {
