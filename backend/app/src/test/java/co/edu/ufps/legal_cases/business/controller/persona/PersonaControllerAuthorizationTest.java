@@ -21,7 +21,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import co.edu.ufps.legal_cases.business.dto.persona.PersonaPageResponseDTO;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import co.edu.ufps.legal_cases.business.service.persona.PersonaService;
 
 class PersonaControllerAuthorizationTest {
@@ -35,8 +35,8 @@ class PersonaControllerAuthorizationTest {
         context = new AnnotationConfigApplicationContext(TestConfiguration.class);
         personaController = context.getBean(PersonaController.class);
         personaService = context.getBean(PersonaService.class);
-        when(personaService.listar(null, 1, 10))
-                .thenReturn(new PersonaPageResponseDTO(List.of(), 1, 10, 0, 0));
+        when(personaService.listar(null, 1, 10, "nombres", "asc"))
+                .thenReturn(new PageResponseDTO<>(List.of(), 1, 10, 0, 0));
     }
 
     @AfterEach
@@ -49,14 +49,14 @@ class PersonaControllerAuthorizationTest {
     void usuarioConVerPersonasPuedeBuscar() {
         autenticarCon(VER_PERSONAS);
 
-        assertDoesNotThrow(() -> personaController.listar(null, 1, 10));
+        assertDoesNotThrow(() -> personaController.listar(null, 1, 10, "nombres", "asc"));
     }
 
     @Test
     void usuarioConGestionarPersonasPuedeBuscar() {
         autenticarCon(GESTIONAR_PERSONAS);
 
-        assertDoesNotThrow(() -> personaController.listar(null, 1, 10));
+        assertDoesNotThrow(() -> personaController.listar(null, 1, 10, "nombres", "asc"));
     }
 
     @Test
@@ -65,7 +65,7 @@ class PersonaControllerAuthorizationTest {
 
         assertThrows(
                 AccessDeniedException.class,
-                () -> personaController.listar(null, 1, 10));
+                () -> personaController.listar(null, 1, 10, "nombres", "asc"));
     }
 
     private void autenticarCon(String authority) {

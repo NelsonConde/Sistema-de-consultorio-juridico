@@ -2,10 +2,11 @@ package co.edu.ufps.legal_cases.business.service.persona;
 
 import org.springframework.stereotype.Service;
 
-import co.edu.ufps.legal_cases.business.dto.persona.PersonaPageResponseDTO;
 import co.edu.ufps.legal_cases.business.dto.persona.PersonaDTO;
+import co.edu.ufps.legal_cases.business.dto.persona.PersonaResumenDTO;
 import co.edu.ufps.legal_cases.business.service.persona.persona.PersonaCommandService;
 import co.edu.ufps.legal_cases.business.service.persona.persona.PersonaQueryService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
 @Service
 public class PersonaService {
@@ -22,12 +23,22 @@ public class PersonaService {
 
     // Fachada del módulo: el controller sigue entrando por aquí,
     // pero la lectura y escritura quedan separadas por responsabilidad.
-    public PersonaPageResponseDTO listar(String search, int page, int size) {
-        return personaQueryService.listar(search, page, size);
+    public PageResponseDTO<PersonaResumenDTO> listar(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction) {
+        return personaQueryService.listar(search, page, size, sortBy, direction);
     }
 
-    public PersonaPageResponseDTO listarActivos(String search, int page, int size) {
-        return personaQueryService.listarActivos(search, page, size);
+    public PageResponseDTO<PersonaResumenDTO> listarActivos(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction) {
+        return personaQueryService.listarActivos(search, page, size, sortBy, direction);
     }
 
     public PersonaDTO obtenerPorId(Long id) {
