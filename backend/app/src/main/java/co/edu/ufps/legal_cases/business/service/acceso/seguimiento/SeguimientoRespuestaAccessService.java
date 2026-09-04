@@ -187,6 +187,16 @@ public class SeguimientoRespuestaAccessService {
     }
 
     @Transactional(readOnly = true)
+    public boolean usuarioEsAdministrador() {
+        return usuarioActualService.esRolAdministrador();
+    }
+
+    @Transactional(readOnly = true)
+    public PerfilUsuarioActual obtenerPerfilActual() {
+        return usuarioActualService.obtenerPerfilActual();
+    }
+
+    @Transactional(readOnly = true)
     public Long obtenerEstudianteActualId() {
         PerfilUsuarioActual perfil = usuarioActualService.obtenerPerfilActual();
 
