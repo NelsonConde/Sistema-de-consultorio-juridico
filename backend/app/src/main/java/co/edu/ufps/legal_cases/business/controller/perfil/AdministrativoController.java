@@ -12,7 +12,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import co.edu.ufps.legal_cases.business.dto.perfil.AdministrativoDTO;
+import co.edu.ufps.legal_cases.business.dto.perfil.AdministrativoResumenDTO;
 import co.edu.ufps.legal_cases.business.service.perfil.AdministrativoService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import jakarta.validation.Valid;
 
 @RestController
@@ -27,8 +29,14 @@ public class AdministrativoController {
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('" + VER_ADMINISTRADORES + "', '" + GESTIONAR_ADMINISTRADORES + "', '" + GESTIONAR_USUARIOS + "')")
-    public List<AdministrativoDTO> listar() {
-        return administrativoService.listar();
+    public PageResponseDTO<AdministrativoResumenDTO> listar(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) Boolean activo) {
+        return administrativoService.buscar(search, page, size, sortBy, direction, activo);
     }
 
     @GetMapping("/activos")
