@@ -47,8 +47,9 @@ class SemanticaEstadisticaRangoRepositoryTest {
     }
 
     @Test
-    void procesosPorRangoUsanFechaDeConsultaYSoloRegistrosActivos()
+    void procesosPorRangoUsanFechaDeCreacionPropiaYSoloRegistrosActivos()
             throws Exception {
+
         Method method = ProcesoRepository.class.getMethod(
                 "contarProcesosPorEstadoPorRango",
                 String.class,
@@ -57,7 +58,8 @@ class SemanticaEstadisticaRangoRepositoryTest {
         String sql = obtenerSql(method);
 
         assertAll(
-                () -> assertTrue(sql.contains("c.fecha")),
+                () -> assertTrue(sql.contains("p.fecha_creacion")),
+                () -> assertFalse(sql.contains("c.fecha")),
                 () -> assertTrue(sql.contains("c.estado <> 'ARCHIVADO'")),
                 () -> assertTrue(sql.contains("p.activo = true")));
     }

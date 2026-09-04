@@ -76,7 +76,7 @@ class SemanticaEstadisticaSemestralRepositoryTest {
     }
 
     @Test
-    void procesosSemestralesUsanFechaDeConsultaYSoloRegistrosActivos() {
+    void procesosSemestralesUsanFechaDeCreacionPropiaYSoloRegistrosActivos() {
         List<Method> metodos =
                 metodosSemestrales(ProcesoRepository.class);
 
@@ -87,6 +87,10 @@ class SemanticaEstadisticaSemestralRepositoryTest {
                     String sql = obtenerSql(method);
 
                     assertTrue(
+                            sql.contains("p.fecha_creacion"),
+                            method.getName());
+
+                    assertFalse(
                             sql.contains("c.fecha"),
                             method.getName());
 

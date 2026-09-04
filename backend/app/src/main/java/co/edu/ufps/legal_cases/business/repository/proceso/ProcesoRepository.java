@@ -34,6 +34,7 @@ public interface ProcesoRepository extends JpaRepository<Proceso, Long> {
     boolean existsByNumeroRadicadoAndIdNot(String numeroRadicado, Long id);
 
     boolean existsByConsulta_IdAndActivoTrueAndEstado(Long consultaId, EstadoProceso estado);
+
     // Procesos agrupados por estado — todos los tiempos.
     // El estado es varchar por ahora; se normaliza como catalogo en vacaciones.
     @Query(value = """
@@ -44,15 +45,15 @@ public interface ProcesoRepository extends JpaRepository<Proceso, Long> {
                 """, nativeQuery = true)
     List<Object[]> contarProcesosPorEstado();
 
-    // Procesos activos asociados a consultas dentro del periodo estadístico configurado.
+    // Procesos activos creados dentro del periodo estadístico configurado.
     @Query(value = """
         SELECT p.estado, COUNT(p.id) AS total_procesos
         FROM "DB_consultorioJuridico".proceso p
         JOIN "DB_consultorioJuridico".consulta c ON c.id = p.consulta_id
         WHERE p.activo = true
         AND c.estado <> 'ARCHIVADO'
-        AND c.fecha >= :fechaInicio
-        AND c.fecha <= :fechaFin
+        AND p.fecha_creacion >= :fechaInicio
+        AND p.fecha_creacion < (:fechaFin + INTERVAL '1 day')
         GROUP BY p.estado
         ORDER BY total_procesos DESC
         """, nativeQuery = true)
@@ -60,15 +61,15 @@ public interface ProcesoRepository extends JpaRepository<Proceso, Long> {
             @Param("fechaInicio") LocalDate fechaInicio,
             @Param("fechaFin") LocalDate fechaFin);
 
-    // Procesos activos asociados a consultas dentro de un rango libre.
+    // Procesos activos creados dentro de un rango libre.
     @Query(value = """
                 SELECT p.estado, COUNT(p.id) AS total_procesos
                 FROM "DB_consultorioJuridico".proceso p
                 JOIN "DB_consultorioJuridico".consulta c ON c.id = p.consulta_id
                 WHERE p.activo = true
                 AND c.estado <> 'ARCHIVADO'
-                AND c.fecha >= CAST(:fechaInicio AS date)
-                AND c.fecha <= CAST(:fechaFin AS date)
+                AND p.fecha_creacion >= CAST(:fechaInicio AS date)
+                AND p.fecha_creacion < (CAST(:fechaFin AS date) + INTERVAL '1 day')
                 GROUP BY p.estado
                 ORDER BY total_procesos DESC
                 """, nativeQuery = true)
@@ -84,8 +85,8 @@ public interface ProcesoRepository extends JpaRepository<Proceso, Long> {
         JOIN "DB_consultorioJuridico".consulta c ON c.id = p.consulta_id
         WHERE p.activo = true
         AND c.estado <> 'ARCHIVADO'
-        AND c.fecha >= :fechaInicio
-        AND c.fecha <= :fechaFin
+        AND p.fecha_creacion >= :fechaInicio
+        AND p.fecha_creacion < (:fechaFin + INTERVAL '1 day')
         AND c.asesor_id = :asesorId
         GROUP BY p.estado
         ORDER BY total_procesos DESC
@@ -102,8 +103,8 @@ public interface ProcesoRepository extends JpaRepository<Proceso, Long> {
         JOIN "DB_consultorioJuridico".consulta c ON c.id = p.consulta_id
         WHERE p.activo = true
         AND c.estado <> 'ARCHIVADO'
-        AND c.fecha >= :fechaInicio
-        AND c.fecha <= :fechaFin
+        AND p.fecha_creacion >= :fechaInicio
+        AND p.fecha_creacion < (:fechaFin + INTERVAL '1 day')
         AND c.estudiante_id = :estudianteId
         GROUP BY p.estado
         ORDER BY total_procesos DESC
@@ -120,8 +121,8 @@ public interface ProcesoRepository extends JpaRepository<Proceso, Long> {
         JOIN "DB_consultorioJuridico".consulta c ON c.id = p.consulta_id
         WHERE p.activo = true
         AND c.estado <> 'ARCHIVADO'
-        AND c.fecha >= :fechaInicio
-        AND c.fecha <= :fechaFin
+        AND p.fecha_creacion >= :fechaInicio
+        AND p.fecha_creacion < (:fechaFin + INTERVAL '1 day')
         AND c.monitor_id = :monitorId
         GROUP BY p.estado
         ORDER BY total_procesos DESC
