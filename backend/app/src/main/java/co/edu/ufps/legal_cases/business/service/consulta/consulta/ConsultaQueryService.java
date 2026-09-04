@@ -23,6 +23,7 @@ import co.edu.ufps.legal_cases.business.repository.consulta.ConsultaResumenProje
 import co.edu.ufps.legal_cases.business.service.acceso.consulta.ConsultaAccessService;
 import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import co.edu.ufps.legal_cases.common.exception.ResourceNotFoundException;
 import co.edu.ufps.legal_cases.security.dto.account.PerfilUsuarioActual;
 import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
 
@@ -251,7 +252,7 @@ public class ConsultaQueryService {
         consultaAccessService.validarPuedeVerConsulta(id);
 
         Consulta consulta = consultaRepository.findByIdConPartes(id)
-                .orElseThrow(() -> new BusinessException("Consulta no encontrada con id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Consulta no encontrada"));
 
         // Esta consulta carga la colección en el contexto para que el mapper tenga contrapartes disponibles.
         consultaRepository.findByIdConContrapartes(id);

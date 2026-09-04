@@ -18,6 +18,7 @@ import co.edu.ufps.legal_cases.business.model.consulta.Consulta;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.business.repository.consulta.ConsultaRepository;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import co.edu.ufps.legal_cases.common.exception.ResourceNotFoundException;
 import co.edu.ufps.legal_cases.security.dto.account.PerfilUsuarioActual;
 import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
 import co.edu.ufps.legal_cases.security.service.context.UsuarioActualService;
@@ -46,10 +47,15 @@ public class ConsultaAccessService {
     public void validarPuedeVerConsulta(Long consultaId) {
         validarTieneAlgunPermiso(VER_CONSULTAS, GESTIONAR_CONSULTAS);
 
-        Consulta consulta = obtenerConsulta(consultaId);
+        if (consultaId == null) {
+            throw consultaNoDisponible();
+        }
+
+        Consulta consulta = consultaRepository.findById(consultaId)
+                .orElseThrow(this::consultaNoDisponible);
 
         if (!puedeAccederAConsulta(consulta)) {
-            throw new AccessDeniedException("No tiene permisos para ver esta consulta");
+            throw consultaNoDisponible();
         }
     }
 
@@ -165,6 +171,10 @@ public class ConsultaAccessService {
         }
 
         PerfilUsuarioActual perfil = usuarioActualService.obtenerPerfilActual();
+        if (perfil == null || perfil.getPerfilId() == null || perfil.getTipoPerfil() == null) {
+            return false;
+        }
+
         Long perfilId = perfil.getPerfilId();
 
         if (perfil.getTipoPerfil() == TipoPerfilUsuario.ESTUDIANTE) {
@@ -235,6 +245,10 @@ public class ConsultaAccessService {
 
         return consultaRepository.findById(consultaId)
                 .orElseThrow(() -> new BusinessException("Consulta no encontrada con id: " + consultaId));
+    }
+
+    private ResourceNotFoundException consultaNoDisponible() {
+        return new ResourceNotFoundException("Consulta no encontrada");
     }
 
     private void validarTienePermiso(String permiso) {
