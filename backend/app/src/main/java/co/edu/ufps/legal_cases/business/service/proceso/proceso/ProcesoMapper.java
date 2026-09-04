@@ -3,7 +3,9 @@ package co.edu.ufps.legal_cases.business.service.proceso.proceso;
 import org.springframework.stereotype.Component;
 
 import co.edu.ufps.legal_cases.business.dto.proceso.ProcesoDTO;
+import co.edu.ufps.legal_cases.business.dto.proceso.ProcesoResumenDTO;
 import co.edu.ufps.legal_cases.business.model.proceso.Proceso;
+import co.edu.ufps.legal_cases.business.repository.proceso.ProcesoResumenProjection;
 
 // Convierte procesos entre entidad y DTO.
 // El service coordina el flujo, pero este mapper mantiene en un solo lugar cómo se expone el proceso hacia la API.
@@ -25,6 +27,24 @@ public class ProcesoMapper {
                         : null,
                 proceso.getEstado(),
                 proceso.getActivo());
+    }
+
+    public ProcesoResumenDTO convertirAResumen(ProcesoResumenProjection proceso) {
+        return new ProcesoResumenDTO(
+                proceso.getId(),
+                proceso.getVersion(),
+                proceso.getNumeroRadicado(),
+                proceso.getDepartamentoId(),
+                proceso.getDepartamentoNombre(),
+                proceso.getConsultaId(),
+                proceso.getConsulta(),
+                proceso.getOrganoControlId(),
+                proceso.getOrganoControlNombre(),
+                proceso.getEspecialidadId(),
+                proceso.getEspecialidadNombre(),
+                proceso.getEstado(),
+                proceso.getActivo(),
+                proceso.getFechaCreacion());
     }
 
     public void aplicarDatos(Proceso proceso, DatosProceso datos) {

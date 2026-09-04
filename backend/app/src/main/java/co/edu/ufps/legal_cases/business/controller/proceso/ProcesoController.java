@@ -3,9 +3,10 @@ package co.edu.ufps.legal_cases.business.controller.proceso;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.GESTIONAR_PROCESOS;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_PROCESOS;
 
-import java.util.List;
+import java.time.LocalDate;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,8 +21,10 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import co.edu.ufps.legal_cases.business.dto.proceso.ProcesoDTO;
+import co.edu.ufps.legal_cases.business.dto.proceso.ProcesoResumenDTO;
 import co.edu.ufps.legal_cases.business.model.proceso.EstadoProceso;
 import co.edu.ufps.legal_cases.business.service.proceso.ProcesoService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import jakarta.validation.Valid;
 
 @RestController
@@ -36,8 +39,24 @@ public class ProcesoController {
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('" + VER_PROCESOS + "', '" + GESTIONAR_PROCESOS + "')")
-    public List<ProcesoDTO> listar() {
-        return procesoService.listar();
+    public PageResponseDTO<ProcesoResumenDTO> buscar(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) EstadoProceso estado,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta) {
+        return procesoService.buscarParaUsuarioActual(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                estado,
+                fechaDesde,
+                fechaHasta);
     }
 
     @GetMapping("/{id}")

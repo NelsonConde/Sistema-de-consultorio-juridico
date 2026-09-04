@@ -11,6 +11,7 @@ import co.edu.ufps.legal_cases.business.model.proceso.Proceso;
 import co.edu.ufps.legal_cases.business.repository.proceso.ProcesoRepository;
 import co.edu.ufps.legal_cases.business.service.acceso.consulta.ConsultaAccessService;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import co.edu.ufps.legal_cases.security.dto.account.PerfilUsuarioActual;
 import co.edu.ufps.legal_cases.security.service.context.UsuarioActualService;
 
 @Service
@@ -123,6 +124,16 @@ public class ProcesoAccessService {
         }
 
         return puedeAccederAProceso(proceso);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean usuarioEsAdministrador() {
+        return usuarioActualService.esRolAdministrador();
+    }
+
+    @Transactional(readOnly = true)
+    public PerfilUsuarioActual obtenerPerfilActual() {
+        return usuarioActualService.obtenerPerfilActual();
     }
 
     private void validarUsuarioPuedeGestionarProcesos() {

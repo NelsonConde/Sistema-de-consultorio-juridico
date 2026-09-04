@@ -1,13 +1,15 @@
 package co.edu.ufps.legal_cases.business.service.proceso;
 
-import java.util.List;
+import java.time.LocalDate;
 
 import org.springframework.stereotype.Service;
 
 import co.edu.ufps.legal_cases.business.dto.proceso.ProcesoDTO;
+import co.edu.ufps.legal_cases.business.dto.proceso.ProcesoResumenDTO;
 import co.edu.ufps.legal_cases.business.model.proceso.EstadoProceso;
 import co.edu.ufps.legal_cases.business.service.proceso.proceso.ProcesoCommandService;
 import co.edu.ufps.legal_cases.business.service.proceso.proceso.ProcesoQueryService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
 @Service
 public class ProcesoService {
@@ -24,8 +26,24 @@ public class ProcesoService {
 
     // Fachada del módulo: el controller sigue entrando por aquí,
     // aunque por dentro lectura y escritura ya estén separadas.
-    public List<ProcesoDTO> listar() {
-        return procesoQueryService.listar();
+    public PageResponseDTO<ProcesoResumenDTO> buscarParaUsuarioActual(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction,
+            EstadoProceso estado,
+            LocalDate fechaDesde,
+            LocalDate fechaHasta) {
+        return procesoQueryService.buscarParaUsuarioActual(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                estado,
+                fechaDesde,
+                fechaHasta);
     }
 
     public ProcesoDTO obtenerPorId(Long id) {
