@@ -7,10 +7,11 @@ import java.util.List;
 import java.util.UUID;
 import java.util.Objects;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.time.LocalDate;
 import co.edu.ufps.legal_cases.audit.aop.log.Auditable;
@@ -39,6 +40,7 @@ public class FileResourceService {
     private final Duration uploadUrlValidity;
     private final Duration downloadUrlValidity;
 
+    @Autowired
     public FileResourceService(
             FileAssetService fileAssetService,
             FileValidationService validationService,
