@@ -42,11 +42,69 @@ public class FileAssetService {
             String contentType,
             long size,
             String checksum) {
+        return startUpload(resourceType, resourceId, originalFileName, contentType, size, checksum, null, null);
+    }
+
+    @Transactional
+    public FileAsset startUpload(
+            FileResourceType resourceType,
+            Long resourceId,
+            String originalFileName,
+            String contentType,
+            long size,
+            String checksum,
+            UUID documentoLogico,
+            String tipoDocumental) {
         if (resourceType == null || resourceId == null || resourceId <= 0) {
             throw new BusinessException("El recurso documental es obligatorio");
         }
 
         String safeName = cleanFileName(originalFileName);
+
+        UUID resolvedDocLogico;
+        int version;
+        FileAsset referenciaAnterior = null;
+
+        if (documentoLogico == null) {
+            resolvedDocLogico = UUID.randomUUID();
+            version = 1;
+        } else {
+            // Se bloquea pesimísticamente la versión vigente actual para control de concurrencia
+            var optVigente = repository.findVigenteForUpdate(documentoLogico, FileAssetStatus.VIGENTE);
+            if (optVigente.isPresent()) {
+                FileAsset vigente = optVigente.get();
+                if (!vigente.getResourceType().equalsIgnoreCase(resourceType.name())
+                        || !vigente.getResourceId().equals(resourceId)) {
+                    throw new BusinessException("El documento lógico no pertenece al recurso indicado");
+                }
+                resolvedDocLogico = documentoLogico;
+                version = vigente.getVersion() + 1;
+                referenciaAnterior = vigente;
+            } else {
+                List<FileAsset> existing = repository.findByDocumentoLogico(documentoLogico);
+                if (existing.isEmpty()) {
+                    resolvedDocLogico = documentoLogico;
+                    version = 1;
+                } else {
+                    FileAsset any = existing.get(0);
+                    if (!any.getResourceType().equalsIgnoreCase(resourceType.name())
+                            || !any.getResourceId().equals(resourceId)) {
+                        throw new BusinessException("El documento lógico no pertenece al recurso indicado");
+                    }
+                    resolvedDocLogico = documentoLogico;
+                    Integer maxVer = repository.findMaxVersionByDocumentoLogico(documentoLogico);
+                    version = (maxVer != null && maxVer >= 1) ? maxVer + 1 : 1;
+                    referenciaAnterior = any;
+                }
+            }
+        }
+
+        // Autor y origen se calculan estrictamente en el servidor
+        var usuarioActual = usuarioActualService.obtenerUsuarioActual();
+        String origen = (usuarioActual != null) ? "CARGA_USUARIO" : "SISTEMA";
+
+        String resolvedTipoDoc = resolveTipoDocumental(tipoDocumental, resourceType, safeName);
+
         FileAsset asset = new FileAsset();
         asset.setUploadId(UUID.randomUUID());
         asset.setBucket(bucket);
@@ -58,7 +116,12 @@ public class FileAssetService {
         asset.setContentType(contentType);
         asset.setSize(size);
         asset.setChecksum(checksum == null ? "" : checksum);
-        asset.setUploadedBy(usuarioActualService.obtenerUsuarioActual());
+        asset.setUploadedBy(usuarioActual);
+        asset.setDocumentoLogico(resolvedDocLogico);
+        asset.setVersion(version);
+        asset.setTipoDocumental(resolvedTipoDoc);
+        asset.setOrigen(origen);
+        asset.setReferenciaAnterior(referenciaAnterior);
         asset.setStatus(FileAssetStatus.UPLOADING);
         asset.setActive(false);
         return repository.save(asset);
@@ -74,7 +137,8 @@ public class FileAssetService {
     public FileAsset findReady(Long id) {
         FileAsset asset = repository.findById(id)
                 .orElseThrow(() -> new BusinessException("Archivo no encontrado"));
-        if (asset.getStatus() != FileAssetStatus.READY
+        if (asset.getStatus() != FileAssetStatus.VIGENTE
+                && asset.getStatus() != FileAssetStatus.READY
                 && asset.getStatus() != FileAssetStatus.ACTIVE) {
             throw new BusinessException("El archivo no está disponible");
         }
@@ -87,16 +151,24 @@ public class FileAssetService {
                 .findByResourceTypeAndResourceIdAndStatusInOrderByCreatedAtDesc(
                 resourceType.name(),
                 resourceId,
-                List.of(FileAssetStatus.READY, FileAssetStatus.ACTIVE)));
+                List.of(FileAssetStatus.VIGENTE, FileAssetStatus.READY, FileAssetStatus.ACTIVE)));
         if (resourceType == FileResourceType.RESPUESTA) {
             assets.addAll(repository.findByResourceTypeAndResourceIdAndStatusInOrderByCreatedAtDesc(
                     "SEGUIMIENTO_RESPUESTA",
                     resourceId,
-                    List.of(FileAssetStatus.READY, FileAssetStatus.ACTIVE)));
+                    List.of(FileAssetStatus.VIGENTE, FileAssetStatus.READY, FileAssetStatus.ACTIVE)));
         }
         assets.sort(Comparator.comparing(FileAsset::getCreatedAt,
                 Comparator.nullsLast(Comparator.reverseOrder())));
         return assets;
+    }
+
+    @Transactional(readOnly = true)
+    public List<FileAsset> listVersions(UUID documentoLogico) {
+        if (documentoLogico == null) {
+            throw new BusinessException("El documento lógico es obligatorio");
+        }
+        return repository.findByDocumentoLogicoOrderByVersionDesc(documentoLogico);
     }
 
     @Transactional
@@ -104,17 +176,41 @@ public class FileAssetService {
         FileAsset asset = findByUploadId(uploadId);
         if (asset.getStatus() != FileAssetStatus.UPLOADING
                 && asset.getStatus() != FileAssetStatus.PENDING) {
-            if (asset.getStatus() == FileAssetStatus.READY
+            if (asset.getStatus() == FileAssetStatus.VIGENTE
+                    || asset.getStatus() == FileAssetStatus.READY
                     || asset.getStatus() == FileAssetStatus.ACTIVE) {
                 return asset;
             }
             throw new BusinessException("La carga documental no puede finalizarse");
         }
+
+        // Si es una nueva versión, pasar la versión anterior a HISTORICO
+        if (asset.getReferenciaAnterior() != null) {
+            FileAsset anterior = asset.getReferenciaAnterior();
+            if (anterior.getStatus() == FileAssetStatus.VIGENTE
+                    || anterior.getStatus() == FileAssetStatus.READY
+                    || anterior.getStatus() == FileAssetStatus.ACTIVE) {
+                anterior.setStatus(FileAssetStatus.HISTORICO);
+                anterior.setActive(false);
+                repository.save(anterior);
+            }
+        }
+
+        // Asegurar que no quede otra versión VIGENTE para este documento lógico
+        repository.findByDocumentoLogicoAndStatus(asset.getDocumentoLogico(), FileAssetStatus.VIGENTE)
+                .ifPresent(otroVigente -> {
+                    if (!otroVigente.getId().equals(asset.getId())) {
+                        otroVigente.setStatus(FileAssetStatus.HISTORICO);
+                        otroVigente.setActive(false);
+                        repository.save(otroVigente);
+                    }
+                });
+
         asset.setSize(size);
         if (contentType != null && !contentType.isBlank()) {
             asset.setContentType(contentType);
         }
-        asset.setStatus(FileAssetStatus.READY);
+        asset.setStatus(FileAssetStatus.VIGENTE);
         asset.setActive(true);
         return repository.save(asset);
     }
@@ -140,6 +236,9 @@ public class FileAssetService {
     public FileAsset markDeleted(Long id) {
         FileAsset asset = repository.findById(id)
                 .orElseThrow(() -> new BusinessException("Archivo no encontrado"));
+        if (asset.getStatus() == FileAssetStatus.HISTORICO) {
+            throw new BusinessException("Las versiones históricas son inmutables y no pueden eliminarse");
+        }
         asset.setStatus(FileAssetStatus.DELETED);
         asset.setActive(false);
         return repository.save(asset);
@@ -149,6 +248,9 @@ public class FileAssetService {
     public FileAsset markDeletePending(Long id) {
         FileAsset asset = repository.findById(id)
                 .orElseThrow(() -> new BusinessException("Archivo no encontrado"));
+        if (asset.getStatus() == FileAssetStatus.HISTORICO) {
+            throw new BusinessException("Las versiones históricas son inmutables y no pueden eliminarse");
+        }
         asset.setStatus(FileAssetStatus.DELETE_PENDING);
         asset.setActive(false);
         return repository.save(asset);
@@ -158,9 +260,35 @@ public class FileAssetService {
     public FileAsset restoreReady(Long id) {
         FileAsset asset = repository.findById(id)
                 .orElseThrow(() -> new BusinessException("Archivo no encontrado"));
-        asset.setStatus(FileAssetStatus.READY);
+        asset.setStatus(FileAssetStatus.VIGENTE);
         asset.setActive(true);
         return repository.save(asset);
+    }
+
+    private static String resolveTipoDocumental(String tipo, FileResourceType resourceType, String safeName) {
+        if (tipo != null && !tipo.isBlank()) {
+            return tipo.trim().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (resourceType == FileResourceType.CONCILIACION) {
+            String lower = safeName.toLowerCase(java.util.Locale.ROOT);
+            if (lower.contains("solicitud")) {
+                return "CONCILIACION_SOLICITUD";
+            }
+            if (lower.contains("acta")) {
+                return "CONCILIACION_ACTA";
+            }
+            return "CONCILIACION_DOCUMENTO";
+        }
+        if (resourceType == FileResourceType.CONSULTA) {
+            return "CONSULTA_ANEXO";
+        }
+        if (resourceType == FileResourceType.RESPUESTA) {
+            return "RESPUESTA_EVIDENCIA";
+        }
+        if (resourceType == FileResourceType.SEGUIMIENTO) {
+            return "SEGUIMIENTO_ANEXO";
+        }
+        return "GENERAL";
     }
 
     private static String cleanFileName(String originalName) {

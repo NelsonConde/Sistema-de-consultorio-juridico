@@ -8,6 +8,10 @@ public enum FileAssetStatus {
     DELETED,
     ORPHANED,
 
+    /** Estados del modelo documental versionado. */
+    VIGENTE,
+    HISTORICO,
+
     /** Estados conservados para compatibilidad durante la migración. */
     PENDING,
     ACTIVE,

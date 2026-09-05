@@ -11,6 +11,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.multipart.MultipartFile;
@@ -77,7 +79,9 @@ class ConciliacionCommandServiceDb03Test {
                 eq(FileResourceType.CONCILIACION),
                 eq(30L),
                 isNull(),
-                eq(acta)))
+                eq(acta),
+                isNull(),
+                eq("CONCILIACION_ACTA")))
                 .thenReturn(actaNueva);
         when(conciliacionRepository.save(conciliacion)).thenReturn(conciliacion);
         doThrow(conflicto).when(entityManager).flush();
@@ -94,8 +98,11 @@ class ConciliacionCommandServiceDb03Test {
     @Test
     void reemplazarSolicitudDescartaSolicitudNuevaSiFlushVersionadoFalla() {
         Conciliacion conciliacion = conciliacion(31L, 3L);
+        UUID docLogico = UUID.randomUUID();
         FileAsset solicitudAnterior = archivo(200L);
+        solicitudAnterior.setDocumentoLogico(docLogico);
         FileAsset solicitudNueva = archivo(201L);
+        solicitudNueva.setDocumentoLogico(docLogico);
         MultipartFile solicitud = mock(MultipartFile.class);
         OptimisticLockException conflicto = new OptimisticLockException("conflicto");
 
@@ -106,7 +113,9 @@ class ConciliacionCommandServiceDb03Test {
                 eq(FileResourceType.CONCILIACION),
                 eq(31L),
                 isNull(),
-                eq(solicitud)))
+                eq(solicitud),
+                eq(docLogico),
+                eq("CONCILIACION_SOLICITUD")))
                 .thenReturn(solicitudNueva);
         when(conciliacionRepository.save(conciliacion)).thenReturn(conciliacion);
         doThrow(conflicto).when(entityManager).flush();
