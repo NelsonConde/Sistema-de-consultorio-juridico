@@ -15,6 +15,7 @@ Los endpoints de `/api/files` requieren usuario autenticado y validan permiso y 
 - consulta: `{consultaId}/...`;
 - documentos de tarea: `tareas-{seguimientoId}-documentos/...`;
 - documentos de respuesta: `tareas-{seguimientoId}-respuestas-{respuestaId}/...`;
+- proceso: `procesos/{procesoId}/...`;
 - conciliación: `conciliacion/{conciliacionId}/...`.
 
 Las operaciones sin recurso identificable, como listar todos los directorios, se rechazan.
@@ -50,6 +51,7 @@ Rutas documentales relevantes:
 - consulta: directorio asociado a la consulta;
 - tarea de seguimiento: `tareas-{seguimientoId}-documentos`;
 - respuesta de seguimiento: `tareas-{seguimientoId}-respuestas-{respuestaId}`;
+- proceso judicial: `procesos/{procesoId}`;
 - solicitud de conciliación: `conciliacion/{id}/solicitud.pdf`;
 - acta de conciliación: `conciliacion/{id}/acta.pdf`.
 
@@ -58,3 +60,16 @@ Rutas documentales relevantes:
 ## 7. Descarga y listado
 
 La descarga se realiza por clave lógica asociada a un recurso autorizado. Si el recurso no existe, el backend responde como no encontrado. El listado solo permite consultar el prefijo del recurso autorizado.
+
+---
+
+## 8. Consulta documental agregada por expediente
+
+El endpoint `GET /api/consultas/{consultaId}/expediente/archivos` permite consultar de manera agregada todos los documentos vinculados a un expediente (consulta raíz, seguimientos, respuestas, procesos judiciales y conciliaciones):
+
+- Valida previamente autorización sobre la consulta raíz (`validarPuedeVerConsulta`), retornando `403` si carece de alcance o `404` si el expediente no existe.
+- No permite listados globales ni exposición de documentos entre diferentes expedientes.
+- Permite filtrar por `tipoDocumental`, `resourceType`, `origen`, `autor` y rango de fechas (`fechaDesde`, `fechaHasta`).
+- Ordena estrictamente por fecha de creación descendente (`createdAt DESC`) y por ID (`id DESC`).
+- Retorna proyecciones seguras sin claves internas de almacenamiento (`bucket`, `objectKey`).
+
