@@ -2,17 +2,36 @@ import { API_URL_BASE } from "@/lib/config";
 import { getApiErrorMessages, getApiErrorTitle, readResponseBody } from "@/lib/api";
 import { ESTADOS_CONSULTA } from "./consultas-juridicas.constants";
 
-export function construirUrlConsultas(search = "") {
+export function construirUrlConsultas({
+  search = "",
+  page = 1,
+  size = 10,
+  sortBy = "fecha",
+  direction = "desc",
+  areaId,
+  estado,
+  asesorId,
+  monitorId,
+  estudianteId,
+} = {}) {
   const params = new URLSearchParams();
   const texto = String(search || "").trim();
 
-  if (texto) {
-    params.set("search", texto);
-  }
+  if (texto) params.set("search", texto);
 
-  const query = params.toString();
+  params.set("page", String(page));
+  params.set("size", String(size));
+  params.set("sortBy", String(sortBy || "fecha"));
+  params.set("direction", String(direction || "desc").toLowerCase());
 
-  return `${API_URL_BASE}/consultas${query ? `?${query}` : ""}`;
+  const opcionales = { areaId, estado, asesorId, monitorId, estudianteId };
+  Object.entries(opcionales).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      params.set(key, String(value));
+    }
+  });
+
+  return `${API_URL_BASE}/consultas?${params.toString()}`;
 }
 
 export function ordenarConsultasPorIdAscendente(items) {

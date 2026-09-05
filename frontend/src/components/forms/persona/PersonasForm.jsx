@@ -28,7 +28,7 @@ import {
   requireResourceVersion,
   withErrorReference,
 } from "@/lib/api";
-import { buscarPersonasActivas, obtenerPersonaDetalle } from "@/lib/personasApi";
+import { buscarPersonas, obtenerPersonaDetalle } from "@/lib/personasApi";
 import { DIGITS_PATTERN, EMAIL_PATTERN } from "@/lib/form-validation";
 
 import {
@@ -62,6 +62,8 @@ export function PersonasForm() {
   const [busquedaAplicada, setBusquedaAplicada] = useState("");
   const [paginaActual, setPaginaActual] = useState(1);
   const [registrosPorPagina, setRegistrosPorPagina] = useState(10);
+  const [sortBy, setSortBy] = useState("nombres");
+  const [direction, setDirection] = useState("asc");
   const [totalRegistros, setTotalRegistros] = useState(0);
   const [totalPaginas, setTotalPaginas] = useState(0);
   const [cargandoLista, setCargandoLista] = useState(false);
@@ -126,7 +128,7 @@ export function PersonasForm() {
     cargarPersonas({ signal: controller.signal });
 
     return () => controller.abort();
-  }, [user, busquedaAplicada, paginaActual, registrosPorPagina]);
+  }, [user, busquedaAplicada, paginaActual, registrosPorPagina, sortBy, direction]);
 
   useEffect(() => {
     if (totalPaginas > 0 && paginaActual > totalPaginas) {
@@ -263,10 +265,13 @@ export function PersonasForm() {
       setCargandoLista(true);
       setError("");
 
-      const resultado = await buscarPersonasActivas({
+      const resultado = await buscarPersonas({
         search: busquedaAplicada,
         page: paginaActual,
         size: registrosPorPagina,
+        sortBy,
+        direction,
+        soloActivas: false,
         signal,
       });
 
@@ -347,7 +352,7 @@ export function PersonasForm() {
       }
 
       if (err.status === 404) {
-        setError("La persona no está disponible para consulta o edición");
+        setError("El recurso no está disponible para consulta.");
         return;
       }
 
@@ -817,6 +822,42 @@ export function PersonasForm() {
             maxLength={100}
             className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Ordenar por:</span>
+            <select
+              value={sortBy}
+              onChange={(event) => {
+                setSortBy(event.target.value);
+                setPaginaActual(1);
+              }}
+              className="h-9 rounded-md border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="nombres">Nombres</option>
+              <option value="apellidos">Apellidos</option>
+              <option value="numeroDocumento">Documento</option>
+              <option value="tipoDocumento">Tipo de documento</option>
+              <option value="tipoPersona">Tipo de persona</option>
+              <option value="activo">Estado</option>
+            </select>
+          </label>
+
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Dirección:</span>
+            <select
+              value={direction}
+              onChange={(event) => {
+                setDirection(event.target.value);
+                setPaginaActual(1);
+              }}
+              className="h-9 rounded-md border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="asc">Ascendente</option>
+              <option value="desc">Descendente</option>
+            </select>
+          </label>
         </div>
 
         <div className="flex flex-col gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm md:flex-row md:items-center md:justify-between">

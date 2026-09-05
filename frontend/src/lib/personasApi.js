@@ -8,7 +8,6 @@ import {
 const PAGINA_POR_DEFECTO = 1;
 const TAMANO_POR_DEFECTO = 10;
 const TAMANO_MAXIMO = 50;
-const DOCUMENTO_VISIBLE = 4;
 
 function crearErrorHttp(response, payload, fallback) {
   const error = new Error(
@@ -37,6 +36,8 @@ function construirRuta({
   search = "",
   page = PAGINA_POR_DEFECTO,
   size = TAMANO_POR_DEFECTO,
+  sortBy = "nombres",
+  direction = "asc",
   soloActivas = true,
 }) {
   validarPaginacion(page, size);
@@ -50,24 +51,11 @@ function construirRuta({
 
   params.set("page", String(page));
   params.set("size", String(size));
+  params.set("sortBy", String(sortBy || "nombres"));
+  params.set("direction", String(direction || "asc").toLowerCase());
 
   const base = soloActivas ? "/personas/activos" : "/personas";
   return `${base}?${params.toString()}`;
-}
-
-function enmascararDocumento(numeroDocumento) {
-  const documento = String(numeroDocumento || "").trim();
-
-  if (!documento) {
-    return null;
-  }
-
-  if (documento.length <= DOCUMENTO_VISIBLE) {
-    return "*".repeat(documento.length);
-  }
-
-  const ocultos = documento.length - DOCUMENTO_VISIBLE;
-  return "*".repeat(ocultos) + documento.slice(-DOCUMENTO_VISIBLE);
 }
 
 function obtenerTipoPersona(persona) {
@@ -99,103 +87,47 @@ function normalizarPersonaResumen(persona) {
     tipoDocumento: persona?.tipoDocumento ?? "",
     numeroDocumentoEnmascarado:
       persona?.numeroDocumentoEnmascarado ??
-      enmascararDocumento(persona?.numeroDocumento),
+      persona?.numeroDocumento ??
+      null,
     tipoPersona: obtenerTipoPersona(persona),
     activo: persona?.activo ?? true,
   };
 }
 
-function coincideBusqueda(persona, search) {
-  const termino = String(search || "").trim().toLocaleLowerCase();
-
-  if (!termino) {
-    return true;
+function normalizarPagina(payload) {
+  if (!payload || !Array.isArray(payload.content)) {
+    throw new Error("Respuesta paginada de personas inválida");
   }
 
-  const valores = [
-    persona?.nombres,
-    persona?.apellidos,
-    `${persona?.nombres || ""} ${persona?.apellidos || ""}`,
-    persona?.numeroDocumento,
-    persona?.numeroDocumentoEnmascarado,
-    persona?.tipoDocumento,
-  ];
+  const page = Number(payload.page);
+  const size = Number(payload.size);
+  const totalElements = Number(payload.totalElements);
+  const totalPages = Number(payload.totalPages);
 
-  return valores.some((valor) =>
-    String(valor || "").toLocaleLowerCase().includes(termino)
-  );
-}
+  if (
+    !Number.isInteger(page) || page < 1 ||
+    !Number.isInteger(size) || size < 1 || size > TAMANO_MAXIMO ||
+    !Number.isFinite(totalElements) || totalElements < 0 ||
+    !Number.isInteger(totalPages) || totalPages < 0
+  ) {
+    throw new Error("Contrato paginado de personas inválido");
+  }
 
-function normalizarPaginaPaginada(payload) {
   return {
     content: payload.content.map(normalizarPersonaResumen),
-    page: Number(payload.page ?? PAGINA_POR_DEFECTO),
-    size: Number(payload.size ?? TAMANO_POR_DEFECTO),
-    totalElements: Number(payload.totalElements ?? payload.content.length),
-    totalPages: Number(payload.totalPages ?? 0),
-  };
-}
-
-/**
- * Compatibility fallback for branches where the backend still returns an array.
- * The preferred SEC-07 contract is the paginated object handled above.
- * This fallback only prevents the existing frontend from breaking while the
- * backend remains unchanged.
- */
-function normalizarPaginaLegacy(
-  payload,
-  {
-    search = "",
-    page = PAGINA_POR_DEFECTO,
-    size = TAMANO_POR_DEFECTO,
-    soloActivas = true,
-  } = {}
-) {
-  const filtradas = payload.filter((persona) => {
-    if (soloActivas && persona?.activo === false) {
-      return false;
-    }
-
-    return coincideBusqueda(persona, search);
-  });
-
-  const totalElements = filtradas.length;
-  const totalPages =
-    totalElements === 0 ? 0 : Math.ceil(totalElements / size);
-
-  const paginaSegura =
-    totalPages === 0 ? 1 : Math.min(Math.max(page, 1), totalPages);
-
-  const inicio = (paginaSegura - 1) * size;
-  const fin = inicio + size;
-
-  return {
-    content: filtradas
-      .slice(inicio, fin)
-      .map(normalizarPersonaResumen),
-    page: paginaSegura,
+    page,
     size,
     totalElements,
     totalPages,
   };
 }
 
-function normalizarPagina(payload, options = {}) {
-  if (payload && Array.isArray(payload.content)) {
-    return normalizarPaginaPaginada(payload);
-  }
-
-  if (Array.isArray(payload)) {
-    return normalizarPaginaLegacy(payload, options);
-  }
-
-  throw new Error("Respuesta de personas inválida");
-}
-
 export async function buscarPersonas({
   search = "",
   page = PAGINA_POR_DEFECTO,
   size = TAMANO_POR_DEFECTO,
+  sortBy = "nombres",
+  direction = "asc",
   soloActivas = true,
   signal,
 } = {}) {
@@ -203,6 +135,8 @@ export async function buscarPersonas({
     search,
     page,
     size,
+    sortBy,
+    direction,
     soloActivas,
   };
 
@@ -218,7 +152,7 @@ export async function buscarPersonas({
     );
   }
 
-  return normalizarPagina(payload, options);
+  return normalizarPagina(payload);
 }
 
 export async function buscarPersonasActivas(options = {}) {
