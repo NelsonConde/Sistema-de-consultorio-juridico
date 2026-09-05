@@ -70,7 +70,9 @@ public class FileResourceService {
                 request.fileName(),
                 request.contentType(),
                 request.size(),
-                request.checksum());
+                request.checksum(),
+                request.documentoLogico(),
+                request.tipoDocumental());
 
         try {
             StorageProvider.PresignedUpload upload = storageProvider.createUploadUrl(
@@ -96,6 +98,17 @@ public class FileResourceService {
             Long resourceId,
             Long parentId,
             MultipartFile file) {
+        return storeMultipartAfterAuthorization(type, resourceId, parentId, file, null, null);
+    }
+
+    @Transactional
+    public FileAsset storeMultipartAfterAuthorization(
+            FileResourceType type,
+            Long resourceId,
+            Long parentId,
+            MultipartFile file,
+            UUID documentoLogico,
+            String tipoDocumental) {
         if (type == FileResourceType.CONCILIACION) {
             validationService.validatePdf(file);
         } else {
@@ -107,7 +120,9 @@ public class FileResourceService {
                 file.getOriginalFilename(),
                 file.getContentType() == null ? "application/octet-stream" : file.getContentType(),
                 file.getSize(),
-                null);
+                null,
+                documentoLogico,
+                tipoDocumental);
         try {
             storageProvider.store(file, asset.getObjectKey());
             StorageProvider.StorageObjectMetadata metadata = storageProvider.head(asset.getObjectKey());
@@ -230,12 +245,32 @@ public class FileResourceService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public List<FileResponse> listVersions(UUID documentoLogico, Long parentId) {
+        List<FileAsset> versions = fileAssetService.listVersions(documentoLogico);
+        if (!versions.isEmpty()) {
+            authorizationService.authorizeRead(versions.get(0), parentId);
+        }
+        return versions.stream()
+                .map(FileResourceService::toResponse)
+                .toList();
+    }
+
     private static FileResponse toResponse(FileAsset asset) {
         String status = asset.getStatus() == null ? null : asset.getStatus().name();
+        Long referenciaAnteriorId = (asset.getReferenciaAnterior() != null)
+                ? asset.getReferenciaAnterior().getId()
+                : null;
+        long size = (asset.getSize() != null) ? asset.getSize() : 0L;
         return new FileResponse(
                 asset.getId(),
+                asset.getDocumentoLogico(),
+                asset.getVersion(),
+                asset.getTipoDocumental(),
+                asset.getOrigen(),
+                referenciaAnteriorId,
                 asset.getOriginalFileName(),
-                asset.getSize(),
+                size,
                 asset.getContentType(),
                 status,
                 asset.getCreatedAt());
