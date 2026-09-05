@@ -5,8 +5,10 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import co.edu.ufps.legal_cases.business.dto.perfil.AdministrativoDTO;
+import co.edu.ufps.legal_cases.business.dto.perfil.AdministrativoResumenDTO;
 import co.edu.ufps.legal_cases.business.service.perfil.administrativo.AdministrativoCommandService;
 import co.edu.ufps.legal_cases.business.service.perfil.administrativo.AdministrativoQueryService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
 @Service
 public class AdministrativoService {
@@ -23,8 +25,14 @@ public class AdministrativoService {
 
     // Fachada del módulo de administrativos.
     // El controller entra por aquí, pero lectura y escritura quedan separadas por responsabilidad.
-    public List<AdministrativoDTO> listar() {
-        return administrativoQueryService.listar();
+    public PageResponseDTO<AdministrativoResumenDTO> buscar(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction,
+            Boolean activo) {
+        return administrativoQueryService.buscar(search, page, size, sortBy, direction, activo);
     }
 
     public List<AdministrativoDTO> listarActivos() {
