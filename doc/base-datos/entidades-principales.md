@@ -1086,18 +1086,67 @@ Criterio documental:
 - `Consulta.lastUpdatedAt` participa en consultas de rango y reportes;
 - los PDF estadísticos se generan como salida del servicio, no como entidad persistente principal documentada aquí.
 
-## 11. Archivos
+## 11. Archivos y Gestión Documental
 
-El almacenamiento de archivos se maneja mediante servicio de archivos. La base de datos conserva rutas en entidades cuando el archivo forma parte del flujo de negocio.
+### `file_asset`
 
-Ejemplos:
+Entidad:
 
-| Entidad | Campo documental |
-|---|---|
-| `Conciliacion` | `documento_solicitud_path`. |
-| `Conciliacion` | `acta_path`. |
+```text
+FileAsset
+```
 
-El módulo de archivos también permite carga, descarga, listado y validación de rutas desde el backend.
+Tabla:
+
+```text
+file_asset
+```
+
+Propósito:
+
+Representa los activos documentales y probatorios asociados a los recursos del dominio (`CONSULTA`, `SEGUIMIENTO`, `RESPUESTA`, `PROCESO`, `CONCILIACION`). Gestiona el ciclo de vida de los archivos, staging temporal, versionamiento lógico ($N+1$), inmutabilidad de versiones históricas, trazabilidad de autoría y sumas de verificación criptográfica SHA-256.
+
+Campos principales:
+
+| Columna | Tipo | Nulable | Uso |
+|---|---|---|---|
+| `id` | `BIGINT` | No | Identificador único autoincremental del activo documental. |
+| `bucket` | `VARCHAR(100)` | No | Nombre del bucket privado de almacenamiento de objetos (ej. `legal-documents`). |
+| `object_key` | `VARCHAR(500)` | No | Clave interna y canónica del objeto dentro del bucket privado (nunca expuesta al cliente). |
+| `upload_id` | `UUID` | Sí | Identificador público único para la sesión de carga temporal en staging. |
+| `resource_type` | `VARCHAR(40)` | No | Tipo de recurso funcional asociado (`CONSULTA`, `SEGUIMIENTO`, `RESPUESTA`, `PROCESO`, `CONCILIACION`). |
+| `resource_id` | `BIGINT` | No | Identificador de la entidad de negocio a la que pertenece el documento. |
+| `original_file_name` | `VARCHAR(255)` | No | Nombre original del archivo sanitizado (sin secuencias `..` ni rutas absolutas). |
+| `content_type` | `VARCHAR(150)` | No | Tipo MIME validado del contenido (ej. `application/pdf`, `image/png`). |
+| `size` | `BIGINT` | No | Tamaño del archivo en bytes verificado contra el almacenamiento. |
+| `checksum` | `VARCHAR(64)` | No | Hash SHA-256 del contenido del archivo para verificación de integridad criptográfica. |
+| `uploaded_by_id` | `BIGINT` | No | Clave foránea al `usuario_sistema` que autenticó y ejecutó la carga (determinado en servidor). |
+| `active` | `BOOLEAN` | No | Estado de disponibilidad lógica (baja lógica). |
+| `status` | `VARCHAR(20)` | No | Estado en el ciclo de vida: `PENDING`, `ACTIVE`, `VIGENTE`, `HISTORICO`, `ANULADO`, `FAILED`, `DELETE_PENDING`. |
+| `documento_logico` | `UUID` | No | Identificador de agrupación de versiones que comparten la misma identidad funcional. |
+| `version` | `INTEGER` | No | Número secuencial de versión ($1, 2, \dots, N$). Primera versión = 1, siguientes = $N+1$. |
+| `tipo_documental` | `VARCHAR(60)` | No | Clasificación funcional (`CONSULTA_ANEXO`, `PROCESO_DOCUMENTO`, `CONCILIACION_ACTA`, etc.). |
+| `origen` | `VARCHAR(40)` | No | Origen del documento: `CARGA_USUARIO`, `SISTEMA`, `MIGRADO` (calculado en servidor). |
+| `referencia_anterior_id` | `BIGINT` | Sí | Clave foránea al `file_asset` que representa la versión inmediatamente anterior reemplazada. |
+| `created_at` | `TIMESTAMP` | No | Fecha y hora UTC de registro en base de datos. |
+| `updated_at` | `TIMESTAMP` | Sí | Fecha y hora de última actualización del registro. |
+
+Relaciones:
+
+```text
+file_asset -> usuario_sistema (uploaded_by_id)
+file_asset -> file_asset (referencia_anterior_id, autorreferencia de versiones)
+```
+
+Índices y restricciones de integridad:
+
+1. `uk_file_asset_bucket_object_key`: Restricción única sobre `(bucket, object_key)` para impedir sobrescritura física de bytes.
+2. `uk_file_asset_upload_id`: Restricción de unicidad sobre `upload_id` para control de idempotencia de cargas.
+3. `uk_file_asset_doc_vigente`: Índice único parcial PostgreSQL sobre `(documento_logico)` donde `status = 'VIGENTE'`, garantizando que nunca coexistan dos versiones vigentes de un mismo documento lógico.
+4. `idx_file_asset_resource`: Índice B-tree sobre `(resource_type, resource_id)` para acelerar consultas por entidad.
+5. `idx_file_asset_doc_version`: Índice B-tree sobre `(documento_logico, version)` para resolución y ordenamiento histórico.
+6. `idx_file_asset_status`: Índice B-tree sobre `status` para optimizar tareas de reconciliación de cargas pendientes o fallidas.
+
 
 ## 12. Tablas con desactivación lógica
 

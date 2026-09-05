@@ -200,3 +200,38 @@ catálogos jurídicos
 ```
 
 Los reportes estadísticos se generan dinámicamente desde servicios de consulta y generación PDF a partir de las entidades operativas relacionadas.
+
+## 13. Relación de gestión documental (`file_asset`)
+
+```text
+file_asset N---1 usuario_sistema (mediante uploaded_by_id)
+file_asset N---1 file_asset (mediante referencia_anterior_id, enlace entre versiones)
+```
+
+Relaciones lógicas y polimórficas por tipo de recurso:
+
+```text
+file_asset (resource_type = 'CONSULTA') -----> consulta.id
+file_asset (resource_type = 'SEGUIMIENTO') ---> seguimiento.id (y consulta asociada)
+file_asset (resource_type = 'RESPUESTA') -----> seguimiento_respuesta.id (parent_id = seguimiento.id)
+file_asset (resource_type = 'PROCESO') -------> proceso.id (y consulta que originó el proceso)
+file_asset (resource_type = 'CONCILIACION') --> conciliacion.id (y consulta remitida)
+```
+
+Agregación de expediente documental:
+
+```text
+consulta (raíz del expediente) 1---N file_asset agregados
+    ├── file_asset propios de la consulta (resource_type = 'CONSULTA')
+    ├── file_asset de actuaciones (resource_type = 'SEGUIMIENTO')
+    ├── file_asset de respuestas de tareas (resource_type = 'RESPUESTA')
+    ├── file_asset de trámites judiciales (resource_type = 'PROCESO')
+    └── file_asset de trámites de conciliación (resource_type = 'CONCILIACION')
+```
+
+Reglas de integridad y navegación:
+
+- Toda versión ($N+1$) referencia a su versión previa mediante `referencia_anterior_id`.
+- La autoría del archivo (`uploaded_by_id`) se vincula de manera obligatoria a la identidad del usuario del sistema autenticado.
+- La consulta documental del expediente consolida y navega estas relaciones en una única consulta optimizada (evitando el problema N+1), vinculando los documentos de todas las entidades hijas hacia la consulta raíz.
+
