@@ -25,8 +25,61 @@ GET  /api/seguimientos/{id}/archivos
 POST /api/seguimientos/{seguimientoId}/respuestas/{respuestaId}/archivos/uploads
 GET  /api/seguimientos/{seguimientoId}/respuestas/{respuestaId}/archivos
 
+POST /api/procesos/{id}/archivos/uploads
+GET  /api/procesos/{id}/archivos
+
 POST /api/conciliaciones/{id}/archivos/uploads
 GET  /api/conciliaciones/{id}/archivos
+```
+
+## Consulta documental agregada por expediente
+
+Permite consolidar y consultar la totalidad de documentos asociados a un expediente a partir de su consulta raíz (`consultaId`), agregando automáticamente archivos de:
+- `CONSULTA` (documentos directos de la consulta)
+- `SEGUIMIENTO` (documentos asociados a las tareas/seguimientos del caso)
+- `RESPUESTA` (documentos adjuntos a las respuestas de seguimiento)
+- `PROCESO` (documentos generados en procesos judiciales vinculados)
+- `CONCILIACION` (solicitud, acta y demás documentos de conciliaciones vinculadas)
+
+```text
+GET /api/consultas/{consultaId}/expediente/archivos
+```
+
+### Reglas y seguridad
+- **Autorización previa sobre el expediente**: Antes de ejecutar la consulta, el backend valida el acceso del usuario sobre la consulta raíz (`validarPuedeVerConsulta`). Usuarios sin alcance reciben `403 Forbidden`; consultas inexistentes reciben `404 Not Found`.
+- **Aislamiento estricto**: No existe listado global. Documentos de recursos ajenos o de otros expedientes nunca aparecen en los resultados.
+- **Filtros opcionales**:
+  - `tipoDocumental`: Filtra por tipo (ej. `CONSULTA_DOCUMENTO`, `PROCESO_DOCUMENTO`, `CONCILIACION_SOLICITUD`).
+  - `resourceType`: Filtra por recurso (`CONSULTA`, `SEGUIMIENTO`, `RESPUESTA`, `PROCESO`, `CONCILIACION`).
+  - `origen`: Filtra por origen (ej. `CARGA_USUARIO`).
+  - `autor`: Filtra por ID de usuario o nombre de usuario (`username`) del autor.
+  - `fechaDesde` / `fechaHasta`: Rango de fechas (`YYYY-MM-DD`). Se valida que `fechaDesde <= fechaHasta` (responde `400 Bad Request` en caso contrario).
+- **Orden determinístico**: Los resultados se retornan ordenados por fecha de creación descendente (`createdAt DESC`) y desempate por identificador descendente (`id DESC`).
+- **Eficiencia sin N+1**: La agregación se resuelve en una sola consulta JPQL con fetch joins (`uploadedBy`, `referenciaAnterior`).
+- **DTO sin fuga de datos**: El DTO `ExpedienteDocumentoResponse` nunca expone `bucket` ni `objectKey`.
+
+### Estructura de respuesta del expediente (ExpedienteDocumentoResponse)
+
+```json
+[
+  {
+    "id": 105,
+    "documentoLogico": "7fa8b9c0-1234-5678-9abc-def012345678",
+    "version": 1,
+    "tipoDocumental": "PROCESO_DOCUMENTO",
+    "origen": "CARGA_USUARIO",
+    "referenciaAnteriorId": null,
+    "resourceType": "PROCESO",
+    "resourceId": 50,
+    "fileName": "demanda_inicial.pdf",
+    "size": 1048576,
+    "contentType": "application/pdf",
+    "status": "VIGENTE",
+    "autorId": 14,
+    "autorUsername": "asesor.juridico",
+    "createdAt": "2026-09-05T10:15:00"
+  }
+]
 ```
 
 ## Operaciones de archivo y versiones

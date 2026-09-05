@@ -5,5 +5,6 @@ public enum FileResourceType {
     CONSULTA,
     SEGUIMIENTO,
     RESPUESTA,
-    CONCILIACION
+    CONCILIACION,
+    PROCESO
 }
