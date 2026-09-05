@@ -57,8 +57,14 @@ doc/
   decisiones/
     Decisiones técnicas y criterios de diseño aplicados.
 
+  especificaciones/
+    Requisitos funcionales SRS (RF16-RF21/RF59), Product Backlog y Casos de Uso (CU-10).
+
   mantenimiento/
-    Guías para conservar la documentación alineada con el código.
+    Guías de mantenimiento documental y Manual de Despliegue y Recuperación ante Desastres.
+
+  evidencias/
+    Matriz de trazabilidad Requisito-Historia-PR-Prueba-Evidencia y Guion de Demostración.
 ```
 
 ## Backend

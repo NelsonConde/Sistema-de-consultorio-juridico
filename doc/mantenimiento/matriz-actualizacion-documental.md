@@ -21,7 +21,7 @@ Esta matriz indica qué documentos revisar según el tipo de cambio realizado en
 | Reuniones de conciliación | `backend/conciliaciones.md`, `api/conciliaciones.md`, `frontend/modulos/reuniones-conciliacion.md` |
 | Estadísticas | `backend/estadisticas.md`, `api/estadisticas.md`, `reglas/estadisticas.md`, `frontend/modulos/estadisticas.md` |
 | Auditoría | `backend/auditoria.md`, `api/auditoria.md`, `frontend/modulos/usuarios-roles.md` |
-| Archivos | `backend/archivos.md`, `api/archivos.md`, `reglas/archivos.md`, documentos frontend que carguen o descarguen archivos |
+| Archivos | `backend/archivos.md`, `api/archivos.md`, `reglas/archivos.md`, `especificaciones/srs-documental-rf19-rf21-rf59.md`, `mantenimiento/manual-despliegue-recuperacion.md`, `evidencias/matriz-historia-pr-prueba-evidencia.md` |
 
 ## Cambios transversales
 
