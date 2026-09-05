@@ -110,6 +110,13 @@ public class FileResourceController {
         return fileResourceService.prepareDownload(fileId, parentId);
     }
 
+    @GetMapping("/documentos/{documentoLogico}/versiones")
+    public List<FileResponse> listarVersionesDocumento(
+            @PathVariable UUID documentoLogico,
+            @RequestParam(required = false) Long parentId) {
+        return fileResourceService.listVersions(documentoLogico, parentId);
+    }
+
     @DeleteMapping("/archivos/{fileId}")
     public ResponseEntity<Void> eliminarArchivo(
             @PathVariable Long fileId,

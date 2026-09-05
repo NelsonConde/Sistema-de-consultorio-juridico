@@ -1,22 +1,19 @@
-# API de archivos
+# API de archivos y versionado documental
 
-La API de archivos trabaja con recursos funcionales y no expone claves ni
-carpetas del bucket. Supabase permanece privado y sus credenciales sólo se
-configuran en el backend.
+La API de archivos trabaja con recursos funcionales y un modelo documental versionado. No expone claves ni carpetas del bucket. Supabase permanece privado y sus credenciales sólo se configuran en el backend.
 
-## Flujo de carga
+## Flujo de carga y versionamiento
 
-1. El frontend solicita una sesión con `POST` a la colección de archivos del
-   recurso.
-2. El backend valida autenticación, permisos y metadata, y devuelve una URL
-   firmada temporal junto con `uploadId`.
-3. El frontend ejecuta `PUT uploadUrl` con el archivo.
-4. El frontend confirma con `POST /api/file-uploads/{uploadId}/complete`. Para
-   una respuesta de seguimiento envía `{"parentId": seguimientoId}`.
-5. El backend verifica el objeto mediante metadata de Storage y lo marca como
-   `READY`.
+1. El frontend o cliente solicita una sesión con `POST` a la colección de archivos del recurso:
+   - Puede enviar opcionalmente `documentoLogico` (UUID) para cargar una nueva versión ($N+1$) de un documento existente.
+   - Puede enviar `tipoDocumental` para clasificar el documento.
+   - Si no se envía `documentoLogico`, el servidor genera un nuevo documento lógico con versión inicial 1.
+2. El backend valida autenticación, permisos funcionales del recurso y metadata, y devuelve una URL firmada temporal junto con `uploadId`.
+3. El cliente ejecuta `PUT uploadUrl` con el archivo directamente al storage privado.
+4. El cliente confirma con `POST /api/file-uploads/{uploadId}/complete`.
+5. El backend verifica el objeto mediante metadata de Storage, marca la nueva versión como `VIGENTE` y transiciona cualquier versión previa a `HISTORICO`.
 
-## Colecciones
+## Colecciones de carga por recurso
 
 ```text
 POST /api/consultas/{id}/archivos/uploads
@@ -32,42 +29,46 @@ POST /api/conciliaciones/{id}/archivos/uploads
 GET  /api/conciliaciones/{id}/archivos
 ```
 
-## Operaciones de archivo
+## Operaciones de archivo y versiones
 
 ```text
 POST   /api/file-uploads/{uploadId}/complete
 GET    /api/archivos/{fileId}/download
 DELETE /api/archivos/{fileId}
+GET    /api/documentos/{documentoLogico}/versiones
 ```
 
-Las operaciones sobre una respuesta reciben `parentId` como query parameter
-en descarga y eliminación. El `parentId` sólo sirve para reconstruir la
-relación de dominio y nunca se usa para construir una clave de Storage.
+## Reglas del modelo documental
 
-La respuesta de listado no incluye `objectKey`:
+1. **Primera versión = 1; Siguiente = N+1**:
+   - Cada nuevo documento lógico inicia en la versión 1.
+   - Las actualizaciones bajo el mismo `documentoLogico` se incrementan secuencialmente ($N+1$) bajo control transaccional y bloqueo pesimista.
+2. **Una sola versión VIGENTE por documento lógico**:
+   - Enforzada a nivel de base de datos mediante el índice único parcial `uk_file_asset_doc_vigente` (`WHERE status = 'VIGENTE'`).
+   - Al confirmarse una versión $N+1$, la versión previa pasa automáticamente a `HISTORICO`.
+3. **Inmutabilidad histórica**:
+   - Los registros en estado `HISTORICO` son inmutables para garantizar valor probatorio y auditoría.
+4. **Baja lógica**:
+   - La eliminación (`DELETE /api/archivos/{fileId}`) marca la versión vigente como inactiva/eliminada (`DELETED`) sin destruir los metadatos históricos ni el rastro de auditoría.
+5. **Cálculo exclusivo en servidor**:
+   - El autor (`uploadedBy`), el origen (`origen`) y la versión (`version`) se determinan en el backend y no pueden ser falsificados por el cliente.
+6. **Checksum SHA-256**:
+   - Se valida y registra la huella criptográfica SHA-256 de cada archivo cargado.
+
+## Estructura de respuesta (FileResponse)
 
 ```json
 {
   "id": 42,
-  "fileName": "soporte.pdf",
+  "documentoLogico": "7fa8b9c0-1234-5678-9abc-def012345678",
+  "version": 2,
+  "tipoDocumental": "CONCILIACION_SOLICITUD",
+  "origen": "CARGA_USUARIO",
+  "referenciaAnteriorId": 38,
+  "fileName": "solicitud_firmada.pdf",
   "size": 24576,
   "contentType": "application/pdf",
-  "status": "READY",
-  "createdAt": "2026-08-23T10:30:00"
+  "status": "VIGENTE",
+  "createdAt": "2026-09-05T10:30:00"
 }
 ```
-
-Los endpoints antiguos basados en `path` fueron retirados. Para cargas
-atómicas de conciliación, los endpoints de negocio todavía reciben multipart,
-pero internamente usan el mismo `FileResourceService` y registran referencias
-por ID.
-
-Una carga que no se confirma permanece en `UPLOADING` y se limpia mediante el
-reconciliador. Una eliminación pasa por `DELETE_PENDING`; esto permite retomar
-la operación si la aplicación se detiene entre Storage y la base de datos.
-
-## Configuración de Supabase
-
-El bucket debe permanecer privado. Para cargas directas desde el navegador,
-el endpoint S3 de Supabase debe permitir CORS únicamente para los orígenes del
-frontend. No se debe configurar ninguna clave de Supabase en `NEXT_PUBLIC_*`.
