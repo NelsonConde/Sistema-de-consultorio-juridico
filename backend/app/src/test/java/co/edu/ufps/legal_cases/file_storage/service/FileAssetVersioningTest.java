@@ -7,11 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -210,5 +212,64 @@ class FileAssetVersioningTest {
         assertEquals(2, versiones.size());
         assertEquals(2, versiones.get(0).getVersion());
         assertEquals(1, versiones.get(1).getVersion());
+    }
+
+    @Test
+    void findExpedienteFilesPropagaParametrosYFiltraEstadosVisibles() {
+        LocalDateTime desde = LocalDateTime.of(2026, 9, 1, 0, 0);
+        LocalDateTime hasta = LocalDateTime.of(2026, 9, 5, 23, 59);
+
+        FileAsset asset = new FileAsset();
+        asset.setId(10L);
+        asset.setResourceType("PROCESO");
+
+        when(repository.findExpedienteFiles(
+                eq(100L),
+                eq(List.of(FileAssetStatus.VIGENTE, FileAssetStatus.READY, FileAssetStatus.ACTIVE)),
+                eq("PROCESO_DOCUMENTO"),
+                eq("PROCESO"),
+                eq("CARGA_USUARIO"),
+                eq("7"),
+                eq(7L),
+                eq(desde),
+                eq(hasta)))
+                .thenReturn(List.of(asset));
+
+        List<FileAsset> result = service.findExpedienteFiles(
+                100L,
+                "PROCESO_DOCUMENTO",
+                "PROCESO",
+                "CARGA_USUARIO",
+                "7",
+                desde,
+                hasta);
+
+        assertEquals(1, result.size());
+        assertEquals(10L, result.get(0).getId());
+    }
+
+    @Test
+    void findExpedienteFilesValidaConsultaIdObligatorio() {
+        assertThrows(BusinessException.class, () -> service.findExpedienteFiles(
+                null, null, null, null, null, null, null));
+        assertThrows(BusinessException.class, () -> service.findExpedienteFiles(
+                0L, null, null, null, null, null, null));
+    }
+
+    @Test
+    void resolveTipoDocumentalParaProcesoRetornaProcesoDocumento() {
+        FileAsset asset = service.startUpload(
+                FileResourceType.PROCESO,
+                50L,
+                "demanda.pdf",
+                "application/pdf",
+                1024L,
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                null,
+                null);
+
+        assertEquals("PROCESO_DOCUMENTO", asset.getTipoDocumental());
+        assertEquals("PROCESO", asset.getResourceType());
+        assertEquals(50L, asset.getResourceId());
     }
 }

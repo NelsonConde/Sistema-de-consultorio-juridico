@@ -288,7 +288,49 @@ public class FileAssetService {
         if (resourceType == FileResourceType.SEGUIMIENTO) {
             return "SEGUIMIENTO_ANEXO";
         }
+        if (resourceType == FileResourceType.PROCESO) {
+            return "PROCESO_DOCUMENTO";
+        }
         return "GENERAL";
+    }
+
+    @Transactional(readOnly = true)
+    public List<FileAsset> findExpedienteFiles(
+            Long consultaId,
+            String tipoDocumental,
+            String resourceType,
+            String origen,
+            String autor,
+            java.time.LocalDateTime fechaDesde,
+            java.time.LocalDateTime fechaHasta) {
+        if (consultaId == null || consultaId <= 0) {
+            throw new BusinessException("El id de la consulta es obligatorio");
+        }
+
+        Long autorId = null;
+        if (autor != null && !autor.isBlank()) {
+            try {
+                autorId = Long.valueOf(autor.trim());
+            } catch (NumberFormatException ignored) {
+                // autor no es numérico, se filtra como texto
+            }
+        }
+
+        List<FileAssetStatus> visibleStatuses = List.of(
+                FileAssetStatus.VIGENTE,
+                FileAssetStatus.READY,
+                FileAssetStatus.ACTIVE);
+
+        return repository.findExpedienteFiles(
+                consultaId,
+                visibleStatuses,
+                (tipoDocumental != null && !tipoDocumental.isBlank()) ? tipoDocumental.trim() : null,
+                (resourceType != null && !resourceType.isBlank()) ? resourceType.trim() : null,
+                (origen != null && !origen.isBlank()) ? origen.trim() : null,
+                (autor != null && !autor.isBlank()) ? autor.trim() : null,
+                autorId,
+                fechaDesde,
+                fechaHasta);
     }
 
     private static String cleanFileName(String originalName) {

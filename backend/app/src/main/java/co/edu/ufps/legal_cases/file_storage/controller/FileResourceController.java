@@ -1,8 +1,10 @@
 package co.edu.ufps.legal_cases.file_storage.controller;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import co.edu.ufps.legal_cases.file_storage.dto.ExpedienteDocumentoResponse;
 import co.edu.ufps.legal_cases.file_storage.dto.FileDownloadResponse;
 import co.edu.ufps.legal_cases.file_storage.dto.FileResponse;
 import co.edu.ufps.legal_cases.file_storage.dto.FileUploadCompletionRequest;
@@ -21,12 +24,18 @@ import co.edu.ufps.legal_cases.file_storage.dto.FileUploadRequest;
 import co.edu.ufps.legal_cases.file_storage.dto.FileUploadResponse;
 import co.edu.ufps.legal_cases.file_storage.model.FileResourceType;
 import co.edu.ufps.legal_cases.file_storage.service.FileResourceService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 /** API de archivos orientada a recursos del dominio, no a rutas del bucket. */
 @RestController
 @RequestMapping("/api")
 @PreAuthorize("isAuthenticated()")
+@Tag(name = "Archivos", description = "Operaciones de carga, descarga y consulta documental agregada del expediente")
 public class FileResourceController {
 
     private final FileResourceService fileResourceService;
@@ -88,6 +97,52 @@ public class FileResourceController {
     @GetMapping("/conciliaciones/{conciliacionId}/archivos")
     public List<FileResponse> listarArchivosConciliacion(@PathVariable Long conciliacionId) {
         return fileResourceService.list(FileResourceType.CONCILIACION, conciliacionId, null);
+    }
+
+    @PostMapping("/procesos/{procesoId}/archivos/uploads")
+    @Operation(summary = "Iniciar carga de archivo para un proceso")
+    public FileUploadResponse iniciarCargaProceso(
+            @PathVariable Long procesoId,
+            @Valid @RequestBody FileUploadRequest request) {
+        return fileResourceService.initiate(
+                FileResourceType.PROCESO, procesoId, null, request);
+    }
+
+    @GetMapping("/procesos/{procesoId}/archivos")
+    @Operation(summary = "Listar archivos de un proceso")
+    public List<FileResponse> listarArchivosProceso(@PathVariable Long procesoId) {
+        return fileResourceService.list(FileResourceType.PROCESO, procesoId, null);
+    }
+
+    @GetMapping("/consultas/{consultaId}/expediente/archivos")
+    @Operation(
+            summary = "Consultar expediente documental agregado",
+            description = "Deriva y consolida en una sola vista todos los documentos del expediente: "
+                    + "CONSULTA, SEGUIMIENTO, RESPUESTA, PROCESO y CONCILIACION, con filtros opcionales de tipo, origen, autor y fecha.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Listado documental del expediente obtenido correctamente"),
+            @ApiResponse(responseCode = "400", description = "Filtro de fechas u otro parámetro inválido"),
+            @ApiResponse(responseCode = "401", description = "Usuario no autenticado"),
+            @ApiResponse(responseCode = "403", description = "Usuario sin permiso para acceder a consultas"),
+            @ApiResponse(responseCode = "404", description = "Consulta inexistente o fuera del alcance autorizado")
+    })
+    public List<ExpedienteDocumentoResponse> listarArchivosExpediente(
+            @Parameter(description = "ID de la consulta raíz del expediente", required = true)
+            @PathVariable Long consultaId,
+            @Parameter(description = "Filtro opcional por tipo documental específico (ej. CONSULTA_ANEXO, PROCESO_DOCUMENTO)")
+            @RequestParam(required = false) String tipoDocumental,
+            @Parameter(description = "Filtro opcional por tipo de recurso (CONSULTA, SEGUIMIENTO, RESPUESTA, PROCESO, CONCILIACION)")
+            @RequestParam(required = false) String resourceType,
+            @Parameter(description = "Filtro opcional por origen (CARGA_USUARIO, SISTEMA, MIGRADO)")
+            @RequestParam(required = false) String origen,
+            @Parameter(description = "Filtro opcional por autor (ID numérico o username/email)")
+            @RequestParam(required = false) String autor,
+            @Parameter(description = "Fecha inicial de creación (formato YYYY-MM-DD)")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
+            @Parameter(description = "Fecha final de creación (formato YYYY-MM-DD)")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta) {
+        return fileResourceService.listExpedienteFiles(
+                consultaId, tipoDocumental, resourceType, origen, autor, fechaDesde, fechaHasta);
     }
 
     @PostMapping("/file-uploads/{uploadId}/complete")
