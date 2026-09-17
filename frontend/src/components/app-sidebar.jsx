@@ -209,15 +209,21 @@ export function AppSidebar({ mainItems = [], footerItems = [] }) {
             {/* USER */}
             <SidebarMenuItem className="mt-6">
               <div className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-sidebar-accent/70">
-
-                <div className="flex items-center gap-3 min-w-0">
+                      
+                <button
+                  type="button"
+                  onClick={() => handleSubmit({ path: "/mi-perfil" })}
+                  title="Mi Perfil"
+                  aria-label="Ir a Mi Perfil"
+                  className="flex min-w-0 items-center gap-3 rounded-lg text-left transition hover:opacity-90"
+                >
                   <Avatar className="size-9 shrink-0">
                     <AvatarImage src="https://github.com/shadcn.png" />
                     <AvatarFallback>
                       {name?.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-
+                      
                   <div className="flex flex-col text-sm leading-tight text-sidebar-foreground min-w-0">
                     <span className="font-medium truncate">
                       {name}
@@ -226,8 +232,8 @@ export function AppSidebar({ mainItems = [], footerItems = [] }) {
                       {email}
                     </span>
                   </div>
-                </div>
-
+                </button>
+                      
                 <button
                   type="button"
                   onClick={handleLogout}
