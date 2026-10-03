@@ -66,7 +66,7 @@ export function ActualizarContactoForm({ perfil, onUpdated }) {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" aria-busy={isSubmitting}>
+    <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-4" aria-busy={isSubmitting}>
       <FormInput
         name="email"
         label="Correo electrónico"

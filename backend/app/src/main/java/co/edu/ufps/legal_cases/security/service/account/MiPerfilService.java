@@ -4,6 +4,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import co.edu.ufps.legal_cases.audit.aop.log.Auditable;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.security.dto.account.ActualizarContactoDTO;
 import co.edu.ufps.legal_cases.security.dto.account.MiPerfilDTO;
@@ -40,6 +41,10 @@ public class MiPerfilService {
         return miPerfilMapper.convertirADTO(usuario, contacto);
     }
 
+    @Auditable(
+            action = "ACTUALIZAR_CONTACTO_PROPIO",
+            entityName = "UsuarioSistema",
+            entityId = "#result.username")
     @Transactional
     public MiPerfilDTO actualizarContacto(ActualizarContactoDTO dto) {
         UsuarioSistema usuario = usuarioActualService.obtenerUsuarioActual();
