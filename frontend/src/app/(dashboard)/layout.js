@@ -34,6 +34,7 @@ const ROUTE_INFO = {
   "/recepcion": { breadcrumb: "Panel / Personas", title: "Registro de Persona" },
   "/roles": { breadcrumb: "Sistema / Usuarios", title: "Crear Usuario del Sistema" },
   "/tareas": { breadcrumb: "Control Tareas", title: "Organización de tareas y seguimiento de proyectos" },
+  "/mi-perfil": { breadcrumb: "Panel / Usuario", title: "Mi Perfil" },
 }
 
 export default function DashboardLayout({ children }) {

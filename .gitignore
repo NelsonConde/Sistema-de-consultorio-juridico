@@ -39,3 +39,4 @@ Thumbs.db
 # Runtime uploads
 uploads/
 backend/app/uploads/
+branch_structure.json

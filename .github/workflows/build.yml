@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - develop
+      - staging
+      - main
       - feature/**
       - bugfix/**
       - hotfix/**
@@ -11,6 +13,8 @@ on:
   pull_request:
     branches:
       - develop
+      - staging
+      - main
 
 jobs:
   backend:
