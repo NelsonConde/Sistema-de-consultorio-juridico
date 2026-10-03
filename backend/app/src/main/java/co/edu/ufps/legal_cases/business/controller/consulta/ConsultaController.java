@@ -9,12 +9,17 @@ import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.CAMBIAR_ES
 
 import java.util.List;
 
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaBusquedaDTO;
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaDTO;
+import co.edu.ufps.legal_cases.business.dto.consulta.ficha.FichaExpedienteDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.business.service.consulta.ConsultaService;
 import jakarta.validation.Valid;
@@ -45,6 +50,24 @@ public class ConsultaController {
     @PreAuthorize("hasAnyAuthority('" + VER_CONSULTAS + "', '" + GESTIONAR_CONSULTAS + "')")
     public ConsultaDTO obtenerPorId(@PathVariable Long id) {
         return consultaService.obtenerPorId(id);
+    }
+
+    @GetMapping("/{id}/ficha")
+    @PreAuthorize("hasAnyAuthority('" + VER_CONSULTAS + "', '" + GESTIONAR_CONSULTAS + "')")
+    public FichaExpedienteDTO obtenerFichaExpediente(@PathVariable Long id) {
+        return consultaService.obtenerFichaExpediente(id);
+    }
+
+    @GetMapping(value = {"/{id}/pdf", "/{id}/ficha-pdf"}, produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAnyAuthority('" + VER_CONSULTAS + "', '" + GESTIONAR_CONSULTAS + "')")
+    public ResponseEntity<byte[]> descargarFichaPdf(@PathVariable Long id) {
+        byte[] pdf = consultaService.generarFichaPdf(id);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(
+                ContentDisposition.attachment().filename("ficha-expediente-" + id + ".pdf").build());
+        headers.setContentLength(pdf.length);
+        return new ResponseEntity<>(pdf, headers, HttpStatus.OK);
     }
 
     @PostMapping

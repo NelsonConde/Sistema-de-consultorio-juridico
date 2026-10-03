@@ -10,6 +10,9 @@ import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.business.service.consulta.consulta.ConsultaCommandService;
 import co.edu.ufps.legal_cases.business.service.consulta.consulta.ConsultaQueryService;
 
+import co.edu.ufps.legal_cases.business.dto.consulta.ficha.FichaExpedienteDTO;
+import co.edu.ufps.legal_cases.business.service.consulta.pdf.FichaExpedienteService;
+
 // Fachada del módulo de consultas.
 // El controller entra por aquí, pero lectura y escritura quedan separadas por responsabilidad.
 @Service
@@ -17,12 +20,15 @@ public class ConsultaService {
 
     private final ConsultaQueryService consultaQueryService;
     private final ConsultaCommandService consultaCommandService;
+    private final FichaExpedienteService fichaExpedienteService;
 
     public ConsultaService(
             ConsultaQueryService consultaQueryService,
-            ConsultaCommandService consultaCommandService) {
+            ConsultaCommandService consultaCommandService,
+            FichaExpedienteService fichaExpedienteService) {
         this.consultaQueryService = consultaQueryService;
         this.consultaCommandService = consultaCommandService;
+        this.fichaExpedienteService = fichaExpedienteService;
     }
 
     public List<ConsultaBusquedaDTO> buscarParaUsuarioActual(String search) {
@@ -68,5 +74,13 @@ public class ConsultaService {
 
     public ConsultaDTO desarchivar(Long id, Long version) {
         return consultaCommandService.desarchivar(id, version);
+    }
+
+    public FichaExpedienteDTO obtenerFichaExpediente(Long id) {
+        return fichaExpedienteService.consolidarFichaExpediente(id);
+    }
+
+    public byte[] generarFichaPdf(Long id) {
+        return fichaExpedienteService.generarFichaPdf(id);
     }
 }
