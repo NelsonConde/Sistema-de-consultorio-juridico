@@ -24,6 +24,7 @@ import { RotateCcw, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PERMISOS } from "@/lib/permission";
 import { tieneTodosLosPermisos } from "@/lib/authz";
+import { useDebouncedPageSearch } from "@/hooks/useDebouncedValue";
 
 const SECCIONES = [
   {
@@ -199,6 +200,10 @@ export function EliminacionForm() {
   const [itemAReactivar, setItemAReactivar] = useState(null);
   const [paginaActual, setPaginaActual] = useState(1);
   const [registrosPorPagina, setRegistrosPorPagina] = useState(10);
+  const [totalRemoto, setTotalRemoto] = useState(0);
+  const [paginasRemotas, setPaginasRemotas] = useState(0);
+  const [autorizado, setAutorizado] = useState(false);
+  const busquedaAplicada = useDebouncedPageSearch(busqueda, setPaginaActual, 350);
   const router = useRouter();
 
   const seccion = useMemo(() => {
@@ -275,7 +280,7 @@ export function EliminacionForm() {
         return;
       }
 
-      await cargarTodo();
+      setAutorizado(true);
     } catch {
 
       router.replace("/");
@@ -284,55 +289,42 @@ export function EliminacionForm() {
     }
   }
 
+  useEffect(() => {
+    if (autorizado) cargarTodo();
+  }, [autorizado, seccionActiva, paginaActual, registrosPorPagina, busquedaAplicada]);
+
   async function cargarTodo() {
     try {
       setLoading(true);
 
-      const resultados = {};
-
-      await Promise.all(
-        SECCIONES.map(async (item) => {
-          try {
-            const res = await apiClient.request(`${API_URL_BASE}${item.endpoint}`, {
-              credentials: "include",
-            });
-
-            if (res.status === 401) {
-              toast.error("La sesión expiró");
-              resultados[item.id] = [];
-              return;
-            }
-
-            if (res.status === 403) {
-              resultados[item.id] = [];
-              return;
-            }
-
-            if (!res.ok) {
-              resultados[item.id] = [];
-              return;
-            }
-
-            const json = await res.json();
-
-            if (item.id === "personas" && !Array.isArray(json)) {
-              // Pagination handling.
-              // Pagination handling.
-              // List and table handling.
-
-              resultados[item.id] = [];
-              return;
-            }
-
-            resultados[item.id] = Array.isArray(json) ? json : [];
-          } catch {
-
-            resultados[item.id] = [];
-          }
-        })
-      );
-
-      setData(resultados);
+      const item = SECCIONES.find((section) => section.id === seccionActiva);
+      const archivadas = item.tipo === "consulta";
+      const endpoint = item.id === "personas" ? "/personas/inactivos" : item.endpoint;
+      const params = new URLSearchParams();
+      if (!archivadas) {
+        params.set("page", String(paginaActual));
+        params.set("size", String(registrosPorPagina));
+        if (item.id !== "personas") {
+          params.set("activo", "false");
+          params.set("sortBy", "id");
+          params.set("direction", "asc");
+        }
+        if (busquedaAplicada.trim()) params.set("search", busquedaAplicada.trim());
+      }
+      const url = `${API_URL_BASE}${endpoint}${params.size ? `?${params}` : ""}`;
+      const res = await apiClient.request(url, { credentials: "include" });
+      if (!res.ok) throw new Error("No fue posible cargar los registros desactivados.");
+      const json = await res.json();
+      const content = archivadas ? (Array.isArray(json) ? json : []) : json?.content;
+      if (!Array.isArray(content)) throw new Error("Respuesta de listado inválida.");
+      setData((prev) => ({ ...prev, [item.id]: content }));
+      setTotalRemoto(archivadas ? 0 : Number(json.totalElements) || 0);
+      setPaginasRemotas(archivadas ? 0 : Number(json.totalPages) || 0);
+    } catch (error) {
+      toast.error(error.message || "No fue posible cargar los registros.");
+      setData((prev) => ({ ...prev, [seccionActiva]: [] }));
+      setTotalRemoto(0);
+      setPaginasRemotas(0);
     } finally {
       setLoading(false);
     }
@@ -384,8 +376,13 @@ export function EliminacionForm() {
 
   async function reactivarActivo(endpoint, item) {
     const id = item?.id;
+    const detalle = endpoint === "/personas"
+      ? await apiClient.request(`${API_URL_BASE}/personas/${id}`, { credentials: "include" })
+      : null;
+    if (detalle && !detalle.ok) throw new Error("No se pudo consultar la versión de la persona.");
+    const version = detalle ? requireResourceVersion(await detalle.json(), "registro de persona") : null;
     const url = endpoint === "/personas"
-      ? `${API_URL_BASE}${endpoint}/${id}/reactivar?version=${encodeURIComponent(String(requireResourceVersion(item, "registro de persona")))}`
+      ? `${API_URL_BASE}${endpoint}/${id}/reactivar?version=${encodeURIComponent(String(version))}`
       : `${API_URL_BASE}${endpoint}/${id}/activo?activo=true`;
 
     const res = await apiClient.request(url, {
@@ -420,11 +417,12 @@ export function EliminacionForm() {
     }
   }
 
-  const totalSeccion = itemsActuales.length;
-  const totalPaginas = getTotalPages(totalSeccion, registrosPorPagina);
+  const esArchivadas = seccionActiva === "consultas";
+  const totalSeccion = esArchivadas ? itemsActuales.length : totalRemoto;
+  const totalPaginas = esArchivadas ? getTotalPages(totalSeccion, registrosPorPagina) : paginasRemotas;
   const itemsPaginados = useMemo(
-    () => paginateItems(itemsActuales, paginaActual, registrosPorPagina),
-    [itemsActuales, paginaActual, registrosPorPagina]
+    () => esArchivadas ? paginateItems(itemsActuales, paginaActual, registrosPorPagina) : itemsActuales,
+    [itemsActuales, paginaActual, registrosPorPagina, esArchivadas]
   );
 
   useEffect(() => {
@@ -432,7 +430,7 @@ export function EliminacionForm() {
   }, [seccionActiva, busqueda, registrosPorPagina]);
 
   useEffect(() => {
-    if (paginaActual > totalPaginas) {
+    if (totalPaginas > 0 && paginaActual > totalPaginas) {
       setPaginaActual(totalPaginas);
     }
   }, [paginaActual, totalPaginas]);
@@ -475,7 +473,7 @@ export function EliminacionForm() {
               >
                 {item.titulo}
                 <span className="ml-2 rounded-full bg-background/20 px-2 py-0.5 text-xs">
-                  {total}
+                  {item.id === seccionActiva ? totalSeccion : (data[item.id] ? total : "—")}
                 </span>
               </button>
             );

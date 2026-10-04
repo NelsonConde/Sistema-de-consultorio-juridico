@@ -8,6 +8,7 @@ import { API_URL_BASE } from "@/lib/config";
 import { PERMISOS } from "@/lib/permission";
 import { tieneAlgunPermiso } from "@/lib/authz";
 import { apiEnviar, apiGet } from "./procesos.service";
+import { RemotePagedSelect } from "@/components/forms/parts/RemotePagedSelect";
 
 const PERMISOS_PROCESOS = {
   VER_PROCESOS: PERMISOS.VER_PROCESOS || "Ver procesos",
@@ -97,117 +98,19 @@ function normalizarPayload(form) {
   };
 }
 
-// Search behavior.
-function ModalBuscarConsulta({ abierto, consultas, busqueda, setBusqueda, onSeleccionar, onCerrar, consultaIdSeleccionada }) {
-  if (!abierto) return null;
-
-  const consultasFiltradas = busqueda.trim()
-    ? consultas.filter((c) => labelConsulta(c).toLowerCase().includes(busqueda.trim().toLowerCase()))
-    : consultas;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-background rounded-xl border shadow-lg w-full max-w-lg mx-4 p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Seleccionar Consulta</h3>
-          <button
-            type="button"
-            onClick={onCerrar}
-            className="text-muted-foreground hover:text-foreground text-xl"
-          >
-            ✕
-          </button>
-        </div>
-
-        <input
-          autoFocus
-          type="text"
-          placeholder="Buscar por #id, descripción, persona o cédula..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        />
-
-        <div className="max-h-72 overflow-y-auto space-y-1">
-          {consultasFiltradas.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-4">Sin resultados</p>
-          ) : (
-            consultasFiltradas.map((consulta) => {
-              const id = consulta.id || consulta.consultaId;
-              const marcado = String(consultaIdSeleccionada) === String(id);
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => onSeleccionar(consulta)}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted transition-colors ${marcado ? "bg-primary/10 text-primary font-medium" : ""
-                    }`}
-                >
-                  <div className="font-medium">
-                    #{id} — {consulta.consulta || consulta.descripcion || consulta.hechos || "Sin descripción"}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {[consulta.nombre, consulta.apellido].filter(Boolean).join(" ")}
-                    {consulta.cedula ? ` · ${consulta.cedula}` : ""}
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // Modal behavior.
 function CampoConsulta({ label, consultaId, consultas, onSeleccionar, required }) {
-  const [modalAbierto, setModalAbierto] = useState(false);
-  const [busqueda, setBusqueda] = useState("");
-
-  const consultaSeleccionada = useMemo(
-    () => consultas.find((c) => String(c.id || c.consultaId) === String(consultaId)) || null,
-    [consultas, consultaId]
-  );
-
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium">
-        {label}{required && " *"}
-      </label>
-
-      <button
-        type="button"
-        onClick={() => { setBusqueda(""); setModalAbierto(true); }}
-        className={`flex h-9 w-full items-center justify-between rounded-lg border bg-background px-3 text-sm text-left hover:bg-muted/50 transition-colors ${!consultaSeleccionada ? "text-muted-foreground" : ""
-          }`}
-      >
-        <span className="truncate">
-          {consultaSeleccionada
-            ? `#${consultaSeleccionada.id || consultaSeleccionada.consultaId} — ${consultaSeleccionada.consulta ||
-            consultaSeleccionada.descripcion ||
-            consultaSeleccionada.hechos ||
-            "Sin descripción"
-            }`
-            : "Buscar consulta..."}
-        </span>
-        <span className="text-muted-foreground ml-2 flex-shrink-0">▼</span>
-      </button>
-
-      <ModalBuscarConsulta
-        abierto={modalAbierto}
-        consultas={consultas}
-        busqueda={busqueda}
-        setBusqueda={setBusqueda}
-        consultaIdSeleccionada={consultaId}
-        onSeleccionar={(c) => {
-          onSeleccionar(String(c.id || c.consultaId));
-          setModalAbierto(false);
-          setBusqueda("");
-        }}
-        onCerrar={() => { setModalAbierto(false); setBusqueda(""); }}
+    <RemotePagedSelect
+        label={label}
+        value={consultaId}
+        selectedLabel={consultas.find((c) => String(c.id) === String(consultaId))?.consulta || ""}
+        onChange={(id) => onSeleccionar(String(id))}
+        endpoint="/consultas"
+        resourceName="consultas"
+        getOptionLabel={labelConsulta}
+        required={required}
       />
-    </div>
   );
 }
 
@@ -264,7 +167,6 @@ export function NuevoProcesoForm() {
   const [departamentos, setDepartamentos] = useState([]);
   const [organosControl, setOrganosControl] = useState([]);
   const [especialidades, setEspecialidades] = useState([]);
-  const [consultas, setConsultas] = useState([]);
 
   const puedeGestionar = puedeGestionarProcesos(user);
 
@@ -274,17 +176,6 @@ export function NuevoProcesoForm() {
       (e) => Number(e.organoControlId) === Number(form.organoControlId)
     );
   }, [especialidades, form.organoControlId]);
-
-  const consultasOperativas = useMemo(() =>
-    consultas.filter((consulta) => {
-      const estado = String(consulta?.estado || consulta?.estadoConsulta || "")
-        .trim()
-        .toUpperCase();
-      return estado !== "CERRADO" && estado !== "CERRADA"
-        && estado !== "ARCHIVADO" && estado !== "ARCHIVADA";
-    }),
-    [consultas]
-  );
 
   useEffect(() => { verificarYCargar(); }, []);
 
@@ -313,23 +204,20 @@ export function NuevoProcesoForm() {
         return;
       }
 
-      const consultasPermitidas = puedeCargarConsultas(usuarioActual);
       const catalogosPermitidos = puedeCargarCatalogos(usuarioActual);
 
-      const [departamentosRes, organosRes, especialidadesRes, consultasRes] =
+      const [departamentosRes, organosRes, especialidadesRes] =
         await Promise.allSettled([
           catalogosPermitidos ? apiGet(`${API_URL_BASE}/departamentos`) : Promise.resolve([]),
           catalogosPermitidos ? apiGet(`${API_URL_BASE}/organos-control`) : Promise.resolve([]),
           catalogosPermitidos ? apiGet(`${API_URL_BASE}/especialidades`) : Promise.resolve([]),
-          consultasPermitidas ? apiGet(`${API_URL_BASE}/consultas`) : Promise.resolve([]),
         ]);
 
       if (departamentosRes.status === "fulfilled") setDepartamentos(ordenarActivosPrimero(extraerLista(departamentosRes.value)));
       if (organosRes.status === "fulfilled") setOrganosControl(ordenarActivosPrimero(extraerLista(organosRes.value)));
       if (especialidadesRes.status === "fulfilled") setEspecialidades(ordenarActivosPrimero(extraerLista(especialidadesRes.value)));
-      if (consultasRes.status === "fulfilled") setConsultas(extraerLista(consultasRes.value));
 
-      const errores = [departamentosRes, organosRes, especialidadesRes, consultasRes]
+      const errores = [departamentosRes, organosRes, especialidadesRes]
         .filter((r) => r.status === "rejected").map((r) => r.reason?.message).filter(Boolean);
       if (errores.length > 0) toast.error(errores[0]);
     } catch (error) {
@@ -454,7 +342,7 @@ export function NuevoProcesoForm() {
             <CampoConsulta
               label="Consulta"
               consultaId={form.consultaId}
-              consultas={consultasOperativas}
+              consultas={[]}
               onSeleccionar={(v) => actualizarCampo("consultaId", v)}
               required
             />

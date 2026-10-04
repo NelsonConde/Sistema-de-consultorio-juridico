@@ -216,6 +216,11 @@ public class SeguimientoAccessService {
         return usuarioActualService.obtenerUsuarioActualId();
     }
 
+    @Transactional(readOnly = true)
+    public PerfilUsuarioActual obtenerPerfilActual() {
+        return usuarioActualService.obtenerPerfilActual();
+    }
+
     private Seguimiento obtenerSeguimiento(Long seguimientoId) {
         if (seguimientoId == null) {
             throw new BusinessException("El id del seguimiento es obligatorio");
@@ -229,5 +234,10 @@ public class SeguimientoAccessService {
         if (!usuarioActualService.tienePermiso(permiso)) {
             throw new AccessDeniedException("No tiene el permiso requerido: " + permiso);
         }
+    }
+
+
+    public boolean usuarioEsAdministrador() {
+        return usuarioActualService.esRolAdministrador();
     }
 }

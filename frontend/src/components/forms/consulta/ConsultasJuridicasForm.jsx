@@ -35,7 +35,7 @@ import {
 } from "@/lib/personasApi";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import Pagination from "@/components/ui/Pagination";
-import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems } from "@/lib/list-utils";
+import { DEFAULT_PAGE_SIZE_OPTIONS } from "@/lib/list-utils";
 
 import { ESTADOS_CONSULTA, VACIOS } from "./consultas-juridicas.constants";
 import {
@@ -50,7 +50,6 @@ import {
   obtenerAreaIdAsesor,
   obtenerArrayDesdeRespuesta,
   obtenerAsesorIdEstudiante,
-  ordenarConsultasPorIdAscendente,
   textoNormalizado,
   textoVacio,
   validarCoherenciaConsultaFrontend,
@@ -63,8 +62,14 @@ export function ConsultasJuridicasForm() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [searchAplicado, setSearchAplicado] = useState("");
   const [paginaActual, setPaginaActual] = useState(1);
   const [registrosPorPagina, setRegistrosPorPagina] = useState(10);
+  const [totalRegistros, setTotalRegistros] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(0);
+  const [sortBy, setSortBy] = useState("fecha");
+  const [direction, setDirection] = useState("desc");
+  const [errorLista, setErrorLista] = useState("");
 
   const [mostrarFormEdicion, setMostrarFormEdicion] = useState(false);
   const [idEditando, setIdEditando] = useState(null);
@@ -424,19 +429,34 @@ export function ConsultasJuridicasForm() {
     );
   }
 
-  const rowsOrdenadas = useMemo(() => ordenarConsultasPorIdAscendente(rows), [rows]);
-  const totalPaginas = getTotalPages(rowsOrdenadas.length, registrosPorPagina);
-  const rowsPaginadas = useMemo(
-    () => paginateItems(rowsOrdenadas, paginaActual, registrosPorPagina),
-    [rowsOrdenadas, paginaActual, registrosPorPagina]
-  );
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setPaginaActual(1);
+      setSearchAplicado(searchText.trim());
+    }, 350);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchText]);
 
   useEffect(() => {
-    setPaginaActual(1);
-  }, [searchText, registrosPorPagina]);
+    if (!user) return;
+
+    const controller = new AbortController();
+
+    cargarConsultas({
+      search: searchAplicado,
+      page: paginaActual,
+      size: registrosPorPagina,
+      sortBy,
+      direction,
+      signal: controller.signal,
+    });
+
+    return () => controller.abort();
+  }, [user, searchAplicado, paginaActual, registrosPorPagina, sortBy, direction]);
 
   useEffect(() => {
-    if (paginaActual > totalPaginas) {
+    if (totalPaginas > 0 && paginaActual > totalPaginas) {
       setPaginaActual(totalPaginas);
     }
   }, [paginaActual, totalPaginas]);
@@ -473,7 +493,6 @@ export function ConsultasJuridicasForm() {
         }
 
         setUser(usuarioActual);
-        await cargarConsultas();
         await cargarCatalogos();
       } catch {
         router.replace("/");
@@ -505,15 +524,30 @@ export function ConsultasJuridicasForm() {
     } else { setTipos([]); }
   }, [form.temaId]);
 
-  async function cargarConsultas(search = "") {
+  async function cargarConsultas({
+    search = "",
+    page = 1,
+    size = 10,
+    sortBy: sortField = "fecha",
+    direction: sortDirection = "desc",
+    signal,
+  } = {}) {
     setLoading(true);
+    setErrorLista("");
 
-    const url = construirUrlConsultas(search);
+    const url = construirUrlConsultas({
+      search,
+      page,
+      size,
+      sortBy: sortField,
+      direction: sortDirection,
+    });
 
     try {
       const { response: res, data: payload, correlationId } = await apiResponse(url, {
         method: "GET",
         credentials: "include",
+        signal,
       });
 
       if (res.status === 401) {
@@ -522,49 +556,69 @@ export function ConsultasJuridicasForm() {
       }
 
       if (res.status === 403) {
-        toast.error("No tienes permisos para ver estas consultas.", {
-          description: withErrorReference(
-            "El acceso a este listado fue denegado.",
-            correlationId
-          ),
-        });
-        router.replace("/inicio");
+        setRows([]);
+        setTotalRegistros(0);
+        setTotalPaginas(0);
+        setErrorLista("No tienes permisos para ver estas consultas.");
         return;
       }
 
       if (!res.ok) {
-        const mensaje = mensajeErrorDesdeRespuesta(
-          payload,
-          "Error cargando consultas"
-        );
-
-        toast.error(`Error ${res.status} cargando consultas`, {
-          description: withErrorReference(mensaje, correlationId),
-        });
-
+        const mensaje = mensajeErrorDesdeRespuesta(payload, "Error cargando consultas");
         setRows([]);
+        setTotalRegistros(0);
+        setTotalPaginas(0);
+        setErrorLista(withErrorReference(mensaje, correlationId));
         return;
       }
 
-      const consultas = obtenerArrayDesdeRespuesta(payload)
-        .map(normalizarConsultaFila)
-        .filter(
-          (consulta) =>
-            consulta.id !== "" &&
-            consulta.id !== null &&
-            consulta.id !== undefined
-        );
+      if (!payload || !Array.isArray(payload.content)) {
+        throw new Error("Respuesta paginada de consultas inválida");
+      }
 
-      setRows(ordenarConsultasPorIdAscendente(consultas));
-    } catch {
-      toast.error("Error de conexión cargando consultas", {
-        description: "No se pudo conectar con el servidor.",
-      });
+      const responsePage = Number(payload.page);
+      const responseSize = Number(payload.size);
+      const responseTotalElements = Number(payload.totalElements);
+      const responseTotalPages = Number(payload.totalPages);
+
+      if (
+        !Number.isInteger(responsePage) || responsePage < 1 ||
+        !Number.isInteger(responseSize) || responseSize < 1 || responseSize > 50 ||
+        !Number.isFinite(responseTotalElements) || responseTotalElements < 0 ||
+        !Number.isInteger(responseTotalPages) || responseTotalPages < 0
+      ) {
+        throw new Error("Contrato paginado de consultas inválido");
+      }
+
+      setRows(payload.content.map(normalizarConsultaFila));
+      setTotalRegistros(responseTotalElements);
+      setTotalPaginas(responseTotalPages);
+
+      if (responsePage !== paginaActual) {
+        setPaginaActual(responsePage);
+      }
+    } catch (error) {
+      if (error?.name === "AbortError") return;
 
       setRows([]);
+      setTotalRegistros(0);
+      setTotalPaginas(0);
+      setErrorLista(error?.message || "No se pudo conectar con el servidor.");
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
+  }
+
+  function recargarConsultasActuales() {
+    return cargarConsultas({
+      search: searchAplicado,
+      page: paginaActual,
+      size: registrosPorPagina,
+      sortBy,
+      direction,
+    });
   }
 
   async function cargarCatalogos() {
@@ -655,6 +709,16 @@ export function ConsultasJuridicasForm() {
         toast.error("No tienes permisos para abrir esta consulta.", {
           description: withErrorReference(
             "El acceso al detalle fue denegado.",
+            correlationId
+          ),
+        });
+        return;
+      }
+
+      if (res.status === 404) {
+        toast.error("El recurso no está disponible para consulta.", {
+          description: withErrorReference(
+            "No fue posible acceder al detalle solicitado.",
             correlationId
           ),
         });
@@ -850,7 +914,7 @@ export function ConsultasJuridicasForm() {
         setResultadoGuardado(form.resultado ?? "");
         toast.success("Consulta actualizada");
         setMostrarFormEdicion(false);
-        cargarConsultas(searchText);
+        recargarConsultasActuales();
       } else {
         toast.error("Error al guardar", {
           description: withErrorReference(
@@ -938,7 +1002,7 @@ export function ConsultasJuridicasForm() {
       if (res.ok) {
         toast.success("Estado de la consulta actualizado");
         setMostrarFormEdicion(false);
-        cargarConsultas(searchText);
+        recargarConsultasActuales();
       } else {
         toast.error("Error al cambiar el estado", {
           description: withErrorReference(
@@ -1000,13 +1064,13 @@ export function ConsultasJuridicasForm() {
             correlationId
           ),
         });
-        await cargarConsultas(searchText);
+        await recargarConsultasActuales();
         return;
       }
 
       if (res.ok) {
         toast.success("Consulta archivada");
-        cargarConsultas(searchText);
+        recargarConsultasActuales();
       } else {
         toast.error("Error al archivar", {
           description: withErrorReference(
@@ -1061,23 +1125,50 @@ export function ConsultasJuridicasForm() {
     <>
       <div className="space-y-6">
         {/* SEARCH */}
-        <div className="flex gap-3 items-end">
-          <div className="flex-1 space-y-1">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="min-w-[260px] flex-1 space-y-1">
             <label className="text-sm font-medium">Buscar consulta</label>
-            <input value={searchText} onChange={e => setSearchText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  cargarConsultas(searchText);
-                }
-              }}
+            <input
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
               placeholder="Nombre, apellido, cédula o descripción..."
               className="w-full rounded-md border px-3 py-2 text-sm"
             />
           </div>
-          <Button onClick={() => cargarConsultas(searchText)} disabled={loading}>
-            {loading ? "Buscando..." : "Buscar"}
-          </Button>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Ordenar por</label>
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                setSortBy(e.target.value);
+                setPaginaActual(1);
+              }}
+              className="rounded-md border bg-background px-3 py-2 text-sm"
+            >
+              <option value="fecha">Fecha</option>
+              <option value="consulta">Consulta</option>
+              <option value="nombre">Nombre</option>
+              <option value="apellido">Apellido</option>
+              <option value="cedula">Cédula</option>
+              <option value="estado">Estado</option>
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Dirección</label>
+            <select
+              value={direction}
+              onChange={(e) => {
+                setDirection(e.target.value);
+                setPaginaActual(1);
+              }}
+              className="rounded-md border bg-background px-3 py-2 text-sm"
+            >
+              <option value="desc">Descendente</option>
+              <option value="asc">Ascendente</option>
+            </select>
+          </div>
         </div>
 
         {/* Form handling.*/}
@@ -1283,9 +1374,15 @@ export function ConsultasJuridicasForm() {
               </tr>
             </thead>
             <tbody>
-              {rowsOrdenadas.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-8 text-sm text-muted-foreground">{loading ? "Cargando..." : "Sin resultados. Usa el buscador o crea una nueva consulta."}</td></tr>
-              ) : rowsPaginadas.map(row => (
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="text-center py-8 text-sm text-muted-foreground">
+                    {loading
+                      ? "Cargando..."
+                      : errorLista || "Sin resultados. Usa el buscador o crea una nueva consulta."}
+                  </td>
+                </tr>
+              ) : rows.map(row => (
                 <tr key={row.id} className="border-t hover:bg-muted/50 transition-colors">
                   <td className="px-4 py-3 text-sm">{row.id}</td>
                   <td className="px-4 py-3 text-sm max-w-[200px] truncate" title={row.consulta}>{row.consulta}</td>
@@ -1342,7 +1439,7 @@ export function ConsultasJuridicasForm() {
             setPaginaActual(1);
           }}
           pageSizeOptions={DEFAULT_PAGE_SIZE_OPTIONS}
-          totalItems={rowsOrdenadas.length}
+          totalItems={totalRegistros}
         />
       </div>
 

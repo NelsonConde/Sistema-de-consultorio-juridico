@@ -17,10 +17,11 @@ import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { API_URL_BASE } from "@/lib/config"
-import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog"
 import Pagination from "@/components/ui/Pagination"
 import { FormFileUpload } from "@/components/forms/parts/FormFileUpload"
-import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils"
+import { DEFAULT_PAGE_SIZE_OPTIONS } from "@/lib/list-utils"
+import { useDebouncedPageSearch } from "@/hooks/useDebouncedValue"
+import { fetchPaged, isAbortError } from "@/lib/pagedApi"
 import { normalizar } from "@/lib/authz"
 import {
   apiRequestData,
@@ -38,7 +39,6 @@ import {
 } from "./seguimientos.constants"
 import {
   accionPermitidaPorRegistro,
-  esEstudiante,
   puedeAccederTareasUsuario,
   puedeCargarCategoriasUsuario,
   puedeCrearTarea,
@@ -62,7 +62,6 @@ import {
   obtenerFechaTarea,
   obtenerIdTarea,
   obtenerTextoTarea,
-  ordenarPorFechaDesc,
   seguimientoEstaVencido,
   seguimientoPermiteOperaciones,
   textoAccionRespuesta,
@@ -81,7 +80,25 @@ export function SeguimientosForm() {
   const [respuestasPorTarea, setRespuestasPorTarea] = useState({})
   const [pendientesRevision, setPendientesRevision] = useState([])
   const [consultaSeleccionada, setConsultaSeleccionada] = useState(null)
+  const [paginaConsultas, setPaginaConsultas] = useState(1)
+  const [registrosPorPaginaConsultas, setRegistrosPorPaginaConsultas] = useState(10)
+  const [paginaTareas, setPaginaTareas] = useState(1)
+  const [registrosPorPaginaTareas, setRegistrosPorPaginaTareas] = useState(10)
+  const [paginaPendientes, setPaginaPendientes] = useState(1)
+  const [registrosPorPaginaPendientes, setRegistrosPorPaginaPendientes] = useState(5)
   const [busquedaLocal, setBusquedaLocal] = useState(searchQuery)
+  const busquedaConsultasAplicada = useDebouncedPageSearch(busquedaLocal, setPaginaConsultas, 350).trim()
+  const [busquedaTareas, setBusquedaTareas] = useState("")
+  const busquedaTareasAplicada = useDebouncedPageSearch(busquedaTareas, setPaginaTareas, 350).trim()
+  const [estadoTareas, setEstadoTareas] = useState("")
+  const [fechaDesdeTareas, setFechaDesdeTareas] = useState("")
+  const [fechaHastaTareas, setFechaHastaTareas] = useState("")
+  const [sortByTareas, setSortByTareas] = useState("fechaCreacion")
+  const [directionTareas, setDirectionTareas] = useState("desc")
+  const [busquedaPendientes, setBusquedaPendientes] = useState("")
+  const busquedaPendientesAplicada = useDebouncedPageSearch(busquedaPendientes, setPaginaPendientes, 350).trim()
+  const [fechaDesdePendientes, setFechaDesdePendientes] = useState("")
+  const [fechaHastaPendientes, setFechaHastaPendientes] = useState("")
 
   useEffect(() => {
     if (searchQuery) {
@@ -110,12 +127,19 @@ export function SeguimientosForm() {
   const [cargandoArchivosTarea, setCargandoArchivosTarea] = useState({})
   const [tareaAEliminar, setTareaAEliminar] = useState(null)
   const [eliminando, setEliminando] = useState(false)
-  const [paginaConsultas, setPaginaConsultas] = useState(1)
-  const [registrosPorPaginaConsultas, setRegistrosPorPaginaConsultas] = useState(10)
-  const [paginaTareas, setPaginaTareas] = useState(1)
-  const [registrosPorPaginaTareas, setRegistrosPorPaginaTareas] = useState(10)
-  const [paginaPendientes, setPaginaPendientes] = useState(1)
-  const [registrosPorPaginaPendientes, setRegistrosPorPaginaPendientes] = useState(5)
+  const [totalConsultas, setTotalConsultas] = useState(0)
+  const [totalPaginasConsultas, setTotalPaginasConsultas] = useState(0)
+  const [totalTareas, setTotalTareas] = useState(0)
+  const [totalPaginasTareas, setTotalPaginasTareas] = useState(0)
+  const [totalPendientes, setTotalPendientes] = useState(0)
+  const [totalPaginasPendientes, setTotalPaginasPendientes] = useState(0)
+  const [loadingConsultas, setLoadingConsultas] = useState(false)
+  const [loadingPendientes, setLoadingPendientes] = useState(false)
+  const [errorConsultas, setErrorConsultas] = useState("")
+  const [errorTareas, setErrorTareas] = useState("")
+  const [errorPendientes, setErrorPendientes] = useState("")
+  const [reloadTareas, setReloadTareas] = useState(0)
+  const [reloadPendientes, setReloadPendientes] = useState(0)
 
   const {
     register,
@@ -136,37 +160,89 @@ export function SeguimientosForm() {
   const puedeResponder = useMemo(() => puedeResponderTarea(user), [user])
   const puedeRevisar = useMemo(() => puedeRevisarRespuestas(user), [user])
   const puedeVerAlertas = useMemo(() => puedeVerAlertasDisciplinarias(user), [user])
-  const usuarioEstudiante = useMemo(() => esEstudiante(user), [user])
-
-  const consultasFiltradas = useMemo(() => {
-    const texto = busquedaLocal.trim().toLowerCase()
-
-    const filtradas = !texto
-      ? consultas
-      : consultas.filter((consulta) =>
-      [
-        consulta.id,
-        consulta.consulta,
-        consulta.descripcion,
-        consulta.hechos,
-        consulta.fecha,
-        consulta.nombre,
-        consulta.apellido,
-        consulta.cedula,
-        consulta.documento,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(texto)
-    )
-
-    return sortByIdAsc(filtradas)
-  }, [consultas, busquedaLocal])
 
   useEffect(() => {
     cargarInicial()
   }, [])
+
+  useEffect(() => {
+    if (!user || !puedeVerConsultasUsuario(user)) return undefined
+    const controller = new AbortController()
+
+    async function cargarConsultasRemotas() {
+      setLoadingConsultas(true)
+      setErrorConsultas("")
+      try {
+        const page = await fetchPaged("/consultas", {
+          search: busquedaConsultasAplicada,
+          page: paginaConsultas,
+          size: registrosPorPaginaConsultas,
+          sortBy: "fecha",
+          direction: "desc",
+          signal: controller.signal,
+          resourceName: "consultas",
+        })
+        setConsultas(page.content)
+        setTotalConsultas(page.totalElements)
+        setTotalPaginasConsultas(page.totalPages)
+        if (page.totalPages > 0 && page.page > page.totalPages) setPaginaConsultas(page.totalPages)
+        else if (page.page !== paginaConsultas) setPaginaConsultas(page.page)
+      } catch (error) {
+        if (isAbortError(error)) return
+        if (error?.status === 401) {
+          router.push("/")
+          return
+        }
+        setConsultas([])
+        setTotalConsultas(0)
+        setTotalPaginasConsultas(0)
+        setErrorConsultas(error?.status === 403 ? "No tienes permiso para consultar consultas." : error?.message || "No se pudieron cargar las consultas")
+      } finally {
+        if (!controller.signal.aborted) setLoadingConsultas(false)
+      }
+    }
+
+    cargarConsultasRemotas()
+    return () => controller.abort()
+  }, [user, busquedaConsultasAplicada, paginaConsultas, registrosPorPaginaConsultas, router])
+
+  useEffect(() => {
+    if (!user || !puedeRevisar) return undefined
+    const controller = new AbortController()
+    cargarPendientesRevision(false, controller.signal).catch((error) => {
+      if (!isAbortError(error) && error?.status === 401) router.push("/")
+    })
+    return () => controller.abort()
+  }, [
+    user,
+    puedeRevisar,
+    busquedaPendientesAplicada,
+    paginaPendientes,
+    registrosPorPaginaPendientes,
+    fechaDesdePendientes,
+    fechaHastaPendientes,
+    reloadPendientes,
+    router,
+  ])
+
+  useEffect(() => {
+    const consultaId = consultaSeleccionada?.id || consultaSeleccionada?.consultaId
+    if (!consultaId) return undefined
+    const controller = new AbortController()
+    cargarTareasPorConsulta(consultaId, controller.signal)
+    return () => controller.abort()
+  }, [
+    consultaSeleccionada,
+    busquedaTareasAplicada,
+    estadoTareas,
+    fechaDesdeTareas,
+    fechaHastaTareas,
+    sortByTareas,
+    directionTareas,
+    paginaTareas,
+    registrosPorPaginaTareas,
+    reloadTareas,
+  ])
 
   async function apiRequest(url, options = {}) {
     try {
@@ -247,36 +323,18 @@ export function SeguimientosForm() {
         return
       }
 
-      const consultasPermitidas = puedeVerConsultasUsuario(meData)
       const categoriasPermitidas = puedeCargarCategoriasUsuario(meData)
-      const revisarPermitido = puedeRevisarRespuestas(meData)
 
-      const [categoriasRes, consultasRes, pendientesRes] = await Promise.allSettled([
-        categoriasPermitidas
-          ? fetchLista(
-              `${API_URL_BASE}/seguimientos/categorias/activas`,
-              "No tienes permiso para consultar categorías"
-            )
-          : Promise.resolve([]),
-        consultasPermitidas
-          ? fetchLista(
-              `${API_URL_BASE}/consultas`,
-              "No tienes permiso para consultar consultas"
-            )
-          : Promise.resolve([]),
-        revisarPermitido ? cargarPendientesRevision(false) : Promise.resolve([]),
-      ])
-
-      if (categoriasRes.status === "fulfilled") setCategorias(categoriasRes.value)
-      if (consultasRes.status === "fulfilled") setConsultas(sortByIdAsc(consultasRes.value))
-      if (pendientesRes.status === "fulfilled") setPendientesRevision(sortByIdAsc(pendientesRes.value))
-
-      const errorCarga = [categoriasRes, consultasRes, pendientesRes].find(
-        (item) => item.status === "rejected"
-      )
-
-      if (errorCarga) {
-        toast.error(errorCarga.reason?.message || "No se pudo cargar toda la información")
+      if (categoriasPermitidas) {
+        try {
+          const categoriasData = await fetchLista(
+            `${API_URL_BASE}/seguimientos/categorias/activas`,
+            "No tienes permiso para consultar categorías"
+          )
+          setCategorias(categoriasData)
+        } catch (error) {
+          toast.error(error?.message || "No se pudieron cargar las categorías")
+        }
       }
     } catch (error) {
       toast.error("Error cargando datos", {
@@ -290,31 +348,42 @@ export function SeguimientosForm() {
     }
   }
 
-  async function cargarPendientesRevision(mostrarToast = true) {
+  async function cargarPendientesRevision(mostrarToast = true, signal) {
     try {
-      const data = await apiRequest(`${API_URL_BASE}/seguimientos/respuestas/pendientes`)
-      const pendientes = extraerLista(data)
-
-      if (mostrarToast) {
-        toast.success("Pendientes actualizados")
-      }
-
-      pendientes.forEach((respuesta) => {
-        if (respuesta.seguimientoId && respuesta.id) {
-          cargarArchivosRespuesta(respuesta.seguimientoId, respuesta.id)
-        }
+      setLoadingPendientes(true)
+      setErrorPendientes("")
+      const page = await fetchPaged("/seguimientos/respuestas/pendientes", {
+        search: busquedaPendientesAplicada,
+        page: paginaPendientes,
+        size: registrosPorPaginaPendientes,
+        sortBy: "fechaCreacion",
+        direction: "desc",
+        filters: { fechaDesde: fechaDesdePendientes, fechaHasta: fechaHastaPendientes },
+        signal,
+        resourceName: "respuestas pendientes",
       })
-
-      return sortByIdAsc(pendientes)
+      setPendientesRevision(page.content)
+      setTotalPendientes(page.totalElements)
+      setTotalPaginasPendientes(page.totalPages)
+      if (page.totalPages > 0 && page.page > page.totalPages) setPaginaPendientes(page.totalPages)
+      else if (page.page !== paginaPendientes) setPaginaPendientes(page.page)
+      if (mostrarToast) toast.success("Pendientes actualizados")
+      return page.content
     } catch (error) {
-      if (mostrarToast) toast.error(error.message || "No se pudieron cargar pendientes")
+      if (isAbortError(error)) return []
+      setPendientesRevision([])
+      setTotalPendientes(0)
+      setTotalPaginasPendientes(0)
+      setErrorPendientes(error?.status === 403 ? "No tienes permiso para revisar respuestas pendientes." : error?.message || "No se pudieron cargar pendientes")
+      if (mostrarToast && error?.status !== 403) toast.error(error?.message || "No se pudieron cargar pendientes")
       throw error
+    } finally {
+      if (!signal?.aborted) setLoadingPendientes(false)
     }
   }
 
   async function refrescarPendientesRevision() {
-    const pendientes = await cargarPendientesRevision(true)
-    setPendientesRevision(sortByIdAsc(pendientes))
+    setReloadPendientes((value) => value + 1)
   }
 
   async function cargarRespuestasPorSeguimiento(seguimientoId) {
@@ -327,12 +396,6 @@ export function SeguimientosForm() {
         [seguimientoId]: respuestas,
       }))
 
-      respuestas.forEach((respuesta) => {
-        if (respuesta.id) {
-          cargarArchivosRespuesta(seguimientoId, respuesta.id)
-        }
-      })
-
       return respuestas
     } catch {
 
@@ -344,32 +407,42 @@ export function SeguimientosForm() {
     }
   }
 
-  async function cargarTareasPorConsulta(consultaId) {
+  async function cargarTareasPorConsulta(consultaId, signal) {
+    if (!consultaId) return []
     try {
       setLoadingTareas(true)
-      setRespuestasPorTarea({})
-      setArchivosPorTarea({})
-
-      const endpoint = usuarioEstudiante
-        ? `${API_URL_BASE}/seguimientos/consulta/${consultaId}/visibles-estudiante`
-        : `${API_URL_BASE}/seguimientos/consulta/${consultaId}`
-
-      const tareasData = await fetchLista(
-        endpoint,
-        "No tienes permisos para consultar las tareas"
-      )
-
-      setTareas(sortByIdAsc(tareasData))
-
-      await Promise.allSettled([
-        ...tareasData.map((item) => cargarRespuestasPorSeguimiento(obtenerIdTarea(item))),
-        ...tareasData.map((item) => cargarArchivosTarea(obtenerIdTarea(item))),
-      ])
+      setErrorTareas("")
+      const page = await fetchPaged("/seguimientos", {
+        search: busquedaTareasAplicada,
+        page: paginaTareas,
+        size: registrosPorPaginaTareas,
+        sortBy: sortByTareas,
+        direction: directionTareas,
+        filters: {
+          consultaId,
+          estado: estadoTareas,
+          fechaDesde: fechaDesdeTareas,
+          fechaHasta: fechaHastaTareas,
+        },
+        signal,
+        resourceName: "seguimientos",
+      })
+      setTareas(page.content)
+      setTotalTareas(page.totalElements)
+      setTotalPaginasTareas(page.totalPages)
+      if (page.totalPages > 0 && page.page > page.totalPages) setPaginaTareas(page.totalPages)
+      else if (page.page !== paginaTareas) setPaginaTareas(page.page)
+      return page.content
     } catch (error) {
-
-      toast.error(error.message || "Error cargando tareas")
+      if (isAbortError(error)) return []
+      setTareas([])
+      setTotalTareas(0)
+      setTotalPaginasTareas(0)
+      setErrorTareas(error?.status === 403 ? "No tienes permiso para consultar los seguimientos." : error?.message || "Error cargando tareas")
+      if (error?.status === 401) router.push("/")
+      return []
     } finally {
-      setLoadingTareas(false)
+      if (!signal?.aborted) setLoadingTareas(false)
     }
   }
 
@@ -386,7 +459,8 @@ export function SeguimientosForm() {
     setFormTarea(FORM_TAREA_INICIAL)
     setArchivosTarea([])
     reset(FORM_RESPUESTA_INICIAL)
-    await cargarTareasPorConsulta(consulta.id || consulta.consultaId)
+    setPaginaTareas(1)
+    setReloadTareas((value) => value + 1)
   }
 
   function volverAConsultas() {
@@ -421,17 +495,23 @@ export function SeguimientosForm() {
     setArchivosTarea([])
   }
 
-  function editarTarea(tarea) {
-    setTareaEditando(tarea)
-    setFormTarea({
-      categoriaId: obtenerCategoriaIdTarea(tarea),
-      descripcion: obtenerTextoTarea(tarea),
-      fechaEntrega: tarea.fechaEntrega || "",
-      diasNotificacion: tarea.diasNotificacion ?? "",
-      notificarPartes: Boolean(tarea.notificarPartes),
-      alertaDisciplinaria: Boolean(tarea.alertaDisciplinaria),
-      notificarEstudiante: tarea.notificarEstudiante !== false,
-    })
+  async function editarTarea(tarea) {
+    try {
+      const seguimientoId = obtenerIdTarea(tarea)
+      const detalleTarea = await apiRequest(`${API_URL_BASE}/seguimientos/${seguimientoId}`)
+      setTareaEditando(detalleTarea)
+      setFormTarea({
+        categoriaId: obtenerCategoriaIdTarea(detalleTarea),
+        descripcion: obtenerTextoTarea(detalleTarea),
+        fechaEntrega: detalleTarea.fechaEntrega || "",
+        diasNotificacion: detalleTarea.diasNotificacion ?? "",
+        notificarPartes: Boolean(detalleTarea.notificarPartes),
+        alertaDisciplinaria: Boolean(detalleTarea.alertaDisciplinaria),
+        notificarEstudiante: detalleTarea.notificarEstudiante !== false,
+      })
+    } catch (error) {
+      toast.error(error?.status === 404 ? "El seguimiento no está disponible para consulta." : error?.message || "No se pudo cargar el seguimiento")
+    }
   }
 
   async function guardarTarea(event) {
@@ -634,7 +714,7 @@ export function SeguimientosForm() {
     }
   }
 
-  function abrirRespuesta(tarea) {
+  async function abrirRespuesta(tarea) {
     if (!consultaPermiteOperaciones(consultaSeleccionada)) {
       toast.error("No se puede responder una tarea de una consulta cerrada o archivada")
       return
@@ -646,7 +726,10 @@ export function SeguimientosForm() {
     }
 
     const seguimientoId = obtenerIdTarea(tarea)
-    const ultima = ultimaRespuesta(respuestasPorTarea[seguimientoId] || [])
+    const respuestas = Object.prototype.hasOwnProperty.call(respuestasPorTarea, seguimientoId)
+      ? respuestasPorTarea[seguimientoId]
+      : await cargarRespuestasPorSeguimiento(seguimientoId)
+    const ultima = ultimaRespuesta(respuestas || [])
     const accion = getAccionRespuesta(ultima, puedeResponder)
 
     if (accion === "SOLO_LECTURA" || accion === "NINGUNA") return
@@ -1148,53 +1231,6 @@ export function SeguimientosForm() {
     )
   }
 
-  const tareasOrdenadas = useMemo(() => sortByIdAsc(tareas), [tareas])
-  const pendientesOrdenados = useMemo(() => sortByIdAsc(pendientesRevision), [pendientesRevision])
-
-  const totalPaginasConsultas = getTotalPages(consultasFiltradas.length, registrosPorPaginaConsultas)
-  const consultasPaginadas = useMemo(
-    () => paginateItems(consultasFiltradas, paginaConsultas, registrosPorPaginaConsultas),
-    [consultasFiltradas, paginaConsultas, registrosPorPaginaConsultas]
-  )
-
-  const totalPaginasTareas = getTotalPages(tareasOrdenadas.length, registrosPorPaginaTareas)
-  const tareasPaginadas = useMemo(
-    () => paginateItems(tareasOrdenadas, paginaTareas, registrosPorPaginaTareas),
-    [tareasOrdenadas, paginaTareas, registrosPorPaginaTareas]
-  )
-
-  const totalPaginasPendientes = getTotalPages(pendientesOrdenados.length, registrosPorPaginaPendientes)
-  const pendientesPaginados = useMemo(
-    () => paginateItems(pendientesOrdenados, paginaPendientes, registrosPorPaginaPendientes),
-    [pendientesOrdenados, paginaPendientes, registrosPorPaginaPendientes]
-  )
-
-  useEffect(() => {
-    setPaginaConsultas(1)
-  }, [busquedaLocal, registrosPorPaginaConsultas])
-
-  useEffect(() => {
-    if (paginaConsultas > totalPaginasConsultas) {
-      setPaginaConsultas(totalPaginasConsultas)
-    }
-  }, [paginaConsultas, totalPaginasConsultas])
-
-  useEffect(() => {
-    setPaginaTareas(1)
-  }, [consultaSeleccionada, registrosPorPaginaTareas])
-
-  useEffect(() => {
-    if (paginaTareas > totalPaginasTareas) {
-      setPaginaTareas(totalPaginasTareas)
-    }
-  }, [paginaTareas, totalPaginasTareas])
-
-  useEffect(() => {
-    if (paginaPendientes > totalPaginasPendientes) {
-      setPaginaPendientes(totalPaginasPendientes)
-    }
-  }, [paginaPendientes, totalPaginasPendientes])
-
   if (loading) {
     return <div className="text-center py-10">Cargando tareas...</div>
   }
@@ -1213,13 +1249,48 @@ export function SeguimientosForm() {
             </Button>
           </div>
 
-          {pendientesOrdenados.length === 0 ? (
+          <div className="grid gap-2 md:grid-cols-3">
+            <input
+              value={busquedaPendientes}
+              onChange={(event) => setBusquedaPendientes(event.target.value)}
+              placeholder="Buscar respuesta pendiente..."
+              className="h-9 rounded-md border bg-background px-3 text-sm"
+            />
+            <input
+              type="date"
+              value={fechaDesdePendientes}
+              onChange={(event) => {
+                setFechaDesdePendientes(event.target.value)
+                setPaginaPendientes(1)
+              }}
+              className="h-9 rounded-md border bg-background px-3 text-sm"
+              aria-label="Pendientes desde"
+            />
+            <input
+              type="date"
+              value={fechaHastaPendientes}
+              onChange={(event) => {
+                setFechaHastaPendientes(event.target.value)
+                setPaginaPendientes(1)
+              }}
+              className="h-9 rounded-md border bg-background px-3 text-sm"
+              aria-label="Pendientes hasta"
+            />
+          </div>
+
+          {errorPendientes && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {errorPendientes}
+            </div>
+          )}
+
+          {pendientesRevision.length === 0 ? (
             <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-              No hay respuestas pendientes por revisar.
+              {loadingPendientes ? "Cargando respuestas pendientes..." : "No hay respuestas pendientes por revisar."}
             </div>
           ) : (
             <div className="space-y-3">
-              {pendientesPaginados.map((respuesta) => (
+              {pendientesRevision.map((respuesta) => (
                 <div key={respuesta.id} className="rounded-lg border bg-background p-4 space-y-3">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div className="space-y-2">
@@ -1269,7 +1340,7 @@ export function SeguimientosForm() {
                   setPaginaPendientes(1)
                 }}
                 pageSizeOptions={DEFAULT_PAGE_SIZE_OPTIONS}
-                totalItems={pendientesOrdenados.length}
+                totalItems={totalPendientes}
               />
             </div>
           )}
@@ -1292,6 +1363,12 @@ export function SeguimientosForm() {
             className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
 
+          {errorConsultas && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {errorConsultas}
+            </div>
+          )}
+
           <div className="overflow-hidden rounded-lg border">
             <table className="w-full text-sm">
               <thead className="bg-muted">
@@ -1307,14 +1384,14 @@ export function SeguimientosForm() {
               </thead>
 
               <tbody>
-                {consultasFiltradas.length === 0 ? (
+                {consultas.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
-                      No hay consultas para mostrar.
+                      {loadingConsultas ? "Cargando consultas..." : "No hay consultas para mostrar."}
                     </td>
                   </tr>
                 ) : (
-                  consultasPaginadas.map((consulta) => (
+                  consultas.map((consulta) => (
                     <tr
                       key={consulta.id || consulta.consultaId}
                       onClick={() => seleccionarConsulta(consulta)}
@@ -1364,7 +1441,7 @@ export function SeguimientosForm() {
               setPaginaConsultas(1)
             }}
             pageSizeOptions={DEFAULT_PAGE_SIZE_OPTIONS}
-            totalItems={consultasFiltradas.length}
+            totalItems={totalConsultas}
           />
         </div>
       )}
@@ -1538,29 +1615,119 @@ export function SeguimientosForm() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => cargarTareasPorConsulta(consultaSeleccionada.id || consultaSeleccionada.consultaId)}
+                onClick={() => setReloadTareas((value) => value + 1)}
                 disabled={loadingTareas}
               >
                 Actualizar
               </Button>
             </div>
 
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-6">
+              <input
+                value={busquedaTareas}
+                onChange={(event) => setBusquedaTareas(event.target.value)}
+                placeholder="Buscar seguimiento..."
+                className="h-9 rounded-md border bg-background px-3 text-sm md:col-span-2"
+              />
+              <select
+                value={estadoTareas}
+                onChange={(event) => {
+                  setEstadoTareas(event.target.value)
+                  setPaginaTareas(1)
+                }}
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+              >
+                <option value="">Todos los estados</option>
+                {ESTADOS_SEGUIMIENTO.map((estado) => (
+                  <option key={estado.value || estado} value={estado.value || estado}>
+                    {estado.label || textoEstadoSeguimiento(estado)}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="date"
+                value={fechaDesdeTareas}
+                onChange={(event) => {
+                  setFechaDesdeTareas(event.target.value)
+                  setPaginaTareas(1)
+                }}
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+                aria-label="Seguimientos desde"
+              />
+              <input
+                type="date"
+                value={fechaHastaTareas}
+                onChange={(event) => {
+                  setFechaHastaTareas(event.target.value)
+                  setPaginaTareas(1)
+                }}
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+                aria-label="Seguimientos hasta"
+              />
+              <div className="flex gap-2">
+                <select
+                  value={sortByTareas}
+                  onChange={(event) => {
+                    setSortByTareas(event.target.value)
+                    setPaginaTareas(1)
+                  }}
+                  className="h-9 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm"
+                >
+                  <option value="fechaCreacion">Fecha creación</option>
+                  <option value="fechaEntrega">Fecha entrega</option>
+                  <option value="estado">Estado</option>
+                  <option value="categoria">Categoría</option>
+                  <option value="autor">Autor</option>
+                  <option value="id">ID</option>
+                </select>
+                <select
+                  value={directionTareas}
+                  onChange={(event) => {
+                    setDirectionTareas(event.target.value)
+                    setPaginaTareas(1)
+                  }}
+                  className="h-9 rounded-md border bg-background px-2 text-sm"
+                  aria-label="Orden seguimientos"
+                >
+                  <option value="desc">Desc</option>
+                  <option value="asc">Asc</option>
+                </select>
+              </div>
+            </div>
+
+            {errorTareas && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {errorTareas}
+              </div>
+            )}
+
             {loadingTareas ? (
               <div className="rounded-lg border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
                 Cargando tareas...
               </div>
-            ) : tareasOrdenadas.length === 0 ? (
+            ) : tareas.length === 0 ? (
               <div className="rounded-lg border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
                 No hay tareas registradas para esta consulta.
               </div>
             ) : (
               <div className="space-y-3">
-                {tareasPaginadas.map((tarea) => {
+                {tareas.map((tarea) => {
                   const seguimientoId = obtenerIdTarea(tarea)
+                  const respuestasCargadas = Object.prototype.hasOwnProperty.call(
+                    respuestasPorTarea,
+                    seguimientoId
+                  )
                   const respuestas = respuestasPorTarea[seguimientoId] || []
                   const ultima = ultimaRespuesta(respuestas)
-                  const accionRespuesta = getAccionRespuesta(ultima, puedeResponder)
-                  const mostrarBotonRespuesta = consultaPermiteOperaciones(consultaSeleccionada) && seguimientoPermiteOperaciones(tarea) && ["RESPONDER", "EDITAR", "RESPONDER_NUEVAMENTE"].includes(accionRespuesta)
+                  const accionRespuesta = respuestasCargadas
+                    ? getAccionRespuesta(ultima, puedeResponder)
+                    : null
+                  const mostrarBotonRespuesta =
+                    consultaPermiteOperaciones(consultaSeleccionada) &&
+                    seguimientoPermiteOperaciones(tarea) &&
+                    puedeResponder &&
+                    (!respuestasCargadas ||
+                      ["RESPONDER", "EDITAR", "RESPONDER_NUEVAMENTE"].includes(accionRespuesta))
                   const puedeOperarConsulta = consultaPermiteOperaciones(consultaSeleccionada)
                   const puedeOperarSeguimiento = seguimientoPermiteOperaciones(tarea)
                   const puedeEditarRegistro = puedeOperarConsulta && puedeOperarSeguimiento && accionPermitidaPorRegistro(tarea, "puedeEditar", puedeEditar)
@@ -1644,13 +1811,26 @@ export function SeguimientosForm() {
                             </Button>
                           )}
 
+                          {!respuestasCargadas && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => cargarRespuestasPorSeguimiento(seguimientoId)}
+                            >
+                              Ver respuestas
+                            </Button>
+                          )}
+
                           {mostrarBotonRespuesta && (
                             <Button
                               type="button"
                               size="sm"
                               onClick={() => abrirRespuesta(tarea)}
                             >
-                              {textoAccionRespuesta(accionRespuesta)}
+                              {respuestasCargadas
+                                ? textoAccionRespuesta(accionRespuesta)
+                                : "Gestionar respuesta"}
                             </Button>
                           )}
                         </div>
@@ -1717,7 +1897,7 @@ export function SeguimientosForm() {
               </div>
             )}
 
-            {tareasOrdenadas.length > 0 && (
+            {tareas.length > 0 && (
               <Pagination
                 currentPage={paginaTareas}
                 totalPages={totalPaginasTareas}
@@ -1728,7 +1908,7 @@ export function SeguimientosForm() {
                   setPaginaTareas(1)
                 }}
                 pageSizeOptions={DEFAULT_PAGE_SIZE_OPTIONS}
-                totalItems={tareasOrdenadas.length}
+                totalItems={totalTareas}
               />
             )}
           </div>

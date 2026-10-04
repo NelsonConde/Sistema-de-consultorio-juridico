@@ -5,8 +5,10 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import co.edu.ufps.legal_cases.business.dto.perfil.EstudianteDTO;
+import co.edu.ufps.legal_cases.business.dto.perfil.EstudianteResumenDTO;
 import co.edu.ufps.legal_cases.business.service.perfil.estudiante.EstudianteCommandService;
 import co.edu.ufps.legal_cases.business.service.perfil.estudiante.EstudianteQueryService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
 // Fachada del módulo de estudiantes.
 // El controller entra por aquí, pero lectura y escritura quedan separadas por responsabilidad.
@@ -21,6 +23,16 @@ public class EstudianteService {
             EstudianteCommandService estudianteCommandService) {
         this.estudianteQueryService = estudianteQueryService;
         this.estudianteCommandService = estudianteCommandService;
+    }
+
+    public PageResponseDTO<EstudianteResumenDTO> buscar(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction,
+            Boolean activo) {
+        return estudianteQueryService.buscar(search, page, size, sortBy, direction, activo);
     }
 
     public List<EstudianteDTO> listar() {

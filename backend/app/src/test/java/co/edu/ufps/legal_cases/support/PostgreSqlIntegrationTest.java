@@ -13,6 +13,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class PostgreSqlIntegrationTest {
 
+    @SuppressWarnings("resource")
     @Container
     protected static final PostgreSQLContainer POSTGRESQL =
             new PostgreSQLContainer("postgres:16-alpine")

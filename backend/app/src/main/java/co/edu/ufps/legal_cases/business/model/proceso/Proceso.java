@@ -1,5 +1,7 @@
 package co.edu.ufps.legal_cases.business.model.proceso;
 
+import java.time.LocalDateTime;
+
 import co.edu.ufps.legal_cases.business.model.catalogo.Departamento;
 import co.edu.ufps.legal_cases.business.model.consulta.Consulta;
 import jakarta.persistence.Column;
@@ -56,6 +58,9 @@ public class Proceso {
     @JoinColumn(name = "especialidad_id")
     private Especialidad especialidad;
 
+    @Column(name = "fecha_creacion", nullable = false, updatable = false)
+    private LocalDateTime fechaCreacion;
+
     // Estado real del resultado del proceso.
     // No reemplaza activo; activo sigue siendo borrado lógico.
     @Enumerated(EnumType.STRING)
@@ -66,7 +71,19 @@ public class Proceso {
     private Boolean activo = true;
 
     @PrePersist
+    private void prepararPersistencia() {
+        if (fechaCreacion == null) {
+            fechaCreacion = LocalDateTime.now();
+        }
+
+        normalizarValoresPorDefecto();
+    }
+
     @PreUpdate
+    private void prepararActualizacion() {
+        normalizarValoresPorDefecto();
+    }
+
     private void normalizarValoresPorDefecto() {
         if (estado == null) {
             estado = EstadoProceso.PENDIENTE;

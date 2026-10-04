@@ -1,12 +1,10 @@
 package co.edu.ufps.legal_cases.business.service.perfil.estudiante;
 
 import java.io.IOException;
-import java.lang.IllegalArgumentException;
 
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import co.edu.ufps.legal_cases.business.dto.perfil.EstudianteDTO;
@@ -201,11 +199,14 @@ public class EstudianteExcelService {
             return null;
         }
 
-        cell.setCellType(CellType.STRING);
+        DataFormatter formatter = new DataFormatter();
 
-        return cell
-                .getStringCellValue()
-                .trim();
+        return switch (cell.getCellType()) {
+            case STRING -> cell.getStringCellValue().trim();
+            case NUMERIC -> formatter.formatCellValue(cell).trim();
+            case BOOLEAN -> Boolean.toString(cell.getBooleanCellValue()).trim();
+            default -> cell.toString().trim();
+        };
     }
 
     private Long getLong(Cell cell) {

@@ -6,15 +6,17 @@ import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.EDITAR_USU
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.GESTIONAR_USUARIOS;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_ESTUDIANTES;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_PERFILES_AUXILIARES;
+
+import co.edu.ufps.legal_cases.business.dto.perfil.EstudianteResumenDTO;
 import co.edu.ufps.legal_cases.business.dto.perfil.ImportacionEstudiantesDTO;
 import co.edu.ufps.legal_cases.business.service.perfil.estudiante.EstudianteExcelService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.ResponseEntity;
 
@@ -40,8 +42,14 @@ public class EstudianteController {
     // Administrador ve todos; asesor ve solo sus estudiantes.
     @GetMapping
     @PreAuthorize("hasAnyAuthority('" + VER_ESTUDIANTES + "', '" + VER_PERFILES_AUXILIARES + "', '" + GESTIONAR_USUARIOS + "')")
-    public List<EstudianteDTO> listar() {
-        return estudianteService.listar();
+    public PageResponseDTO<EstudianteResumenDTO> buscar(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) Boolean activo) {
+        return estudianteService.buscar(search, page, size, sortBy, direction, activo);
     }
 
     // Solo activos con el mismo alcance del listado general.

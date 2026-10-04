@@ -64,6 +64,15 @@ public class PersonaController {
         return personaService.listarActivos(search, page, size);
     }
 
+    @GetMapping("/inactivos")
+    @PreAuthorize("hasAnyAuthority('" + VER_PERSONAS + "', '" + GESTIONAR_PERSONAS + "')")
+    public PersonaPageResponseDTO listarInactivos(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return personaService.listarInactivos(search, page, size);
+    }
+
     @PatchMapping("/{id}/desactivar")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('" + CAMBIAR_ESTADO_PERSONAS + "', '" + GESTIONAR_PERSONAS + "')")

@@ -3,7 +3,9 @@ package co.edu.ufps.legal_cases.business.service.perfil.asesor;
 import org.springframework.stereotype.Component;
 
 import co.edu.ufps.legal_cases.business.dto.perfil.AsesorDTO;
+import co.edu.ufps.legal_cases.business.dto.perfil.AsesorResumenDTO;
 import co.edu.ufps.legal_cases.business.model.perfil.Asesor;
+import co.edu.ufps.legal_cases.business.repository.perfil.AsesorResumenProjection;
 
 @Component
 public class AsesorMapper {
@@ -38,6 +40,24 @@ public class AsesorMapper {
                         : null);
 
         dto.setActivo(asesor.getActivo());
+
+        return dto;
+    }
+
+    public AsesorResumenDTO convertirAResumenDTO(AsesorResumenProjection asesor) {
+        AsesorResumenDTO dto = new AsesorResumenDTO();
+
+        dto.setId(asesor.getId());
+        dto.setNombre(asesor.getNombre());
+        dto.setDocumento(asesor.getDocumento());
+        dto.setEmail(asesor.getEmail());
+        dto.setUsuario(asesor.getUsuario());
+        dto.setCodigo(asesor.getCodigo());
+        dto.setActivo(asesor.getActivo());
+        dto.setAreaId(asesor.getAreaId());
+        dto.setAreaNombre(asesor.getAreaNombre());
+        dto.setSedeId(asesor.getSedeId());
+        dto.setSedeNombre(asesor.getSedeNombre());
 
         return dto;
     }

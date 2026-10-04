@@ -1,5 +1,7 @@
 package co.edu.ufps.legal_cases.business.repository.perfil;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import java.util.List;
 import java.util.Optional;
 
@@ -54,4 +56,45 @@ public interface MonitorRepository extends JpaRepository<Monitor, Long> {
             """)
     Optional<SeguimientoDestinatarioDTO> findDestinatarioByUsuarioSistemaId(
             @Param("usuarioSistemaId") Long usuarioSistemaId);
+
+
+    @Query(value = """
+            SELECT m.id AS id,
+                   m.nombre AS nombre,
+                   m.documento AS documento,
+                   m.email AS email,
+                   m.usuario AS usuario,
+                   m.codigo AS codigo,
+                   m.activo AS activo,
+                   sede.id AS sedeId,
+                   sede.nombre AS sedeNombre
+            FROM Monitor m
+            JOIN m.sede sede
+            WHERE (
+                    CAST(:search AS String) IS NULL
+                    OR LOWER(m.nombre) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(m.documento) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(m.email) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(m.usuario) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(m.codigo) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+              )
+              AND (:activo IS NULL OR m.activo = :activo)
+            """, countQuery = """
+            SELECT COUNT(m.id)
+            FROM Monitor m
+            JOIN m.sede sede
+            WHERE (
+                    CAST(:search AS String) IS NULL
+                    OR LOWER(m.nombre) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(m.documento) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(m.email) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(m.usuario) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(m.codigo) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+              )
+              AND (:activo IS NULL OR m.activo = :activo)
+            """)
+    Page<MonitorResumenProjection> buscarResumenPaginado(
+            @Param("search") String search,
+            @Param("activo") Boolean activo,
+            Pageable pageable);
 }

@@ -30,6 +30,10 @@ public class PersonaService {
         return personaQueryService.listarActivos(search, page, size);
     }
 
+    public PersonaPageResponseDTO listarInactivos(String search, int page, int size) {
+        return personaQueryService.listarInactivos(search, page, size);
+    }
+
     public PersonaDTO obtenerPorId(Long id) {
         return personaQueryService.obtenerPorId(id);
     }

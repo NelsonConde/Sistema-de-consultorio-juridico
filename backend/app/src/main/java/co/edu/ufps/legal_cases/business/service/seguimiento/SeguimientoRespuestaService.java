@@ -1,5 +1,6 @@
 package co.edu.ufps.legal_cases.business.service.seguimiento;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -9,6 +10,7 @@ import co.edu.ufps.legal_cases.business.dto.seguimiento.respuesta.SeguimientoRes
 import co.edu.ufps.legal_cases.business.dto.seguimiento.respuesta.SeguimientoRespuestaResponseDTO;
 import co.edu.ufps.legal_cases.business.service.seguimiento.respuesta.SeguimientoRespuestaCommandService;
 import co.edu.ufps.legal_cases.business.service.seguimiento.respuesta.SeguimientoRespuestaQueryService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
 @Service
 public class SeguimientoRespuestaService {
@@ -31,8 +33,22 @@ public class SeguimientoRespuestaService {
         return seguimientoRespuestaQueryService.listarPorSeguimiento(seguimientoId);
     }
 
-    public List<SeguimientoRespuestaResponseDTO> listarPendientes() {
-        return seguimientoRespuestaQueryService.listarPendientes();
+    public PageResponseDTO<SeguimientoRespuestaResponseDTO> listarPendientes(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction,
+            LocalDate fechaDesde,
+            LocalDate fechaHasta) {
+        return seguimientoRespuestaQueryService.listarPendientes(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                fechaDesde,
+                fechaHasta);
     }
 
     public SeguimientoRespuestaResponseDTO crear(Long seguimientoId, SeguimientoRespuestaRequestDTO dto) {

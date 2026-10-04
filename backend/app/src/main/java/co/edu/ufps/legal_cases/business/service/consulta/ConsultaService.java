@@ -1,6 +1,8 @@
 package co.edu.ufps.legal_cases.business.service.consulta;
 
 import java.util.List;
+import co.edu.ufps.legal_cases.business.dto.consulta.ficha.FichaExpedienteDTO;
+import co.edu.ufps.legal_cases.business.service.consulta.pdf.FichaExpedienteService;
 
 import org.springframework.stereotype.Service;
 
@@ -9,9 +11,7 @@ import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.business.service.consulta.consulta.ConsultaCommandService;
 import co.edu.ufps.legal_cases.business.service.consulta.consulta.ConsultaQueryService;
-
-import co.edu.ufps.legal_cases.business.dto.consulta.ficha.FichaExpedienteDTO;
-import co.edu.ufps.legal_cases.business.service.consulta.pdf.FichaExpedienteService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
 // Fachada del módulo de consultas.
 // El controller entra por aquí, pero lectura y escritura quedan separadas por responsabilidad.
@@ -31,8 +31,28 @@ public class ConsultaService {
         this.fichaExpedienteService = fichaExpedienteService;
     }
 
-    public List<ConsultaBusquedaDTO> buscarParaUsuarioActual(String search) {
-        return consultaQueryService.buscarParaUsuarioActual(search);
+    public PageResponseDTO<ConsultaBusquedaDTO> buscarParaUsuarioActual(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction,
+            Long areaId,
+            EstadoConsulta estado,
+            Long asesorId,
+            Long monitorId,
+            Long estudianteId) {
+        return consultaQueryService.buscarParaUsuarioActual(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                areaId,
+                estado,
+                asesorId,
+                monitorId,
+                estudianteId);
     }
 
     // Se conserva temporalmente para compatibilidad interna si alguna clase lo usa.
@@ -75,7 +95,6 @@ public class ConsultaService {
     public ConsultaDTO desarchivar(Long id, Long version) {
         return consultaCommandService.desarchivar(id, version);
     }
-
     public FichaExpedienteDTO obtenerFichaExpediente(Long id) {
         return fichaExpedienteService.consolidarFichaExpediente(id);
     }

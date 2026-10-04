@@ -5,8 +5,10 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import co.edu.ufps.legal_cases.business.dto.perfil.AsesorDTO;
+import co.edu.ufps.legal_cases.business.dto.perfil.AsesorResumenDTO;
 import co.edu.ufps.legal_cases.business.service.perfil.asesor.AsesorCommandService;
 import co.edu.ufps.legal_cases.business.service.perfil.asesor.AsesorQueryService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
 @Service
 public class AsesorService {
@@ -23,8 +25,14 @@ public class AsesorService {
 
     // Fachada del módulo de asesores.
     // El controller entra por aquí, pero lectura y escritura quedan separadas por responsabilidad.
-    public List<AsesorDTO> listar() {
-        return asesorQueryService.listar();
+    public PageResponseDTO<AsesorResumenDTO> buscar(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction,
+            Boolean activo) {
+        return asesorQueryService.buscar(search, page, size, sortBy, direction, activo);
     }
 
     public List<AsesorDTO> listarActivos() {

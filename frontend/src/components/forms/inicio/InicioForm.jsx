@@ -493,9 +493,13 @@ export function InicioForm() {
   const cargarConsultasPendientes = React.useCallback(async () => {
     setCargandoConsultas(true)
     try {
-      const { response: res, data: payload } = await apiResponse(`${API_URL_BASE}/consultas`, { method: "GET" })
-      if (!res.ok) return
-      const lista = obtenerArrayDesdeRespuesta(payload)
+      const estados = ["PENDIENTE", "URGENTE", "EN_PROCESO", "ACTIVO"]
+      const respuestas = await Promise.all(estados.map((estado) =>
+        apiResponse(`${API_URL_BASE}/consultas?estado=${estado}&page=1&size=10`, { method: "GET" })
+      ))
+      const lista = respuestas.flatMap(({ response, data }) =>
+        response.ok && Array.isArray(data?.content) ? data.content : []
+      )
       const pendientes = lista
         .filter((c) => {
           const estado = String(c.estado || "").toUpperCase()
@@ -514,10 +518,10 @@ export function InicioForm() {
   const cargarTareasPendientes = React.useCallback(async () => {
     setCargandoTareas(true)
     try {
-      const { response: resConsultas, data: payload } = await apiResponse(`${API_URL_BASE}/consultas`, { method: "GET" })
+      const { response: resConsultas, data: payload } = await apiResponse(`${API_URL_BASE}/consultas?page=1&size=5`, { method: "GET" })
       if (!resConsultas.ok) { setTareasPendientes([]); return }
 
-      const consultas = obtenerArrayDesdeRespuesta(payload).slice(0, 5)
+      const consultas = Array.isArray(payload?.content) ? payload.content : []
 
       const resultados = await Promise.allSettled(
         consultas.map((c) => {
