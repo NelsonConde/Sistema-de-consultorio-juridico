@@ -1,7 +1,6 @@
 package co.edu.ufps.legal_cases.security.controller.account;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -37,19 +36,22 @@ class MiPerfilControllerTest {
     void setUp() {
         miPerfilService = mock(MiPerfilService.class);
         MiPerfilController controller = new MiPerfilController(miPerfilService);
+
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
 
     @Test
-    @DisplayName("GET /api/mi-perfil retorna 200 con DTO completo y sin filtrar campos sensibles ajenos")
+    @DisplayName("GET /api/mi-perfil retorna 200 con DTO completo y documento enmascarado")
     void obtenerMiPerfil_exitoso() throws Exception {
         MiPerfilDTO dto = new MiPerfilDTO();
+
         dto.setUsername("estudiante.demo");
         dto.setRolNombre("Estudiante Consultorio");
         dto.setTipoPerfil("ESTUDIANTE");
         dto.setNombre("Carlos Perez");
+        dto.setDocumentoEnmascarado("******3456");
         dto.setEmail("carlos@ufps.edu.co");
         dto.setTelefono("+57 300 111 2233");
         dto.setSede("Sede Central");
@@ -64,10 +66,12 @@ class MiPerfilControllerTest {
                 .andExpect(jsonPath("$.rolNombre").value("Estudiante Consultorio"))
                 .andExpect(jsonPath("$.tipoPerfil").value("ESTUDIANTE"))
                 .andExpect(jsonPath("$.nombre").value("Carlos Perez"))
+                .andExpect(jsonPath("$.documentoEnmascarado").value("******3456"))
                 .andExpect(jsonPath("$.email").value("carlos@ufps.edu.co"))
                 .andExpect(jsonPath("$.telefono").value("+57 300 111 2233"))
                 .andExpect(jsonPath("$.sede").value("Sede Central"))
                 .andExpect(jsonPath("$.codigo").value("1150001"))
+                .andExpect(jsonPath("$.documento").doesNotExist())
                 .andExpect(jsonPath("$.password").doesNotExist())
                 .andExpect(jsonPath("$.id").doesNotExist())
                 .andExpect(jsonPath("$.token").doesNotExist());
@@ -77,10 +81,12 @@ class MiPerfilControllerTest {
     @DisplayName("PATCH /api/mi-perfil/contacto con datos válidos retorna 200 y actualiza solo contacto")
     void actualizarContacto_validoRetorna200() throws Exception {
         MiPerfilDTO actualizado = new MiPerfilDTO();
+
         actualizado.setUsername("estudiante.demo");
         actualizado.setRolNombre("Estudiante Consultorio");
         actualizado.setTipoPerfil("ESTUDIANTE");
         actualizado.setNombre("Carlos Perez");
+        actualizado.setDocumentoEnmascarado("******3456");
         actualizado.setEmail("carlos.nuevo@ufps.edu.co");
         actualizado.setTelefono("+57 311 222 3344");
         actualizado.setSede("Sede Central");
@@ -102,13 +108,23 @@ class MiPerfilControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("carlos.nuevo@ufps.edu.co"))
                 .andExpect(jsonPath("$.telefono").value("+57 311 222 3344"))
+                .andExpect(jsonPath("$.documentoEnmascarado").value("******3456"))
                 .andExpect(jsonPath("$.codigo").value("1150001"))
-                .andExpect(jsonPath("$.sede").value("Sede Central"));
+                .andExpect(jsonPath("$.sede").value("Sede Central"))
+                .andExpect(jsonPath("$.documento").doesNotExist());
 
-        ArgumentCaptor<ActualizarContactoDTO> captor = ArgumentCaptor.forClass(ActualizarContactoDTO.class);
+        ArgumentCaptor<ActualizarContactoDTO> captor =
+                ArgumentCaptor.forClass(ActualizarContactoDTO.class);
+
         verify(miPerfilService).actualizarContacto(captor.capture());
-        assertEquals("carlos.nuevo@ufps.edu.co", captor.getValue().getEmail());
-        assertEquals("+57 311 222 3344", captor.getValue().getTelefono());
+
+        assertEquals(
+                "carlos.nuevo@ufps.edu.co",
+                captor.getValue().getEmail());
+
+        assertEquals(
+                "+57 311 222 3344",
+                captor.getValue().getTelefono());
     }
 
     @ParameterizedTest(name = "Email inválido: {0}")
@@ -134,7 +150,8 @@ class MiPerfilControllerTest {
     @Test
     @DisplayName("Email mayor a 120 caracteres es rechazado con 400 Bad Request")
     void actualizarContacto_emailMayor120Retorna400() throws Exception {
-        String emailLargo = "a".repeat(115) + "@prueba.com"; // 127 caracteres
+        String emailLargo = "a".repeat(115) + "@prueba.com";
+
         String jsonPayload = """
                 {
                     "email": "%s",
@@ -175,7 +192,9 @@ class MiPerfilControllerTest {
     @DisplayName("Contacto duplicado lanza BusinessException y retorna 400 sin exponer detalles de BD")
     void actualizarContacto_duplicadoRetorna400() throws Exception {
         when(miPerfilService.actualizarContacto(any(ActualizarContactoDTO.class)))
-                .thenThrow(new BusinessException("El correo o telefono ya esta en uso por otro usuario"));
+                .thenThrow(
+                        new BusinessException(
+                                "El correo o telefono ya esta en uso por otro usuario"));
 
         String jsonPayload = """
                 {
@@ -188,25 +207,30 @@ class MiPerfilControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonPayload))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.mensaje").value("El correo o telefono ya esta en uso por otro usuario"));
+                .andExpect(
+                        jsonPath("$.mensaje")
+                                .value(
+                                        "El correo o telefono ya esta en uso por otro usuario"));
     }
 
     @Test
-    @DisplayName("Protección contra Mass Assignment: payload con atributos protegidos (ID/rol/perfil/documento/código/sede/activo) no altera ningún atributo protegido")
+    @DisplayName("Protección contra Mass Assignment: atributos protegidos no pueden modificarse")
     void actualizarContacto_massAssignmentProtegido() throws Exception {
         MiPerfilDTO dto = new MiPerfilDTO();
+
         dto.setUsername("victima");
         dto.setRolNombre("Rol Estudiante");
         dto.setTipoPerfil("ESTUDIANTE");
         dto.setNombre("Victima Inmutable");
+        dto.setDocumentoEnmascarado("******1234");
         dto.setEmail("nuevo@prueba.local");
         dto.setTelefono("+57 300 123 4567");
         dto.setSede("Sede Central Original");
         dto.setCodigo("COD-ORIGINAL");
 
-        when(miPerfilService.actualizarContacto(any(ActualizarContactoDTO.class))).thenReturn(dto);
+        when(miPerfilService.actualizarContacto(any(ActualizarContactoDTO.class)))
+                .thenReturn(dto);
 
-        // Payload con inyección de atributos protegidos
         String payloadMalicioso = """
                 {
                     "id": 999,
@@ -216,6 +240,7 @@ class MiPerfilControllerTest {
                     "tipoPerfil": "ADMINISTRATIVO",
                     "perfil": "ADMIN",
                     "documento": "99999999",
+                    "documentoEnmascarado": "HACK",
                     "codigo": "HACK-001",
                     "sede": "Sede Hacked",
                     "activo": false,
@@ -231,17 +256,27 @@ class MiPerfilControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("nuevo@prueba.local"))
                 .andExpect(jsonPath("$.telefono").value("+57 300 123 4567"))
+                .andExpect(jsonPath("$.documentoEnmascarado").value("******1234"))
                 .andExpect(jsonPath("$.codigo").value("COD-ORIGINAL"))
                 .andExpect(jsonPath("$.sede").value("Sede Central Original"))
                 .andExpect(jsonPath("$.rolNombre").value("Rol Estudiante"))
-                .andExpect(jsonPath("$.tipoPerfil").value("ESTUDIANTE"));
+                .andExpect(jsonPath("$.tipoPerfil").value("ESTUDIANTE"))
+                .andExpect(jsonPath("$.documento").doesNotExist());
 
-        ArgumentCaptor<ActualizarContactoDTO> captor = ArgumentCaptor.forClass(ActualizarContactoDTO.class);
+        ArgumentCaptor<ActualizarContactoDTO> captor =
+                ArgumentCaptor.forClass(ActualizarContactoDTO.class);
+
         verify(miPerfilService).actualizarContacto(captor.capture());
 
         ActualizarContactoDTO capturado = captor.getValue();
-        assertEquals("nuevo@prueba.local", capturado.getEmail());
-        assertEquals("+57 300 123 4567", capturado.getTelefono());
+
+        assertEquals(
+                "nuevo@prueba.local",
+                capturado.getEmail());
+
+        assertEquals(
+                "+57 300 123 4567",
+                capturado.getTelefono());
     }
 
     @Test

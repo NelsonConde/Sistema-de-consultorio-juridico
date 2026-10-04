@@ -27,6 +27,7 @@ public class EstudiantePerfilContactoResolver implements PerfilContactoResolver 
 
         return new PerfilContactoDatos(
                 estudiante.getNombre(),
+                estudiante.getDocumento(),
                 estudiante.getEmail(),
                 estudiante.getTelefono(),
                 estudiante.getSede().getNombre(),

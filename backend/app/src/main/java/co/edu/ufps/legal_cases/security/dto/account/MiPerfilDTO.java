@@ -4,12 +4,9 @@ import lombok.Getter;
 import lombok.Setter;
 
 // DTO de salida para la vista "Mi Perfil".
-// username, rolNombre y tipoPerfil vienen de UsuarioSistema.
-// nombre, email, telefono, sede y codigo vienen del perfil real
-// (Estudiante/Asesor/Monitor/Administrativo/Conciliador), resuelto por
-// PerfilContactoResolverRegistry.
-// El frontend trata email y telefono como editables; el resto es de
-// solo lectura (no hay endpoint que permita modificarlos desde aquí).
+// La identidad se deriva siempre de la sesión autenticada.
+// El documento nunca se expone completo.
+// Email y telefono son los únicos datos editables desde autogestión.
 @Getter
 @Setter
 public class MiPerfilDTO {
@@ -18,6 +15,7 @@ public class MiPerfilDTO {
     private String rolNombre;
     private String tipoPerfil;
     private String nombre;
+    private String documentoEnmascarado;
     private String email;
     private String telefono;
     private String sede;

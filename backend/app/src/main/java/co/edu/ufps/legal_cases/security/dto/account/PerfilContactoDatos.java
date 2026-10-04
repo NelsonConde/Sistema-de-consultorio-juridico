@@ -12,6 +12,7 @@ import lombok.Getter;
 public class PerfilContactoDatos {
 
     private String nombre;
+    private String documento;
     private String email;
     private String telefono;
     private String sedeNombre;
