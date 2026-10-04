@@ -15,8 +15,8 @@
  */
 
 import { apiClient } from "@/lib/apiClient";
-import { fileApi } from "@/lib/fileApi";
-import React, { useEffect, useMemo, useState } from "react";
+import { useFileResource } from "@/hooks/useFileResource";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
@@ -48,7 +48,24 @@ export function NuevaConsultaForm() {
 
   const [form, setForm] = useState(VACIOS);
   const [archivos, setArchivos] = useState([]);
+  const [consultaCreadaId, setConsultaCreadaId] = useState(null);
+
+  const {
+    upload: uploadArchivos,
+    isUploading: archivosSubiendo,
+    getUploadState,
+    clearUploadState,
+    cancelUpload,
+    retryConfirmation,
+  } = useFileResource(
+      {
+        type: "consulta",
+        id: consultaCreadaId,
+      },
+      { load: false },
+  );
   const [guardando, setGuardando] = useState(false);
+  const submitLockRef = useRef(false);
   const [checking, setChecking] = useState(true);
   const [puedeAsignarResponsables, setPuedeAsignarResponsables] =
     useState(false);
@@ -506,43 +523,186 @@ export function NuevaConsultaForm() {
   }
 
   async function subirArchivosConsulta(consultaId) {
-    if (!archivos || archivos.length === 0) {
+    const seleccionados = Array.from(archivos || []);
+
+    if (seleccionados.length === 0) {
       return true;
     }
 
-    try {
-      const results = await fileApi.uploadMany(
-        { type: "consulta", id: consultaId },
-        archivos
-      );
-      const failed = results.filter((result) => !result.ok);
+    /*
+     * A confirmation failure means the bytes already reached storage.
+     * Those files must never start a second upload session.
+     */
+    const confirmacionesPendientes = seleccionados.filter(
+        (file) =>
+            getUploadState(file).state === "confirmation_failed",
+    );
 
-      if (failed.length === 0) {
+    const archivosParaTransferir = seleccionados.filter(
+        (file) =>
+            getUploadState(file).state !== "confirmation_failed",
+    );
+
+    if (archivosParaTransferir.length === 0) {
+      toast.warning("Hay archivos pendientes de confirmación", {
+        description:
+            "Usa la opción de reintentar confirmación. No vuelvas a cargar el archivo.",
+      });
+      return false;
+    }
+
+    try {
+      const results = await uploadArchivos(
+          archivosParaTransferir,
+          {
+            type: "consulta",
+            id: consultaId,
+          },
+      );
+
+      const failed = results.filter((result) => !result.ok);
+      const succeeded = results.filter((result) => result.ok);
+
+      for (const result of succeeded) {
+        clearUploadState(result.file);
+      }
+
+      const archivosRestantes = [
+        ...confirmacionesPendientes,
+        ...failed.map((result) => result.file),
+      ];
+
+      setArchivos(archivosRestantes);
+
+      if (archivosRestantes.length === 0) {
         toast.success("Archivos subidos correctamente");
         return true;
       }
 
+      const confirmationFailures = failed.filter(
+          (result) =>
+              result.error?.phase === "confirmation" &&
+              result.error?.retryableCompletion === true,
+      );
+
       const correlationId =
-        failed.find((result) => result.error?.correlationId)?.error?.correlationId ||
-        null;
+          failed.find((result) => result.error?.correlationId)
+              ?.error?.correlationId || null;
+
+      const totalConfirmacionesPendientes =
+          confirmacionesPendientes.length +
+          confirmationFailures.length;
+
+      if (totalConfirmacionesPendientes > 0) {
+        toast.warning(
+            "La consulta se creó, pero hay archivos pendientes de confirmación",
+            {
+              description: withErrorReference(
+                  "La transferencia ya terminó. Reintenta únicamente la confirmación.",
+                  correlationId,
+              ),
+            },
+        );
+
+        return false;
+      }
 
       const warning =
-        failed.length === archivos.length
-          ? "La consulta se creó, pero no se pudieron subir los archivos"
-          : `La consulta se creó; ${failed.length} archivo(s) no pudieron subirse`;
+          failed.length === archivosParaTransferir.length
+              ? "La consulta se creó, pero no se pudieron subir los archivos"
+              : `La consulta se creó; ${failed.length} archivo(s) no pudieron completar la carga`;
 
       toast.warning(warning, {
         description: withErrorReference(
-          "Revisa los archivos e intenta cargarlos nuevamente.",
-          correlationId
+            "Revisa los archivos e intenta nuevamente.",
+            correlationId,
         ),
       });
+
       return false;
-    } catch {
-      toast.warning("La consulta se creó, pero falló la conexión al subir archivos", {
-        description: "Los archivos seleccionados no se registraron. Intenta cargarlos nuevamente.",
+    } catch (error) {
+      toast.warning(
+          "La consulta se creó, pero falló la carga de archivos",
+          {
+            description: withErrorReference(
+                error?.message ||
+                "Revisa los archivos e intenta nuevamente.",
+                error?.correlationId || null,
+            ),
+          },
+      );
+
+      return false;
+    }
+  }
+
+  async function cancelarCargaArchivo(file) {
+    try {
+      await cancelUpload(file);
+    } catch (error) {
+      toast.error("No se pudo cancelar la carga", {
+        description:
+            error?.message || "Intenta nuevamente.",
       });
-      return false;
+    }
+  }
+
+  async function reintentarConfirmacionArchivo(file) {
+    try {
+      await retryConfirmation(file);
+
+      const restantes = archivos.filter(
+          (selectedFile) => selectedFile !== file,
+      );
+
+      setArchivos(restantes);
+      clearUploadState(file);
+
+      toast.success("Archivo confirmado correctamente");
+
+      if (
+          consultaCreadaId &&
+          restantes.length === 0
+      ) {
+        router.push(
+            `/consultasjuridicas?refresh=${Date.now()}`,
+        );
+      }
+    } catch (error) {
+      toast.error("No se pudo confirmar el archivo", {
+        description:
+            error?.message ||
+            "La confirmación sigue pendiente. Puedes volver a intentarlo.",
+      });
+    }
+  }
+
+  async function descartarCargaPendiente(file) {
+    try {
+      await cancelUpload(file);
+
+      const restantes = archivos.filter(
+          (selectedFile) => selectedFile !== file,
+      );
+
+      setArchivos(restantes);
+      clearUploadState(file);
+
+      toast.success("Carga pendiente descartada");
+
+      if (
+          consultaCreadaId &&
+          restantes.length === 0
+      ) {
+        router.push(
+            `/consultasjuridicas?refresh=${Date.now()}`,
+        );
+      }
+    } catch (error) {
+      toast.error("No se pudo descartar la carga pendiente", {
+        description:
+            error?.message || "Intenta nuevamente.",
+      });
     }
   }
 
@@ -611,10 +771,44 @@ export function NuevaConsultaForm() {
   async function handleGuardar(e) {
     e.preventDefault();
 
+    if (submitLockRef.current) {
+      return;
+    }
+
+    /*
+     * La consulta ya existe. A partir de aquí solo se pueden
+     * reintentar operaciones documentales.
+     */
+    if (consultaCreadaId) {
+      if (guardando || archivosSubiendo) {
+        return;
+      }
+
+      submitLockRef.current = true;
+      setGuardando(true);
+
+      try {
+        const archivosCompletos =
+            await subirArchivosConsulta(consultaCreadaId);
+
+        if (archivosCompletos) {
+          router.push(
+              `/consultasjuridicas?refresh=${Date.now()}`,
+          );
+        }
+      } finally {
+        submitLockRef.current = false;
+        setGuardando(false);
+      }
+
+      return;
+    }
+
     if (!validarFormularioConsulta()) {
       return;
     }
 
+    submitLockRef.current = true;
     setGuardando(true);
 
     const payload = {
@@ -693,16 +887,24 @@ export function NuevaConsultaForm() {
         return;
       }
 
+      setConsultaCreadaId(consultaId);
+
       toast.success("Consulta creada");
 
-      await subirArchivosConsulta(consultaId);
+      const archivosCompletos =
+          await subirArchivosConsulta(consultaId);
 
-      router.push(`/consultasjuridicas?refresh=${Date.now()}`);
+      if (archivosCompletos) {
+        router.push(
+            `/consultasjuridicas?refresh=${Date.now()}`,
+        );
+      }
     } catch {
       toast.error("Error de conexión", {
         description: "No se pudo completar la creación de la consulta. Verifica la conexión e intenta nuevamente.",
       });
     } finally {
+      submitLockRef.current = false;
       setGuardando(false);
     }
   }
@@ -1076,20 +1278,37 @@ export function NuevaConsultaForm() {
           />
         </C>
 
-        <ArchivosConsultaForm archivos={archivos} onChange={setArchivos} />
+        <ArchivosConsultaForm
+            archivos={archivos}
+            onChange={setArchivos}
+            getUploadState={getUploadState}
+            isUploading={archivosSubiendo}
+            onCancel={cancelarCargaArchivo}
+            onRetryConfirmation={reintentarConfirmacionArchivo}
+            onDiscardPending={descartarCargaPendiente}
+        />
 
         <div className="flex justify-end gap-3 pt-2">
           <Button
             type="button"
             variant="outline"
             onClick={() => router.push("/consultasjuridicas")}
-            disabled={guardando}
+            disabled={guardando || archivosSubiendo}
           >
             Cancelar
           </Button>
 
-          <Button type="submit" disabled={guardando}>
-            {guardando ? "Guardando..." : "Crear consulta"}
+          <Button
+              type="submit"
+              disabled={guardando || archivosSubiendo}
+          >
+            {guardando || archivosSubiendo
+                ? consultaCreadaId
+                    ? "Procesando archivos..."
+                    : "Guardando..."
+                : consultaCreadaId
+                    ? "Reintentar archivos"
+                    : "Crear consulta"}
           </Button>
         </div>
       </form>
