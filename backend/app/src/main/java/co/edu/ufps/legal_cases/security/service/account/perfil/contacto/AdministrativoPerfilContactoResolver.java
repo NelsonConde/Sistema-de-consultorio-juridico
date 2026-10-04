@@ -27,6 +27,7 @@ public class AdministrativoPerfilContactoResolver implements PerfilContactoResol
 
         return new PerfilContactoDatos(
                 administrativo.getNombre(),
+                administrativo.getDocumento(),
                 administrativo.getEmail(),
                 administrativo.getTelefono(),
                 administrativo.getSede().getNombre(),

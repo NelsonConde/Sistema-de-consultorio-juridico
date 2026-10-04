@@ -27,6 +27,7 @@ public class MonitorPerfilContactoResolver implements PerfilContactoResolver {
 
         return new PerfilContactoDatos(
                 monitor.getNombre(),
+                monitor.getDocumento(),
                 monitor.getEmail(),
                 monitor.getTelefono(),
                 monitor.getSede().getNombre(),

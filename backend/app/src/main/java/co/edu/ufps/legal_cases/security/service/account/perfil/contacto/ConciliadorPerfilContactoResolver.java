@@ -27,6 +27,7 @@ public class ConciliadorPerfilContactoResolver implements PerfilContactoResolver
 
         return new PerfilContactoDatos(
                 conciliador.getNombre(),
+                conciliador.getDocumento(),
                 conciliador.getEmail(),
                 conciliador.getTelefono(),
                 conciliador.getSede().getNombre(),

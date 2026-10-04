@@ -27,6 +27,7 @@ public class AsesorPerfilContactoResolver implements PerfilContactoResolver {
 
         return new PerfilContactoDatos(
                 asesor.getNombre(),
+                asesor.getDocumento(),
                 asesor.getEmail(),
                 asesor.getTelefono(),
                 asesor.getSede().getNombre(),

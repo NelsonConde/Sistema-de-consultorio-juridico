@@ -65,6 +65,7 @@ class MiPerfilServiceTest {
         PerfilContactoResolver resolver = mock(PerfilContactoResolver.class);
         PerfilContactoDatos contacto = new PerfilContactoDatos(
                 "Nombre " + tipo.name(),
+                "1090123456",
                 tipo.name().toLowerCase() + "@prueba.local",
                 "+57 300 000 0000",
                 "Sede Principal",
@@ -80,6 +81,7 @@ class MiPerfilServiceTest {
         assertEquals("Rol " + tipo.name(), dto.getRolNombre());
         assertEquals(tipo.name(), dto.getTipoPerfil());
         assertEquals("Nombre " + tipo.name(), dto.getNombre());
+        assertEquals("******3456", dto.getDocumentoEnmascarado());
         assertEquals(tipo.name().toLowerCase() + "@prueba.local", dto.getEmail());
         assertEquals("+57 300 000 0000", dto.getTelefono());
         assertEquals("Sede Principal", dto.getSede());
@@ -98,6 +100,7 @@ class MiPerfilServiceTest {
 
         PerfilContactoDatos contactoActualizado = new PerfilContactoDatos(
                 "Nombre " + tipo.name(),
+                "1090765432",
                 input.getEmail(),
                 input.getTelefono(),
                 "Sede Principal",
@@ -112,6 +115,7 @@ class MiPerfilServiceTest {
         verify(resolver).actualizarContacto(2L, input);
         assertEquals(input.getEmail(), dto.getEmail());
         assertEquals(input.getTelefono(), dto.getTelefono());
+        assertEquals("******5432", dto.getDocumentoEnmascarado());
         assertEquals("COD-" + tipo.name(), dto.getCodigo());
         assertEquals("Sede Principal", dto.getSede());
     }

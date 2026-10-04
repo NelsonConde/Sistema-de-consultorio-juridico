@@ -14,14 +14,33 @@ public class MiPerfilMapper {
 
         dto.setUsername(usuario.getUsername());
         dto.setRolNombre(usuario.getRol() != null ? usuario.getRol().getNombre() : null);
-        dto.setTipoPerfil(usuario.getTipoPerfilActual() != null ? usuario.getTipoPerfilActual().name() : null);
+        dto.setTipoPerfil(
+                usuario.getTipoPerfilActual() != null
+                        ? usuario.getTipoPerfilActual().name()
+                        : null);
 
         dto.setNombre(contacto.getNombre());
+        dto.setDocumentoEnmascarado(enmascararDocumento(contacto.getDocumento()));
         dto.setEmail(contacto.getEmail());
         dto.setTelefono(contacto.getTelefono());
         dto.setSede(contacto.getSedeNombre());
         dto.setCodigo(contacto.getCodigo());
 
         return dto;
+    }
+
+    private String enmascararDocumento(String documento) {
+        if (documento == null || documento.isBlank()) {
+            return null;
+        }
+
+        int longitud = documento.length();
+
+        if (longitud <= 4) {
+            return "*".repeat(longitud);
+        }
+
+        return "*".repeat(longitud - 4)
+                + documento.substring(longitud - 4);
     }
 }
