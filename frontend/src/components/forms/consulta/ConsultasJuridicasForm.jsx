@@ -94,6 +94,7 @@ export function ConsultasJuridicasForm() {
   const [estudiantes, setEstudiantes] = useState([]);
   const [archivosCaso, setArchivosCaso] = useState([]);
   const [cargandoArchivos, setCargandoArchivos] = useState(false);
+  const [descargandoArchivos, setDescargandoArchivos] = useState({});
   const [user, setUser] = useState(null);
   const [checkingPermisos, setCheckingPermisos] = useState(true);
   const [confirmArchivar, setConfirmArchivar] = useState({ abierto: false, id: null, loading: false });
@@ -798,6 +799,9 @@ export function ConsultasJuridicasForm() {
   }
 
   const descargarArchivo = async (file) => {
+    if (!file?.id || descargandoArchivos[file.id]) return;
+
+    setDescargandoArchivos((prev) => ({ ...prev, [file.id]: true }));
     try {
       await fileApi.download(file, { type: "consulta", id: idEditando });
     } catch (error) {
@@ -807,6 +811,8 @@ export function ConsultasJuridicasForm() {
           error?.correlationId || null
         ),
       });
+    } finally {
+      setDescargandoArchivos((prev) => ({ ...prev, [file.id]: false }));
     }
   };
 
@@ -1348,7 +1354,14 @@ export function ConsultasJuridicasForm() {
                     {archivosCaso.map((file) => (
                       <li key={file.id ?? file.fileName} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
                         <span className="truncate">{file.fileName ?? file.nombre ?? "Archivo"}</span>
-                        <button type="button" onClick={() => descargarArchivo(file)} className="text-primary hover:underline">Descargar</button>
+                        <button
+                          type="button"
+                          onClick={() => descargarArchivo(file)}
+                          disabled={!file.id || !!descargandoArchivos[file.id]}
+                          className="text-primary hover:underline disabled:pointer-events-none disabled:opacity-60"
+                        >
+                          {descargandoArchivos[file.id] ? "Descargando..." : "Descargar"}
+                        </button>
                       </li>
                     ))}
                   </ul>

@@ -122,9 +122,11 @@ export function SeguimientosForm() {
   const [guardandoEstadoSeguimiento, setGuardandoEstadoSeguimiento] = useState(false)
   const [archivosPorRespuesta, setArchivosPorRespuesta] = useState({})
   const [cargandoArchivosRespuesta, setCargandoArchivosRespuesta] = useState({})
+  const [descargandoArchivosRespuesta, setDescargandoArchivosRespuesta] = useState({})
   const [archivosTarea, setArchivosTarea] = useState([])
   const [archivosPorTarea, setArchivosPorTarea] = useState({})
   const [cargandoArchivosTarea, setCargandoArchivosTarea] = useState({})
+  const [descargandoArchivosTarea, setDescargandoArchivosTarea] = useState({})
   const [tareaAEliminar, setTareaAEliminar] = useState(null)
   const [eliminando, setEliminando] = useState(false)
   const [totalConsultas, setTotalConsultas] = useState(0)
@@ -791,6 +793,12 @@ export function SeguimientosForm() {
   }
 
   async function descargarArchivoTarea(seguimientoId, file) {
+    if (!file?.id || descargandoArchivosTarea[file.id]) return
+
+    setDescargandoArchivosTarea((prev) => ({
+      ...prev,
+      [file.id]: true,
+    }))
     try {
       await fileApi.download(file, { type: "seguimiento", id: seguimientoId })
     } catch (error) {
@@ -800,6 +808,11 @@ export function SeguimientosForm() {
           error?.correlationId || null
         ),
       })
+    } finally {
+      setDescargandoArchivosTarea((prev) => ({
+        ...prev,
+        [file.id]: false,
+      }))
     }
   }
 
@@ -849,6 +862,12 @@ export function SeguimientosForm() {
   }
 
   async function descargarArchivoRespuesta(seguimientoId, respuestaId, file) {
+    if (!file?.id || descargandoArchivosRespuesta[file.id]) return
+
+    setDescargandoArchivosRespuesta((prev) => ({
+      ...prev,
+      [file.id]: true,
+    }))
     try {
       await fileApi.download(file, {
         type: "respuesta",
@@ -862,6 +881,11 @@ export function SeguimientosForm() {
           error?.correlationId || null
         ),
       })
+    } finally {
+      setDescargandoArchivosRespuesta((prev) => ({
+        ...prev,
+        [file.id]: false,
+      }))
     }
   }
 
@@ -1165,9 +1189,10 @@ export function SeguimientosForm() {
                   type="button"
                   variant="outline"
                   size="sm"
+                  disabled={!file.id || !!descargandoArchivosRespuesta[file.id]}
                   onClick={() => descargarArchivoRespuesta(seguimientoId, respuesta.id, file)}
                 >
-                  Descargar
+                  {descargandoArchivosRespuesta[file.id] ? "Descargando..." : "Descargar"}
                 </Button>
               </li>
             ))}
@@ -1217,9 +1242,10 @@ export function SeguimientosForm() {
                   type="button"
                   variant="outline"
                   size="sm"
+                  disabled={!file.id || !!descargandoArchivosTarea[file.id]}
                   onClick={() => descargarArchivoTarea(seguimientoId, file)}
                 >
-                  Descargar
+                  {descargandoArchivosTarea[file.id] ? "Descargando..." : "Descargar"}
                 </Button>
               </li>
             ))}

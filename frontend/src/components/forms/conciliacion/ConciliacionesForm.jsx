@@ -78,6 +78,7 @@ export function ConciliacionesForm() {
   const [totalPages, setTotalPages] = useState(0);
   const [loadingLista, setLoadingLista] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [descargandoDocumentos, setDescargandoDocumentos] = useState({});
 
   const [crearConsultaId, setCrearConsultaId] = useState("");
   const [crearConsultaSeleccionada, setCrearConsultaSeleccionada] = useState(null);
@@ -577,28 +578,45 @@ export function ConciliacionesForm() {
   async function descargarDocumentoDesdeListado(item, campoFileId) {
     if (!item?.id) return;
 
+    const operationKey = `${item.id}:${campoFileId}`;
+    if (descargandoDocumentos[operationKey]) return;
+
+    setDescargandoDocumentos((prev) => ({ ...prev, [operationKey]: true }));
     let fileId = item?.[campoFileId];
-    if (!fileId) {
-      const detalleActual = await cargarDetalle(item.id);
-      fileId = detalleActual?.[campoFileId];
-    }
+    try {
+      if (!fileId) {
+        const detalleActual = await cargarDetalle(item.id);
+        fileId = detalleActual?.[campoFileId];
+      }
 
-    if (!fileId) {
-      setError("El documento no está disponible para esta conciliación.");
-      return;
-    }
+      if (!fileId) {
+        setError("El documento no está disponible para esta conciliación.");
+        return;
+      }
 
-    await descargarDocumento(fileId, item.id);
+      await descargarDocumento(fileId, item.id, operationKey);
+    } finally {
+      setDescargandoDocumentos((prev) => ({ ...prev, [operationKey]: false }));
+    }
   }
 
-  async function descargarDocumento(fileId, conciliacionId) {
+  async function descargarDocumento(fileId, conciliacionId, operationKey = null) {
     if (!fileId || !conciliacionId) return;
+
+    const downloadKey = operationKey || `${conciliacionId}:file:${fileId}`;
+    if (!operationKey && descargandoDocumentos[downloadKey]) return;
+
+    if (!operationKey) {
+      setDescargandoDocumentos((prev) => ({ ...prev, [downloadKey]: true }));
+    }
 
     try {
       const files = await fileApi.list({ type: "conciliacion", id: conciliacionId });
       const file = files.find((item) => Number(item.id) === Number(fileId));
       if (!file) throw new Error("El documento ya no está disponible");
-      await fileApi.download(file, { type: "conciliacion", id: conciliacionId });
+      await fileApi.downloadById(file.id, { type: "conciliacion", id: conciliacionId }, {
+        fileName: file.fileName || file.nombre,
+      });
     } catch (err) {
       setError(
         withErrorReference(
@@ -606,6 +624,10 @@ export function ConciliacionesForm() {
           err?.correlationId || null
         )
       );
+    } finally {
+      if (!operationKey) {
+        setDescargandoDocumentos((prev) => ({ ...prev, [downloadKey]: false }));
+      }
     }
   }
 
@@ -828,17 +850,19 @@ export function ConciliacionesForm() {
                           type="button"
                           size="sm"
                           variant="outline"
+                          disabled={!!descargandoDocumentos[`${item.id}:documentoSolicitudFileId`]}
                           onClick={() => descargarDocumentoDesdeListado(item, "documentoSolicitudFileId")}
                         >
-                          Solicitud
+                          {descargandoDocumentos[`${item.id}:documentoSolicitudFileId`] ? "Descargando..." : "Solicitud"}
                         </Button>
                         <Button
                           type="button"
                           size="sm"
                           variant="outline"
+                          disabled={!!descargandoDocumentos[`${item.id}:actaFileId`]}
                           onClick={() => descargarDocumentoDesdeListado(item, "actaFileId")}
                         >
-                          Acta
+                          {descargandoDocumentos[`${item.id}:actaFileId`] ? "Descargando..." : "Acta"}
                         </Button>
                       </div>
                     </td>
@@ -916,20 +940,30 @@ export function ConciliacionesForm() {
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={!detalle.documentoSolicitudFileId}
+                    disabled={
+                      !detalle.documentoSolicitudFileId ||
+                      !!descargandoDocumentos[`${detalle.id}:file:${detalle.documentoSolicitudFileId}`]
+                    }
                     onClick={() => descargarDocumento(detalle.documentoSolicitudFileId, detalle.id)}
                   >
                     <Download className="mr-2 h-4 w-4" />
-                    Descargar solicitud
+                    {descargandoDocumentos[`${detalle.id}:file:${detalle.documentoSolicitudFileId}`]
+                      ? "Descargando..."
+                      : "Descargar solicitud"}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={!detalle.actaFileId}
+                    disabled={
+                      !detalle.actaFileId ||
+                      !!descargandoDocumentos[`${detalle.id}:file:${detalle.actaFileId}`]
+                    }
                     onClick={() => descargarDocumento(detalle.actaFileId, detalle.id)}
                   >
                     <Download className="mr-2 h-4 w-4" />
-                    Descargar acta
+                    {descargandoDocumentos[`${detalle.id}:file:${detalle.actaFileId}`]
+                      ? "Descargando..."
+                      : "Descargar acta"}
                   </Button>
                 </div>
               </div>
