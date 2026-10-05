@@ -262,12 +262,34 @@ public class ConsultaQueryService {
 
     @Transactional(readOnly = true)
     @Auditable(action = "READ_ARCHIVED_LEGAL_CASES", entityName = "Consulta", entityId = "'archived'")
-    public List<ConsultaBusquedaDTO> listarArchivadas() {
+    public PageResponseDTO<ConsultaBusquedaDTO> listarArchivadas(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction) {
         consultaAccessService.validarPuedeListarConsultasArchivadas();
 
-        return consultaRepository.findByEstado(EstadoConsulta.ARCHIVADO)
+        validarPaginacion(page, size);
+        String termino = normalizarBusqueda(search);
+        Sort sort = construirSort(sortBy, direction);
+        PageRequest pageable = PageRequest.of(page - 1, size, sort);
+
+        Page<ConsultaResumenProjection> resultado = consultaRepository.buscarArchivadasResumenPaginado(
+                termino,
+                EstadoConsulta.ARCHIVADO,
+                pageable);
+
+        List<ConsultaBusquedaDTO> contenido = resultado.getContent()
                 .stream()
                 .map(consultaMapper::convertirABusquedaDTO)
                 .toList();
+
+        return new PageResponseDTO<>(
+                contenido,
+                page,
+                size,
+                resultado.getTotalElements(),
+                resultado.getTotalPages());
     }
 }

@@ -150,6 +150,16 @@ public class EstudianteQueryService {
     }
 
     @Transactional(readOnly = true)
+    public PageResponseDTO<EstudianteResumenDTO> listarActivosPaginados(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction) {
+        return buscarSelectorPaginado(search, page, size, sortBy, direction, null);
+    }
+
+    @Transactional(readOnly = true)
     public List<EstudianteDTO> listarConConciliacion() {
         estudianteAccessService.validarPuedeListarEstudiantes();
 
@@ -158,6 +168,58 @@ public class EstudianteQueryService {
                 .filter(estudianteAccessService::puedeVerEstudiante)
                 .map(estudianteMapper::convertirADTO)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponseDTO<EstudianteResumenDTO> listarConConciliacionPaginados(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction) {
+        return buscarSelectorPaginado(search, page, size, sortBy, direction, true);
+    }
+
+    private PageResponseDTO<EstudianteResumenDTO> buscarSelectorPaginado(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction,
+            Boolean conciliacion) {
+        estudianteAccessService.validarPuedeListarEstudiantes();
+
+        validarPaginacion(page, size);
+        String termino = normalizarBusqueda(search);
+        String campoOrdenamiento = validarCampoOrdenamiento(sortBy);
+        Sort.Direction direccion = validarDireccion(direction);
+
+        AlcanceListado alcance = resolverAlcanceListado();
+        if (!alcance.puedeConsultar()) {
+            return new PageResponseDTO<>(List.of(), page, size, 0, 0);
+        }
+
+        PageRequest pageable = PageRequest.of(
+                page - 1,
+                size,
+                construirSort(campoOrdenamiento, direccion));
+        Page<EstudianteResumenProjection> resultado = estudianteRepository.buscarSelectorPaginado(
+                termino,
+                conciliacion,
+                alcance.asesorId(),
+                pageable);
+
+        List<EstudianteResumenDTO> contenido = resultado.getContent()
+                .stream()
+                .map(estudianteMapper::convertirAResumenDTO)
+                .toList();
+
+        return new PageResponseDTO<>(
+                contenido,
+                page,
+                size,
+                resultado.getTotalElements(),
+                resultado.getTotalPages());
     }
 
     @Transactional(readOnly = true)

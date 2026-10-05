@@ -59,10 +59,32 @@ public class EstudianteController {
         return estudianteService.listarActivos();
     }
 
+    @GetMapping("/activos/paginados")
+    @PreAuthorize("hasAnyAuthority('" + VER_ESTUDIANTES + "', '" + VER_PERFILES_AUXILIARES + "', '" + GESTIONAR_USUARIOS + "')")
+    public PageResponseDTO<EstudianteResumenDTO> listarActivosPaginados(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "nombre") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction) {
+        return estudianteService.listarActivosPaginados(search, page, size, sortBy, direction);
+    }
+
     @GetMapping("/conciliacion")
     @PreAuthorize("hasAnyAuthority('" + VER_ESTUDIANTES + "', '" + VER_PERFILES_AUXILIARES + "', '" + GESTIONAR_USUARIOS + "')")
     public List<EstudianteDTO> listarConConciliacion() {
         return estudianteService.listarConConciliacion();
+    }
+
+    @GetMapping("/conciliacion/paginados")
+    @PreAuthorize("hasAnyAuthority('" + VER_ESTUDIANTES + "', '" + VER_PERFILES_AUXILIARES + "', '" + GESTIONAR_USUARIOS + "')")
+    public PageResponseDTO<EstudianteResumenDTO> listarConConciliacionPaginados(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "nombre") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction) {
+        return estudianteService.listarConConciliacionPaginados(search, page, size, sortBy, direction);
     }
 
     // Si el usuario es asesor, solo puede consultar su propio id de asesor.

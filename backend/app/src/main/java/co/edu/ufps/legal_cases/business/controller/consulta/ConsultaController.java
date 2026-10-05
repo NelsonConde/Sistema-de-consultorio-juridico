@@ -7,8 +7,6 @@ import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.GESTIONAR_
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_CONSULTAS;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.CAMBIAR_ESTADO_CONSULTAS;
 
-import java.util.List;
-
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -136,8 +134,13 @@ public class ConsultaController {
 
     @GetMapping("/archivadas")
     @PreAuthorize("hasAuthority('" + ARCHIVAR_CONSULTAS + "')")
-    public List<ConsultaBusquedaDTO> listarArchivadas() {
-        return consultaService.listarArchivadas();
+    public PageResponseDTO<ConsultaBusquedaDTO> listarArchivadas(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "fecha") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction) {
+        return consultaService.listarArchivadas(search, page, size, sortBy, direction);
     }
 
     @PatchMapping("/{id}/desarchivar")

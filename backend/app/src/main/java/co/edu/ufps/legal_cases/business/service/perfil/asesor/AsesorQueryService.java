@@ -102,6 +102,35 @@ public class AsesorQueryService {
     }
 
     @Transactional(readOnly = true)
+    public PageResponseDTO<AsesorResumenDTO> listarActivosPaginados(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction) {
+        asesorMonitorAccessService.validarPuedeListarAsesoresYMonitoresActivos();
+
+        validarPaginacion(page, size);
+        String termino = normalizarBusqueda(search);
+        Sort sort = construirSort(sortBy, direction);
+        PageRequest pageable = PageRequest.of(page - 1, size, sort);
+        Page<AsesorResumenProjection> resultado =
+                asesorRepository.buscarResumenPaginado(termino, true, pageable);
+
+        List<AsesorResumenDTO> contenido = resultado.getContent()
+                .stream()
+                .map(asesorMapper::convertirAResumenDTO)
+                .toList();
+
+        return new PageResponseDTO<>(
+                contenido,
+                page,
+                size,
+                resultado.getTotalElements(),
+                resultado.getTotalPages());
+    }
+
+    @Transactional(readOnly = true)
     public AsesorDTO obtenerPorId(Long id) {
         asesorMonitorAccessService.validarPuedeListarAsesoresYMonitores();
 

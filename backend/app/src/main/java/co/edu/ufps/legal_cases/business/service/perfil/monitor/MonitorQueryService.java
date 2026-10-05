@@ -102,6 +102,35 @@ public class MonitorQueryService {
     }
 
     @Transactional(readOnly = true)
+    public PageResponseDTO<MonitorResumenDTO> listarActivosPaginados(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction) {
+        asesorMonitorAccessService.validarPuedeListarAsesoresYMonitoresActivos();
+
+        validarPaginacion(page, size);
+        String termino = normalizarBusqueda(search);
+        Sort sort = construirSort(sortBy, direction);
+        PageRequest pageable = PageRequest.of(page - 1, size, sort);
+        Page<MonitorResumenProjection> resultado =
+                monitorRepository.buscarResumenPaginado(termino, true, pageable);
+
+        List<MonitorResumenDTO> contenido = resultado.getContent()
+                .stream()
+                .map(monitorMapper::convertirAResumenDTO)
+                .toList();
+
+        return new PageResponseDTO<>(
+                contenido,
+                page,
+                size,
+                resultado.getTotalElements(),
+                resultado.getTotalPages());
+    }
+
+    @Transactional(readOnly = true)
     public MonitorDTO obtenerPorId(Long id) {
         asesorMonitorAccessService.validarPuedeListarAsesoresYMonitores();
 

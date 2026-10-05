@@ -43,8 +43,26 @@ public class EstudianteService {
         return estudianteQueryService.listarActivos();
     }
 
+    public PageResponseDTO<EstudianteResumenDTO> listarActivosPaginados(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction) {
+        return estudianteQueryService.listarActivosPaginados(search, page, size, sortBy, direction);
+    }
+
     public List<EstudianteDTO> listarConConciliacion() {
         return estudianteQueryService.listarConConciliacion();
+    }
+
+    public PageResponseDTO<EstudianteResumenDTO> listarConConciliacionPaginados(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction) {
+        return estudianteQueryService.listarConConciliacionPaginados(search, page, size, sortBy, direction);
     }
 
     public List<EstudianteDTO> listarPorAsesor(Long asesorId) {

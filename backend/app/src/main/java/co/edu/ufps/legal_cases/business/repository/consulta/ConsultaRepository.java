@@ -900,4 +900,45 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
             @Param("perfilId") Long perfilId,
             @Param("estadoArchivado") EstadoConsulta estadoArchivado,
             Pageable pageable);
+
+    @Query(value = """
+            SELECT c.id AS id,
+                   c.version AS version,
+                   c.descripcion AS consulta,
+                   c.fecha AS fecha,
+                   p.nombres AS nombre,
+                   p.apellidos AS apellido,
+                   p.numeroDocumento AS cedula,
+                   c.estado AS estado
+            FROM Consulta c
+            JOIN c.persona p
+            WHERE c.estado = :estadoArchivado
+              AND (
+                    CAST(:search AS String) IS NULL
+                    OR LOWER(c.descripcion) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(p.nombres) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(p.apellidos) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(CONCAT(CONCAT(p.nombres, ' '), p.apellidos))
+                       LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(p.numeroDocumento) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+              )
+            """, countQuery = """
+            SELECT COUNT(c.id)
+            FROM Consulta c
+            JOIN c.persona p
+            WHERE c.estado = :estadoArchivado
+              AND (
+                    CAST(:search AS String) IS NULL
+                    OR LOWER(c.descripcion) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(p.nombres) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(p.apellidos) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(CONCAT(CONCAT(p.nombres, ' '), p.apellidos))
+                       LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(p.numeroDocumento) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+              )
+            """)
+    Page<ConsultaResumenProjection> buscarArchivadasResumenPaginado(
+            @Param("search") String search,
+            @Param("estadoArchivado") EstadoConsulta estadoArchivado,
+            Pageable pageable);
 }

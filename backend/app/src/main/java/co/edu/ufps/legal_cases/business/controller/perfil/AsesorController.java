@@ -45,6 +45,17 @@ public class AsesorController {
         return asesorService.listarActivos();
     }
 
+    @GetMapping("/activos/paginados")
+    @PreAuthorize("hasAnyAuthority('" + VER_PERFILES_AUXILIARES + "', '" + VER_ASESORES_MONITORES + "', '" + GESTIONAR_ASESORES_MONITORES + "', '" + GESTIONAR_USUARIOS + "')")
+    public PageResponseDTO<AsesorResumenDTO> listarActivosPaginados(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "nombre") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction) {
+        return asesorService.listarActivosPaginados(search, page, size, sortBy, direction);
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('" + VER_ASESORES_MONITORES + "', '" + GESTIONAR_ASESORES_MONITORES + "', '" + GESTIONAR_USUARIOS + "')")
     public AsesorDTO obtenerPorId(@PathVariable Long id) {

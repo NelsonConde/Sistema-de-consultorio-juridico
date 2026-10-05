@@ -45,6 +45,17 @@ public class MonitorController {
         return monitorService.listarActivos();
     }
 
+    @GetMapping("/activos/paginados")
+    @PreAuthorize("hasAnyAuthority('" + VER_PERFILES_AUXILIARES + "', '" + VER_ASESORES_MONITORES + "', '" + GESTIONAR_ASESORES_MONITORES + "', '" + GESTIONAR_USUARIOS + "')")
+    public PageResponseDTO<MonitorResumenDTO> listarActivosPaginados(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "nombre") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction) {
+        return monitorService.listarActivosPaginados(search, page, size, sortBy, direction);
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('" + VER_ASESORES_MONITORES + "', '" + GESTIONAR_ASESORES_MONITORES + "', '" + GESTIONAR_USUARIOS + "')")
     public MonitorDTO obtenerPorId(@PathVariable Long id) {

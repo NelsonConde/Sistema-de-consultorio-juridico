@@ -39,6 +39,15 @@ public class MonitorService {
         return monitorQueryService.listarActivos();
     }
 
+    public PageResponseDTO<MonitorResumenDTO> listarActivosPaginados(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction) {
+        return monitorQueryService.listarActivosPaginados(search, page, size, sortBy, direction);
+    }
+
     public MonitorDTO obtenerPorId(Long id) {
         return monitorQueryService.obtenerPorId(id);
     }

@@ -39,6 +39,15 @@ public class AsesorService {
         return asesorQueryService.listarActivos();
     }
 
+    public PageResponseDTO<AsesorResumenDTO> listarActivosPaginados(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction) {
+        return asesorQueryService.listarActivosPaginados(search, page, size, sortBy, direction);
+    }
+
     public AsesorDTO obtenerPorId(Long id) {
         return asesorQueryService.obtenerPorId(id);
     }

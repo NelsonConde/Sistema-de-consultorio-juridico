@@ -1,5 +1,6 @@
 package co.edu.ufps.legal_cases.business.controller.consulta;
 
+import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.ARCHIVAR_CONSULTAS;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.GESTIONAR_CONSULTAS;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_CONSULTAS;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -28,6 +29,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import co.edu.ufps.legal_cases.business.dto.consulta.ficha.FichaExpedienteDTO;
 import co.edu.ufps.legal_cases.business.service.consulta.ConsultaService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
 class ConsultaControllerAuthorizationTest {
 
@@ -104,6 +106,28 @@ class ConsultaControllerAuthorizationTest {
                 () -> assertThrows(AuthenticationCredentialsNotFoundException.class, () -> consultaController.descargarFichaPdf(1L)),
                 () -> assertThrows(AuthenticationCredentialsNotFoundException.class, () -> consultaController.obtenerFichaExpediente(1L))
         );
+
+        verifyNoInteractions(consultaService);
+    }
+
+    @Test
+    void soloUsuarioConPermisoArchivarPuedeListarConsultasArchivadas() {
+        autenticarCon(ARCHIVAR_CONSULTAS);
+        when(consultaService.listarArchivadas(null, 1, 10, "fecha", "desc"))
+                .thenReturn(new PageResponseDTO<>(List.of(), 1, 10, 0, 0));
+
+        assertDoesNotThrow(() -> consultaController.listarArchivadas(null, 1, 10, "fecha", "desc"));
+
+        verify(consultaService).listarArchivadas(null, 1, 10, "fecha", "desc");
+    }
+
+    @Test
+    void usuarioSinPermisoArchivarNoPuedeListarConsultasArchivadas() {
+        autenticarCon(VER_CONSULTAS);
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> consultaController.listarArchivadas(null, 1, 10, "fecha", "desc"));
 
         verifyNoInteractions(consultaService);
     }

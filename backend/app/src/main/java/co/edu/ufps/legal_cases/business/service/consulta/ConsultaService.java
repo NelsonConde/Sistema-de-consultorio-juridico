@@ -68,8 +68,13 @@ public class ConsultaService {
         return consultaQueryService.obtenerPorId(id);
     }
 
-    public List<ConsultaBusquedaDTO> listarArchivadas() {
-        return consultaQueryService.listarArchivadas();
+    public PageResponseDTO<ConsultaBusquedaDTO> listarArchivadas(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction) {
+        return consultaQueryService.listarArchivadas(search, page, size, sortBy, direction);
     }
 
     public ConsultaDTO crear(ConsultaDTO dto) {
