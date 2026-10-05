@@ -79,6 +79,39 @@ export function normalizePageResponse(payload, resourceName = "listado") {
   };
 }
 
+function normalizeLegacyArray(
+  payload,
+  { search = "", page = 1, size = DEFAULT_REMOTE_PAGE_SIZE } = {}
+) {
+  const normalizedSearch = String(search || "").trim().toLowerCase();
+  const filtered = normalizedSearch
+    ? payload.filter((item) =>
+        Object.values(item || {})
+          .filter((value) => value !== null && value !== undefined)
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedSearch)
+      )
+    : payload;
+  const safeSize = Math.min(
+    MAX_REMOTE_PAGE_SIZE,
+    toPositiveInteger(size, DEFAULT_REMOTE_PAGE_SIZE)
+  );
+  const totalElements = filtered.length;
+  const totalPages = Math.ceil(totalElements / safeSize);
+  const requestedPage = toPositiveInteger(page, 1);
+  const safePage = totalPages > 0 ? Math.min(requestedPage, totalPages) : 1;
+  const start = (safePage - 1) * safeSize;
+
+  return {
+    content: filtered.slice(start, start + safeSize),
+    page: safePage,
+    size: safeSize,
+    totalElements,
+    totalPages,
+  };
+}
+
 export async function fetchPaged(
   path,
   {
@@ -90,9 +123,11 @@ export async function fetchPaged(
     filters = {},
     signal = undefined,
     resourceName = "listado",
+    allowLegacyArray = false,
+    legacyPath = "",
   } = {}
 ) {
-  const response = await apiClient.get(
+  let response = await apiClient.get(
     buildPagedPath(path, {
       search,
       page,
@@ -103,7 +138,12 @@ export async function fetchPaged(
     }),
     { signal }
   );
-  const payload = await readResponseBody(response);
+  let payload = await readResponseBody(response);
+
+  if (response.status === 404 && legacyPath) {
+    response = await apiClient.get(legacyPath, { signal });
+    payload = await readResponseBody(response);
+  }
 
   if (!response.ok) {
     throw new ApiError(
@@ -115,6 +155,14 @@ export async function fetchPaged(
         correlationId: getResponseCorrelationId(response, payload),
       }
     );
+  }
+
+  if (Array.isArray(payload)) {
+    if (!allowLegacyArray && !legacyPath) {
+      throw new Error(`Respuesta paginada de ${resourceName} inválida`);
+    }
+
+    return normalizeLegacyArray(payload, { search, page, size });
   }
 
   return normalizePageResponse(payload, resourceName);

@@ -13,6 +13,7 @@ export function RemotePagedSelect({
   selectedLabel = "",
   onChange,
   endpoint,
+  legacyEndpoint = "",
   resourceName = "opciones",
   getOptionLabel = (item) => item?.nombre || item?.username || String(item?.id ?? ""),
   searchPlaceholder = "Buscar...",
@@ -47,8 +48,13 @@ export function RemotePagedSelect({
   useEffect(() => {
     if (!value) {
       setSelectedItem(null);
+      return;
     }
-  }, [value]);
+
+    if (selectedItem && Number(selectedItem.id) !== Number(value)) {
+      setSelectedItem(null);
+    }
+  }, [value, selectedItem]);
 
   useEffect(() => {
     if (!open || disabled) return undefined;
@@ -69,6 +75,8 @@ export function RemotePagedSelect({
           filters: stableFilters,
           signal: controller.signal,
           resourceName,
+          allowLegacyArray: Boolean(legacyEndpoint),
+          legacyPath: legacyEndpoint,
         });
 
         setItems(result.content);
@@ -97,6 +105,7 @@ export function RemotePagedSelect({
     open,
     disabled,
     endpoint,
+    legacyEndpoint,
     debouncedSearch,
     page,
     pageSize,
@@ -111,8 +120,10 @@ export function RemotePagedSelect({
     : selectedLabel || (value ? `Seleccionado #${value}` : placeholder);
 
   function selectItem(item) {
+    const accepted = onChange?.(item?.id ?? "", item);
+    if (accepted === false) return;
+
     setSelectedItem(item);
-    onChange?.(item?.id ?? "", item);
     setOpen(false);
   }
 

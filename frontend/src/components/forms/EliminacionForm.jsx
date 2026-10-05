@@ -19,7 +19,8 @@ import { Button } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import Pagination from "@/components/ui/Pagination";
 import { API_URL_BASE } from "@/lib/config";
-import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils";
+import { DEFAULT_PAGE_SIZE_OPTIONS } from "@/lib/list-utils";
+import { fetchPaged } from "@/lib/pagedApi";
 import { RotateCcw, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PERMISOS } from "@/lib/permission";
@@ -212,35 +213,15 @@ export function EliminacionForm() {
 
   const itemsActuales = useMemo(() => {
     const lista = data[seccionActiva] || [];
-    const q = busqueda.trim().toLowerCase();
 
-    const filtradosPorEstado = lista.filter((item) => {
+    return lista.filter((item) => {
       if (seccion?.tipo === "consulta") {
         return estaArchivadaConsulta(item);
       }
 
       return estaInactivo(item);
     });
-
-    const filtrados = !q
-      ? filtradosPorEstado
-      : filtradosPorEstado.filter((item) =>
-      [
-        item?.id,
-        nombrePersona(item),
-        documentoPersona(item),
-        textoConsulta(item),
-        detalleItem(item, seccion?.tipo),
-        item?.estado,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
-    );
-
-    return sortByIdAsc(filtrados);
-  }, [data, seccionActiva, busqueda, seccion]);
+  }, [data, seccionActiva, seccion]);
 
   useEffect(() => {
     verificarYCargar();
@@ -299,27 +280,75 @@ export function EliminacionForm() {
 
       const item = SECCIONES.find((section) => section.id === seccionActiva);
       const archivadas = item.tipo === "consulta";
+
+      if (archivadas) {
+        const page = await fetchPaged(item.endpoint, {
+          search: busquedaAplicada,
+          page: paginaActual,
+          size: registrosPorPagina,
+          sortBy: "fecha",
+          direction: "desc",
+          resourceName: "consultas archivadas",
+          allowLegacyArray: true,
+        });
+        setData((prev) => ({ ...prev, [item.id]: page.content }));
+        setTotalRemoto(page.totalElements);
+        setPaginasRemotas(page.totalPages);
+        return;
+      }
+
       const endpoint = item.id === "personas" ? "/personas/inactivos" : item.endpoint;
       const params = new URLSearchParams();
-      if (!archivadas) {
-        params.set("page", String(paginaActual));
-        params.set("size", String(registrosPorPagina));
-        if (item.id !== "personas") {
-          params.set("activo", "false");
-          params.set("sortBy", "id");
-          params.set("direction", "asc");
-        }
-        if (busquedaAplicada.trim()) params.set("search", busquedaAplicada.trim());
+      params.set("page", String(paginaActual));
+      params.set("size", String(registrosPorPagina));
+      if (item.id !== "personas") {
+        params.set("activo", "false");
+        params.set("sortBy", "id");
+        params.set("direction", "asc");
       }
+      if (busquedaAplicada.trim()) params.set("search", busquedaAplicada.trim());
       const url = `${API_URL_BASE}${endpoint}${params.size ? `?${params}` : ""}`;
       const res = await apiClient.request(url, { credentials: "include" });
       if (!res.ok) throw new Error("No fue posible cargar los registros desactivados.");
       const json = await res.json();
-      const content = archivadas ? (Array.isArray(json) ? json : []) : json?.content;
+
+      if (Array.isArray(json)) {
+        const search = busquedaAplicada.trim().toLowerCase();
+        const filtered = json
+          .filter((record) => estaInactivo(record))
+          .filter((record) =>
+            !search ||
+            [
+              record?.id,
+              nombrePersona(record),
+              documentoPersona(record),
+              detalleItem(record, item.tipo),
+              record?.estado,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase()
+              .includes(search)
+          );
+        const totalPages = Math.ceil(filtered.length / registrosPorPagina);
+        const safePage = totalPages > 0 ? Math.min(paginaActual, totalPages) : 1;
+        const start = (safePage - 1) * registrosPorPagina;
+
+        setData((prev) => ({
+          ...prev,
+          [item.id]: filtered.slice(start, start + registrosPorPagina),
+        }));
+        setTotalRemoto(filtered.length);
+        setPaginasRemotas(totalPages);
+        if (safePage !== paginaActual) setPaginaActual(safePage);
+        return;
+      }
+
+      const content = json?.content;
       if (!Array.isArray(content)) throw new Error("Respuesta de listado inválida.");
       setData((prev) => ({ ...prev, [item.id]: content }));
-      setTotalRemoto(archivadas ? 0 : Number(json.totalElements) || 0);
-      setPaginasRemotas(archivadas ? 0 : Number(json.totalPages) || 0);
+      setTotalRemoto(Number(json.totalElements) || 0);
+      setPaginasRemotas(Number(json.totalPages) || 0);
     } catch (error) {
       toast.error(error.message || "No fue posible cargar los registros.");
       setData((prev) => ({ ...prev, [seccionActiva]: [] }));
@@ -417,13 +446,8 @@ export function EliminacionForm() {
     }
   }
 
-  const esArchivadas = seccionActiva === "consultas";
-  const totalSeccion = esArchivadas ? itemsActuales.length : totalRemoto;
-  const totalPaginas = esArchivadas ? getTotalPages(totalSeccion, registrosPorPagina) : paginasRemotas;
-  const itemsPaginados = useMemo(
-    () => esArchivadas ? paginateItems(itemsActuales, paginaActual, registrosPorPagina) : itemsActuales,
-    [itemsActuales, paginaActual, registrosPorPagina, esArchivadas]
-  );
+  const totalSeccion = totalRemoto;
+  const totalPaginas = paginasRemotas;
 
   useEffect(() => {
     setPaginaActual(1);
@@ -536,7 +560,7 @@ export function EliminacionForm() {
                     </td>
                   </tr>
                 ) : (
-                  itemsPaginados.map((item) => {
+                  itemsActuales.map((item) => {
                     const key = `${seccion.id}-${item.id}`;
                     const isLoading = reactivando === key;
 

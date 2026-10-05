@@ -32,7 +32,6 @@ import { PERMISOS } from "@/lib/permission";
 import {
   esConciliador,
   esEstudiante,
-  tieneAlgunPermiso,
   tienePermiso,
 } from "@/lib/authz";
 
@@ -41,11 +40,9 @@ import {
   archivoEsPdf,
   badgeEstadoClass,
   etiquetaEstado,
-  extraerLista,
   formatearFecha,
   nombrePersona,
   normalizarTexto,
-  ordenarPorIdAsc,
 } from "./conciliaciones.utils";
 import { esRolAdministrador } from "./conciliaciones.permissions";
 import { ActionCard, InfoCard, PersonasCard } from "./ConciliacionesFormParts";
@@ -57,7 +54,6 @@ export function ConciliacionesForm() {
 
   const [usuario, setUsuario] = useState(null);
   const [conciliaciones, setConciliaciones] = useState([]);
-  const [estudiantes, setEstudiantes] = useState([]);
   const [detalle, setDetalle] = useState(null);
 
   const [loading, setLoading] = useState(true);
@@ -143,6 +139,7 @@ export function ConciliacionesForm() {
           filters: { estado: estadoFiltro, fechaDesde, fechaHasta },
           signal: controller.signal,
           resourceName: "conciliaciones",
+          allowLegacyArray: true,
         });
         setConciliaciones(page.content);
         setTotalElements(page.totalElements);
@@ -246,28 +243,6 @@ export function ConciliacionesForm() {
     }
   }
 
-  async function cargarEstudiantesConciliacion(me = usuario) {
-    const puedeCargar = tieneAlgunPermiso(me, [
-      PERMISOS.VER_ESTUDIANTES,
-      PERMISOS.VER_PERFILES_AUXILIARES,
-      PERMISOS.GESTIONAR_CONCILIACIONES,
-      PERMISOS.CONCLUIR_CONCILIACIONES,
-    ]);
-
-    if (!puedeCargar || estudiantes.length > 0) return;
-
-    try {
-      const data = await apiFetch(
-        "/estudiantes/conciliacion",
-        { method: "GET" },
-        "No se pudieron cargar los estudiantes habilitados para conciliación"
-      );
-      setEstudiantes(ordenarPorIdAsc(extraerLista(data)));
-    } catch {
-      setEstudiantes([]);
-    }
-  }
-
   async function refrescar(mensajeOk = "Información actualizada") {
     setReloadKey((value) => value + 1);
     if (detalle?.id) {
@@ -294,7 +269,6 @@ export function ConciliacionesForm() {
       setDetalle(data);
       setEstudianteId(String(data?.estudianteId || ""));
       setConciliadorId(String(data?.conciliadorId || ""));
-      await cargarEstudiantesConciliacion();
       return data;
     } catch (err) {
       setError(
@@ -703,7 +677,8 @@ export function ConciliacionesForm() {
                 setCrearConsultaId(id ? String(id) : "");
                 setCrearConsultaSeleccionada(item);
               }}
-              endpoint="/consultas"
+            endpoint="/consultas"
+            legacyEndpoint="/consultas"
               resourceName="consultas"
               sortBy="fecha"
               direction="desc"
@@ -973,18 +948,25 @@ export function ConciliacionesForm() {
                   {puedeAsignarEstudiante && !detalleFinalizado && (
                     <ActionCard title="Asignar estudiante">
                       <div className="flex flex-col gap-2 sm:flex-row">
-                        <select
+                        <div className="flex-1">
+                          <RemotePagedSelect
                           value={estudianteId}
-                          onChange={(event) => setEstudianteId(event.target.value)}
-                          className="h-10 flex-1 rounded-md border bg-background px-3 text-sm"
-                        >
-                          <option value="">Selecciona estudiante</option>
-                          {estudiantes.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              #{item.id} - {nombrePersona(item)}
-                            </option>
-                          ))}
-                        </select>
+                            selectedLabel={
+                              detalle.estudianteId && String(detalle.estudianteId) === String(estudianteId)
+                                ? detalle.estudianteNombre || ""
+                                : ""
+                            }
+                            onChange={(id) => setEstudianteId(id ? String(id) : "")}
+                            endpoint="/estudiantes/conciliacion/paginados"
+                            legacyEndpoint="/estudiantes/conciliacion"
+                            resourceName="estudiantes habilitados para conciliación"
+                            sortBy="nombre"
+                            direction="asc"
+                            placeholder="Selecciona estudiante"
+                            searchPlaceholder="Buscar estudiante..."
+                            getOptionLabel={(item) => `#${item.id} - ${nombrePersona(item)}`}
+                          />
+                        </div>
                         <Button type="button" onClick={asignarEstudiante} disabled={saving}>
                           Guardar
                         </Button>
@@ -1005,6 +987,7 @@ export function ConciliacionesForm() {
                             }
                             onChange={(id) => setConciliadorId(id ? String(id) : "")}
                             endpoint="/conciliadores"
+                            legacyEndpoint="/conciliadores"
                             resourceName="conciliadores"
                             filters={{ activo: true }}
                             sortBy="nombre"
