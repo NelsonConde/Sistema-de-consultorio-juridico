@@ -1,116 +1,134 @@
-# Backend - Archivos y almacenamiento documental
+# Backend - Archivos y Gestión Documental del Expediente
 
-> Documento ajustado contra el código fuente actual. Describe la implementación real de almacenamiento genérico y su uso por módulos funcionales.
-
-## 1. Propósito
-
-El backend incluye un módulo de almacenamiento para cargar, listar y descargar archivos. La fachada conserva el contrato existente, pero el proveedor de producción utiliza el bucket privado `legal-documents` de Supabase Storage mediante su API S3 compatible.
+> Documentación de la arquitectura interna, componentes Spring Boot, entidades JPA, servicios de negocio, control de concurrencia y reconciliación de almacenamiento.
 
 ---
 
-## 2. Componentes principales
+## 1. Arquitectura General del Módulo
 
-| Componente | Responsabilidad |
-|---|---|
-| `FileUploadController` | Expone endpoints bajo `/api/files`. |
-| `FileStorageService` | Fachada compatible con la API que delega en el proveedor de objetos. |
-| `StorageProvider` | Contrato interno para desacoplar la aplicación del proveedor físico. |
-| `SupabaseStorageProvider` | Implementación S3 para Supabase Storage. |
-| `FileAsset` | Metadatos de cada objeto y asociación con su recurso funcional. |
-| `FileAssetService` | Gestiona estados PENDING, ACTIVE, FAILED y DELETE_PENDING. |
-| `FileAssetReconciliationService` | Reintenta limpiar objetos de operaciones incompletas. |
-| `FileValidationService` | Aplica tamaño, extensión y firmas básicas de contenido. |
-| `FileStorageException` | Excepción de almacenamiento. |
-| `FileNotFoundException` | Excepción de archivo o directorio no encontrado. |
-| `ConciliacionDocumentoService` | Usa almacenamiento para solicitud y acta PDF de conciliación. |
+El módulo de gestión documental implementa un patrón desacoplado en capas, donde la lógica de negocio y las autorizaciones del dominio jurídico son completamente independientes del proveedor de almacenamiento físico:
+
+```mermaid
+graph TD
+    Client[Cliente Web / Frontend] --> FRC[FileResourceController]
+    FRC --> FRS[FileResourceService]
+    FRS --> FRAS[FileResourceAuthorizationService]
+    FRAS --> CAS[ConsultaAccessService / ProcesoAccessService]
+    FRS --> FAS[FileAssetService]
+    FAS --> FAR[FileAssetRepository]
+    FAR --> DB[(PostgreSQL / file_asset)]
+    FRS --> SP[StorageProvider]
+    SP --> SSP[SupabaseStorageProvider / S3]
+    FARS[FileAssetReconciliationService] -.-> FAS
+    FARS -.-> SP
+```
 
 ---
 
-## 3. Configuración
+## 2. Componentes Principales
 
-La conexión a Supabase Storage se configura mediante:
+| Componente | Paquete | Responsabilidad |
+|---|---|---|
+| `FileResourceController` | `file_storage.controller` | Endpoints REST bajo `/api` organizados por recursos del dominio (`/consultas/...`, `/seguimientos/...`, `/procesos/...`, `/conciliaciones/...`, `/file-uploads/...`, `/archivos/...`). |
+| `FileResourceService` | `file_storage.service` | Orquesta la autorización de recursos, generación de claves canónicas, staging temporal, finalización idempotente y consulta agregada del expediente. |
+| `FileResourceAuthorizationService` | `file_storage.service` | Intermediario que valida roles y alcance por tipo de recurso (`CONSULTA`, `SEGUIMIENTO`, `RESPUESTA`, `PROCESO`, `CONCILIACION`). |
+| `FileAssetService` | `file_storage.service` | Gestiona el ciclo de vida de `FileAsset` en base de datos: creación en `PENDING`, promoción a `VIGENTE`, versionamiento secuencial $N+1$, bloqueo pesimista y paso a `HISTORICO`. |
+| `FileAssetRepository` | `file_storage.repository` | Métodos JPA y JPQL avanzados: búsqueda por `uploadId`, versiones por `documentoLogico`, consultas de bloqueo pesimista y consulta agregada de expediente `findExpedienteFiles`. |
+| `StorageProvider` | `file_storage.service` | Interfaz que define el contrato de almacenamiento: subida binaria, URLs presignadas de subida y descarga, verificación de existencia (`head`), cálculo de hash SHA-256 y eliminación física. |
+| `SupabaseStorageProvider` | `file_storage.service` | Implementación compatible con la API S3 de Supabase Storage (o MinIO en entornos locales de prueba). |
+| `FileAssetReconciliationService` | `file_storage.service` | Tarea programada (`@Scheduled`) que identifica cargas huérfanas en `PENDING` o `DELETE_PENDING` y compensa eliminando archivos incompletos del bucket. |
+| `FileValidationService` | `file_storage.service` | Valida extensiones, nombres de archivo sanitizados y tipos MIME permitidos. |
+
+---
+
+## 3. Modelo de Datos y Versionamiento ($N+1$)
+
+El modelo está respaldado por la entidad `FileAsset` (`file_asset`), migrada mediante Flyway (`V23`, `V25`, `V26`).
+
+### Ciclo de vida de una versión documental
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: Iniciar carga (initiate)
+    PENDING --> VIGENTE: Confirmar (complete) - Versión 1 o N+1
+    PENDING --> FAILED: Error de subida / Checksum inválido
+    PENDING --> DELETE_PENDING: Cancelar (abort) / Reconciliación
+    VIGENTE --> HISTORICO: Reemplazado por nueva versión N+1
+    VIGENTE --> ANULADO: Baja lógica (delete)
+    HISTORICO --> [*]
+    ANULADO --> [*]
+    FAILED --> [*]
+    DELETE_PENDING --> [*]
+```
+
+### Control de Concurrencia en Versionado
+
+1. **Bloqueo Pesimista**: Cuando se solicita una nueva versión de un `documentoLogico` existente, el método `findVigenteForUpdate(documentoLogico)` adquiere un bloqueo pesimista de escritura (`PESSIMISTIC_WRITE`) a nivel de fila en PostgreSQL (`SELECT ... FOR UPDATE`).
+2. **Cálculo Secuencial Server-Side**: La nueva versión se calcula evaluando la versión máxima persistida ($N+1$), sin permitir que el cliente decida o suministre el número de versión.
+3. **Garantía en Base de Datos**: El índice único parcial `uk_file_asset_doc_vigente` (`CREATE UNIQUE INDEX uk_file_asset_doc_vigente ON file_asset (documento_logico) WHERE status = 'VIGENTE';`) imposibilita físicamente que dos transacciones simultáneas dejen dos versiones activas para el mismo documento lógico.
+
+---
+
+## 4. Flujo Idempotente de Carga
+
+1. **Iniciación (`initiate`)**:
+   - Se valida permiso y alcance sobre el recurso funcional.
+   - Si es un reemplazo, se valida que el `documentoLogico` exista y pertenezca al mismo recurso.
+   - Se genera un `uploadId` (UUID) y se inserta un registro en estado `PENDING`.
+   - Se genera una clave física interna no colisionable: `{recurso}/{id}/{uuid}_{nombreSanitizado}`.
+   - Se retorna el `uploadId` y la URL presignada de subida física.
+2. **Subida Física**: El cliente transfiere los bytes directamente al almacenamiento privado de objetos mediante HTTP PUT.
+3. **Completado (`complete`)**:
+   - Se consulta el registro por `uploadId`.
+   - **Idempotencia**: Si el registro ya se encuentra en estado `VIGENTE`, se retorna de inmediato el DTO existente sin ejecutar mutaciones adicionales.
+   - Si está en `PENDING`, se comprueba la existencia física del objeto en el bucket, se valida su tamaño y se calcula/compara la suma SHA-256.
+   - Se promueve atómicamente a `VIGENTE` y, si correspondía a un reemplazo, la versión anterior pasa a `HISTORICO` registrando la relación `referencia_anterior_id`.
+   - Si ocurre una excepción, la transacción de base de datos se revierte y el objeto huérfano se marca para limpieza segura.
+
+---
+
+## 5. Consulta Documental Agregada por Expediente
+
+El endpoint `GET /api/consultas/{consultaId}/expediente/archivos` resuelve el acervo documental completo del caso mediante el método de repositorio:
+
+```java
+@Query("SELECT f FROM FileAsset f " +
+       "LEFT JOIN FETCH f.uploadedBy " +
+       "WHERE f.active = true AND f.status = 'VIGENTE' AND (" +
+       "  (f.resourceType = 'CONSULTA' AND f.resourceId = :consultaId) OR " +
+       "  (f.resourceType = 'SEGUIMIENTO' AND f.resourceId IN (SELECT s.id FROM Seguimiento s WHERE s.consulta.id = :consultaId AND s.activo = true)) OR " +
+       "  (f.resourceType = 'RESPUESTA' AND f.resourceId IN (SELECT r.id FROM SeguimientoRespuesta r WHERE r.seguimiento.consulta.id = :consultaId AND r.activo = true)) OR " +
+       "  (f.resourceType = 'PROCESO' AND f.resourceId IN (SELECT p.id FROM Proceso p WHERE p.consulta.id = :consultaId AND p.activo = true)) OR " +
+       "  (f.resourceType = 'CONCILIACION' AND f.resourceId IN (SELECT c.id FROM Conciliacion c WHERE c.consulta.id = :consultaId AND c.activo = true))" +
+       ") " +
+       "ORDER BY f.createdAt DESC, f.id DESC")
+List<FileAsset> findExpedienteFiles(@Param("consultaId") Long consultaId);
+```
+
+### Características de Rendimiento y Seguridad
+
+- **Prevención del problema N+1**: La cláusula `LEFT JOIN FETCH f.uploadedBy` carga de manera anticipada los datos de autoría de los usuarios en una única sentencia SQL.
+- **Aislamiento de Expedientes**: La subconsulta vincula estrictamente cada recurso hijo (`Seguimiento`, `SeguimientoRespuesta`, `Proceso`, `Conciliacion`) a la consulta raíz, impidiendo filtraciones entre expedientes distintos.
+- **Filtros en memoria**: Los filtros opcionales (`tipoDocumental`, `resourceType`, `origen`, `autor`, fechas) se aplican sobre el flujo de datos validado antes de retornar la proyección segura `ExpedienteDocumentoResponse`.
+
+---
+
+## 6. Configuración de Entorno y Almacenamiento
+
+El módulo soporta múltiples perfiles de despliegue mediante variables de entorno en `application.properties`:
 
 ```properties
+# Configuración del proveedor de almacenamiento
+file.storage.provider=${FILE_STORAGE_PROVIDER:supabase}
 supabase.storage.endpoint=${SUPABASE_STORAGE_ENDPOINT}
-supabase.storage.region=${SUPABASE_STORAGE_REGION}
+supabase.storage.region=${SUPABASE_STORAGE_REGION:us-east-1}
 supabase.storage.access-key=${SUPABASE_STORAGE_ACCESS_KEY}
 supabase.storage.secret-key=${SUPABASE_STORAGE_SECRET_KEY}
 supabase.storage.bucket=${SUPABASE_STORAGE_BUCKET:legal-documents}
+
+# Tamaño máximo admitido
+spring.servlet.multipart.max-file-size=10MB
+spring.servlet.multipart.max-request-size=10MB
 ```
 
-Las credenciales son obligatorias y deben inyectarse en Railway. No se deben guardar claves reales en el repositorio.
-
-Cada carga inicia un `FileAsset` en estado `PENDING`, pasa a `ACTIVE` cuando el objeto se confirma en Storage y se marca como `FAILED` o `DELETE_PENDING` si la compensación requiere reintento. El reconciliador revisa operaciones antiguas periódicamente. Cada registro conserva bucket, clave, recurso, usuario, tamaño, tipo MIME y checksum SHA-256.
-
----
-
-## 4. Carga individual y múltiple
-
-La carga individual usa:
-
-```http
-POST /api/files/upload
-```
-
-La carga múltiple usa:
-
-```http
-POST /api/files/upload-multiple
-```
-
-Ambos endpoints reciben `MultipartFile` y un `path` opcional. Si se envía `path`, el archivo se almacena bajo ese subdirectorio relativo.
-
-La carga múltiple registra un resultado por archivo y permite respuestas mixtas de éxito y error dentro de la misma lista. La petición multipart continúa siendo compatible con el frontend actual.
-
----
-
-## 5. Descarga y listado
-
-El controller expone:
-
-```http
-GET /api/files/download/**
-GET /api/files/list
-GET /api/files/list/{subDir}
-GET /api/files/directories
-```
-
-La descarga retorna un `Resource`. El listado de archivos retorna nombres de archivo del directorio solicitado. El listado de directorios recorre la raíz configurada y devuelve rutas relativas de directorios.
-
----
-
-## 6. Seguridad de rutas
-
-`FileStorageService` aplica las siguientes reglas:
-
-- limpia nombres de archivo con `StringUtils.cleanPath`;
-- rechaza nombres de archivo que contengan `..`;
-- rechaza rutas absolutas;
-- normaliza claves antes de almacenarlas o cargarlas;
-- delega la escritura y lectura en `SupabaseStorageProvider`.
-
-El contrato funcional espera rutas relativas bajo la raíz configurada de almacenamiento.
-
----
-
-## 7. Validación de tipo documental
-
-El almacenamiento genérico todavía no valida el contenido real del archivo. En este bloque se establece un límite multipart de 10 MB, coherente con el bucket `legal-documents`; la validación de tipos y contenido se implementará en el bloque de seguridad.
-
-Las reglas de tipo documental se aplican en el módulo que usa el archivo. Por ejemplo, `ConciliacionDocumentoService` exige PDF para solicitud y acta.
-
----
-
-## 8. Rutas lógicas usadas por módulos
-
-Los módulos funcionales usan rutas lógicas sobre el almacenamiento:
-
-| Módulo | Ruta lógica |
-|---|---|
-| Consultas | Directorios asociados al id de la consulta. |
-| Seguimientos - tarea | `tareas-{seguimientoId}-documentos` |
-| Seguimientos - respuesta | `tareas-{seguimientoId}-respuestas-{respuestaId}` |
-| Conciliación - solicitud | `conciliacion/{id}/solicitud.pdf` |
-| Conciliación - acta | `conciliacion/{id}/acta.pdf` |
-
-Estas rutas se usan como contrato lógico entre backend, frontend y almacenamiento.
+En pruebas locales e integración se utiliza `LocalStorageProvider` o MinIO con bucket privado y credenciales locales seguras.
