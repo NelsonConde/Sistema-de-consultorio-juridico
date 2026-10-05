@@ -89,13 +89,13 @@ class FileResourceControllerExpedienteSecurityTest {
     }
 
     @Test
-    void consultaInexistenteRecibe404NotFound() throws Exception {
+    void consultaInexistenteRecibe400BadRequest() throws Exception {
         permitirLecturaConsultas();
         when(consultaRepository.findById(10L)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/consultas/10/expediente/archivos"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.mensaje").value("Consulta no encontrada"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Error de negocio"));
     }
 
     @Test
@@ -137,7 +137,7 @@ class FileResourceControllerExpedienteSecurityTest {
     }
 
     @Test
-    void perfilEstudianteConExpedienteAjenoRecibe404NotFound() throws Exception {
+    void perfilEstudianteConExpedienteAjenoRecibe403Forbidden() throws Exception {
         permitirLecturaConsultas();
         Consulta consulta = new Consulta();
         Estudiante est = new Estudiante();
@@ -149,8 +149,8 @@ class FileResourceControllerExpedienteSecurityTest {
                 .thenReturn(new PerfilUsuarioActual(15L, TipoPerfilUsuario.ESTUDIANTE));
 
         mockMvc.perform(get("/api/consultas/10/expediente/archivos"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.mensaje").value("Consulta no encontrada"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("No autorizado"));
     }
 
     @Test
@@ -175,7 +175,7 @@ class FileResourceControllerExpedienteSecurityTest {
     }
 
     @Test
-    void perfilAsesorConExpedienteAjenoRecibe404NotFound() throws Exception {
+    void perfilAsesorConExpedienteAjenoRecibe403Forbidden() throws Exception {
         permitirLecturaConsultas();
         Consulta consulta = new Consulta();
         Asesor asesor = new Asesor();
@@ -187,7 +187,8 @@ class FileResourceControllerExpedienteSecurityTest {
                 .thenReturn(new PerfilUsuarioActual(20L, TipoPerfilUsuario.ASESOR));
 
         mockMvc.perform(get("/api/consultas/10/expediente/archivos"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("No autorizado"));
     }
 
     @Test
@@ -211,7 +212,7 @@ class FileResourceControllerExpedienteSecurityTest {
     }
 
     @Test
-    void perfilMonitorConExpedienteAjenoRecibe404NotFound() throws Exception {
+    void perfilMonitorConExpedienteAjenoRecibe403Forbidden() throws Exception {
         permitirLecturaConsultas();
         Consulta consulta = new Consulta();
         Monitor monitor = new Monitor();
@@ -223,11 +224,12 @@ class FileResourceControllerExpedienteSecurityTest {
                 .thenReturn(new PerfilUsuarioActual(30L, TipoPerfilUsuario.MONITOR));
 
         mockMvc.perform(get("/api/consultas/10/expediente/archivos"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("No autorizado"));
     }
 
     @Test
-    void perfilConciliadorRecibe404NotFoundEnExpedienteGeneral() throws Exception {
+    void perfilConciliadorRecibe403ForbiddenEnExpedienteGeneral() throws Exception {
         permitirLecturaConsultas();
         Consulta consulta = new Consulta();
 
@@ -236,7 +238,8 @@ class FileResourceControllerExpedienteSecurityTest {
                 .thenReturn(new PerfilUsuarioActual(40L, TipoPerfilUsuario.CONCILIADOR));
 
         mockMvc.perform(get("/api/consultas/10/expediente/archivos"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("No autorizado"));
     }
 
     @Test
