@@ -5,8 +5,10 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import co.edu.ufps.legal_cases.business.dto.perfil.MonitorDTO;
+import co.edu.ufps.legal_cases.business.dto.perfil.MonitorResumenDTO;
 import co.edu.ufps.legal_cases.business.service.perfil.monitor.MonitorCommandService;
 import co.edu.ufps.legal_cases.business.service.perfil.monitor.MonitorQueryService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
 @Service
 public class MonitorService {
@@ -23,12 +25,27 @@ public class MonitorService {
 
     // Fachada del módulo de monitores.
     // El controller entra por aquí, pero lectura y escritura quedan separadas por responsabilidad.
-    public List<MonitorDTO> listar() {
-        return monitorQueryService.listar();
+    public PageResponseDTO<MonitorResumenDTO> buscar(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction,
+            Boolean activo) {
+        return monitorQueryService.buscar(search, page, size, sortBy, direction, activo);
     }
 
     public List<MonitorDTO> listarActivos() {
         return monitorQueryService.listarActivos();
+    }
+
+    public PageResponseDTO<MonitorResumenDTO> listarActivosPaginados(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction) {
+        return monitorQueryService.listarActivosPaginados(search, page, size, sortBy, direction);
     }
 
     public MonitorDTO obtenerPorId(Long id) {

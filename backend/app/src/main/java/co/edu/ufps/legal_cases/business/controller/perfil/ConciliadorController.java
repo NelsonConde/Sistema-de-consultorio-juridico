@@ -12,7 +12,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import co.edu.ufps.legal_cases.business.dto.perfil.ConciliadorDTO;
+import co.edu.ufps.legal_cases.business.dto.perfil.ConciliadorResumenDTO;
+import co.edu.ufps.legal_cases.business.model.perfil.TipoConciliador;
 import co.edu.ufps.legal_cases.business.service.perfil.ConciliadorService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import jakarta.validation.Valid;
 
 @RestController
@@ -27,8 +30,15 @@ public class ConciliadorController {
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('" + VER_CONCILIADORES + "', '" + GESTIONAR_CONCILIADORES + "', '" + GESTIONAR_USUARIOS + "')")
-    public List<ConciliadorDTO> listar() {
-        return conciliadorService.listar();
+    public PageResponseDTO<ConciliadorResumenDTO> listar(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) Boolean activo,
+            @RequestParam(required = false) TipoConciliador tipoConciliador) {
+        return conciliadorService.buscar(search, page, size, sortBy, direction, activo, tipoConciliador);
     }
 
     @GetMapping("/activos")

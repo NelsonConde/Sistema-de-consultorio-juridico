@@ -9,6 +9,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @Testcontainers(disabledWithoutDocker = true)
 abstract class Db03PostgreSqlTestBase {
 
+    @SuppressWarnings("resource")
     @Container
     static final PostgreSQLContainer POSTGRESQL =
             new PostgreSQLContainer("postgres:16-alpine")

@@ -7,13 +7,11 @@ import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.GESTIONAR_
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_CONSULTAS;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.CAMBIAR_ESTADO_CONSULTAS;
 
-import java.util.List;
-
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,6 +20,7 @@ import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaDTO;
 import co.edu.ufps.legal_cases.business.dto.consulta.ficha.FichaExpedienteDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.business.service.consulta.ConsultaService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import jakarta.validation.Valid;
 
 @RestController
@@ -41,9 +40,28 @@ public class ConsultaController {
      */
     @GetMapping
     @PreAuthorize("hasAnyAuthority('" + VER_CONSULTAS + "', '" + GESTIONAR_CONSULTAS + "')")
-    public List<ConsultaBusquedaDTO> buscar(
-            @RequestParam(required = false, defaultValue = "") String search) {
-        return consultaService.buscarParaUsuarioActual(search);
+    public PageResponseDTO<ConsultaBusquedaDTO> buscar(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "fecha") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) Long areaId,
+            @RequestParam(required = false) EstadoConsulta estado,
+            @RequestParam(required = false) Long asesorId,
+            @RequestParam(required = false) Long monitorId,
+            @RequestParam(required = false) Long estudianteId) {
+        return consultaService.buscarParaUsuarioActual(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                areaId,
+                estado,
+                asesorId,
+                monitorId,
+                estudianteId);
     }
 
     @GetMapping("/{id}")
@@ -116,8 +134,13 @@ public class ConsultaController {
 
     @GetMapping("/archivadas")
     @PreAuthorize("hasAuthority('" + ARCHIVAR_CONSULTAS + "')")
-    public List<ConsultaBusquedaDTO> listarArchivadas() {
-        return consultaService.listarArchivadas();
+    public PageResponseDTO<ConsultaBusquedaDTO> listarArchivadas(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "fecha") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction) {
+        return consultaService.listarArchivadas(search, page, size, sortBy, direction);
     }
 
     @PatchMapping("/{id}/desarchivar")

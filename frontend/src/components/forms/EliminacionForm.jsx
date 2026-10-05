@@ -19,11 +19,13 @@ import { Button } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import Pagination from "@/components/ui/Pagination";
 import { API_URL_BASE } from "@/lib/config";
-import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils";
+import { DEFAULT_PAGE_SIZE_OPTIONS } from "@/lib/list-utils";
+import { fetchPaged } from "@/lib/pagedApi";
 import { RotateCcw, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PERMISOS } from "@/lib/permission";
 import { tieneTodosLosPermisos } from "@/lib/authz";
+import { useDebouncedPageSearch } from "@/hooks/useDebouncedValue";
 
 const SECCIONES = [
   {
@@ -199,6 +201,10 @@ export function EliminacionForm() {
   const [itemAReactivar, setItemAReactivar] = useState(null);
   const [paginaActual, setPaginaActual] = useState(1);
   const [registrosPorPagina, setRegistrosPorPagina] = useState(10);
+  const [totalRemoto, setTotalRemoto] = useState(0);
+  const [paginasRemotas, setPaginasRemotas] = useState(0);
+  const [autorizado, setAutorizado] = useState(false);
+  const busquedaAplicada = useDebouncedPageSearch(busqueda, setPaginaActual, 350);
   const router = useRouter();
 
   const seccion = useMemo(() => {
@@ -207,35 +213,15 @@ export function EliminacionForm() {
 
   const itemsActuales = useMemo(() => {
     const lista = data[seccionActiva] || [];
-    const q = busqueda.trim().toLowerCase();
 
-    const filtradosPorEstado = lista.filter((item) => {
+    return lista.filter((item) => {
       if (seccion?.tipo === "consulta") {
         return estaArchivadaConsulta(item);
       }
 
       return estaInactivo(item);
     });
-
-    const filtrados = !q
-      ? filtradosPorEstado
-      : filtradosPorEstado.filter((item) =>
-      [
-        item?.id,
-        nombrePersona(item),
-        documentoPersona(item),
-        textoConsulta(item),
-        detalleItem(item, seccion?.tipo),
-        item?.estado,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
-    );
-
-    return sortByIdAsc(filtrados);
-  }, [data, seccionActiva, busqueda, seccion]);
+  }, [data, seccionActiva, seccion]);
 
   useEffect(() => {
     verificarYCargar();
@@ -275,7 +261,7 @@ export function EliminacionForm() {
         return;
       }
 
-      await cargarTodo();
+      setAutorizado(true);
     } catch {
 
       router.replace("/");
@@ -284,55 +270,90 @@ export function EliminacionForm() {
     }
   }
 
+  useEffect(() => {
+    if (autorizado) cargarTodo();
+  }, [autorizado, seccionActiva, paginaActual, registrosPorPagina, busquedaAplicada]);
+
   async function cargarTodo() {
     try {
       setLoading(true);
 
-      const resultados = {};
+      const item = SECCIONES.find((section) => section.id === seccionActiva);
+      const archivadas = item.tipo === "consulta";
 
-      await Promise.all(
-        SECCIONES.map(async (item) => {
-          try {
-            const res = await apiClient.request(`${API_URL_BASE}${item.endpoint}`, {
-              credentials: "include",
-            });
+      if (archivadas) {
+        const page = await fetchPaged(item.endpoint, {
+          search: busquedaAplicada,
+          page: paginaActual,
+          size: registrosPorPagina,
+          sortBy: "fecha",
+          direction: "desc",
+          resourceName: "consultas archivadas",
+          allowLegacyArray: true,
+        });
+        setData((prev) => ({ ...prev, [item.id]: page.content }));
+        setTotalRemoto(page.totalElements);
+        setPaginasRemotas(page.totalPages);
+        return;
+      }
 
-            if (res.status === 401) {
-              toast.error("La sesión expiró");
-              resultados[item.id] = [];
-              return;
-            }
+      const endpoint = item.id === "personas" ? "/personas/inactivos" : item.endpoint;
+      const params = new URLSearchParams();
+      params.set("page", String(paginaActual));
+      params.set("size", String(registrosPorPagina));
+      if (item.id !== "personas") {
+        params.set("activo", "false");
+        params.set("sortBy", "id");
+        params.set("direction", "asc");
+      }
+      if (busquedaAplicada.trim()) params.set("search", busquedaAplicada.trim());
+      const url = `${API_URL_BASE}${endpoint}${params.size ? `?${params}` : ""}`;
+      const res = await apiClient.request(url, { credentials: "include" });
+      if (!res.ok) throw new Error("No fue posible cargar los registros desactivados.");
+      const json = await res.json();
 
-            if (res.status === 403) {
-              resultados[item.id] = [];
-              return;
-            }
+      if (Array.isArray(json)) {
+        const search = busquedaAplicada.trim().toLowerCase();
+        const filtered = json
+          .filter((record) => estaInactivo(record))
+          .filter((record) =>
+            !search ||
+            [
+              record?.id,
+              nombrePersona(record),
+              documentoPersona(record),
+              detalleItem(record, item.tipo),
+              record?.estado,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase()
+              .includes(search)
+          );
+        const totalPages = Math.ceil(filtered.length / registrosPorPagina);
+        const safePage = totalPages > 0 ? Math.min(paginaActual, totalPages) : 1;
+        const start = (safePage - 1) * registrosPorPagina;
 
-            if (!res.ok) {
-              resultados[item.id] = [];
-              return;
-            }
+        setData((prev) => ({
+          ...prev,
+          [item.id]: filtered.slice(start, start + registrosPorPagina),
+        }));
+        setTotalRemoto(filtered.length);
+        setPaginasRemotas(totalPages);
+        if (safePage !== paginaActual) setPaginaActual(safePage);
+        return;
+      }
 
-            const json = await res.json();
-
-            if (item.id === "personas" && !Array.isArray(json)) {
-              // Pagination handling.
-              // Pagination handling.
-              // List and table handling.
-
-              resultados[item.id] = [];
-              return;
-            }
-
-            resultados[item.id] = Array.isArray(json) ? json : [];
-          } catch {
-
-            resultados[item.id] = [];
-          }
-        })
-      );
-
-      setData(resultados);
+      const content = json?.content;
+      if (!Array.isArray(content)) throw new Error("Respuesta de listado inválida.");
+      setData((prev) => ({ ...prev, [item.id]: content }));
+      setTotalRemoto(Number(json.totalElements) || 0);
+      setPaginasRemotas(Number(json.totalPages) || 0);
+    } catch (error) {
+      toast.error(error.message || "No fue posible cargar los registros.");
+      setData((prev) => ({ ...prev, [seccionActiva]: [] }));
+      setTotalRemoto(0);
+      setPaginasRemotas(0);
     } finally {
       setLoading(false);
     }
@@ -384,8 +405,13 @@ export function EliminacionForm() {
 
   async function reactivarActivo(endpoint, item) {
     const id = item?.id;
+    const detalle = endpoint === "/personas"
+      ? await apiClient.request(`${API_URL_BASE}/personas/${id}`, { credentials: "include" })
+      : null;
+    if (detalle && !detalle.ok) throw new Error("No se pudo consultar la versión de la persona.");
+    const version = detalle ? requireResourceVersion(await detalle.json(), "registro de persona") : null;
     const url = endpoint === "/personas"
-      ? `${API_URL_BASE}${endpoint}/${id}/reactivar?version=${encodeURIComponent(String(requireResourceVersion(item, "registro de persona")))}`
+      ? `${API_URL_BASE}${endpoint}/${id}/reactivar?version=${encodeURIComponent(String(version))}`
       : `${API_URL_BASE}${endpoint}/${id}/activo?activo=true`;
 
     const res = await apiClient.request(url, {
@@ -420,19 +446,15 @@ export function EliminacionForm() {
     }
   }
 
-  const totalSeccion = itemsActuales.length;
-  const totalPaginas = getTotalPages(totalSeccion, registrosPorPagina);
-  const itemsPaginados = useMemo(
-    () => paginateItems(itemsActuales, paginaActual, registrosPorPagina),
-    [itemsActuales, paginaActual, registrosPorPagina]
-  );
+  const totalSeccion = totalRemoto;
+  const totalPaginas = paginasRemotas;
 
   useEffect(() => {
     setPaginaActual(1);
   }, [seccionActiva, busqueda, registrosPorPagina]);
 
   useEffect(() => {
-    if (paginaActual > totalPaginas) {
+    if (totalPaginas > 0 && paginaActual > totalPaginas) {
       setPaginaActual(totalPaginas);
     }
   }, [paginaActual, totalPaginas]);
@@ -475,7 +497,7 @@ export function EliminacionForm() {
               >
                 {item.titulo}
                 <span className="ml-2 rounded-full bg-background/20 px-2 py-0.5 text-xs">
-                  {total}
+                  {item.id === seccionActiva ? totalSeccion : (data[item.id] ? total : "—")}
                 </span>
               </button>
             );
@@ -538,7 +560,7 @@ export function EliminacionForm() {
                     </td>
                   </tr>
                 ) : (
-                  itemsPaginados.map((item) => {
+                  itemsActuales.map((item) => {
                     const key = `${seccion.id}-${item.id}`;
                     const isLoading = reactivando === key;
 

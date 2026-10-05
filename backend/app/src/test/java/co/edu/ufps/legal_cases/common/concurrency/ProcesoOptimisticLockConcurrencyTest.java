@@ -44,66 +44,67 @@ class ProcesoOptimisticLockConcurrencyTest
     @Autowired
     private DataSource dataSource;
 
-    @BeforeEach
-    void prepararProceso() throws SQLException {
-        /*
-         * Solo necesitamos una fila de Proceso.
-         *
-         * Las relaciones del proceso son LAZY. Para esta prueba aislada
-         * insertamos ids técnicos y deshabilitamos temporalmente las FK
-         * en esta conexión de prueba.
-         *
-         * Esto jamás se ejecuta contra la BD real: corre únicamente
-         * dentro del PostgreSQL efímero de Testcontainers.
-         */
-        try (Connection connection = dataSource.getConnection()) {
-            connection.setAutoCommit(false);
+   @BeforeEach
+   void prepararProceso() throws SQLException {
+    /*
+     * Solo necesitamos una fila de Proceso.
+     *
+     * Las relaciones del proceso son LAZY. Para esta prueba aislada
+     * insertamos ids técnicos y deshabilitamos temporalmente las FK
+     * en esta conexión de prueba.
+     *
+     * Esto jamás se ejecuta contra la BD real: corre únicamente
+     * dentro del PostgreSQL efímero de Testcontainers.
+     */
+    try (Connection connection = dataSource.getConnection()) {
+        connection.setAutoCommit(false);
 
-            try (Statement statement = connection.createStatement()) {
-                statement.execute(
-                        "SET session_replication_role = replica");
+        try (Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "SET session_replication_role = replica");
 
-                statement.executeUpdate("""
-                        DELETE FROM "DB_consultorioJuridico".proceso
-                        WHERE id = 900001
-                        """);
+            statement.executeUpdate("""
+                    DELETE FROM "DB_consultorioJuridico".proceso
+                    WHERE id = 900001
+                    """);
 
-                statement.executeUpdate("""
-                        INSERT INTO "DB_consultorioJuridico".proceso (
-                            id,
-                            version,
-                            numero_radicado,
-                            departamento_id,
-                            consulta_id,
-                            organo_control_id,
-                            especialidad_id,
-                            estado,
-                            activo
-                        )
-                        VALUES (
-                            900001,
-                            0,
-                            'DB03-BASE',
-                            900001,
-                            900001,
-                            NULL,
-                            NULL,
-                            'PENDIENTE',
-                            TRUE
-                        )
-                        """);
+            statement.executeUpdate("""
+                    INSERT INTO "DB_consultorioJuridico".proceso (
+                        id,
+                        version,
+                        numero_radicado,
+                        departamento_id,
+                        consulta_id,
+                        organo_control_id,
+                        especialidad_id,
+                        estado,
+                        activo,
+                        fecha_creacion
+                    )
+                    VALUES (
+                        900001,
+                        0,
+                        'DB03-BASE',
+                        900001,
+                        900001,
+                        NULL,
+                        NULL,
+                        'PENDIENTE',
+                        TRUE,
+                        CURRENT_TIMESTAMP
+                    )
+                    """);
 
-                statement.execute(
-                        "SET session_replication_role = origin");
+            statement.execute(
+                    "SET session_replication_role = origin");
 
-                connection.commit();
-            } catch (Exception ex) {
-                connection.rollback();
-                throw ex;
-            }
+            connection.commit();
+        } catch (Exception ex) {
+            connection.rollback();
+            throw ex;
         }
     }
-
+}
     @Test
     void impideQueUnaTransaccionObsoletaSobrescribaLaPrimera() {
         EntityManager emUsuarioA =

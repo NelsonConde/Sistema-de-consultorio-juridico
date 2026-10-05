@@ -9,10 +9,12 @@ import org.springframework.stereotype.Component;
 import co.edu.ufps.legal_cases.business.dto.conciliacion.ConciliacionDetalleResponseDTO;
 import co.edu.ufps.legal_cases.business.dto.conciliacion.ConciliacionPersonaDTO;
 import co.edu.ufps.legal_cases.business.dto.conciliacion.ConciliacionResponseDTO;
+import co.edu.ufps.legal_cases.business.dto.conciliacion.ConciliacionResumenDTO;
 import co.edu.ufps.legal_cases.business.model.conciliacion.Conciliacion;
 import co.edu.ufps.legal_cases.business.model.conciliacion.EstadoConciliacion;
 import co.edu.ufps.legal_cases.business.model.consulta.Consulta;
 import co.edu.ufps.legal_cases.business.model.persona.Persona;
+import co.edu.ufps.legal_cases.business.repository.conciliacion.ConciliacionResumenProjection;
 
 // Convierte conciliaciones entre entidad y DTO de salida.
 // No valida permisos ni reglas de negocio; eso queda en AccessService y Validator.
@@ -114,6 +116,24 @@ public class ConciliacionMapper {
         dto.setFechaFinalizacion(conciliacion.getFechaFinalizacion());
 
         return dto;
+    }
+
+    public ConciliacionResumenDTO convertirAResumen(ConciliacionResumenProjection conciliacion) {
+        return new ConciliacionResumenDTO(
+                conciliacion.getId(),
+                conciliacion.getVersion(),
+                conciliacion.getConsultaId(),
+                conciliacion.getConsulta(),
+                conciliacion.getEstadoCodigo(),
+                conciliacion.getEstadoNombre(),
+                conciliacion.getEstudianteId(),
+                conciliacion.getEstudianteNombre(),
+                conciliacion.getConciliadorId(),
+                conciliacion.getConciliadorNombre(),
+                conciliacion.getFechaCreacion(),
+                conciliacion.getFechaConciliacion(),
+                conciliacion.getFechaFinalizacion(),
+                conciliacion.getActivo());
     }
 
     private void aplicarEstado(ConciliacionResponseDTO dto, EstadoConciliacion estado) {

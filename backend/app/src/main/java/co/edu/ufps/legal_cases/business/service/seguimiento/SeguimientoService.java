@@ -7,9 +7,12 @@ import org.springframework.stereotype.Service;
 
 import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoRequestDTO;
 import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoResponseDTO;
+import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoResumenDTO;
 import co.edu.ufps.legal_cases.business.model.seguimiento.EstadoSeguimiento;
+import co.edu.ufps.legal_cases.business.repository.seguimiento.SeguimientoAgendaProjection;
 import co.edu.ufps.legal_cases.business.service.seguimiento.seguimiento.SeguimientoCommandService;
 import co.edu.ufps.legal_cases.business.service.seguimiento.seguimiento.SeguimientoQueryService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
 @Service
 public class SeguimientoService {
@@ -26,6 +29,30 @@ public class SeguimientoService {
 
     // Fachada del módulo: el controller sigue usando este service,
     // mientras la lectura y la escritura quedan separadas por dentro.
+    public PageResponseDTO<SeguimientoResumenDTO> buscarParaUsuarioActual(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction,
+            EstadoSeguimiento estado,
+            LocalDate fechaDesde,
+            LocalDate fechaHasta,
+            Long consultaId,
+            Long autorId) {
+        return seguimientoQueryService.buscarParaUsuarioActual(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                estado,
+                fechaDesde,
+                fechaHasta,
+                consultaId,
+                autorId);
+    }
+
     public List<SeguimientoResponseDTO> listarPorConsulta(Long consultaId) {
         return seguimientoQueryService.listarPorConsulta(consultaId);
     }
@@ -38,8 +65,17 @@ public class SeguimientoService {
         return seguimientoQueryService.listarPorAutor(autorId);
     }
 
-    public List<SeguimientoResponseDTO> listarParaCalendario() {
-        return seguimientoQueryService.listarParaCalendario();
+    // Calendario por rango – Bloque B (SCRUM-269).
+    // Reemplaza listarParaCalendario() que usaba findAll() + filtros en memoria.
+    // El endpoint GET /api/seguimientos/calendario ahora requiere from y to.
+    public List<SeguimientoResponseDTO> listarCalendarioPorRango(LocalDate from, LocalDate to) {
+        return seguimientoQueryService.listarCalendarioPorRango(from, to);
+    }
+
+    // Para Agenda – Bloque B (SCRUM-269).
+    // Resuelve scope internamente; AgendaQueryService solo pasa el rango.
+    public List<SeguimientoAgendaProjection> buscarParaAgenda(LocalDate from, LocalDate to) {
+        return seguimientoQueryService.buscarParaAgenda(from, to);
     }
 
     public List<SeguimientoResponseDTO> listarAlertasDisciplinarias() {
@@ -68,5 +104,10 @@ public class SeguimientoService {
 
     public void eliminar(Long id, Long version) {
         seguimientoCommandService.eliminar(id, version);
+    }
+
+
+    public List<SeguimientoResponseDTO> listarParaCalendario() {
+        return seguimientoQueryService.listarParaCalendario();
     }
 }

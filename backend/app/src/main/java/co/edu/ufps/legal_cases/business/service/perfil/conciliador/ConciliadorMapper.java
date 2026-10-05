@@ -3,7 +3,9 @@ package co.edu.ufps.legal_cases.business.service.perfil.conciliador;
 import org.springframework.stereotype.Component;
 
 import co.edu.ufps.legal_cases.business.dto.perfil.ConciliadorDTO;
+import co.edu.ufps.legal_cases.business.dto.perfil.ConciliadorResumenDTO;
 import co.edu.ufps.legal_cases.business.model.perfil.Conciliador;
+import co.edu.ufps.legal_cases.business.repository.perfil.ConciliadorResumenProjection;
 
 @Component
 public class ConciliadorMapper {
@@ -34,6 +36,21 @@ public class ConciliadorMapper {
         dto.setTipoConciliador(conciliador.getTipoConciliador());
         dto.setActivo(conciliador.getActivo());
 
+        return dto;
+    }
+
+    public ConciliadorResumenDTO convertirAResumenDTO(ConciliadorResumenProjection projection) {
+        ConciliadorResumenDTO dto = new ConciliadorResumenDTO();
+        dto.setId(projection.getId());
+        dto.setNombre(projection.getNombre());
+        dto.setDocumento(projection.getDocumento());
+        dto.setEmail(projection.getEmail());
+        dto.setUsuario(projection.getUsuario());
+        dto.setCodigo(projection.getCodigo());
+        dto.setActivo(projection.getActivo());
+        dto.setTipoConciliador(projection.getTipoConciliador());
+        dto.setSedeId(projection.getSedeId());
+        dto.setSedeNombre(projection.getSedeNombre());
         return dto;
     }
 

@@ -3,7 +3,9 @@ package co.edu.ufps.legal_cases.business.service.perfil.monitor;
 import org.springframework.stereotype.Component;
 
 import co.edu.ufps.legal_cases.business.dto.perfil.MonitorDTO;
+import co.edu.ufps.legal_cases.business.dto.perfil.MonitorResumenDTO;
 import co.edu.ufps.legal_cases.business.model.perfil.Monitor;
+import co.edu.ufps.legal_cases.business.repository.perfil.MonitorResumenProjection;
 
 @Component
 public class MonitorMapper {
@@ -32,6 +34,22 @@ public class MonitorMapper {
                         : null);
 
         dto.setActivo(monitor.getActivo());
+
+        return dto;
+    }
+
+    public MonitorResumenDTO convertirAResumenDTO(MonitorResumenProjection monitor) {
+        MonitorResumenDTO dto = new MonitorResumenDTO();
+
+        dto.setId(monitor.getId());
+        dto.setNombre(monitor.getNombre());
+        dto.setDocumento(monitor.getDocumento());
+        dto.setEmail(monitor.getEmail());
+        dto.setUsuario(monitor.getUsuario());
+        dto.setCodigo(monitor.getCodigo());
+        dto.setActivo(monitor.getActivo());
+        dto.setSedeId(monitor.getSedeId());
+        dto.setSedeNombre(monitor.getSedeNombre());
 
         return dto;
     }

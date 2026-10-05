@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 
 import co.edu.ufps.legal_cases.business.dto.seguimiento.respuesta.SeguimientoRespuestaResponseDTO;
 import co.edu.ufps.legal_cases.business.model.seguimiento.respuesta.SeguimientoRespuesta;
+import co.edu.ufps.legal_cases.business.repository.seguimiento.respuesta.SeguimientoRespuestaPendienteProjection;
 
 @Component
 public class SeguimientoRespuestaMapper {
@@ -57,6 +58,29 @@ public class SeguimientoRespuestaMapper {
                         : null
         );
 
+        dto.setActivo(respuesta.getActivo());
+        dto.setFechaCreacion(respuesta.getFechaCreacion());
+        dto.setFechaActualizacion(respuesta.getFechaActualizacion());
+        dto.setFechaDecision(respuesta.getFechaDecision());
+
+        return dto;
+    }
+
+    public SeguimientoRespuestaResponseDTO convertirAResponseDTO(SeguimientoRespuestaPendienteProjection respuesta) {
+        SeguimientoRespuestaResponseDTO dto = new SeguimientoRespuestaResponseDTO();
+
+        dto.setId(respuesta.getId());
+        dto.setVersion(respuesta.getVersion());
+        dto.setSeguimientoId(respuesta.getSeguimientoId());
+        dto.setConsultaId(respuesta.getConsultaId());
+        dto.setEstudianteId(respuesta.getEstudianteId());
+        dto.setEstudianteNombre(respuesta.getEstudianteNombre());
+        dto.setContenido(respuesta.getContenido());
+        dto.setEstado(respuesta.getEstado());
+        dto.setFueraPlazo(respuesta.getFueraPlazo());
+        dto.setObservacionRevision(respuesta.getObservacionRevision());
+        dto.setRevisadoPorId(respuesta.getRevisadoPorId());
+        dto.setRevisadoPorUsername(respuesta.getRevisadoPorUsername());
         dto.setActivo(respuesta.getActivo());
         dto.setFechaCreacion(respuesta.getFechaCreacion());
         dto.setFechaActualizacion(respuesta.getFechaActualizacion());

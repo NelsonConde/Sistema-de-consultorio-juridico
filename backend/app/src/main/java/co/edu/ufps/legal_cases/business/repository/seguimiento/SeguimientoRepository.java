@@ -1,5 +1,8 @@
 package co.edu.ufps.legal_cases.business.repository.seguimiento;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -18,6 +21,177 @@ import co.edu.ufps.legal_cases.business.model.seguimiento.Seguimiento;
 
 @Repository
 public interface SeguimientoRepository extends JpaRepository<Seguimiento, Long> {
+
+        @Query("""
+                        SELECT s
+                        FROM Seguimiento s
+                        JOIN s.consulta c
+                        LEFT JOIN c.asesor asesorDirecto
+                        LEFT JOIN c.estudiante estudiante
+                        LEFT JOIN estudiante.asesor asesorEstudiante
+                        LEFT JOIN c.monitor monitor
+                        WHERE s.activo = true
+                          AND c.estado <> :estadoArchivado
+                          AND s.fechaEntrega >= :from
+                          AND s.fechaEntrega < :to
+                          AND (
+                                :alcanceGlobal = true
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ASESOR'
+                                    AND (
+                                        asesorDirecto.id = :perfilId
+                                        OR asesorEstudiante.id = :perfilId
+                                    )
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'MONITOR'
+                                    AND monitor.id = :perfilId
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ESTUDIANTE'
+                                    AND estudiante.id = :perfilId
+                                    AND s.notificarEstudiante = true
+                                )
+                          )
+                          ORDER BY s.fechaEntrega ASC, s.id ASC
+                        """)
+        List<Seguimiento> buscarParaCalendarioPorRangoConScope(
+                        @Param("from") LocalDate from,
+                        @Param("to") LocalDate to,
+                        @Param("alcanceGlobal") boolean alcanceGlobal,
+                        @Param("tipoPerfil") String tipoPerfil,
+                        @Param("perfilId") Long perfilId,
+                        @Param("estadoArchivado") EstadoConsulta estadoArchivado);
+
+        @Query("""
+                        SELECT s
+                        FROM Seguimiento s
+                        JOIN s.consulta c
+                        LEFT JOIN c.asesor asesorDirecto
+                        LEFT JOIN c.estudiante estudiante
+                        LEFT JOIN estudiante.asesor asesorEstudiante
+                        LEFT JOIN c.monitor monitor
+                        WHERE s.activo = true
+                          AND c.estado <> :estadoArchivado
+                          AND s.autor.id = :autorId
+                          AND (
+                                :alcanceGlobal = true
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ASESOR'
+                                    AND (
+                                        asesorDirecto.id = :perfilId
+                                        OR asesorEstudiante.id = :perfilId
+                                    )
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'MONITOR'
+                                    AND monitor.id = :perfilId
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ESTUDIANTE'
+                                    AND estudiante.id = :perfilId
+                                    AND s.notificarEstudiante = true
+                                )
+                          )
+                          ORDER BY s.fechaCreacion DESC, s.id DESC
+                        """)
+        List<Seguimiento> buscarPorAutorConScope(
+                        @Param("autorId") Long autorId,
+                        @Param("alcanceGlobal") boolean alcanceGlobal,
+                        @Param("tipoPerfil") String tipoPerfil,
+                        @Param("perfilId") Long perfilId,
+                        @Param("estadoArchivado") EstadoConsulta estadoArchivado);
+
+        @Query("""
+                        SELECT s
+                        FROM Seguimiento s
+                        JOIN s.consulta c
+                        LEFT JOIN c.asesor asesorDirecto
+                        LEFT JOIN c.estudiante estudiante
+                        LEFT JOIN estudiante.asesor asesorEstudiante
+                        LEFT JOIN c.monitor monitor
+                        WHERE s.activo = true
+                          AND c.estado <> :estadoArchivado
+                          AND s.fechaEntrega = :fechaEntrega
+                          AND (
+                                :alcanceGlobal = true
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ASESOR'
+                                    AND (
+                                        asesorDirecto.id = :perfilId
+                                        OR asesorEstudiante.id = :perfilId
+                                    )
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'MONITOR'
+                                    AND monitor.id = :perfilId
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ESTUDIANTE'
+                                    AND estudiante.id = :perfilId
+                                    AND s.notificarEstudiante = true
+                                )
+                          )
+                          ORDER BY s.fechaCreacion DESC, s.id DESC
+                        """)
+        List<Seguimiento> buscarPorFechaEntregaConScope(
+                        @Param("fechaEntrega") LocalDate fechaEntrega,
+                        @Param("alcanceGlobal") boolean alcanceGlobal,
+                        @Param("tipoPerfil") String tipoPerfil,
+                        @Param("perfilId") Long perfilId,
+                        @Param("estadoArchivado") EstadoConsulta estadoArchivado);
+
+        @Query("""
+                        SELECT s.id AS id,
+                               s.descripcion AS descripcion,
+                               s.fechaEntrega AS fechaEntrega,
+                               s.notificarEstudiante AS notificarEstudiante,
+                               s.alertaDisciplinaria AS alertaDisciplinaria,
+                               s.estado AS estado,
+                               c.id AS consultaId,
+                               categoria.nombre AS categoriaSeguimientoNombre,
+                               autor.id AS autorId,
+                               autor.username AS autorUsername
+                        FROM Seguimiento s
+                        JOIN s.consulta c
+                        JOIN s.categoriaSeguimiento categoria
+                        JOIN s.autor autor
+                        LEFT JOIN c.asesor asesorDirecto
+                        LEFT JOIN c.estudiante estudiante
+                        LEFT JOIN estudiante.asesor asesorEstudiante
+                        LEFT JOIN c.monitor monitor
+                        WHERE s.activo = true
+                          AND c.estado <> :estadoArchivado
+                          AND s.fechaEntrega >= :from
+                          AND s.fechaEntrega < :to
+                          AND (
+                                :alcanceGlobal = true
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ASESOR'
+                                    AND (
+                                        asesorDirecto.id = :perfilId
+                                        OR asesorEstudiante.id = :perfilId
+                                    )
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'MONITOR'
+                                    AND monitor.id = :perfilId
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ESTUDIANTE'
+                                    AND estudiante.id = :perfilId
+                                    AND s.notificarEstudiante = true
+                                )
+                          )
+                          ORDER BY s.fechaEntrega ASC, s.id ASC
+                        """)
+        List<SeguimientoAgendaProjection> buscarParaAgenda(
+                        @Param("from") LocalDate from,
+                        @Param("to") LocalDate to,
+                        @Param("alcanceGlobal") boolean alcanceGlobal,
+                        @Param("tipoPerfil") String tipoPerfil,
+                        @Param("perfilId") Long perfilId,
+                        @Param("estadoArchivado") EstadoConsulta estadoArchivado);
 
         Optional<Seguimiento> findByIdAndActivoTrue(Long id);
 
@@ -221,4 +395,132 @@ public interface SeguimientoRepository extends JpaRepository<Seguimiento, Long> 
                         @Param("fechaInicio") String fechaInicio,
                         @Param("fechaFin") String fechaFin);
 
+
+
+    @Query(value = """
+                        SELECT s.id AS id,
+                               s.version AS version,
+                               s.descripcion AS descripcion,
+                               s.fechaEntrega AS fechaEntrega,
+                               s.diasNotificacion AS diasNotificacion,
+                               s.notificarPartes AS notificarPartes,
+                               s.notificarEstudiante AS notificarEstudiante,
+                               s.alertaDisciplinaria AS alertaDisciplinaria,
+                               s.estado AS estado,
+                               categoria.id AS categoriaSeguimientoId,
+                               categoria.nombre AS categoriaSeguimientoNombre,
+                               c.id AS consultaId,
+                               autor.id AS autorId,
+                               autor.username AS autorUsername,
+                               s.fechaCreacion AS fechaCreacion,
+                               s.fechaActualizacion AS fechaActualizacion
+                        FROM Seguimiento s
+                        JOIN s.consulta c
+                        JOIN s.categoriaSeguimiento categoria
+                        JOIN s.autor autor
+                        LEFT JOIN c.asesor asesorDirecto
+                        LEFT JOIN c.estudiante estudiante
+                        LEFT JOIN estudiante.asesor asesorEstudiante
+                        LEFT JOIN c.monitor monitor
+                        WHERE s.activo = true
+                          AND c.estado <> :estadoArchivado
+                          AND (
+                                CAST(:search AS String) IS NULL
+                                OR LOWER(s.descripcion)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(categoria.nombre)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(autor.username)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(CAST(s.estado AS String))
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(c.descripcion)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                          )
+                          AND (:estado IS NULL OR s.estado = :estado)
+                          AND (CAST(:fechaDesde AS LocalDateTime) IS NULL OR s.fechaCreacion >= :fechaDesde)
+                          AND (CAST(:fechaHastaExclusiva AS LocalDateTime) IS NULL OR s.fechaCreacion < :fechaHastaExclusiva)
+                          AND (:consultaId IS NULL OR c.id = :consultaId)
+                          AND (:autorId IS NULL OR autor.id = :autorId)
+                          AND (
+                                :alcanceGlobal = true
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ASESOR'
+                                    AND (
+                                        asesorDirecto.id = :perfilId
+                                        OR asesorEstudiante.id = :perfilId
+                                    )
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'MONITOR'
+                                    AND monitor.id = :perfilId
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ESTUDIANTE'
+                                    AND estudiante.id = :perfilId
+                                    AND s.notificarEstudiante = true
+                                )
+                          )
+                        """, countQuery = """
+                        SELECT COUNT(s.id)
+                        FROM Seguimiento s
+                        JOIN s.consulta c
+                        JOIN s.categoriaSeguimiento categoria
+                        JOIN s.autor autor
+                        LEFT JOIN c.asesor asesorDirecto
+                        LEFT JOIN c.estudiante estudiante
+                        LEFT JOIN estudiante.asesor asesorEstudiante
+                        LEFT JOIN c.monitor monitor
+                        WHERE s.activo = true
+                          AND c.estado <> :estadoArchivado
+                          AND (
+                                CAST(:search AS String) IS NULL
+                                OR LOWER(s.descripcion)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(categoria.nombre)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(autor.username)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(CAST(s.estado AS String))
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(c.descripcion)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                          )
+                          AND (:estado IS NULL OR s.estado = :estado)
+                          AND (CAST(:fechaDesde AS LocalDateTime) IS NULL OR s.fechaCreacion >= :fechaDesde)
+                          AND (CAST(:fechaHastaExclusiva AS LocalDateTime) IS NULL OR s.fechaCreacion < :fechaHastaExclusiva)
+                          AND (:consultaId IS NULL OR c.id = :consultaId)
+                          AND (:autorId IS NULL OR autor.id = :autorId)
+                          AND (
+                                :alcanceGlobal = true
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ASESOR'
+                                    AND (
+                                        asesorDirecto.id = :perfilId
+                                        OR asesorEstudiante.id = :perfilId
+                                    )
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'MONITOR'
+                                    AND monitor.id = :perfilId
+                                )
+                                OR (
+                                    CAST(:tipoPerfil AS String) = 'ESTUDIANTE'
+                                    AND estudiante.id = :perfilId
+                                    AND s.notificarEstudiante = true
+                                )
+                          )
+                        """)
+        Page<SeguimientoResumenProjection> buscarResumenPaginado(
+                        @Param("search") String search,
+                        @Param("estado") EstadoSeguimiento estado,
+                        @Param("fechaDesde") LocalDateTime fechaDesde,
+                        @Param("fechaHastaExclusiva") LocalDateTime fechaHastaExclusiva,
+                        @Param("consultaId") Long consultaId,
+                        @Param("autorId") Long autorId,
+                        @Param("alcanceGlobal") boolean alcanceGlobal,
+                        @Param("tipoPerfil") String tipoPerfil,
+                        @Param("perfilId") Long perfilId,
+                        @Param("estadoArchivado") EstadoConsulta estadoArchivado,
+                        Pageable pageable);
 }

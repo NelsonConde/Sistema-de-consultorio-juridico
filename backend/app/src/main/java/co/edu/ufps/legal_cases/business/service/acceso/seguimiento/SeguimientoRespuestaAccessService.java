@@ -187,6 +187,11 @@ public class SeguimientoRespuestaAccessService {
     }
 
     @Transactional(readOnly = true)
+    public PerfilUsuarioActual obtenerPerfilActual() {
+        return usuarioActualService.obtenerPerfilActual();
+    }
+
+    @Transactional(readOnly = true)
     public Long obtenerEstudianteActualId() {
         PerfilUsuarioActual perfil = usuarioActualService.obtenerPerfilActual();
 
@@ -242,5 +247,10 @@ public class SeguimientoRespuestaAccessService {
         if (!usuarioActualService.tienePermiso(permiso)) {
             throw new AccessDeniedException("No tiene el permiso requerido: " + permiso);
         }
+    }
+
+
+    public boolean usuarioEsAdministrador() {
+        return usuarioActualService.esRolAdministrador();
     }
 }

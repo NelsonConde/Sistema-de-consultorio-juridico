@@ -3,7 +3,9 @@ package co.edu.ufps.legal_cases.business.service.perfil.estudiante;
 import org.springframework.stereotype.Component;
 
 import co.edu.ufps.legal_cases.business.dto.perfil.EstudianteDTO;
+import co.edu.ufps.legal_cases.business.dto.perfil.EstudianteResumenDTO;
 import co.edu.ufps.legal_cases.business.model.perfil.Estudiante;
+import co.edu.ufps.legal_cases.business.repository.perfil.EstudianteResumenProjection;
 
 @Component
 public class EstudianteMapper {
@@ -39,6 +41,25 @@ public class EstudianteMapper {
 
         dto.setActivo(estudiante.getActivo());
         dto.setConciliacion(estudiante.getConciliacion());
+
+        return dto;
+    }
+
+    public EstudianteResumenDTO convertirAResumenDTO(EstudianteResumenProjection projection) {
+        EstudianteResumenDTO dto = new EstudianteResumenDTO();
+
+        dto.setId(projection.getId());
+        dto.setNombre(projection.getNombre());
+        dto.setDocumento(projection.getDocumento());
+        dto.setEmail(projection.getEmail());
+        dto.setUsuario(projection.getUsuario());
+        dto.setCodigo(projection.getCodigo());
+        dto.setActivo(projection.getActivo());
+        dto.setSedeId(projection.getSedeId());
+        dto.setSedeNombre(projection.getSedeNombre());
+        dto.setAsesorId(projection.getAsesorId());
+        dto.setAsesorNombre(projection.getAsesorNombre());
+        dto.setConciliacion(projection.getConciliacion());
 
         return dto;
     }

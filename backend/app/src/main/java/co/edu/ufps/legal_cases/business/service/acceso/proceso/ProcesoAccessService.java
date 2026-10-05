@@ -1,5 +1,6 @@
 package co.edu.ufps.legal_cases.business.service.acceso.proceso;
 
+import co.edu.ufps.legal_cases.security.dto.account.PerfilUsuarioActual;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.GESTIONAR_PROCESOS;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_PROCESOS;
 
@@ -173,5 +174,15 @@ public class ProcesoAccessService {
         if (!usuarioActualService.tienePermiso(permiso)) {
             throw new AccessDeniedException("No tiene el permiso requerido: " + permiso);
         }
+    }
+
+
+    public boolean usuarioEsAdministrador() {
+        return usuarioActualService.esRolAdministrador();
+    }
+
+
+    public PerfilUsuarioActual obtenerPerfilActual() {
+        return usuarioActualService.obtenerPerfilActual();
     }
 }
