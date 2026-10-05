@@ -37,6 +37,7 @@ import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import Pagination from "@/components/ui/Pagination";
 import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems } from "@/lib/list-utils";
 
+import { BotonDescargarFicha } from "./BotonDescargarFicha"
 import { ESTADOS_CONSULTA, VACIOS } from "./consultas-juridicas.constants";
 import {
   accionPermitidaPorRegistro,
@@ -1314,7 +1315,6 @@ export function ConsultasJuridicasForm() {
                           Editar
                         </Button>
                       )}
-
                       {puedeArchivarConsultas && normalizarEstadoConsulta(row.estado) !== "ARCHIVADO" && (
                         <Button
                           size="sm"
@@ -1324,6 +1324,7 @@ export function ConsultasJuridicasForm() {
                           Archivar
                         </Button>
                       )}
+                      <BotonDescargarFicha consultaId={row.id} />
                     </div>
                   </td>
                 </tr>
