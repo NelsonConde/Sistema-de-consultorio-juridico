@@ -303,16 +303,38 @@ public class FileAssetService {
             String autor,
             java.time.LocalDateTime fechaDesde,
             java.time.LocalDateTime fechaHasta) {
+
         if (consultaId == null || consultaId <= 0) {
             throw new BusinessException("El id de la consulta es obligatorio");
         }
 
+        String tipoDocumentalNormalizado =
+                tipoDocumental != null && !tipoDocumental.isBlank()
+                        ? tipoDocumental.trim().toUpperCase(java.util.Locale.ROOT)
+                        : "";
+
+        String resourceTypeNormalizado =
+                resourceType != null && !resourceType.isBlank()
+                        ? resourceType.trim().toUpperCase(java.util.Locale.ROOT)
+                        : "";
+
+        String origenNormalizado =
+                origen != null && !origen.isBlank()
+                        ? origen.trim().toUpperCase(java.util.Locale.ROOT)
+                        : "";
+
+        String autorNormalizado =
+                autor != null && !autor.isBlank()
+                        ? autor.trim().toLowerCase(java.util.Locale.ROOT)
+                        : "";
+
         Long autorId = null;
-        if (autor != null && !autor.isBlank()) {
+
+        if (!autorNormalizado.isBlank()) {
             try {
-                autorId = Long.valueOf(autor.trim());
+                autorId = Long.valueOf(autorNormalizado);
             } catch (NumberFormatException ignored) {
-                // autor no es numérico, se filtra como texto
+                // Si no es numérico se utiliza como filtro por username.
             }
         }
 
@@ -324,10 +346,10 @@ public class FileAssetService {
         return repository.findExpedienteFiles(
                 consultaId,
                 visibleStatuses,
-                (tipoDocumental != null && !tipoDocumental.isBlank()) ? tipoDocumental.trim() : null,
-                (resourceType != null && !resourceType.isBlank()) ? resourceType.trim() : null,
-                (origen != null && !origen.isBlank()) ? origen.trim() : null,
-                (autor != null && !autor.isBlank()) ? autor.trim() : null,
+                tipoDocumentalNormalizado,
+                resourceTypeNormalizado,
+                origenNormalizado,
+                autorNormalizado,
                 autorId,
                 fechaDesde,
                 fechaHasta);
