@@ -18,6 +18,8 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import co.edu.ufps.legal_cases.audit.service.log.AuditSecurityService;
 import co.edu.ufps.legal_cases.common.exception.AdministracionInvariantException;
@@ -106,9 +108,13 @@ public class GlobalExceptionHandler {
         return construirRespuesta(HttpStatus.BAD_REQUEST, error);
     }
 
-    @ExceptionHandler(ResourceNotFoundException.class)
+    @ExceptionHandler({
+            ResourceNotFoundException.class,
+            NoResourceFoundException.class,
+            NoHandlerFoundException.class
+    })
     public ResponseEntity<ErrorResponseDTO> manejarResourceNotFoundException(
-            ResourceNotFoundException ex,
+            Exception ex,
             HttpServletRequest request) {
 
         ErrorResponseDTO error = construirError(

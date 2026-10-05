@@ -103,6 +103,8 @@ public class SecurityConfig {
                         // Endpoints de usuario autenticado.
                         .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/api/auth/cambiar-password").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/mi-perfil").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/api/mi-perfil/contacto").authenticated()
 
                         // Todo lo demás requiere autenticación.
                         .anyRequest().authenticated())
