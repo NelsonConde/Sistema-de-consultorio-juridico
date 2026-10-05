@@ -64,6 +64,127 @@ async function buildApiError(response, fallback) {
   });
 }
 
+async function buildSafeDownloadError(response) {
+  const payload = await readResponseBody(response);
+  const correlationId = getResponseCorrelationId(response, payload);
+
+  const messages = {
+    401: "Tu sesión ya no es válida. Inicia sesión nuevamente.",
+    403: "No tienes autorización para descargar este archivo.",
+    404: "El archivo solicitado ya no está disponible.",
+    409: "El archivo no está disponible para descarga en este momento.",
+    503: "El almacenamiento de documentos no está disponible en este momento.",
+  };
+
+  return new ApiError(
+      messages[response.status] ||
+      "No se pudo preparar la descarga del archivo.",
+      {
+        status: response.status,
+        payload: null,
+        response,
+        correlationId,
+      },
+  );
+}
+
+function removeControlCharacters(value) {
+  return Array.from(value)
+      .filter((character) => {
+        const code = character.charCodeAt(0);
+        return code > 31 && code !== 127;
+      })
+      .join("");
+}
+
+function sanitizeDownloadFileName(value) {
+  const fallback = "archivo";
+
+  const leafName =
+      String(value || fallback)
+          .split(/[\\/]/)
+          .pop() || fallback;
+
+  let safeName = removeControlCharacters(leafName)
+      .replace(/[<>:"/\\|?*]/g, "_")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  if (!safeName || safeName === "." || safeName === "..") {
+    safeName = fallback;
+  }
+
+  const reservedName = safeName
+      .split(".")[0]
+      .toUpperCase();
+
+  if (/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/.test(reservedName)) {
+    safeName = `_${safeName}`;
+  }
+
+  return safeName.slice(0, 180);
+}
+
+function signedUrlMayBeExpired(status) {
+  return status === 400 || status === 401 || status === 403;
+}
+
+async function requestDownloadDescriptor(fileId, parentId = null) {
+  const query = parentId
+      ? `?parentId=${encodeURIComponent(parentId)}`
+      : "";
+
+  const response = await apiClient.get(
+      `/archivos/${fileId}/download${query}`,
+      {
+        cache: "no-store",
+      },
+  );
+
+  if (!response.ok) {
+    throw await buildSafeDownloadError(response);
+  }
+
+  const descriptor = await response.json();
+
+  if (!descriptor?.downloadUrl) {
+    throw new Error(
+        "No se pudo preparar la descarga del archivo.",
+    );
+  }
+
+  return descriptor;
+}
+
+async function fetchSignedDownload(downloadUrl) {
+  try {
+    return await fetch(downloadUrl, {
+      method: "GET",
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error(
+        "El almacenamiento de documentos no está disponible en este momento.",
+    );
+  }
+}
+
+function saveDownloadedBlob(blob, fileName) {
+  const objectUrl = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+
+  try {
+    anchor.href = objectUrl;
+    anchor.download = sanitizeDownloadFileName(fileName);
+
+    document.body.appendChild(anchor);
+    anchor.click();
+  } finally {
+    anchor.remove();
+    window.URL.revokeObjectURL(objectUrl);
+  }
+}
+
 function createAbortError() {
   const error = new Error("La carga fue cancelada");
   error.name = "AbortError";
@@ -554,46 +675,85 @@ export async function list(resource) {
 }
 
 export async function download(file, resource = null) {
+  if (!file?.id) {
+    throw new Error("El archivo solicitado no es válido.");
+  }
+
+  const resourceType = String(
+      resource?.type ||
+      file?.resourceType ||
+      "",
+  ).toLowerCase();
+
   const parentId =
-      resource?.type === "respuesta" ? resource.parentId : null;
+      resource?.parentId ??
+      file?.parentId ??
+      file?.seguimientoId ??
+      null;
 
-  const query = parentId
-      ? `?parentId=${encodeURIComponent(parentId)}`
-      : "";
+  /*
+   * Los archivos RESPUESTA actualmente requieren el seguimiento padre
+   * para la autorización backend.
+   *
+   * El agregado documental todavía no expone esa relación.
+   */
+  if (resourceType === "respuesta" && !parentId) {
+    const error = new Error(
+        "Este documento no está disponible para descarga desde esta vista.",
+    );
 
-  const response = await apiClient.get(
-      `/archivos/${file.id}/download${query}`,
+    error.status = 409;
+    throw error;
+  }
+
+  let descriptor = await requestDownloadDescriptor(
+      file.id,
+      parentId,
   );
 
-  if (!response.ok) {
-    throw await buildApiError(
-        response,
-        "No se pudo preparar la descarga",
+  let fileResponse = await fetchSignedDownload(
+      descriptor.downloadUrl,
+  );
+
+  /*
+   * Una URL firmada puede expirar entre la obtención del descriptor
+   * y la descarga. En ese caso se solicita una nueva autorización
+   * al backend y se reintenta una sola vez.
+   */
+  if (
+      !fileResponse.ok &&
+      signedUrlMayBeExpired(fileResponse.status)
+  ) {
+    descriptor = await requestDownloadDescriptor(
+        file.id,
+        parentId,
+    );
+
+    fileResponse = await fetchSignedDownload(
+        descriptor.downloadUrl,
     );
   }
 
-  const descriptor = await response.json();
-
-  // Presigned download URLs are external to the backend API.
-  const fileResponse = await fetch(descriptor.downloadUrl);
-
   if (!fileResponse.ok) {
-    throw new Error("No se pudo descargar el archivo");
+    if (fileResponse.status === 404) {
+      throw new Error(
+          "El archivo ya no está disponible en el almacenamiento.",
+      );
+    }
+
+    throw new Error(
+        "No se pudo obtener el archivo desde el almacenamiento.",
+    );
   }
 
   const blob = await fileResponse.blob();
-  const url = window.URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
 
-  anchor.href = url;
-  anchor.download =
-      descriptor.fileName || file.fileName || "archivo";
-
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-
-  window.URL.revokeObjectURL(url);
+  saveDownloadedBlob(
+      blob,
+      descriptor.fileName ||
+      file.fileName ||
+      "archivo",
+  );
 }
 
 export async function remove(file, resource = null) {
