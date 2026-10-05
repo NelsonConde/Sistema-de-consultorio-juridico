@@ -7,7 +7,15 @@ import {
   requireResourceVersion,
   withErrorReference,
 } from "@/lib/api";
-import { fileApi } from "@/lib/fileApi";
+
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+
+import { DocumentosExpedienteTab } from "./documentos/DocumentosExpedienteTab";
   /**
    * List and table handling.
    *
@@ -87,8 +95,6 @@ export function ConsultasJuridicasForm() {
   const [asesores, setAsesores] = useState([]);
   const [monitores, setMonitores] = useState([]);
   const [estudiantes, setEstudiantes] = useState([]);
-  const [archivosCaso, setArchivosCaso] = useState([]);
-  const [cargandoArchivos, setCargandoArchivos] = useState(false);
   const [user, setUser] = useState(null);
   const [checkingPermisos, setCheckingPermisos] = useState(true);
   const [confirmArchivar, setConfirmArchivar] = useState({ abierto: false, id: null, loading: false });
@@ -714,37 +720,11 @@ export function ConsultasJuridicasForm() {
 
       setIdEditando(id);
       setMostrarFormEdicion(true);
-      cargarArchivosCaso(id);
     } catch (error) {
 
       toast.error("Error al cargar la consulta");
     }
   }
-
-  async function cargarArchivosCaso(consultaId) {
-    setCargandoArchivos(true);
-    try {
-      setArchivosCaso(await fileApi.list({ type: "consulta", id: consultaId }));
-    } catch {
-
-      setArchivosCaso([]);
-    } finally {
-      setCargandoArchivos(false);
-    }
-  }
-
-  const descargarArchivo = async (file) => {
-    try {
-      await fileApi.download(file, { type: "consulta", id: idEditando });
-    } catch (error) {
-      toast.error("No se pudo descargar el archivo", {
-        description: withErrorReference(
-          error?.message || "Intenta nuevamente.",
-          error?.correlationId || null
-        ),
-      });
-    }
-  };
 
   async function handleGuardar(e) {
     e.preventDefault();
@@ -1082,9 +1062,24 @@ export function ConsultasJuridicasForm() {
 
         {/* Form handling.*/}
         {mostrarFormEdicion && (
-          <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
-            <h2 className="text-lg font-semibold">Editar consulta #{idEditando}</h2>
-            <form onSubmit={handleGuardar} className="space-y-4">
+            <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+              <h2 className="text-lg font-semibold">
+                Consulta #{idEditando}
+              </h2>
+
+              <Tabs defaultValue="informacion" className="w-full">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="informacion">
+                    Información
+                  </TabsTrigger>
+
+                  <TabsTrigger value="documentos">
+                    Documentos
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="informacion">
+                  <form onSubmit={handleGuardar} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <C label="Fecha *"><input type="date" name="fecha" value={form.fecha} onChange={handleChange} required className={ic} /></C>
                 <C label="Estado *">
@@ -1246,29 +1241,17 @@ export function ConsultasJuridicasForm() {
               <C label="Concepto jurídico *"><textarea name="conceptoJuridico" value={form.conceptoJuridico} onChange={handleChange} required rows={3} placeholder="Fundamento legal aplicable" className={ic} /></C>
               <C label="Observaciones"><textarea name="observaciones" value={form.observaciones} onChange={handleChange} rows={2} placeholder="Opcional" className={ic} /></C>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Archivos relacionados</label>
-                {cargandoArchivos ? (
-                  <p className="text-sm text-muted-foreground">Cargando archivos...</p>
-                ) : archivosCaso.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No hay archivos adjuntos.</p>
-                ) : (
-                  <ul className="space-y-2">
-                    {archivosCaso.map((file) => (
-                      <li key={file.id ?? file.fileName} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                        <span className="truncate">{file.fileName ?? file.nombre ?? "Archivo"}</span>
-                        <button type="button" onClick={() => descargarArchivo(file)} className="text-primary hover:underline">Descargar</button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
               <div className="flex justify-end gap-3 pt-2">
                 <Button type="button" variant="outline" onClick={() => setMostrarFormEdicion(false)} disabled={guardando}>Cancelar</Button>
                 <Button type="submit" disabled={guardando}>{guardando ? "Guardando..." : "Actualizar"}</Button>
               </div>
             </form>
+                </TabsContent>
+
+                <TabsContent value="documentos">
+                  <DocumentosExpedienteTab consultaId={idEditando} />
+                </TabsContent>
+              </Tabs>
           </div>
         )}
 
