@@ -85,7 +85,9 @@ public class ConciliacionCommandService {
                 FileResourceType.CONCILIACION,
                 conciliacionGuardada.getId(),
                 null,
-                solicitud);
+                solicitud,
+                null,
+                "CONCILIACION_SOLICITUD");
         conciliacionGuardada.setDocumentoSolicitud(solicitudAsset);
 
         conciliacionGuardada = conciliacionRepository.save(conciliacionGuardada);
@@ -216,8 +218,10 @@ public class ConciliacionCommandService {
 
         // El acta es soporte obligatorio de cierre.
         // Se guarda antes de cambiar estado para no finalizar sin documento.
+        FileAsset anteriorActa = conciliacion.getActa();
+        java.util.UUID docLogicoActa = (anteriorActa != null) ? anteriorActa.getDocumentoLogico() : null;
         FileAsset actaAsset = fileResourceService.storeMultipartAfterAuthorization(
-                FileResourceType.CONCILIACION, id, null, acta);
+                FileResourceType.CONCILIACION, id, null, acta, docLogicoActa, "CONCILIACION_ACTA");
 
         Conciliacion guardada;
         try {
@@ -258,8 +262,10 @@ public class ConciliacionCommandService {
         conciliacionValidator.validarConciliacionNoFinalizada(conciliacion);
         conciliacionValidator.validarConsultaPermiteOperacionConciliacion(conciliacion.getConsulta());
 
+        FileAsset anterior = conciliacion.getDocumentoSolicitud();
+        java.util.UUID docLogico = (anterior != null) ? anterior.getDocumentoLogico() : null;
         FileAsset solicitudAsset = fileResourceService.storeMultipartAfterAuthorization(
-                FileResourceType.CONCILIACION, id, null, solicitud);
+                FileResourceType.CONCILIACION, id, null, solicitud, docLogico, "CONCILIACION_SOLICITUD");
         Conciliacion guardada;
         try {
             conciliacion.setDocumentoSolicitud(solicitudAsset);

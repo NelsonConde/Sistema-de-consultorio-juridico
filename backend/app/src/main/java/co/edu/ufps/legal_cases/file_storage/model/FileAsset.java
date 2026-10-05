@@ -72,6 +72,22 @@ public class FileAsset {
     @Column(nullable = false, length = 20)
     private FileAssetStatus status = FileAssetStatus.PENDING;
 
+    @Column(name = "documento_logico", nullable = false)
+    private UUID documentoLogico;
+
+    @Column(name = "version", nullable = false)
+    private Integer version = 1;
+
+    @Column(name = "tipo_documental", nullable = false, length = 60)
+    private String tipoDocumental = "GENERAL";
+
+    @Column(name = "origen", nullable = false, length = 40)
+    private String origen = "SISTEMA";
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "referencia_anterior_id")
+    private FileAsset referenciaAnterior;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -86,6 +102,18 @@ public class FileAsset {
         if (updatedAt == null) {
             updatedAt = createdAt;
         }
+        if (documentoLogico == null) {
+            documentoLogico = UUID.randomUUID();
+        }
+        if (version == null) {
+            version = 1;
+        }
+        if (tipoDocumental == null || tipoDocumental.isBlank()) {
+            tipoDocumental = "GENERAL";
+        }
+        if (origen == null || origen.isBlank()) {
+            origen = "SISTEMA";
+        }
         normalizeState();
     }
 
@@ -97,8 +125,10 @@ public class FileAsset {
 
     private void normalizeState() {
         if (status == null) {
-            status = Boolean.TRUE.equals(active) ? FileAssetStatus.ACTIVE : FileAssetStatus.FAILED;
+            status = Boolean.TRUE.equals(active) ? FileAssetStatus.VIGENTE : FileAssetStatus.FAILED;
         }
-        active = status == FileAssetStatus.ACTIVE || status == FileAssetStatus.READY;
+        active = status == FileAssetStatus.VIGENTE
+                || status == FileAssetStatus.ACTIVE
+                || status == FileAssetStatus.READY;
     }
 }

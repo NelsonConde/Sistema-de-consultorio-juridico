@@ -7,7 +7,15 @@ import {
   requireResourceVersion,
   withErrorReference,
 } from "@/lib/api";
-import { fileApi } from "@/lib/fileApi";
+
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+
+import { DocumentosExpedienteTab } from "./documentos/DocumentosExpedienteTab";
   /**
    * List and table handling.
    *
@@ -35,8 +43,9 @@ import {
 } from "@/lib/personasApi";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import Pagination from "@/components/ui/Pagination";
-import { DEFAULT_PAGE_SIZE_OPTIONS } from "@/lib/list-utils";
+import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems } from "@/lib/list-utils";
 
+import { BotonDescargarFicha } from "./BotonDescargarFicha"
 import { ESTADOS_CONSULTA, VACIOS } from "./consultas-juridicas.constants";
 import {
   accionPermitidaPorRegistro,
@@ -50,6 +59,7 @@ import {
   obtenerAreaIdAsesor,
   obtenerArrayDesdeRespuesta,
   obtenerAsesorIdEstudiante,
+  ordenarConsultasPorIdAscendente,
   textoNormalizado,
   textoVacio,
   validarCoherenciaConsultaFrontend,
@@ -62,14 +72,8 @@ export function ConsultasJuridicasForm() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [searchAplicado, setSearchAplicado] = useState("");
   const [paginaActual, setPaginaActual] = useState(1);
   const [registrosPorPagina, setRegistrosPorPagina] = useState(10);
-  const [totalRegistros, setTotalRegistros] = useState(0);
-  const [totalPaginas, setTotalPaginas] = useState(0);
-  const [sortBy, setSortBy] = useState("fecha");
-  const [direction, setDirection] = useState("desc");
-  const [errorLista, setErrorLista] = useState("");
 
   const [mostrarFormEdicion, setMostrarFormEdicion] = useState(false);
   const [idEditando, setIdEditando] = useState(null);
@@ -92,9 +96,6 @@ export function ConsultasJuridicasForm() {
   const [asesores, setAsesores] = useState([]);
   const [monitores, setMonitores] = useState([]);
   const [estudiantes, setEstudiantes] = useState([]);
-  const [archivosCaso, setArchivosCaso] = useState([]);
-  const [cargandoArchivos, setCargandoArchivos] = useState(false);
-  const [descargandoArchivos, setDescargandoArchivos] = useState({});
   const [user, setUser] = useState(null);
   const [checkingPermisos, setCheckingPermisos] = useState(true);
   const [confirmArchivar, setConfirmArchivar] = useState({ abierto: false, id: null, loading: false });
@@ -430,34 +431,19 @@ export function ConsultasJuridicasForm() {
     );
   }
 
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setPaginaActual(1);
-      setSearchAplicado(searchText.trim());
-    }, 350);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [searchText]);
+  const rowsOrdenadas = useMemo(() => ordenarConsultasPorIdAscendente(rows), [rows]);
+  const totalPaginas = getTotalPages(rowsOrdenadas.length, registrosPorPagina);
+  const rowsPaginadas = useMemo(
+    () => paginateItems(rowsOrdenadas, paginaActual, registrosPorPagina),
+    [rowsOrdenadas, paginaActual, registrosPorPagina]
+  );
 
   useEffect(() => {
-    if (!user) return;
-
-    const controller = new AbortController();
-
-    cargarConsultas({
-      search: searchAplicado,
-      page: paginaActual,
-      size: registrosPorPagina,
-      sortBy,
-      direction,
-      signal: controller.signal,
-    });
-
-    return () => controller.abort();
-  }, [user, searchAplicado, paginaActual, registrosPorPagina, sortBy, direction]);
+    setPaginaActual(1);
+  }, [searchText, registrosPorPagina]);
 
   useEffect(() => {
-    if (totalPaginas > 0 && paginaActual > totalPaginas) {
+    if (paginaActual > totalPaginas) {
       setPaginaActual(totalPaginas);
     }
   }, [paginaActual, totalPaginas]);
@@ -494,6 +480,7 @@ export function ConsultasJuridicasForm() {
         }
 
         setUser(usuarioActual);
+        await cargarConsultas();
         await cargarCatalogos();
       } catch {
         router.replace("/");
@@ -525,30 +512,15 @@ export function ConsultasJuridicasForm() {
     } else { setTipos([]); }
   }, [form.temaId]);
 
-  async function cargarConsultas({
-    search = "",
-    page = 1,
-    size = 10,
-    sortBy: sortField = "fecha",
-    direction: sortDirection = "desc",
-    signal,
-  } = {}) {
+  async function cargarConsultas(search = "") {
     setLoading(true);
-    setErrorLista("");
 
-    const url = construirUrlConsultas({
-      search,
-      page,
-      size,
-      sortBy: sortField,
-      direction: sortDirection,
-    });
+    const url = construirUrlConsultas(search);
 
     try {
       const { response: res, data: payload, correlationId } = await apiResponse(url, {
         method: "GET",
         credentials: "include",
-        signal,
       });
 
       if (res.status === 401) {
@@ -557,69 +529,49 @@ export function ConsultasJuridicasForm() {
       }
 
       if (res.status === 403) {
-        setRows([]);
-        setTotalRegistros(0);
-        setTotalPaginas(0);
-        setErrorLista("No tienes permisos para ver estas consultas.");
+        toast.error("No tienes permisos para ver estas consultas.", {
+          description: withErrorReference(
+            "El acceso a este listado fue denegado.",
+            correlationId
+          ),
+        });
+        router.replace("/inicio");
         return;
       }
 
       if (!res.ok) {
-        const mensaje = mensajeErrorDesdeRespuesta(payload, "Error cargando consultas");
+        const mensaje = mensajeErrorDesdeRespuesta(
+          payload,
+          "Error cargando consultas"
+        );
+
+        toast.error(`Error ${res.status} cargando consultas`, {
+          description: withErrorReference(mensaje, correlationId),
+        });
+
         setRows([]);
-        setTotalRegistros(0);
-        setTotalPaginas(0);
-        setErrorLista(withErrorReference(mensaje, correlationId));
         return;
       }
 
-      if (!payload || !Array.isArray(payload.content)) {
-        throw new Error("Respuesta paginada de consultas inválida");
-      }
+      const consultas = obtenerArrayDesdeRespuesta(payload)
+        .map(normalizarConsultaFila)
+        .filter(
+          (consulta) =>
+            consulta.id !== "" &&
+            consulta.id !== null &&
+            consulta.id !== undefined
+        );
 
-      const responsePage = Number(payload.page);
-      const responseSize = Number(payload.size);
-      const responseTotalElements = Number(payload.totalElements);
-      const responseTotalPages = Number(payload.totalPages);
-
-      if (
-        !Number.isInteger(responsePage) || responsePage < 1 ||
-        !Number.isInteger(responseSize) || responseSize < 1 || responseSize > 50 ||
-        !Number.isFinite(responseTotalElements) || responseTotalElements < 0 ||
-        !Number.isInteger(responseTotalPages) || responseTotalPages < 0
-      ) {
-        throw new Error("Contrato paginado de consultas inválido");
-      }
-
-      setRows(payload.content.map(normalizarConsultaFila));
-      setTotalRegistros(responseTotalElements);
-      setTotalPaginas(responseTotalPages);
-
-      if (responsePage !== paginaActual) {
-        setPaginaActual(responsePage);
-      }
-    } catch (error) {
-      if (error?.name === "AbortError") return;
+      setRows(ordenarConsultasPorIdAscendente(consultas));
+    } catch {
+      toast.error("Error de conexión cargando consultas", {
+        description: "No se pudo conectar con el servidor.",
+      });
 
       setRows([]);
-      setTotalRegistros(0);
-      setTotalPaginas(0);
-      setErrorLista(error?.message || "No se pudo conectar con el servidor.");
     } finally {
-      if (!signal?.aborted) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
-  }
-
-  function recargarConsultasActuales() {
-    return cargarConsultas({
-      search: searchAplicado,
-      page: paginaActual,
-      size: registrosPorPagina,
-      sortBy,
-      direction,
-    });
   }
 
   async function cargarCatalogos() {
@@ -716,16 +668,6 @@ export function ConsultasJuridicasForm() {
         return;
       }
 
-      if (res.status === 404) {
-        toast.error("El recurso no está disponible para consulta.", {
-          description: withErrorReference(
-            "No fue posible acceder al detalle solicitado.",
-            correlationId
-          ),
-        });
-        return;
-      }
-
       if (!res.ok) {
         toast.error("Error al cargar la consulta", {
           description: withErrorReference(
@@ -779,42 +721,11 @@ export function ConsultasJuridicasForm() {
 
       setIdEditando(id);
       setMostrarFormEdicion(true);
-      cargarArchivosCaso(id);
     } catch (error) {
 
       toast.error("Error al cargar la consulta");
     }
   }
-
-  async function cargarArchivosCaso(consultaId) {
-    setCargandoArchivos(true);
-    try {
-      setArchivosCaso(await fileApi.list({ type: "consulta", id: consultaId }));
-    } catch {
-
-      setArchivosCaso([]);
-    } finally {
-      setCargandoArchivos(false);
-    }
-  }
-
-  const descargarArchivo = async (file) => {
-    if (!file?.id || descargandoArchivos[file.id]) return;
-
-    setDescargandoArchivos((prev) => ({ ...prev, [file.id]: true }));
-    try {
-      await fileApi.download(file, { type: "consulta", id: idEditando });
-    } catch (error) {
-      toast.error("No se pudo descargar el archivo", {
-        description: withErrorReference(
-          error?.message || "Intenta nuevamente.",
-          error?.correlationId || null
-        ),
-      });
-    } finally {
-      setDescargandoArchivos((prev) => ({ ...prev, [file.id]: false }));
-    }
-  };
 
   async function handleGuardar(e) {
     e.preventDefault();
@@ -920,7 +831,7 @@ export function ConsultasJuridicasForm() {
         setResultadoGuardado(form.resultado ?? "");
         toast.success("Consulta actualizada");
         setMostrarFormEdicion(false);
-        recargarConsultasActuales();
+        cargarConsultas(searchText);
       } else {
         toast.error("Error al guardar", {
           description: withErrorReference(
@@ -1008,7 +919,7 @@ export function ConsultasJuridicasForm() {
       if (res.ok) {
         toast.success("Estado de la consulta actualizado");
         setMostrarFormEdicion(false);
-        recargarConsultasActuales();
+        cargarConsultas(searchText);
       } else {
         toast.error("Error al cambiar el estado", {
           description: withErrorReference(
@@ -1070,13 +981,13 @@ export function ConsultasJuridicasForm() {
             correlationId
           ),
         });
-        await recargarConsultasActuales();
+        await cargarConsultas(searchText);
         return;
       }
 
       if (res.ok) {
         toast.success("Consulta archivada");
-        recargarConsultasActuales();
+        cargarConsultas(searchText);
       } else {
         toast.error("Error al archivar", {
           description: withErrorReference(
@@ -1131,57 +1042,45 @@ export function ConsultasJuridicasForm() {
     <>
       <div className="space-y-6">
         {/* SEARCH */}
-        <div className="flex flex-wrap gap-3 items-end">
-          <div className="min-w-[260px] flex-1 space-y-1">
+        <div className="flex gap-3 items-end">
+          <div className="flex-1 space-y-1">
             <label className="text-sm font-medium">Buscar consulta</label>
-            <input
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+            <input value={searchText} onChange={e => setSearchText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  cargarConsultas(searchText);
+                }
+              }}
               placeholder="Nombre, apellido, cédula o descripción..."
               className="w-full rounded-md border px-3 py-2 text-sm"
             />
           </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Ordenar por</label>
-            <select
-              value={sortBy}
-              onChange={(e) => {
-                setSortBy(e.target.value);
-                setPaginaActual(1);
-              }}
-              className="rounded-md border bg-background px-3 py-2 text-sm"
-            >
-              <option value="fecha">Fecha</option>
-              <option value="consulta">Consulta</option>
-              <option value="nombre">Nombre</option>
-              <option value="apellido">Apellido</option>
-              <option value="cedula">Cédula</option>
-              <option value="estado">Estado</option>
-            </select>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Dirección</label>
-            <select
-              value={direction}
-              onChange={(e) => {
-                setDirection(e.target.value);
-                setPaginaActual(1);
-              }}
-              className="rounded-md border bg-background px-3 py-2 text-sm"
-            >
-              <option value="desc">Descendente</option>
-              <option value="asc">Ascendente</option>
-            </select>
-          </div>
+          <Button onClick={() => cargarConsultas(searchText)} disabled={loading}>
+            {loading ? "Buscando..." : "Buscar"}
+          </Button>
         </div>
 
         {/* Form handling.*/}
         {mostrarFormEdicion && (
-          <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
-            <h2 className="text-lg font-semibold">Editar consulta #{idEditando}</h2>
-            <form onSubmit={handleGuardar} className="space-y-4">
+            <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+              <h2 className="text-lg font-semibold">
+                Consulta #{idEditando}
+              </h2>
+
+              <Tabs defaultValue="informacion" className="w-full">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="informacion">
+                    Información
+                  </TabsTrigger>
+
+                  <TabsTrigger value="documentos">
+                    Documentos
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="informacion">
+                  <form onSubmit={handleGuardar} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <C label="Fecha *"><input type="date" name="fecha" value={form.fecha} onChange={handleChange} required className={ic} /></C>
                 <C label="Estado *">
@@ -1343,36 +1242,17 @@ export function ConsultasJuridicasForm() {
               <C label="Concepto jurídico *"><textarea name="conceptoJuridico" value={form.conceptoJuridico} onChange={handleChange} required rows={3} placeholder="Fundamento legal aplicable" className={ic} /></C>
               <C label="Observaciones"><textarea name="observaciones" value={form.observaciones} onChange={handleChange} rows={2} placeholder="Opcional" className={ic} /></C>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Archivos relacionados</label>
-                {cargandoArchivos ? (
-                  <p className="text-sm text-muted-foreground">Cargando archivos...</p>
-                ) : archivosCaso.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No hay archivos adjuntos.</p>
-                ) : (
-                  <ul className="space-y-2">
-                    {archivosCaso.map((file) => (
-                      <li key={file.id ?? file.fileName} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                        <span className="truncate">{file.fileName ?? file.nombre ?? "Archivo"}</span>
-                        <button
-                          type="button"
-                          onClick={() => descargarArchivo(file)}
-                          disabled={!file.id || !!descargandoArchivos[file.id]}
-                          className="text-primary hover:underline disabled:pointer-events-none disabled:opacity-60"
-                        >
-                          {descargandoArchivos[file.id] ? "Descargando..." : "Descargar"}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
               <div className="flex justify-end gap-3 pt-2">
                 <Button type="button" variant="outline" onClick={() => setMostrarFormEdicion(false)} disabled={guardando}>Cancelar</Button>
                 <Button type="submit" disabled={guardando}>{guardando ? "Guardando..." : "Actualizar"}</Button>
               </div>
             </form>
+                </TabsContent>
+
+                <TabsContent value="documentos">
+                  <DocumentosExpedienteTab consultaId={idEditando} />
+                </TabsContent>
+              </Tabs>
           </div>
         )}
 
@@ -1387,15 +1267,9 @@ export function ConsultasJuridicasForm() {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-8 text-sm text-muted-foreground">
-                    {loading
-                      ? "Cargando..."
-                      : errorLista || "Sin resultados. Usa el buscador o crea una nueva consulta."}
-                  </td>
-                </tr>
-              ) : rows.map(row => (
+              {rowsOrdenadas.length === 0 ? (
+                <tr><td colSpan={8} className="text-center py-8 text-sm text-muted-foreground">{loading ? "Cargando..." : "Sin resultados. Usa el buscador o crea una nueva consulta."}</td></tr>
+              ) : rowsPaginadas.map(row => (
                 <tr key={row.id} className="border-t hover:bg-muted/50 transition-colors">
                   <td className="px-4 py-3 text-sm">{row.id}</td>
                   <td className="px-4 py-3 text-sm max-w-[200px] truncate" title={row.consulta}>{row.consulta}</td>
@@ -1424,7 +1298,6 @@ export function ConsultasJuridicasForm() {
                           Editar
                         </Button>
                       )}
-
                       {puedeArchivarConsultas && normalizarEstadoConsulta(row.estado) !== "ARCHIVADO" && (
                         <Button
                           size="sm"
@@ -1434,6 +1307,7 @@ export function ConsultasJuridicasForm() {
                           Archivar
                         </Button>
                       )}
+                      <BotonDescargarFicha consultaId={row.id} />
                     </div>
                   </td>
                 </tr>
@@ -1452,7 +1326,7 @@ export function ConsultasJuridicasForm() {
             setPaginaActual(1);
           }}
           pageSizeOptions={DEFAULT_PAGE_SIZE_OPTIONS}
-          totalItems={totalRegistros}
+          totalItems={rowsOrdenadas.length}
         />
       </div>
 

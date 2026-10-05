@@ -107,3 +107,17 @@ Este documento resume la cobertura documental vigente del sistema y permite ubic
 | `doc/mantenimiento/matriz-actualizacion-documental.md` | Relación entre cambios y documentos a revisar. |
 | `doc/mantenimiento/versionado-documentacion.md` | Criterios de versionado documental. |
 | `doc/mantenimiento/estado-cobertura-documental.md` | Mapa de cobertura documental vigente. |
+| `doc/mantenimiento/manual-despliegue-recuperacion.md` | Manual de Despliegue, Operación y Recuperación ante Desastres (Backup & Restore). |
+
+## Especificaciones y Requisitos
+
+| Documento | Propósito |
+|---|---|
+| `doc/especificaciones/srs-documental-rf19-rf21-rf59.md` | Especificación formal SRS (RF16-RF21, RF59), Product Backlog (PB-27 a PB-29) y Caso de Uso CU-10. |
+
+## Evidencias y Trazabilidad
+
+| Documento | Propósito |
+|---|---|
+| `doc/evidencias/matriz-historia-pr-prueba-evidencia.md` | Matriz de trazabilidad Requisito-Historia-PR-Prueba-Evidencia, Guion de Demo y Acta de Revisión Técnica. |
+
