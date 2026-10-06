@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { FormInput } from "../parts/FormInput";
 import { FormSelect } from "../parts/FormSelect";
 import { FormCheckbox } from "../parts/FormCheckbox";
+import { RemotePagedSelect } from "../parts/RemotePagedSelect";
 import { Button } from "@/components/ui/button";
 import { API_URL_BASE } from "@/lib/config";
 import { PERMISOS } from "@/lib/permission";
@@ -92,13 +93,13 @@ export function UsuarioSistemaForm() {
   const [tiposDocumento, setTiposDocumento] = useState([]);
   const [sedes, setSedes] = useState([]);
   const [areas, setAreas] = useState([]);
-  const [asesores, setAsesores] = useState([]);
 
   const {
     register,
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors },
   } = useForm({
     defaultValues: {
@@ -120,6 +121,7 @@ export function UsuarioSistemaForm() {
   });
 
   const rol = watch("rol") || "";
+  const asesorId = watch("asesorId") || "";
 
   const puedeCrearUsuarios = puedeCrearUsuariosUsuario(user);
   const puedeGestionarAdministradores =
@@ -202,37 +204,24 @@ export function UsuarioSistemaForm() {
         return;
       }
 
-      const [tiposData, sedesData, areasData, asesoresData] =
-        await Promise.all([
-          fetchLista(
-            `${API_URL_BASE}/tipos-documento/activos`,
-            "No tienes permiso para consultar tipos de documento"
-          ),
-          fetchLista(
-            `${API_URL_BASE}/sedes`,
-            "No tienes permiso para consultar sedes"
-          ),
-          fetchLista(
-            `${API_URL_BASE}/areas`,
-            "No tienes permiso para consultar áreas"
-          ),
-          fetchLista(
-            `${API_URL_BASE}/asesores/activos`,
-            "No tienes permiso para consultar asesores"
-          ),
-        ]);
+      const [tiposData, sedesData, areasData] = await Promise.all([
+        fetchLista(
+          `${API_URL_BASE}/tipos-documento/activos`,
+          "No tienes permiso para consultar tipos de documento"
+        ),
+        fetchLista(
+          `${API_URL_BASE}/sedes`,
+          "No tienes permiso para consultar sedes"
+        ),
+        fetchLista(
+          `${API_URL_BASE}/areas`,
+          "No tienes permiso para consultar áreas"
+        ),
+      ]);
 
       setTiposDocumento(tiposData.map(mapOption));
       setSedes(sedesData.map(mapOption));
       setAreas(areasData.map(mapOption));
-      setAsesores(
-        asesoresData.map((asesor) => ({
-          value: asesor.id,
-          label: asesor.documento
-            ? `${asesor.nombre} - ${asesor.documento}`
-            : asesor.nombre || String(asesor.id),
-        }))
-      );
     } catch (error) {
 
       toast.error("Error cargando el formulario");
@@ -372,18 +361,33 @@ export function UsuarioSistemaForm() {
     if (rol === "estudiantes") {
       return (
         <>
-          {asesores.length > 0 ? (
-            <FormSelect
-              name="asesorId"
-              label="Asesor"
-              options={asesores}
-              register={register}
-              errors={errors}
-              rules={{ required: REQUIRED, valueAsNumber: true }}
-            />
-          ) : (
-            <Aviso>No se cargaron asesores.</Aviso>
-          )}
+          <input
+            type="hidden"
+            {...register("asesorId", { required: REQUIRED, valueAsNumber: true })}
+          />
+          <RemotePagedSelect
+            label="Asesor"
+            value={asesorId}
+            onChange={(id) =>
+              setValue("asesorId", id ? Number(id) : "", {
+                shouldValidate: true,
+                shouldDirty: true,
+              })
+            }
+            endpoint="/asesores"
+            resourceName="asesores"
+            filters={{ activo: true }}
+            sortBy="nombre"
+            direction="asc"
+            required
+            error={errors?.asesorId?.message}
+            getOptionLabel={(asesor) =>
+              asesor.documento
+                ? `${asesor.nombre} - ${asesor.documento}`
+                : asesor.nombre || String(asesor.id)
+            }
+            searchPlaceholder="Buscar asesor por nombre, documento o correo..."
+          />
 
           <FormCheckbox
             name="conciliacion"

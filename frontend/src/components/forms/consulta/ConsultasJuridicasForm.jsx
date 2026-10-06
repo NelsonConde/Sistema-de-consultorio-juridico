@@ -7,7 +7,15 @@ import {
   requireResourceVersion,
   withErrorReference,
 } from "@/lib/api";
-import { fileApi } from "@/lib/fileApi";
+
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+
+import { DocumentosExpedienteTab } from "./documentos/DocumentosExpedienteTab";
   /**
    * List and table handling.
    *
@@ -35,8 +43,10 @@ import {
 } from "@/lib/personasApi";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import Pagination from "@/components/ui/Pagination";
-import { DEFAULT_PAGE_SIZE_OPTIONS, getTotalPages, paginateItems } from "@/lib/list-utils";
+import { DEFAULT_PAGE_SIZE_OPTIONS } from "@/lib/list-utils";
+import { useDebouncedPageSearch } from "@/hooks/useDebouncedValue";
 
+import { BotonDescargarFicha } from "./BotonDescargarFicha"
 import { ESTADOS_CONSULTA, VACIOS } from "./consultas-juridicas.constants";
 import {
   accionPermitidaPorRegistro,
@@ -50,12 +60,12 @@ import {
   obtenerAreaIdAsesor,
   obtenerArrayDesdeRespuesta,
   obtenerAsesorIdEstudiante,
-  ordenarConsultasPorIdAscendente,
   textoNormalizado,
   textoVacio,
   validarCoherenciaConsultaFrontend,
 } from "./consultas-juridicas.utils";
 import { ModalMultiple, ModalSimple } from "./ConsultaSelectionModals";
+import { RemotePagedSelect } from "../parts/RemotePagedSelect";
 
 export function ConsultasJuridicasForm() {
   const router = useRouter();
@@ -65,6 +75,9 @@ export function ConsultasJuridicasForm() {
   const [searchText, setSearchText] = useState("");
   const [paginaActual, setPaginaActual] = useState(1);
   const [registrosPorPagina, setRegistrosPorPagina] = useState(10);
+  const [totalElementos, setTotalElementos] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(0);
+  const searchAplicado = useDebouncedPageSearch(searchText, setPaginaActual, 350);
 
   const [mostrarFormEdicion, setMostrarFormEdicion] = useState(false);
   const [idEditando, setIdEditando] = useState(null);
@@ -87,26 +100,16 @@ export function ConsultasJuridicasForm() {
   const [asesores, setAsesores] = useState([]);
   const [monitores, setMonitores] = useState([]);
   const [estudiantes, setEstudiantes] = useState([]);
-  const [archivosCaso, setArchivosCaso] = useState([]);
-  const [cargandoArchivos, setCargandoArchivos] = useState(false);
   const [user, setUser] = useState(null);
   const [checkingPermisos, setCheckingPermisos] = useState(true);
   const [confirmArchivar, setConfirmArchivar] = useState({ abierto: false, id: null, loading: false });
 
   // Modal behavior.
-  const [modalAsesor, setModalAsesor] = useState({ abierto: false, busqueda: "" });
-  const [modalMonitor, setModalMonitor] = useState({ abierto: false, busqueda: "" });
-  const [modalEstudiante, setModalEstudiante] = useState({ abierto: false, busqueda: "" });
   const [modalParte, setModalParte] = useState({ abierto: false, busqueda: "" });
   const [modalPartesAdicionales, setModalPartesAdicionales] = useState({ abierto: false, busqueda: "" });
   const [modalContrapartes, setModalContrapartes] = useState({ abierto: false, busqueda: "" });
 
   // Selected items
-  const areaSeleccionadaId = useMemo(
-    () => idNormalizado(form.areaId),
-    [form.areaId]
-  );
-
   const asesorSeleccionado = useMemo(
     () => asesores.find((a) => idNormalizado(a.id) === idNormalizado(form.asesorId)) || null,
     [asesores, form.asesorId]
@@ -181,60 +184,6 @@ export function ConsultasJuridicasForm() {
     [personasResultado, form.personaId, form.partesIds]
   );
 
-  // Search behavior.
-  // Search behavior.
-  // Validation rule.
-  const asesoresDisponiblesPorArea = useMemo(() => {
-    if (!areaSeleccionadaId) {
-      return [];
-    }
-
-    return asesores.filter(
-      (asesor) => obtenerAreaIdAsesor(asesor) === areaSeleccionadaId
-    );
-  }, [asesores, areaSeleccionadaId]);
-
-  const estudiantesDisponiblesPorAsesor = useMemo(() => {
-    if (!form.asesorId) {
-      return [];
-    }
-
-    const asesorId = idNormalizado(form.asesorId);
-
-    return estudiantes.filter(
-      (estudiante) => obtenerAsesorIdEstudiante(estudiante) === asesorId
-    );
-  }, [estudiantes, form.asesorId]);
-
-  const asesoresFiltrados = useMemo(() => {
-    const t = modalAsesor.busqueda.toLowerCase();
-
-    return t
-      ? asesoresDisponiblesPorArea.filter((a) =>
-        `${a.nombre} ${a.documento}`.toLowerCase().includes(t)
-      )
-      : asesoresDisponiblesPorArea;
-  }, [asesoresDisponiblesPorArea, modalAsesor.busqueda]);
-
-  const monitoresFiltrados = useMemo(() => {
-    const t = modalMonitor.busqueda.toLowerCase();
-
-    return t
-      ? monitores.filter((m) =>
-        `${m.nombre} ${m.documento}`.toLowerCase().includes(t)
-      )
-      : monitores;
-  }, [monitores, modalMonitor.busqueda]);
-
-  const estudiantesFiltrados = useMemo(() => {
-    const t = modalEstudiante.busqueda.toLowerCase();
-
-    return t
-      ? estudiantesDisponiblesPorAsesor.filter((e) =>
-        `${e.nombre} ${e.documento} ${e.codigo}`.toLowerCase().includes(t)
-      )
-      : estudiantesDisponiblesPorAsesor;
-  }, [estudiantesDisponiblesPorAsesor, modalEstudiante.busqueda]);
   const parteFiltrada = personasParaPrincipal;
   const partesAdicionalesFiltradas = personasParaAdicionales;
   const contrapartesFiltradas = personasParaContrapartes;
@@ -424,19 +373,8 @@ export function ConsultasJuridicasForm() {
     );
   }
 
-  const rowsOrdenadas = useMemo(() => ordenarConsultasPorIdAscendente(rows), [rows]);
-  const totalPaginas = getTotalPages(rowsOrdenadas.length, registrosPorPagina);
-  const rowsPaginadas = useMemo(
-    () => paginateItems(rowsOrdenadas, paginaActual, registrosPorPagina),
-    [rowsOrdenadas, paginaActual, registrosPorPagina]
-  );
-
   useEffect(() => {
-    setPaginaActual(1);
-  }, [searchText, registrosPorPagina]);
-
-  useEffect(() => {
-    if (paginaActual > totalPaginas) {
+    if (totalPaginas > 0 && paginaActual > totalPaginas) {
       setPaginaActual(totalPaginas);
     }
   }, [paginaActual, totalPaginas]);
@@ -473,7 +411,6 @@ export function ConsultasJuridicasForm() {
         }
 
         setUser(usuarioActual);
-        await cargarConsultas();
         await cargarCatalogos();
       } catch {
         router.replace("/");
@@ -484,6 +421,10 @@ export function ConsultasJuridicasForm() {
 
     init();
   }, []);
+
+  useEffect(() => {
+    if (user) cargarConsultas();
+  }, [user, searchAplicado, paginaActual, registrosPorPagina]);
 
   const prevAreaId = React.useRef(null);
   useEffect(() => {
@@ -505,10 +446,16 @@ export function ConsultasJuridicasForm() {
     } else { setTipos([]); }
   }, [form.temaId]);
 
-  async function cargarConsultas(search = "") {
+  async function cargarConsultas(search = searchAplicado) {
     setLoading(true);
 
-    const url = construirUrlConsultas(search);
+    const url = construirUrlConsultas({
+      search,
+      page: paginaActual,
+      size: registrosPorPagina,
+      sortBy: "fecha",
+      direction: "desc",
+    });
 
     try {
       const { response: res, data: payload, correlationId } = await apiResponse(url, {
@@ -543,6 +490,8 @@ export function ConsultasJuridicasForm() {
         });
 
         setRows([]);
+        setTotalElementos(0);
+        setTotalPaginas(0);
         return;
       }
 
@@ -555,13 +504,35 @@ export function ConsultasJuridicasForm() {
             consulta.id !== undefined
         );
 
-      setRows(ordenarConsultasPorIdAscendente(consultas));
+      if (Array.isArray(payload)) {
+        const totalLegacy = consultas.length;
+        const paginasLegacy = Math.ceil(totalLegacy / registrosPorPagina);
+        const paginaLegacy = paginasLegacy > 0
+          ? Math.min(paginaActual, paginasLegacy)
+          : 1;
+        const inicio = (paginaLegacy - 1) * registrosPorPagina;
+
+        setRows(consultas.slice(inicio, inicio + registrosPorPagina));
+        setTotalElementos(totalLegacy);
+        setTotalPaginas(paginasLegacy);
+        if (paginaLegacy !== paginaActual) setPaginaActual(paginaLegacy);
+        return;
+      }
+
+      setRows(consultas);
+      setTotalElementos(Number(payload?.totalElements) || 0);
+      setTotalPaginas(Number(payload?.totalPages) || 0);
+
+      const paginaRespuesta = Number(payload?.page) || 1;
+      if (paginaRespuesta !== paginaActual) setPaginaActual(paginaRespuesta);
     } catch {
       toast.error("Error de conexión cargando consultas", {
         description: "No se pudo conectar con el servidor.",
       });
 
       setRows([]);
+      setTotalElementos(0);
+      setTotalPaginas(0);
     } finally {
       setLoading(false);
     }
@@ -592,19 +563,13 @@ export function ConsultasJuridicasForm() {
         return obtenerArrayDesdeRespuesta(payload);
       };
 
-      const [sR, aR, asR, moR, esR] = await Promise.all([
+      const [sR, aR] = await Promise.all([
         fetchCatalogo(`${API_URL_BASE}/sedes`),
         fetchCatalogo(`${API_URL_BASE}/areas`),
-        fetchCatalogo(`${API_URL_BASE}/asesores/activos`),
-        fetchCatalogo(`${API_URL_BASE}/monitores/activos`),
-        fetchCatalogo(`${API_URL_BASE}/estudiantes/activos`),
       ]);
 
       setSedes(sR);
       setAreas(aR);
-      setAsesores(asR);
-      setMonitores(moR);
-      setEstudiantes(esR);
     } catch {
       // Catalog failures are already represented by empty option lists.
     }
@@ -612,6 +577,11 @@ export function ConsultasJuridicasForm() {
 
   function handleChange(e) {
     const { name, value } = e.target;
+
+    if (name === "areaId") {
+      setAsesores([]);
+      setEstudiantes([]);
+    }
 
     setForm((prev) => {
       if (name === "areaId") {
@@ -673,6 +643,10 @@ export function ConsultasJuridicasForm() {
 
       const data = payload?.data || payload?.consulta || payload;
 
+      setAsesores(data.asesor ? [data.asesor] : []);
+      setMonitores(data.monitor ? [data.monitor] : []);
+      setEstudiantes(data.estudiante ? [data.estudiante] : []);
+
       if (data.areaId) {
         const temasRes = await apiClient.request(`${API_URL_BASE}/temas/area/${data.areaId}`, { credentials: "include" });
         const temasData = await leerJsonSeguro(temasRes);
@@ -714,37 +688,11 @@ export function ConsultasJuridicasForm() {
 
       setIdEditando(id);
       setMostrarFormEdicion(true);
-      cargarArchivosCaso(id);
     } catch (error) {
 
       toast.error("Error al cargar la consulta");
     }
   }
-
-  async function cargarArchivosCaso(consultaId) {
-    setCargandoArchivos(true);
-    try {
-      setArchivosCaso(await fileApi.list({ type: "consulta", id: consultaId }));
-    } catch {
-
-      setArchivosCaso([]);
-    } finally {
-      setCargandoArchivos(false);
-    }
-  }
-
-  const descargarArchivo = async (file) => {
-    try {
-      await fileApi.download(file, { type: "consulta", id: idEditando });
-    } catch (error) {
-      toast.error("No se pudo descargar el archivo", {
-        description: withErrorReference(
-          error?.message || "Intenta nuevamente.",
-          error?.correlationId || null
-        ),
-      });
-    }
-  };
 
   async function handleGuardar(e) {
     e.preventDefault();
@@ -850,7 +798,7 @@ export function ConsultasJuridicasForm() {
         setResultadoGuardado(form.resultado ?? "");
         toast.success("Consulta actualizada");
         setMostrarFormEdicion(false);
-        cargarConsultas(searchText);
+        cargarConsultas();
       } else {
         toast.error("Error al guardar", {
           description: withErrorReference(
@@ -938,7 +886,7 @@ export function ConsultasJuridicasForm() {
       if (res.ok) {
         toast.success("Estado de la consulta actualizado");
         setMostrarFormEdicion(false);
-        cargarConsultas(searchText);
+        cargarConsultas();
       } else {
         toast.error("Error al cambiar el estado", {
           description: withErrorReference(
@@ -1000,13 +948,13 @@ export function ConsultasJuridicasForm() {
             correlationId
           ),
         });
-        await cargarConsultas(searchText);
+        await cargarConsultas();
         return;
       }
 
       if (res.ok) {
         toast.success("Consulta archivada");
-        cargarConsultas(searchText);
+        cargarConsultas();
       } else {
         toast.error("Error al archivar", {
           description: withErrorReference(
@@ -1022,24 +970,6 @@ export function ConsultasJuridicasForm() {
     } finally {
       setConfirmArchivar({ abierto: false, id: null, loading: false });
     }
-  }
-
-  function abrirModalAsesor() {
-    if (!form.areaId) {
-      toast.error("Selecciona primero el área de la consulta.");
-      return;
-    }
-
-    setModalAsesor((prev) => ({ ...prev, abierto: true }));
-  }
-
-  function abrirModalEstudiante() {
-    if (!form.asesorId) {
-      toast.error("Selecciona primero un asesor.");
-      return;
-    }
-
-    setModalEstudiante((prev) => ({ ...prev, abierto: true }));
   }
 
   function renderPersona(p) {
@@ -1068,6 +998,7 @@ export function ConsultasJuridicasForm() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
+                  setPaginaActual(1);
                   cargarConsultas(searchText);
                 }
               }}
@@ -1082,9 +1013,24 @@ export function ConsultasJuridicasForm() {
 
         {/* Form handling.*/}
         {mostrarFormEdicion && (
-          <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
-            <h2 className="text-lg font-semibold">Editar consulta #{idEditando}</h2>
-            <form onSubmit={handleGuardar} className="space-y-4">
+            <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+              <h2 className="text-lg font-semibold">
+                Consulta #{idEditando}
+              </h2>
+
+              <Tabs defaultValue="informacion" className="w-full">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="informacion">
+                    Información
+                  </TabsTrigger>
+
+                  <TabsTrigger value="documentos">
+                    Documentos
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="informacion">
+                  <form onSubmit={handleGuardar} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <C label="Fecha *"><input type="date" name="fecha" value={form.fecha} onChange={handleChange} required className={ic} /></C>
                 <C label="Estado *">
@@ -1149,51 +1095,89 @@ export function ConsultasJuridicasForm() {
                   <>
                     {/* ADVISOR */}
                     <C label="Asesor">
-                      <button
-                        type="button"
-                        onClick={abrirModalAsesor}
+                      <RemotePagedSelect
+                        value={form.asesorId}
+                        selectedLabel={asesorSeleccionado
+                          ? `${asesorSeleccionado.nombre}${asesorSeleccionado.documento ? ` - ${asesorSeleccionado.documento}` : ""}`
+                          : ""}
+                        onChange={(id, item) => {
+                          if (item && obtenerAreaIdAsesor(item) !== idNormalizado(form.areaId)) {
+                            toast.error("El asesor seleccionado no pertenece al área de la consulta.");
+                            return false;
+                          }
+                          setAsesores(item ? [item] : []);
+                          setEstudiantes([]);
+                          setForm((prev) => ({
+                            ...prev,
+                            asesorId: id ? String(id) : "",
+                            estudianteId: "",
+                          }));
+                        }}
+                        endpoint="/asesores/activos/paginados"
+                        legacyEndpoint="/asesores/activos"
+                        resourceName="asesores activos"
+                        sortBy="nombre"
+                        direction="asc"
+                        placeholder={form.areaId ? "Sin asignar" : "Seleccione área primero"}
+                        searchPlaceholder="Buscar asesor..."
+                        getOptionLabel={(item) =>
+                          `${item.nombre}${item.documento ? ` - ${item.documento}` : ""}`
+                        }
                         disabled={!form.areaId}
-                        className="flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <span className={asesorSeleccionado ? "text-foreground" : "text-muted-foreground"}>
-                          {asesorSeleccionado
-                            ? `${asesorSeleccionado.nombre}${asesorSeleccionado.documento ? ` - ${asesorSeleccionado.documento}` : ""}`
-                            : form.areaId
-                              ? "Sin asignar"
-                              : "Seleccione área primero"}
-                        </span>
-                        <span className="text-muted-foreground">▼</span>
-                      </button>
+                      />
                     </C>
 
                     {/* MONITOR */}
                     <C label="Monitor">
-                      <button type="button" onClick={() => setModalMonitor(p => ({ ...p, abierto: true }))}
-                        className="flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors">
-                        <span className={monitorSeleccionado ? "text-foreground" : "text-muted-foreground"}>
-                          {monitorSeleccionado ? `${monitorSeleccionado.nombre}${monitorSeleccionado.documento ? ` - ${monitorSeleccionado.documento}` : ""}` : "Sin asignar"}
-                        </span>
-                        <span className="text-muted-foreground">▼</span>
-                      </button>
+                      <RemotePagedSelect
+                        value={form.monitorId}
+                        selectedLabel={monitorSeleccionado
+                          ? `${monitorSeleccionado.nombre}${monitorSeleccionado.documento ? ` - ${monitorSeleccionado.documento}` : ""}`
+                          : ""}
+                        onChange={(id, item) => {
+                          setMonitores(item ? [item] : []);
+                          setForm((prev) => ({ ...prev, monitorId: id ? String(id) : "" }));
+                        }}
+                        endpoint="/monitores/activos/paginados"
+                        legacyEndpoint="/monitores/activos"
+                        resourceName="monitores activos"
+                        sortBy="nombre"
+                        direction="asc"
+                        placeholder="Sin asignar"
+                        searchPlaceholder="Buscar monitor..."
+                        getOptionLabel={(item) =>
+                          `${item.nombre}${item.documento ? ` - ${item.documento}` : ""}`
+                        }
+                      />
                     </C>
 
                     {/* STUDENT */}
                     <C label="Estudiante">
-                      <button
-                        type="button"
-                        onClick={abrirModalEstudiante}
+                      <RemotePagedSelect
+                        value={form.estudianteId}
+                        selectedLabel={estudianteSeleccionado
+                          ? `${estudianteSeleccionado.nombre}${estudianteSeleccionado.codigo ? ` - ${estudianteSeleccionado.codigo}` : ""}`
+                          : ""}
+                        onChange={(id, item) => {
+                          if (item && obtenerAsesorIdEstudiante(item) !== idNormalizado(form.asesorId)) {
+                            toast.error("El estudiante seleccionado no pertenece al asesor asignado.");
+                            return false;
+                          }
+                          setEstudiantes(item ? [item] : []);
+                          setForm((prev) => ({ ...prev, estudianteId: id ? String(id) : "" }));
+                        }}
+                        endpoint="/estudiantes/activos/paginados"
+                        legacyEndpoint="/estudiantes/activos"
+                        resourceName="estudiantes activos"
+                        sortBy="nombre"
+                        direction="asc"
+                        placeholder={form.asesorId ? "Sin asignar" : "Seleccione asesor primero"}
+                        searchPlaceholder="Buscar estudiante..."
+                        getOptionLabel={(item) =>
+                          `${item.nombre}${item.codigo ? ` - ${item.codigo}` : ""}`
+                        }
                         disabled={!form.asesorId}
-                        className="flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <span className={estudianteSeleccionado ? "text-foreground" : "text-muted-foreground"}>
-                          {estudianteSeleccionado
-                            ? `${estudianteSeleccionado.nombre}${estudianteSeleccionado.codigo ? ` - ${estudianteSeleccionado.codigo}` : ""}`
-                            : form.asesorId
-                              ? "Sin asignar"
-                              : "Seleccione asesor primero"}
-                        </span>
-                        <span className="text-muted-foreground">▼</span>
-                      </button>
+                      />
                     </C>
                   </>
                 ) : (
@@ -1246,29 +1230,17 @@ export function ConsultasJuridicasForm() {
               <C label="Concepto jurídico *"><textarea name="conceptoJuridico" value={form.conceptoJuridico} onChange={handleChange} required rows={3} placeholder="Fundamento legal aplicable" className={ic} /></C>
               <C label="Observaciones"><textarea name="observaciones" value={form.observaciones} onChange={handleChange} rows={2} placeholder="Opcional" className={ic} /></C>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Archivos relacionados</label>
-                {cargandoArchivos ? (
-                  <p className="text-sm text-muted-foreground">Cargando archivos...</p>
-                ) : archivosCaso.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No hay archivos adjuntos.</p>
-                ) : (
-                  <ul className="space-y-2">
-                    {archivosCaso.map((file) => (
-                      <li key={file.id ?? file.fileName} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                        <span className="truncate">{file.fileName ?? file.nombre ?? "Archivo"}</span>
-                        <button type="button" onClick={() => descargarArchivo(file)} className="text-primary hover:underline">Descargar</button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
               <div className="flex justify-end gap-3 pt-2">
                 <Button type="button" variant="outline" onClick={() => setMostrarFormEdicion(false)} disabled={guardando}>Cancelar</Button>
                 <Button type="submit" disabled={guardando}>{guardando ? "Guardando..." : "Actualizar"}</Button>
               </div>
             </form>
+                </TabsContent>
+
+                <TabsContent value="documentos">
+                  <DocumentosExpedienteTab consultaId={idEditando} />
+                </TabsContent>
+              </Tabs>
           </div>
         )}
 
@@ -1283,9 +1255,9 @@ export function ConsultasJuridicasForm() {
               </tr>
             </thead>
             <tbody>
-              {rowsOrdenadas.length === 0 ? (
+              {rows.length === 0 ? (
                 <tr><td colSpan={8} className="text-center py-8 text-sm text-muted-foreground">{loading ? "Cargando..." : "Sin resultados. Usa el buscador o crea una nueva consulta."}</td></tr>
-              ) : rowsPaginadas.map(row => (
+              ) : rows.map(row => (
                 <tr key={row.id} className="border-t hover:bg-muted/50 transition-colors">
                   <td className="px-4 py-3 text-sm">{row.id}</td>
                   <td className="px-4 py-3 text-sm max-w-[200px] truncate" title={row.consulta}>{row.consulta}</td>
@@ -1314,7 +1286,6 @@ export function ConsultasJuridicasForm() {
                           Editar
                         </Button>
                       )}
-
                       {puedeArchivarConsultas && normalizarEstadoConsulta(row.estado) !== "ARCHIVADO" && (
                         <Button
                           size="sm"
@@ -1324,6 +1295,7 @@ export function ConsultasJuridicasForm() {
                           Archivar
                         </Button>
                       )}
+                      <BotonDescargarFicha consultaId={row.id} />
                     </div>
                   </td>
                 </tr>
@@ -1342,73 +1314,9 @@ export function ConsultasJuridicasForm() {
             setPaginaActual(1);
           }}
           pageSizeOptions={DEFAULT_PAGE_SIZE_OPTIONS}
-          totalItems={rowsOrdenadas.length}
+          totalItems={totalElementos}
         />
       </div>
-
-      {/* MODAL ADVISOR */}
-      <ModalSimple
-        abierto={modalAsesor.abierto}
-        titulo="Seleccionar Asesor"
-        items={asesoresFiltrados}
-        busqueda={modalAsesor.busqueda}
-        setBusqueda={(v) => setModalAsesor((p) => ({ ...p, busqueda: v }))}
-        onSeleccionar={(item) => {
-          setForm((prev) => ({
-            ...prev,
-            asesorId: item ? String(item.id) : "",
-            estudianteId: "",
-          }));
-          setModalAsesor({ abierto: false, busqueda: "" });
-        }}
-        onCerrar={() => setModalAsesor({ abierto: false, busqueda: "" })}
-        seleccionado={asesorSeleccionado}
-        renderItem={(a) => (
-          <>
-            <div className="font-medium">{a.nombre}</div>
-            <div className="text-xs text-muted-foreground">
-              {a.documento}
-            </div>
-          </>
-        )}
-      />
-
-      {/* MODAL MONITOR */}
-      <ModalSimple
-        abierto={modalMonitor.abierto} titulo="Seleccionar Monitor"
-        items={monitoresFiltrados} busqueda={modalMonitor.busqueda}
-        setBusqueda={v => setModalMonitor(p => ({ ...p, busqueda: v }))}
-        onSeleccionar={item => { setForm(prev => ({ ...prev, monitorId: item ? String(item.id) : "" })); setModalMonitor({ abierto: false, busqueda: "" }); }}
-        onCerrar={() => setModalMonitor({ abierto: false, busqueda: "" })}
-        seleccionado={monitorSeleccionado}
-        renderItem={m => (<><div className="font-medium">{m.nombre}</div><div className="text-xs text-muted-foreground">{m.documento}</div></>)}
-      />
-
-      {/* MODAL STUDENT */}
-      <ModalSimple
-        abierto={modalEstudiante.abierto}
-        titulo="Seleccionar Estudiante"
-        items={estudiantesFiltrados}
-        busqueda={modalEstudiante.busqueda}
-        setBusqueda={(v) => setModalEstudiante((p) => ({ ...p, busqueda: v }))}
-        onSeleccionar={(item) => {
-          setForm((prev) => ({
-            ...prev,
-            estudianteId: item ? String(item.id) : "",
-          }));
-          setModalEstudiante({ abierto: false, busqueda: "" });
-        }}
-        onCerrar={() => setModalEstudiante({ abierto: false, busqueda: "" })}
-        seleccionado={estudianteSeleccionado}
-        renderItem={(e) => (
-          <>
-            <div className="font-medium">{e.nombre}</div>
-            <div className="text-xs text-muted-foreground">
-              {e.codigo} — {e.documento}
-            </div>
-          </>
-        )}
-      />
 
       {/* MODAL PRIMARY PARTY */}
       <ModalSimple

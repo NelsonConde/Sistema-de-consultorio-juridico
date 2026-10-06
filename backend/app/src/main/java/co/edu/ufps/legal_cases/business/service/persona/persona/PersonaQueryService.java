@@ -53,6 +53,11 @@ public class PersonaQueryService {
     }
 
     @Transactional(readOnly = true)
+    public PersonaPageResponseDTO listarInactivos(String search, int page, int size) {
+        return buscarResumen(search, page, size, false);
+    }
+
+    @Transactional(readOnly = true)
     @Auditable(action = "CONSULTAR_DETALLE_PERSONA", entityName = "Persona", entityId = "#id")
     public PersonaDTO obtenerPorId(Long id) {
         personaAccessService.validarPuedeVerDetallePersona(id);

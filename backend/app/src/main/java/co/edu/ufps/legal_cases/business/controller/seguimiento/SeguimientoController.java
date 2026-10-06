@@ -24,8 +24,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoRequestDTO;
 import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoResponseDTO;
+import co.edu.ufps.legal_cases.business.dto.seguimiento.SeguimientoResumenDTO;
 import co.edu.ufps.legal_cases.business.model.seguimiento.EstadoSeguimiento;
 import co.edu.ufps.legal_cases.business.service.seguimiento.SeguimientoService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -35,6 +37,33 @@ import lombok.RequiredArgsConstructor;
 public class SeguimientoController {
 
     private final SeguimientoService seguimientoService;
+
+    // Listado paginado principal – Bloque A (SCRUM-269).
+    @GetMapping
+    @PreAuthorize("hasAuthority('" + VER_SEGUIMIENTOS + "')")
+    public PageResponseDTO<SeguimientoResumenDTO> buscar(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) EstadoSeguimiento estado,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
+            @RequestParam(required = false) Long consultaId,
+            @RequestParam(required = false) Long autorId) {
+        return seguimientoService.buscarParaUsuarioActual(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                estado,
+                fechaDesde,
+                fechaHasta,
+                consultaId,
+                autorId);
+    }
 
     @GetMapping("/consulta/{consultaId}")
     @PreAuthorize("hasAuthority('" + VER_SEGUIMIENTOS + "')")
@@ -55,17 +84,27 @@ public class SeguimientoController {
     }
 
     /**
-     * Devuelve los seguimientos visibles para el usuario autenticado según su rol.
-     * Se usa para el calendario de actividades en el frontend.
-     * - Administrador: ve todos.
+     * Devuelve los seguimientos visibles para el usuario autenticado según su rol,
+     * acotados al rango [from, to) por fechaEntrega.
+     * - Administrador: ve todos dentro del rango.
      * - Asesor/Monitor: ve los de consultas dentro de su alcance.
      * - Estudiante: ve solo los marcados como notificarEstudiante = true.
-     * - Conciliador: por ahora no ve ninguno.
+     * Este endpoint se conserva por compatibilidad; la agenda usa /api/agenda.
+     * Rango máximo: 3 meses. from y to son obligatorios y from < to.
+     * Bloque B – SCRUM-269: reemplaza el antiguo no-arg con findAll() + filtros en memoria.
      */
     @GetMapping("/calendario")
     @PreAuthorize("hasAuthority('" + VER_SEGUIMIENTOS + "')")
     public List<SeguimientoResponseDTO> listarParaCalendario() {
         return seguimientoService.listarParaCalendario();
+    }
+
+    @GetMapping("/calendario/rango")
+    @PreAuthorize("hasAuthority('" + VER_SEGUIMIENTOS + "')")
+    public List<SeguimientoResponseDTO> listarCalendarioPorRango(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return seguimientoService.listarCalendarioPorRango(from, to);
     }
 
     @GetMapping("/alertas-disciplinarias")

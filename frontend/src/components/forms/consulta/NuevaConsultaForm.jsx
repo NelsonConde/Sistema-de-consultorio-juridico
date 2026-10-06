@@ -15,8 +15,8 @@
  */
 
 import { apiClient } from "@/lib/apiClient";
-import { fileApi } from "@/lib/fileApi";
-import React, { useEffect, useMemo, useState } from "react";
+import { useFileResource } from "@/hooks/useFileResource";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
@@ -42,13 +42,31 @@ import {
   validarCoherenciaConsultaFrontend,
 } from "./consultas-juridicas.utils";
 import { ModalMultiple, ModalSimple } from "./ConsultaSelectionModals";
+import { RemotePagedSelect } from "../parts/RemotePagedSelect";
 
 export function NuevaConsultaForm() {
   const router = useRouter();
 
   const [form, setForm] = useState(VACIOS);
   const [archivos, setArchivos] = useState([]);
+  const [consultaCreadaId, setConsultaCreadaId] = useState(null);
+
+  const {
+    upload: uploadArchivos,
+    isUploading: archivosSubiendo,
+    getUploadState,
+    clearUploadState,
+    cancelUpload,
+    retryConfirmation,
+  } = useFileResource(
+      {
+        type: "consulta",
+        id: consultaCreadaId,
+      },
+      { load: false },
+  );
   const [guardando, setGuardando] = useState(false);
+  const submitLockRef = useRef(false);
   const [checking, setChecking] = useState(true);
   const [puedeAsignarResponsables, setPuedeAsignarResponsables] =
     useState(false);
@@ -69,21 +87,6 @@ export function NuevaConsultaForm() {
   const [monitores, setMonitores] = useState([]);
   const [estudiantes, setEstudiantes] = useState([]);
 
-  const [modalAsesor, setModalAsesor] = useState({
-    abierto: false,
-    busqueda: "",
-  });
-
-  const [modalMonitor, setModalMonitor] = useState({
-    abierto: false,
-    busqueda: "",
-  });
-
-  const [modalEstudiante, setModalEstudiante] = useState({
-    abierto: false,
-    busqueda: "",
-  });
-
   const [modalParte, setModalParte] = useState({
     abierto: false,
     busqueda: "",
@@ -98,28 +101,6 @@ export function NuevaConsultaForm() {
     abierto: false,
     busqueda: "",
   });
-
-  const areaSeleccionadaId = useMemo(
-    () => idNormalizado(form.areaId),
-    [form.areaId]
-  );
-
-  const asesoresDisponiblesPorArea = useMemo(() => {
-    if (!areaSeleccionadaId) return [];
-
-    return asesores.filter(
-      (asesor) => obtenerAreaIdAsesor(asesor) === areaSeleccionadaId
-    );
-  }, [asesores, areaSeleccionadaId]);
-
-  const estudiantesDisponiblesPorAsesor = useMemo(() => {
-    if (!form.asesorId) return [];
-
-    const asesorId = idNormalizado(form.asesorId);
-    return estudiantes.filter(
-      (estudiante) => obtenerAsesorIdEstudiante(estudiante) === asesorId
-    );
-  }, [estudiantes, form.asesorId]);
 
   const asesorSeleccionado = useMemo(
     () => asesores.find((a) => String(a.id) === String(form.asesorId)) || null,
@@ -198,36 +179,6 @@ export function NuevaConsultaForm() {
       }),
     [personasResultado, form.personaId, form.partesIds]
   );
-
-  const asesoresFiltrados = useMemo(() => {
-    const t = modalAsesor.busqueda.toLowerCase();
-
-    return t
-      ? asesoresDisponiblesPorArea.filter((a) =>
-        `${a.nombre} ${a.documento}`.toLowerCase().includes(t)
-      )
-      : asesoresDisponiblesPorArea;
-  }, [asesoresDisponiblesPorArea, modalAsesor.busqueda]);
-
-  const monitoresFiltrados = useMemo(() => {
-    const t = modalMonitor.busqueda.toLowerCase();
-
-    return t
-      ? monitores.filter((m) =>
-        `${m.nombre} ${m.documento}`.toLowerCase().includes(t)
-      )
-      : monitores;
-  }, [monitores, modalMonitor.busqueda]);
-
-  const estudiantesFiltrados = useMemo(() => {
-    const t = modalEstudiante.busqueda.toLowerCase();
-
-    return t
-      ? estudiantesDisponiblesPorAsesor.filter((e) =>
-        `${e.nombre} ${e.documento} ${e.codigo}`.toLowerCase().includes(t)
-      )
-      : estudiantesDisponiblesPorAsesor;
-  }, [estudiantesDisponiblesPorAsesor, modalEstudiante.busqueda]);
 
   const parteFiltrada = personasParaPrincipal;
   const partesAdicionalesFiltradas = personasParaAdicionales;
@@ -359,7 +310,7 @@ export function NuevaConsultaForm() {
 
         setPuedeAsignarResponsables(puedeAsignar);
 
-        await cargarCatalogos(puedeAsignar);
+        await cargarCatalogos();
       } catch {
         router.replace("/");
       } finally {
@@ -428,7 +379,7 @@ export function NuevaConsultaForm() {
     }
   }, [form.temaId, router]);
 
-  async function cargarCatalogos(puedeAsignar = false) {
+  async function cargarCatalogos() {
     try {
       async function fetchLista(url) {
         const res = await apiClient.request(url, {
@@ -460,22 +411,6 @@ export function NuevaConsultaForm() {
 
       setSedes(sR);
       setAreas(aR);
-
-      if (puedeAsignar) {
-        const [asR, moR, esR] = await Promise.all([
-          fetchLista(`${API_URL_BASE}/asesores/activos`),
-          fetchLista(`${API_URL_BASE}/monitores/activos`),
-          fetchLista(`${API_URL_BASE}/estudiantes/activos`),
-        ]);
-
-        setAsesores(asR);
-        setMonitores(moR);
-        setEstudiantes(esR);
-      } else {
-        setAsesores([]);
-        setMonitores([]);
-        setEstudiantes([]);
-      }
     } catch {
       toast.error("Error cargando datos");
     }
@@ -483,6 +418,11 @@ export function NuevaConsultaForm() {
 
   function handleChange(e) {
     const { name, value } = e.target;
+
+    if (name === "areaId") {
+      setAsesores([]);
+      setEstudiantes([]);
+    }
 
     setForm((prev) => {
       const next = {
@@ -506,43 +446,186 @@ export function NuevaConsultaForm() {
   }
 
   async function subirArchivosConsulta(consultaId) {
-    if (!archivos || archivos.length === 0) {
+    const seleccionados = Array.from(archivos || []);
+
+    if (seleccionados.length === 0) {
       return true;
     }
 
-    try {
-      const results = await fileApi.uploadMany(
-        { type: "consulta", id: consultaId },
-        archivos
-      );
-      const failed = results.filter((result) => !result.ok);
+    /*
+     * A confirmation failure means the bytes already reached storage.
+     * Those files must never start a second upload session.
+     */
+    const confirmacionesPendientes = seleccionados.filter(
+        (file) =>
+            getUploadState(file).state === "confirmation_failed",
+    );
 
-      if (failed.length === 0) {
+    const archivosParaTransferir = seleccionados.filter(
+        (file) =>
+            getUploadState(file).state !== "confirmation_failed",
+    );
+
+    if (archivosParaTransferir.length === 0) {
+      toast.warning("Hay archivos pendientes de confirmación", {
+        description:
+            "Usa la opción de reintentar confirmación. No vuelvas a cargar el archivo.",
+      });
+      return false;
+    }
+
+    try {
+      const results = await uploadArchivos(
+          archivosParaTransferir,
+          {
+            type: "consulta",
+            id: consultaId,
+          },
+      );
+
+      const failed = results.filter((result) => !result.ok);
+      const succeeded = results.filter((result) => result.ok);
+
+      for (const result of succeeded) {
+        clearUploadState(result.file);
+      }
+
+      const archivosRestantes = [
+        ...confirmacionesPendientes,
+        ...failed.map((result) => result.file),
+      ];
+
+      setArchivos(archivosRestantes);
+
+      if (archivosRestantes.length === 0) {
         toast.success("Archivos subidos correctamente");
         return true;
       }
 
+      const confirmationFailures = failed.filter(
+          (result) =>
+              result.error?.phase === "confirmation" &&
+              result.error?.retryableCompletion === true,
+      );
+
       const correlationId =
-        failed.find((result) => result.error?.correlationId)?.error?.correlationId ||
-        null;
+          failed.find((result) => result.error?.correlationId)
+              ?.error?.correlationId || null;
+
+      const totalConfirmacionesPendientes =
+          confirmacionesPendientes.length +
+          confirmationFailures.length;
+
+      if (totalConfirmacionesPendientes > 0) {
+        toast.warning(
+            "La consulta se creó, pero hay archivos pendientes de confirmación",
+            {
+              description: withErrorReference(
+                  "La transferencia ya terminó. Reintenta únicamente la confirmación.",
+                  correlationId,
+              ),
+            },
+        );
+
+        return false;
+      }
 
       const warning =
-        failed.length === archivos.length
-          ? "La consulta se creó, pero no se pudieron subir los archivos"
-          : `La consulta se creó; ${failed.length} archivo(s) no pudieron subirse`;
+          failed.length === archivosParaTransferir.length
+              ? "La consulta se creó, pero no se pudieron subir los archivos"
+              : `La consulta se creó; ${failed.length} archivo(s) no pudieron completar la carga`;
 
       toast.warning(warning, {
         description: withErrorReference(
-          "Revisa los archivos e intenta cargarlos nuevamente.",
-          correlationId
+            "Revisa los archivos e intenta nuevamente.",
+            correlationId,
         ),
       });
+
       return false;
-    } catch {
-      toast.warning("La consulta se creó, pero falló la conexión al subir archivos", {
-        description: "Los archivos seleccionados no se registraron. Intenta cargarlos nuevamente.",
+    } catch (error) {
+      toast.warning(
+          "La consulta se creó, pero falló la carga de archivos",
+          {
+            description: withErrorReference(
+                error?.message ||
+                "Revisa los archivos e intenta nuevamente.",
+                error?.correlationId || null,
+            ),
+          },
+      );
+
+      return false;
+    }
+  }
+
+  async function cancelarCargaArchivo(file) {
+    try {
+      await cancelUpload(file);
+    } catch (error) {
+      toast.error("No se pudo cancelar la carga", {
+        description:
+            error?.message || "Intenta nuevamente.",
       });
-      return false;
+    }
+  }
+
+  async function reintentarConfirmacionArchivo(file) {
+    try {
+      await retryConfirmation(file);
+
+      const restantes = archivos.filter(
+          (selectedFile) => selectedFile !== file,
+      );
+
+      setArchivos(restantes);
+      clearUploadState(file);
+
+      toast.success("Archivo confirmado correctamente");
+
+      if (
+          consultaCreadaId &&
+          restantes.length === 0
+      ) {
+        router.push(
+            `/consultasjuridicas?refresh=${Date.now()}`,
+        );
+      }
+    } catch (error) {
+      toast.error("No se pudo confirmar el archivo", {
+        description:
+            error?.message ||
+            "La confirmación sigue pendiente. Puedes volver a intentarlo.",
+      });
+    }
+  }
+
+  async function descartarCargaPendiente(file) {
+    try {
+      await cancelUpload(file);
+
+      const restantes = archivos.filter(
+          (selectedFile) => selectedFile !== file,
+      );
+
+      setArchivos(restantes);
+      clearUploadState(file);
+
+      toast.success("Carga pendiente descartada");
+
+      if (
+          consultaCreadaId &&
+          restantes.length === 0
+      ) {
+        router.push(
+            `/consultasjuridicas?refresh=${Date.now()}`,
+        );
+      }
+    } catch (error) {
+      toast.error("No se pudo descartar la carga pendiente", {
+        description:
+            error?.message || "Intenta nuevamente.",
+      });
     }
   }
 
@@ -611,10 +694,44 @@ export function NuevaConsultaForm() {
   async function handleGuardar(e) {
     e.preventDefault();
 
+    if (submitLockRef.current) {
+      return;
+    }
+
+    /*
+     * La consulta ya existe. A partir de aquí solo se pueden
+     * reintentar operaciones documentales.
+     */
+    if (consultaCreadaId) {
+      if (guardando || archivosSubiendo) {
+        return;
+      }
+
+      submitLockRef.current = true;
+      setGuardando(true);
+
+      try {
+        const archivosCompletos =
+            await subirArchivosConsulta(consultaCreadaId);
+
+        if (archivosCompletos) {
+          router.push(
+              `/consultasjuridicas?refresh=${Date.now()}`,
+          );
+        }
+      } finally {
+        submitLockRef.current = false;
+        setGuardando(false);
+      }
+
+      return;
+    }
+
     if (!validarFormularioConsulta()) {
       return;
     }
 
+    submitLockRef.current = true;
     setGuardando(true);
 
     const payload = {
@@ -693,16 +810,24 @@ export function NuevaConsultaForm() {
         return;
       }
 
+      setConsultaCreadaId(consultaId);
+
       toast.success("Consulta creada");
 
-      await subirArchivosConsulta(consultaId);
+      const archivosCompletos =
+          await subirArchivosConsulta(consultaId);
 
-      router.push(`/consultasjuridicas?refresh=${Date.now()}`);
+      if (archivosCompletos) {
+        router.push(
+            `/consultasjuridicas?refresh=${Date.now()}`,
+        );
+      }
     } catch {
       toast.error("Error de conexión", {
         description: "No se pudo completar la creación de la consulta. Verifica la conexión e intenta nuevamente.",
       });
     } finally {
+      submitLockRef.current = false;
       setGuardando(false);
     }
   }
@@ -850,92 +975,87 @@ export function NuevaConsultaForm() {
           {puedeAsignarResponsables && (
             <>
               <C label="Asesor">
-                <button
-                  type="button"
-                  disabled={!form.areaId}
-                  onClick={() =>
-                    setModalAsesor((prev) => ({
-                      ...prev,
-                      abierto: true,
-                    }))
-                  }
-                  className="flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors"
-                >
-                  <span
-                    className={
-                      asesorSeleccionado
-                        ? "text-foreground"
-                        : "text-muted-foreground"
+                <RemotePagedSelect
+                  value={form.asesorId}
+                  selectedLabel={asesorSeleccionado
+                    ? `${asesorSeleccionado.nombre}${asesorSeleccionado.documento ? ` - ${asesorSeleccionado.documento}` : ""}`
+                    : ""}
+                  onChange={(id, item) => {
+                    if (item && obtenerAreaIdAsesor(item) !== idNormalizado(form.areaId)) {
+                      toast.error("El asesor seleccionado no pertenece al área de la consulta.");
+                      return false;
                     }
-                  >
-                    {asesorSeleccionado
-                      ? `${asesorSeleccionado.nombre}${asesorSeleccionado.documento
-                        ? ` - ${asesorSeleccionado.documento}`
-                        : ""
-                      }`
-                      : "Sin asignar"}
-                  </span>
-                  <span className="text-muted-foreground">▼</span>
-                </button>
+                    setAsesores(item ? [item] : []);
+                    setEstudiantes([]);
+                    setForm((prev) => ({
+                      ...prev,
+                      asesorId: id ? String(id) : "",
+                      estudianteId: "",
+                    }));
+                  }}
+                  endpoint="/asesores/activos/paginados"
+                  legacyEndpoint="/asesores/activos"
+                  resourceName="asesores activos"
+                  sortBy="nombre"
+                  direction="asc"
+                  placeholder={form.areaId ? "Sin asignar" : "Seleccione área primero"}
+                  searchPlaceholder="Buscar asesor..."
+                  getOptionLabel={(item) =>
+                    `${item.nombre}${item.documento ? ` - ${item.documento}` : ""}`
+                  }
+                  disabled={!form.areaId}
+                />
               </C>
 
               <C label="Monitor">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setModalMonitor((prev) => ({
-                      ...prev,
-                      abierto: true,
-                    }))
+                <RemotePagedSelect
+                  value={form.monitorId}
+                  selectedLabel={monitorSeleccionado
+                    ? `${monitorSeleccionado.nombre}${monitorSeleccionado.documento ? ` - ${monitorSeleccionado.documento}` : ""}`
+                    : ""}
+                  onChange={(id, item) => {
+                    setMonitores(item ? [item] : []);
+                    setForm((prev) => ({ ...prev, monitorId: id ? String(id) : "" }));
+                  }}
+                  endpoint="/monitores/activos/paginados"
+                  legacyEndpoint="/monitores/activos"
+                  resourceName="monitores activos"
+                  sortBy="nombre"
+                  direction="asc"
+                  placeholder="Sin asignar"
+                  searchPlaceholder="Buscar monitor..."
+                  getOptionLabel={(item) =>
+                    `${item.nombre}${item.documento ? ` - ${item.documento}` : ""}`
                   }
-                  className="flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors"
-                >
-                  <span
-                    className={
-                      monitorSeleccionado
-                        ? "text-foreground"
-                        : "text-muted-foreground"
-                    }
-                  >
-                    {monitorSeleccionado
-                      ? `${monitorSeleccionado.nombre}${monitorSeleccionado.documento
-                        ? ` - ${monitorSeleccionado.documento}`
-                        : ""
-                      }`
-                      : "Sin asignar"}
-                  </span>
-                  <span className="text-muted-foreground">▼</span>
-                </button>
+                />
               </C>
 
               <C label="Estudiante">
-                <button
-                  type="button"
-                  disabled={!form.asesorId}
-                  onClick={() =>
-                    setModalEstudiante((prev) => ({
-                      ...prev,
-                      abierto: true,
-                    }))
-                  }
-                  className="flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors"
-                >
-                  <span
-                    className={
-                      estudianteSeleccionado
-                        ? "text-foreground"
-                        : "text-muted-foreground"
+                <RemotePagedSelect
+                  value={form.estudianteId}
+                  selectedLabel={estudianteSeleccionado
+                    ? `${estudianteSeleccionado.nombre}${estudianteSeleccionado.codigo ? ` - ${estudianteSeleccionado.codigo}` : ""}`
+                    : ""}
+                  onChange={(id, item) => {
+                    if (item && obtenerAsesorIdEstudiante(item) !== idNormalizado(form.asesorId)) {
+                      toast.error("El estudiante seleccionado no pertenece al asesor asignado.");
+                      return false;
                     }
-                  >
-                    {estudianteSeleccionado
-                      ? `${estudianteSeleccionado.nombre}${estudianteSeleccionado.codigo
-                        ? ` - ${estudianteSeleccionado.codigo}`
-                        : ""
-                      }`
-                      : "Sin asignar"}
-                  </span>
-                  <span className="text-muted-foreground">▼</span>
-                </button>
+                    setEstudiantes(item ? [item] : []);
+                    setForm((prev) => ({ ...prev, estudianteId: id ? String(id) : "" }));
+                  }}
+                  endpoint="/estudiantes/activos/paginados"
+                  legacyEndpoint="/estudiantes/activos"
+                  resourceName="estudiantes activos"
+                  sortBy="nombre"
+                  direction="asc"
+                  placeholder={form.asesorId ? "Sin asignar" : "Seleccione asesor primero"}
+                  searchPlaceholder="Buscar estudiante..."
+                  getOptionLabel={(item) =>
+                    `${item.nombre}${item.codigo ? ` - ${item.codigo}` : ""}`
+                  }
+                  disabled={!form.asesorId}
+                />
               </C>
             </>
           )}
@@ -1076,120 +1196,40 @@ export function NuevaConsultaForm() {
           />
         </C>
 
-        <ArchivosConsultaForm archivos={archivos} onChange={setArchivos} />
+        <ArchivosConsultaForm
+            archivos={archivos}
+            onChange={setArchivos}
+            getUploadState={getUploadState}
+            isUploading={archivosSubiendo}
+            onCancel={cancelarCargaArchivo}
+            onRetryConfirmation={reintentarConfirmacionArchivo}
+            onDiscardPending={descartarCargaPendiente}
+        />
 
         <div className="flex justify-end gap-3 pt-2">
           <Button
             type="button"
             variant="outline"
             onClick={() => router.push("/consultasjuridicas")}
-            disabled={guardando}
+            disabled={guardando || archivosSubiendo}
           >
             Cancelar
           </Button>
 
-          <Button type="submit" disabled={guardando}>
-            {guardando ? "Guardando..." : "Crear consulta"}
+          <Button
+              type="submit"
+              disabled={guardando || archivosSubiendo}
+          >
+            {guardando || archivosSubiendo
+                ? consultaCreadaId
+                    ? "Procesando archivos..."
+                    : "Guardando..."
+                : consultaCreadaId
+                    ? "Reintentar archivos"
+                    : "Crear consulta"}
           </Button>
         </div>
       </form>
-
-      {puedeAsignarResponsables && (
-        <>
-          <ModalSimple
-            abierto={modalAsesor.abierto}
-            titulo="Seleccionar Asesor"
-            items={asesoresFiltrados}
-            busqueda={modalAsesor.busqueda}
-            setBusqueda={(value) =>
-              setModalAsesor((prev) => ({
-                ...prev,
-                busqueda: value,
-              }))
-            }
-            onSeleccionar={(item) => {
-              setForm((prev) => ({
-                ...prev,
-                asesorId: item ? String(item.id) : "",
-                estudianteId: "",
-              }));
-              setModalAsesor({ abierto: false, busqueda: "" });
-            }}
-            onCerrar={() => setModalAsesor({ abierto: false, busqueda: "" })}
-            seleccionado={asesorSeleccionado}
-            renderItem={(asesor) => (
-              <>
-                <div className="font-medium">{asesor.nombre}</div>
-                <div className="text-xs text-muted-foreground">
-                  {asesor.documento}
-                </div>
-              </>
-            )}
-          />
-
-          <ModalSimple
-            abierto={modalMonitor.abierto}
-            titulo="Seleccionar Monitor"
-            items={monitoresFiltrados}
-            busqueda={modalMonitor.busqueda}
-            setBusqueda={(value) =>
-              setModalMonitor((prev) => ({
-                ...prev,
-                busqueda: value,
-              }))
-            }
-            onSeleccionar={(item) => {
-              setForm((prev) => ({
-                ...prev,
-                monitorId: item ? String(item.id) : "",
-              }));
-              setModalMonitor({ abierto: false, busqueda: "" });
-            }}
-            onCerrar={() => setModalMonitor({ abierto: false, busqueda: "" })}
-            seleccionado={monitorSeleccionado}
-            renderItem={(monitor) => (
-              <>
-                <div className="font-medium">{monitor.nombre}</div>
-                <div className="text-xs text-muted-foreground">
-                  {monitor.documento}
-                </div>
-              </>
-            )}
-          />
-
-          <ModalSimple
-            abierto={modalEstudiante.abierto}
-            titulo="Seleccionar Estudiante"
-            items={estudiantesFiltrados}
-            busqueda={modalEstudiante.busqueda}
-            setBusqueda={(value) =>
-              setModalEstudiante((prev) => ({
-                ...prev,
-                busqueda: value,
-              }))
-            }
-            onSeleccionar={(item) => {
-              setForm((prev) => ({
-                ...prev,
-                estudianteId: item ? String(item.id) : "",
-              }));
-              setModalEstudiante({ abierto: false, busqueda: "" });
-            }}
-            onCerrar={() =>
-              setModalEstudiante({ abierto: false, busqueda: "" })
-            }
-            seleccionado={estudianteSeleccionado}
-            renderItem={(estudiante) => (
-              <>
-                <div className="font-medium">{estudiante.nombre}</div>
-                <div className="text-xs text-muted-foreground">
-                  {estudiante.codigo} — {estudiante.documento}
-                </div>
-              </>
-            )}
-          />
-        </>
-      )}
 
       <ModalSimple
         abierto={modalParte.abierto}

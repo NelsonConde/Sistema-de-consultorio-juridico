@@ -2,7 +2,6 @@ package co.edu.ufps.legal_cases.business.service.estadisticas.estadisticas;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.util.ArrayList;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

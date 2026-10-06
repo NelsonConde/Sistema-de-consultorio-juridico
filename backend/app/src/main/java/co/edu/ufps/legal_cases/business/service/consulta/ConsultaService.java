@@ -1,6 +1,8 @@
 package co.edu.ufps.legal_cases.business.service.consulta;
 
 import java.util.List;
+import co.edu.ufps.legal_cases.business.dto.consulta.ficha.FichaExpedienteDTO;
+import co.edu.ufps.legal_cases.business.service.consulta.pdf.FichaExpedienteService;
 
 import org.springframework.stereotype.Service;
 
@@ -9,6 +11,7 @@ import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.business.service.consulta.consulta.ConsultaCommandService;
 import co.edu.ufps.legal_cases.business.service.consulta.consulta.ConsultaQueryService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
 // Fachada del módulo de consultas.
 // El controller entra por aquí, pero lectura y escritura quedan separadas por responsabilidad.
@@ -17,16 +20,39 @@ public class ConsultaService {
 
     private final ConsultaQueryService consultaQueryService;
     private final ConsultaCommandService consultaCommandService;
+    private final FichaExpedienteService fichaExpedienteService;
 
     public ConsultaService(
             ConsultaQueryService consultaQueryService,
-            ConsultaCommandService consultaCommandService) {
+            ConsultaCommandService consultaCommandService,
+            FichaExpedienteService fichaExpedienteService) {
         this.consultaQueryService = consultaQueryService;
         this.consultaCommandService = consultaCommandService;
+        this.fichaExpedienteService = fichaExpedienteService;
     }
 
-    public List<ConsultaBusquedaDTO> buscarParaUsuarioActual(String search) {
-        return consultaQueryService.buscarParaUsuarioActual(search);
+    public PageResponseDTO<ConsultaBusquedaDTO> buscarParaUsuarioActual(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction,
+            Long areaId,
+            EstadoConsulta estado,
+            Long asesorId,
+            Long monitorId,
+            Long estudianteId) {
+        return consultaQueryService.buscarParaUsuarioActual(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                areaId,
+                estado,
+                asesorId,
+                monitorId,
+                estudianteId);
     }
 
     // Se conserva temporalmente para compatibilidad interna si alguna clase lo usa.
@@ -42,8 +68,13 @@ public class ConsultaService {
         return consultaQueryService.obtenerPorId(id);
     }
 
-    public List<ConsultaBusquedaDTO> listarArchivadas() {
-        return consultaQueryService.listarArchivadas();
+    public PageResponseDTO<ConsultaBusquedaDTO> listarArchivadas(
+            String search,
+            int page,
+            int size,
+            String sortBy,
+            String direction) {
+        return consultaQueryService.listarArchivadas(search, page, size, sortBy, direction);
     }
 
     public ConsultaDTO crear(ConsultaDTO dto) {
@@ -68,5 +99,12 @@ public class ConsultaService {
 
     public ConsultaDTO desarchivar(Long id, Long version) {
         return consultaCommandService.desarchivar(id, version);
+    }
+    public FichaExpedienteDTO obtenerFichaExpediente(Long id) {
+        return fichaExpedienteService.consolidarFichaExpediente(id);
+    }
+
+    public byte[] generarFichaPdf(Long id) {
+        return fichaExpedienteService.generarFichaPdf(id);
     }
 }

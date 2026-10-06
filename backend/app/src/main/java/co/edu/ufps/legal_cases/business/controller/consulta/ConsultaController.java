@@ -7,16 +7,20 @@ import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.GESTIONAR_
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_CONSULTAS;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.CAMBIAR_ESTADO_CONSULTAS;
 
-import java.util.List;
-
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaBusquedaDTO;
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaDTO;
+import co.edu.ufps.legal_cases.business.dto.consulta.ficha.FichaExpedienteDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.business.service.consulta.ConsultaService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import jakarta.validation.Valid;
 
 @RestController
@@ -36,15 +40,52 @@ public class ConsultaController {
      */
     @GetMapping
     @PreAuthorize("hasAnyAuthority('" + VER_CONSULTAS + "', '" + GESTIONAR_CONSULTAS + "')")
-    public List<ConsultaBusquedaDTO> buscar(
-            @RequestParam(required = false, defaultValue = "") String search) {
-        return consultaService.buscarParaUsuarioActual(search);
+    public PageResponseDTO<ConsultaBusquedaDTO> buscar(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "fecha") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) Long areaId,
+            @RequestParam(required = false) EstadoConsulta estado,
+            @RequestParam(required = false) Long asesorId,
+            @RequestParam(required = false) Long monitorId,
+            @RequestParam(required = false) Long estudianteId) {
+        return consultaService.buscarParaUsuarioActual(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                areaId,
+                estado,
+                asesorId,
+                monitorId,
+                estudianteId);
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('" + VER_CONSULTAS + "', '" + GESTIONAR_CONSULTAS + "')")
     public ConsultaDTO obtenerPorId(@PathVariable Long id) {
         return consultaService.obtenerPorId(id);
+    }
+
+    @GetMapping("/{id}/ficha")
+    @PreAuthorize("hasAnyAuthority('" + VER_CONSULTAS + "', '" + GESTIONAR_CONSULTAS + "')")
+    public FichaExpedienteDTO obtenerFichaExpediente(@PathVariable Long id) {
+        return consultaService.obtenerFichaExpediente(id);
+    }
+
+    @GetMapping(value = {"/{id}/pdf", "/{id}/ficha-pdf"}, produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAnyAuthority('" + VER_CONSULTAS + "', '" + GESTIONAR_CONSULTAS + "')")
+    public ResponseEntity<byte[]> descargarFichaPdf(@PathVariable Long id) {
+        byte[] pdf = consultaService.generarFichaPdf(id);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(
+                ContentDisposition.attachment().filename("ficha-expediente-" + id + ".pdf").build());
+        headers.setContentLength(pdf.length);
+        return new ResponseEntity<>(pdf, headers, HttpStatus.OK);
     }
 
     @PostMapping
@@ -93,8 +134,13 @@ public class ConsultaController {
 
     @GetMapping("/archivadas")
     @PreAuthorize("hasAuthority('" + ARCHIVAR_CONSULTAS + "')")
-    public List<ConsultaBusquedaDTO> listarArchivadas() {
-        return consultaService.listarArchivadas();
+    public PageResponseDTO<ConsultaBusquedaDTO> listarArchivadas(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "fecha") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction) {
+        return consultaService.listarArchivadas(search, page, size, sortBy, direction);
     }
 
     @PatchMapping("/{id}/desarchivar")

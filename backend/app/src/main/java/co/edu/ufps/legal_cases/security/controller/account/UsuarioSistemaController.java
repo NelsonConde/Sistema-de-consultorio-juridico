@@ -18,13 +18,16 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import co.edu.ufps.legal_cases.security.dto.account.UsuarioSistemaDTO;
+import co.edu.ufps.legal_cases.security.dto.account.UsuarioSistemaResumenDTO;
 import co.edu.ufps.legal_cases.security.dto.account.cambio.CambiarPerfilAAdministrativoDTO;
 import co.edu.ufps.legal_cases.security.dto.account.cambio.CambiarPerfilAAsesorDTO;
 import co.edu.ufps.legal_cases.security.dto.account.cambio.CambiarPerfilAConciliadorDTO;
 import co.edu.ufps.legal_cases.security.dto.account.cambio.CambiarPerfilAEstudianteDTO;
 import co.edu.ufps.legal_cases.security.dto.account.cambio.CambiarPerfilAMonitorDTO;
+import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
 import co.edu.ufps.legal_cases.security.service.account.UsuarioCambioPerfilService;
 import co.edu.ufps.legal_cases.security.service.account.UsuarioSistemaService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import jakarta.validation.Valid;
 
 @RestController
@@ -43,8 +46,22 @@ public class UsuarioSistemaController {
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('" + VER_USUARIOS + "', '" + GESTIONAR_USUARIOS + "')")
-    public List<UsuarioSistemaDTO> listar() {
-        return usuarioSistemaService.listar();
+    public PageResponseDTO<UsuarioSistemaResumenDTO> listar(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) Boolean activo,
+            @RequestParam(required = false) TipoPerfilUsuario tipoPerfil) {
+        return usuarioSistemaService.buscar(
+                search,
+                page,
+                size,
+                sortBy,
+                direction,
+                activo,
+                tipoPerfil);
     }
 
     @GetMapping("/activos")

@@ -8,8 +8,10 @@ import org.springframework.stereotype.Component;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.security.dto.account.PerfilUsuarioActual;
 import co.edu.ufps.legal_cases.security.dto.account.UsuarioSistemaDTO;
+import co.edu.ufps.legal_cases.security.dto.account.UsuarioSistemaResumenDTO;
 import co.edu.ufps.legal_cases.security.model.access.Permiso;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
+import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaResumenProjection;
 import co.edu.ufps.legal_cases.security.service.account.perfil.PerfilUsuarioResolverService;
 
 // Centraliza la conversión entre UsuarioSistema y UsuarioSistemaDTO.
@@ -32,6 +34,19 @@ public class UsuarioSistemaMapper {
 
         asignarRolYPermisos(dto, usuario);
         asignarPerfil(dto, usuario);
+
+        return dto;
+    }
+
+    public UsuarioSistemaResumenDTO convertirAResumenDTO(UsuarioSistemaResumenProjection usuario) {
+        UsuarioSistemaResumenDTO dto = new UsuarioSistemaResumenDTO();
+
+        dto.setId(usuario.getId());
+        dto.setUsername(usuario.getUsername());
+        dto.setActivo(usuario.getActivo());
+        dto.setRolId(usuario.getRolId());
+        dto.setRolNombre(usuario.getRolNombre());
+        dto.setTipoPerfil(usuario.getTipoPerfil());
 
         return dto;
     }

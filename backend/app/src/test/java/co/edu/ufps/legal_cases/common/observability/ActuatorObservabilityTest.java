@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -163,9 +164,13 @@ class ActuatorObservabilityTest {
 
     @Test
     void correlationIdFilterShouldNotBeRegisteredAsIndependentServletFilter() {
-        Map<String, FilterRegistrationBean> registrations =
+        @SuppressWarnings("rawtypes")
+        Map<String, FilterRegistrationBean> rawRegistrations =
                 applicationContext.getBeansOfType(
                         FilterRegistrationBean.class);
+
+        Map<String, FilterRegistrationBean<?>> registrations = new HashMap<>();
+        rawRegistrations.forEach((key, value) -> registrations.put(key, value));
 
         FilterRegistrationBean<?> registration =
                 registrations.get(

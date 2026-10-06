@@ -1,7 +1,9 @@
 "use client";
 
 import { apiClient } from "@/lib/apiClient";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useDebouncedPageSearch } from "@/hooks/useDebouncedValue";
+import { fetchPaged, isAbortError } from "@/lib/pagedApi";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -147,7 +149,17 @@ export function ReunionesConciliacionForm() {
   const [mensaje, setMensaje] = useState("");
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const searchAplicado = useDebouncedPageSearch(search, setCurrentPage, 350).trim();
+  const [estadoFiltro, setEstadoFiltro] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+  const [sortBy, setSortBy] = useState("fechaReunion");
+  const [direction, setDirection] = useState("desc");
   const [pageSize, setPageSize] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [loadingLista, setLoadingLista] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [form, setForm] = useState(FORM_INICIAL);
   const [versionBase, setVersionBase] = useState({ conciliacion: null, reunion: null });
 
@@ -170,6 +182,87 @@ export function ReunionesConciliacionForm() {
     inicializar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!usuario || !puedeVer) return undefined;
+
+    const controller = new AbortController();
+
+    async function cargarPagina() {
+      setLoadingLista(true);
+      setError("");
+      try {
+        const page = await fetchPaged("/conciliaciones/reuniones", {
+          search: searchAplicado,
+          page: currentPage,
+          size: pageSize,
+          sortBy,
+          direction,
+          filters: { estado: estadoFiltro, fechaDesde, fechaHasta },
+          signal: controller.signal,
+          resourceName: "reuniones de conciliación",
+        });
+
+        const items = page.content.map((item) => ({
+          ...item,
+          id: item.conciliacionId,
+          reunion: {
+            version: item.version,
+            fechaReunion: item.fechaReunion,
+            sedeId: item.sedeId,
+            sedeNombre: item.sedeNombre,
+            observaciones: item.observaciones,
+            fechaCreacion: item.fechaCreacion,
+            fechaActualizacion: item.fechaActualizacion,
+          },
+        }));
+
+        setConciliaciones(items);
+        setTotalElements(page.totalElements);
+        setTotalPages(page.totalPages);
+        if (page.totalPages > 0 && page.page > page.totalPages) {
+          setCurrentPage(page.totalPages);
+        } else if (page.page !== currentPage) {
+          setCurrentPage(page.page);
+        }
+      } catch (err) {
+        if (isAbortError(err)) return;
+        if (err?.status === 401) {
+          router.replace("/");
+          return;
+        }
+        setConciliaciones([]);
+        setTotalElements(0);
+        setTotalPages(0);
+        setError(
+          withErrorReference(
+            err?.status === 403
+              ? "No tienes permiso para consultar reuniones de conciliación."
+              : err?.message || "No se pudieron cargar las reuniones de conciliación",
+            err?.correlationId || null
+          )
+        );
+      } finally {
+        if (!controller.signal.aborted) setLoadingLista(false);
+      }
+    }
+
+    cargarPagina();
+    return () => controller.abort();
+  }, [
+    usuario,
+    puedeVer,
+    searchAplicado,
+    currentPage,
+    pageSize,
+    sortBy,
+    direction,
+    estadoFiltro,
+    fechaDesde,
+    fechaHasta,
+    reloadKey,
+    router,
+  ]);
 
   useEffect(() => {
     if (!detalle) {
@@ -232,7 +325,7 @@ export function ReunionesConciliacionForm() {
       }
 
       setUsuario(me);
-      await Promise.all([cargarConciliaciones(), cargarSedes()]);
+      await cargarSedes();
     } catch (err) {
       setError(
         withErrorReference(
@@ -245,16 +338,6 @@ export function ReunionesConciliacionForm() {
     }
   }
 
-  async function cargarConciliaciones() {
-    const data = await apiFetch(
-      "/conciliaciones",
-      { method: "GET" },
-      "No se pudieron cargar las conciliaciones"
-    );
-
-    setConciliaciones(ordenarPorIdAsc(extraerLista(data)));
-  }
-
   async function cargarSedes() {
     try {
       const data = await apiFetch("/sedes", { method: "GET" }, "No se pudieron cargar las sedes");
@@ -265,7 +348,7 @@ export function ReunionesConciliacionForm() {
   }
 
   async function refrescar(mensajeOk = "Información actualizada") {
-    await cargarConciliaciones();
+    setReloadKey((value) => value + 1);
     if (detalle?.id) {
       await cargarDetalle(detalle.id, { silencioso: true });
     }
@@ -410,37 +493,6 @@ export function ReunionesConciliacionForm() {
     setCurrentPage(1);
   }
 
-  const conciliacionesFiltradas = useMemo(() => {
-    const texto = normalizarTexto(search);
-    const ordenadas = ordenarPorIdAsc(conciliaciones);
-
-    if (!texto) return ordenadas;
-
-    return ordenadas.filter((item) => {
-      const contenido = [
-        item?.id,
-        item?.consultaId,
-        item?.estadoCodigo,
-        item?.estadoNombre,
-        item?.estudianteNombre,
-        item?.conciliadorNombre,
-        item?.reunion?.fechaReunion,
-        item?.reunion?.sedeNombre,
-      ]
-        .map(normalizarTexto)
-        .join(" ");
-
-      return contenido.includes(texto);
-    });
-  }, [conciliaciones, search]);
-
-  const totalPages = Math.max(1, Math.ceil(conciliacionesFiltradas.length / pageSize));
-
-  const conciliacionesPagina = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return conciliacionesFiltradas.slice(start, start + pageSize);
-  }, [conciliacionesFiltradas, currentPage, pageSize]);
-
   if (loading) {
     return <div className="py-10 text-center text-sm text-muted-foreground">Cargando reuniones de conciliación...</div>;
   }
@@ -494,18 +546,80 @@ export function ReunionesConciliacionForm() {
             <h3 className="font-semibold">Seleccionar conciliación</h3>
           </div>
 
-          <div className="relative w-full lg:w-80">
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <input
-              value={search}
+          <div className="grid w-full gap-2 lg:max-w-4xl lg:grid-cols-5">
+            <div className="relative lg:col-span-2">
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar por consulta, estado o responsable"
+                className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm"
+              />
+            </div>
+            <select
+              value={estadoFiltro}
               onChange={(event) => {
-                setSearch(event.target.value);
+                setEstadoFiltro(event.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="Buscar por id, consulta, estado o responsable"
-              className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm"
+              className="h-10 rounded-md border bg-background px-2 text-sm"
+            >
+              <option value="">Todos los estados</option>
+              <option value="SOLICITUD">Solicitud</option>
+              <option value="ESPERANDO_REUNION">Esperando reunión</option>
+              <option value="COMPLETO_CONCILIADO">Completo conciliado</option>
+              <option value="COMPLETO_NO_CONCILIADO">Completo no conciliado</option>
+            </select>
+            <input
+              type="date"
+              value={fechaDesde}
+              onChange={(event) => {
+                setFechaDesde(event.target.value);
+                setCurrentPage(1);
+              }}
+              className="h-10 rounded-md border bg-background px-2 text-sm"
+              aria-label="Fecha desde"
+            />
+            <input
+              type="date"
+              value={fechaHasta}
+              onChange={(event) => {
+                setFechaHasta(event.target.value);
+                setCurrentPage(1);
+              }}
+              className="h-10 rounded-md border bg-background px-2 text-sm"
+              aria-label="Fecha hasta"
             />
           </div>
+        </div>
+
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Orden:</span>
+          <select
+            value={sortBy}
+            onChange={(event) => {
+              setSortBy(event.target.value);
+              setCurrentPage(1);
+            }}
+            className="h-8 rounded-md border bg-background px-2"
+          >
+            <option value="fechaReunion">Fecha de reunión</option>
+            <option value="id">ID</option>
+            <option value="fechaCreacion">Fecha de creación</option>
+            <option value="estado">Estado</option>
+            <option value="sede">Sede</option>
+          </select>
+          <select
+            value={direction}
+            onChange={(event) => {
+              setDirection(event.target.value);
+              setCurrentPage(1);
+            }}
+            className="h-8 rounded-md border bg-background px-2"
+          >
+            <option value="desc">Descendente</option>
+            <option value="asc">Ascendente</option>
+          </select>
         </div>
 
         <div className="overflow-x-auto rounded-xl border">
@@ -521,14 +635,14 @@ export function ReunionesConciliacionForm() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {conciliacionesPagina.length === 0 ? (
+              {conciliaciones.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                    No hay conciliaciones para mostrar.
+                    {loadingLista ? "Cargando reuniones..." : "No hay reuniones para mostrar."}
                   </td>
                 </tr>
               ) : (
-                conciliacionesPagina.map((item) => {
+                conciliaciones.map((item) => {
                   const seleccionada = String(detalle?.id || "") === String(item.id);
                   const reunion = item.reunion || null;
 
@@ -564,7 +678,7 @@ export function ReunionesConciliacionForm() {
           onPageChange={setCurrentPage}
           onPageSizeChange={handlePageSizeChange}
           pageSizeOptions={PAGE_SIZE_OPTIONS}
-          totalItems={conciliacionesFiltradas.length}
+          totalItems={totalElements}
         />
       </section>
 

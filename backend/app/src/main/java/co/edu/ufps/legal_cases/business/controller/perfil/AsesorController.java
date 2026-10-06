@@ -12,7 +12,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import co.edu.ufps.legal_cases.business.dto.perfil.AsesorDTO;
+import co.edu.ufps.legal_cases.business.dto.perfil.AsesorResumenDTO;
 import co.edu.ufps.legal_cases.business.service.perfil.AsesorService;
+import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import jakarta.validation.Valid;
 
 @RestController
@@ -27,14 +29,31 @@ public class AsesorController {
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('" + VER_ASESORES_MONITORES + "', '" + GESTIONAR_ASESORES_MONITORES + "', '" + GESTIONAR_USUARIOS + "')")
-    public List<AsesorDTO> listar() {
-        return asesorService.listar();
+    public PageResponseDTO<AsesorResumenDTO> listar(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) Boolean activo) {
+        return asesorService.buscar(search, page, size, sortBy, direction, activo);
     }
 
     @GetMapping("/activos")
     @PreAuthorize("hasAnyAuthority('" + VER_PERFILES_AUXILIARES + "', '" + VER_ASESORES_MONITORES + "', '" + GESTIONAR_ASESORES_MONITORES + "', '" + GESTIONAR_USUARIOS + "')")
     public List<AsesorDTO> listarActivos() {
         return asesorService.listarActivos();
+    }
+
+    @GetMapping("/activos/paginados")
+    @PreAuthorize("hasAnyAuthority('" + VER_PERFILES_AUXILIARES + "', '" + VER_ASESORES_MONITORES + "', '" + GESTIONAR_ASESORES_MONITORES + "', '" + GESTIONAR_USUARIOS + "')")
+    public PageResponseDTO<AsesorResumenDTO> listarActivosPaginados(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "nombre") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction) {
+        return asesorService.listarActivosPaginados(search, page, size, sortBy, direction);
     }
 
     @GetMapping("/{id}")

@@ -12,6 +12,10 @@
 export const REQUIRED_MESSAGE = "El campo es obligatorio";
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
 export const DIGITS_PATTERN = /^\d+$/;
+export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MAX_LENGTH = 100;
+export const PASSWORD_UPPERCASE_PATTERN = /[A-Z]/;
+export const PASSWORD_NUMBER_PATTERN = /\d/;
 
 export function isBlank(value) {
   return String(value ?? "").trim() === "";
@@ -131,5 +135,50 @@ export function futureDateRule(message = "La fecha debe ser futura") {
       const selected = new Date(value);
       return (!Number.isNaN(selected.getTime()) && selected.getTime() > Date.now()) || message;
     },
+  };
+}
+
+
+/**
+ * Reglas de política de contraseña. Debe reflejar exactamente lo que valida
+ * el backend (CambioPasswordValidator) para que el usuario nunca vea un error
+ * de política distinto en frontend vs backend.
+ */
+export function passwordPolicyRule({
+  required = "La nueva contraseña es obligatoria",
+} = {}) {
+  return {
+    required,
+    minLength: {
+      value: PASSWORD_MIN_LENGTH,
+      message: `Debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres`,
+    },
+    maxLength: {
+      value: PASSWORD_MAX_LENGTH,
+      message: `No puede superar ${PASSWORD_MAX_LENGTH} caracteres`,
+    },
+    validate: {
+      hasUppercase: (value) =>
+        PASSWORD_UPPERCASE_PATTERN.test(String(value ?? "")) ||
+        "Debe incluir al menos una letra mayúscula",
+      hasNumber: (value) =>
+        PASSWORD_NUMBER_PATTERN.test(String(value ?? "")) ||
+        "Debe incluir al menos un número",
+    },
+  };
+}
+
+/**
+ * Confirmación de contraseña. `getNuevaPassword` debe ser una función (no un
+ * valor) para que react-hook-form la reevalúe en cada validación, no solo en
+ * el render en que se registró la regla.
+ */
+export function passwordsMatchRule(
+  getNuevaPassword,
+  message = "Las contraseñas no coinciden"
+) {
+  return {
+    required: "Debes confirmar la nueva contraseña",
+    validate: (value) => value === getNuevaPassword() || message,
   };
 }
