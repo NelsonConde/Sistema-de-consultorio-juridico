@@ -1,5 +1,7 @@
 package co.edu.ufps.legal_cases.business.repository.perfil;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -56,4 +58,49 @@ public interface AsesorRepository extends JpaRepository<Asesor, Long> {
             """)
     Optional<SeguimientoDestinatarioDTO> findDestinatarioByUsuarioSistemaId(
             @Param("usuarioSistemaId") Long usuarioSistemaId);
+
+
+    @Query(value = """
+            SELECT a.id AS id,
+                   a.nombre AS nombre,
+                   a.documento AS documento,
+                   a.email AS email,
+                   a.usuario AS usuario,
+                   a.codigo AS codigo,
+                   a.activo AS activo,
+                   area.id AS areaId,
+                   area.nombre AS areaNombre,
+                   sede.id AS sedeId,
+                   sede.nombre AS sedeNombre
+            FROM Asesor a
+            JOIN a.area area
+            JOIN a.sede sede
+            WHERE (
+                    CAST(:search AS String) IS NULL
+                    OR LOWER(a.nombre) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(a.documento) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(a.email) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(a.usuario) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(a.codigo) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+              )
+              AND (:activo IS NULL OR a.activo = :activo)
+            """, countQuery = """
+            SELECT COUNT(a.id)
+            FROM Asesor a
+            JOIN a.area area
+            JOIN a.sede sede
+            WHERE (
+                    CAST(:search AS String) IS NULL
+                    OR LOWER(a.nombre) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(a.documento) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(a.email) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(a.usuario) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                    OR LOWER(a.codigo) LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+              )
+              AND (:activo IS NULL OR a.activo = :activo)
+            """)
+    Page<AsesorResumenProjection> buscarResumenPaginado(
+            @Param("search") String search,
+            @Param("activo") Boolean activo,
+            Pageable pageable);
 }

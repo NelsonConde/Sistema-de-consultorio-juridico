@@ -8,6 +8,7 @@ import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaBusquedaDTO;
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.Consulta;
 import co.edu.ufps.legal_cases.business.model.persona.Persona;
+import co.edu.ufps.legal_cases.business.repository.consulta.ConsultaResumenProjection;
 
 // Convierte la entidad Consulta a DTO para evitar exponer directamente el modelo.
 @Component
@@ -62,5 +63,17 @@ public class ConsultaMapper {
                 p != null ? p.getApellidos() : null,
                 p != null ? p.getNumeroDocumento() : null,
                 c.getEstado());
+    }
+
+    public ConsultaBusquedaDTO convertirABusquedaDTO(ConsultaResumenProjection projection) {
+        return new ConsultaBusquedaDTO(
+                projection.getId(),
+                projection.getVersion(),
+                projection.getConsulta(),
+                projection.getFecha(),
+                projection.getNombre(),
+                projection.getApellido(),
+                projection.getCedula(),
+                projection.getEstado());
     }
 }

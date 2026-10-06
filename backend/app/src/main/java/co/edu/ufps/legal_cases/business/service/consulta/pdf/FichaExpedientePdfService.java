@@ -441,12 +441,12 @@ public class FichaExpedientePdfService {
             int numPagina = pdfDoc.getPageNumber(page);
 
             PdfCanvas canvas = new PdfCanvas(page.newContentStreamAfter(), page.getResources(), pdfDoc);
-            new Canvas(canvas, page.getPageSize())
-                    .showTextAligned(
-                            new Paragraph(String.format("Página %d — Consultorio Jurídico UFPS — Expediente Confidencial", numPagina))
-                                    .setFontSize(7.5f).setFontColor(ColorConstants.GRAY),
-                            page.getPageSize().getWidth() / 2, 18, TextAlignment.CENTER)
-                    .close();
+            try (Canvas pageCanvas = new Canvas(canvas, page.getPageSize())) {
+                pageCanvas.showTextAligned(
+                        new Paragraph(String.format("Página %d — Consultorio Jurídico UFPS — Expediente Confidencial", numPagina))
+                                .setFontSize(7.5f).setFontColor(ColorConstants.GRAY),
+                        page.getPageSize().getWidth() / 2, 18, TextAlignment.CENTER);
+            }
         }
     }
 }

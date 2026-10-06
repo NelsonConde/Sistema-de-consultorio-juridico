@@ -3,6 +3,8 @@
 import { apiClient } from "@/lib/apiClient";
 import { fileApi } from "@/lib/fileApi";
 import { useEffect, useMemo, useState } from "react";
+import { useDebouncedPageSearch } from "@/hooks/useDebouncedValue";
+import { fetchPaged, isAbortError } from "@/lib/pagedApi";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -30,7 +32,6 @@ import { PERMISOS } from "@/lib/permission";
 import {
   esConciliador,
   esEstudiante,
-  tieneAlgunPermiso,
   tienePermiso,
 } from "@/lib/authz";
 
@@ -39,17 +40,13 @@ import {
   archivoEsPdf,
   badgeEstadoClass,
   etiquetaEstado,
-  extraerLista,
   formatearFecha,
-  leerRespuesta,
-  idConsulta,
-  nombreConsulta,
   nombrePersona,
   normalizarTexto,
-  ordenarPorIdAsc,
 } from "./conciliaciones.utils";
 import { esRolAdministrador } from "./conciliaciones.permissions";
-import { ActionCard, CampoConsulta, InfoCard, PersonasCard } from "./ConciliacionesFormParts";
+import { ActionCard, InfoCard, PersonasCard } from "./ConciliacionesFormParts";
+import { RemotePagedSelect } from "../parts/RemotePagedSelect";
 import { requestConciliacion } from "./conciliaciones.service";
 
 export function ConciliacionesForm() {
@@ -57,9 +54,6 @@ export function ConciliacionesForm() {
 
   const [usuario, setUsuario] = useState(null);
   const [conciliaciones, setConciliaciones] = useState([]);
-  const [consultas, setConsultas] = useState([]);
-  const [estudiantes, setEstudiantes] = useState([]);
-  const [conciliadores, setConciliadores] = useState([]);
   const [detalle, setDetalle] = useState(null);
 
   const [loading, setLoading] = useState(true);
@@ -69,9 +63,21 @@ export function ConciliacionesForm() {
   const [mensaje, setMensaje] = useState("");
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const searchAplicado = useDebouncedPageSearch(search, setCurrentPage, 350).trim();
+  const [estadoFiltro, setEstadoFiltro] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+  const [sortBy, setSortBy] = useState("id");
+  const [direction, setDirection] = useState("desc");
   const [pageSize, setPageSize] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [loadingLista, setLoadingLista] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [descargandoDocumentos, setDescargandoDocumentos] = useState({});
 
   const [crearConsultaId, setCrearConsultaId] = useState("");
+  const [crearConsultaSeleccionada, setCrearConsultaSeleccionada] = useState(null);
   const [archivoSolicitud, setArchivoSolicitud] = useState(null);
   const [estadoNoFinal, setEstadoNoFinal] = useState("ESPERANDO_REUNION");
   const [estadoFinal, setEstadoFinal] = useState("COMPLETO_CONCILIADO");
@@ -106,34 +112,6 @@ export function ConciliacionesForm() {
     puedeReemplazarSolicitud ||
     puedeDesactivar;
 
-  const conciliacionesActivasNoFinalizadasPorConsulta = useMemo(() => {
-    const ids = new Set();
-
-    conciliaciones.forEach((item) => {
-      const estado = normalizarTexto(item?.estadoCodigo || item?.estadoNombre);
-      const activa = item?.activo !== false;
-      const finalizada = estado === "COMPLETO_CONCILIADO" || estado === "COMPLETO_NO_CONCILIADO";
-
-      if (activa && !finalizada && item?.consultaId) {
-        ids.add(String(item.consultaId));
-      }
-    });
-
-    return ids;
-  }, [conciliaciones]);
-
-  const consultasDisponiblesParaConciliacion = useMemo(() => {
-    return consultas.filter((consulta) => {
-      const estado = normalizarTexto(consulta?.estado || consulta?.estadoConsulta || consulta?.estadoNombre);
-      const consultaId = String(idConsulta(consulta) || "");
-      const cerradaOArchivada = ["CERRADO", "CERRADA", "ARCHIVADO", "ARCHIVADA"].includes(estado);
-
-      return Boolean(consultaId)
-        && !cerradaOArchivada
-        && !conciliacionesActivasNoFinalizadasPorConsulta.has(consultaId);
-    });
-  }, [consultas, conciliacionesActivasNoFinalizadasPorConsulta]);
-
   const detalleFinalizado = useMemo(() => {
     const estado = normalizarTexto(detalle?.estadoCodigo || detalle?.estadoNombre);
     return estado === "COMPLETO_CONCILIADO" || estado === "COMPLETO_NO_CONCILIADO";
@@ -144,8 +122,71 @@ export function ConciliacionesForm() {
   }, []);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [search, conciliaciones.length, pageSize]);
+    if (!usuario || !puedeVer) return undefined;
+
+    const controller = new AbortController();
+
+    async function cargarPagina() {
+      setLoadingLista(true);
+      setError("");
+      try {
+        const page = await fetchPaged("/conciliaciones", {
+          search: searchAplicado,
+          page: currentPage,
+          size: pageSize,
+          sortBy,
+          direction,
+          filters: { estado: estadoFiltro, fechaDesde, fechaHasta },
+          signal: controller.signal,
+          resourceName: "conciliaciones",
+          allowLegacyArray: true,
+        });
+        setConciliaciones(page.content);
+        setTotalElements(page.totalElements);
+        setTotalPages(page.totalPages);
+        if (page.totalPages > 0 && page.page > page.totalPages) {
+          setCurrentPage(page.totalPages);
+        } else if (page.page !== currentPage) {
+          setCurrentPage(page.page);
+        }
+      } catch (err) {
+        if (isAbortError(err)) return;
+        if (err?.status === 401) {
+          router.replace("/");
+          return;
+        }
+        setConciliaciones([]);
+        setTotalElements(0);
+        setTotalPages(0);
+        setError(
+          withErrorReference(
+            err?.status === 403
+              ? "No tienes permiso para consultar conciliaciones."
+              : err?.message || "No se pudieron cargar las conciliaciones",
+            err?.correlationId || null
+          )
+        );
+      } finally {
+        if (!controller.signal.aborted) setLoadingLista(false);
+      }
+    }
+
+    cargarPagina();
+    return () => controller.abort();
+  }, [
+    usuario,
+    puedeVer,
+    searchAplicado,
+    currentPage,
+    pageSize,
+    sortBy,
+    direction,
+    estadoFiltro,
+    fechaDesde,
+    fechaHasta,
+    reloadKey,
+    router,
+  ]);
 
   async function apiFetch(path, options = {}, fallback = "No se pudo completar la operación") {
     try {
@@ -190,7 +231,6 @@ export function ConciliacionesForm() {
       }
 
       setUsuario(me);
-      await Promise.all([cargarConciliaciones(), cargarAuxiliares(me)]);
     } catch (err) {
       setError(
         withErrorReference(
@@ -203,69 +243,8 @@ export function ConciliacionesForm() {
     }
   }
 
-  async function cargarConciliaciones() {
-    const data = await apiFetch(
-      "/conciliaciones",
-      { method: "GET" },
-      "No se pudieron cargar las conciliaciones"
-    );
-
-    setConciliaciones(ordenarPorIdAsc(extraerLista(data)));
-  }
-
-  async function cargarAuxiliares(me) {
-    const puedeCargarConsultas = tienePermiso(me, PERMISOS.VER_CONSULTAS);
-    const puedeCargarEstudiantes = tieneAlgunPermiso(me, [
-      PERMISOS.VER_ESTUDIANTES,
-      PERMISOS.VER_PERFILES_AUXILIARES,
-      PERMISOS.GESTIONAR_CONCILIACIONES,
-      PERMISOS.CONCLUIR_CONCILIACIONES,
-    ]);
-    const puedeCargarConciliadores = tieneAlgunPermiso(me, [
-      PERMISOS.VER_CONCILIADORES,
-      PERMISOS.VER_PERFILES_AUXILIARES,
-      PERMISOS.GESTIONAR_CONCILIACIONES,
-    ]);
-
-    const tareas = [];
-
-    if (puedeCargarConsultas) {
-      tareas.push(
-        apiFetch("/consultas", { method: "GET" }, "No se pudieron cargar las consultas")
-          .then((data) => setConsultas(ordenarPorIdAsc(extraerLista(data))))
-          .catch(() => setConsultas([]))
-      );
-    }
-
-    if (puedeCargarEstudiantes) {
-      tareas.push(
-        apiFetch(
-          "/estudiantes/conciliacion",
-          { method: "GET" },
-          "No se pudieron cargar los estudiantes habilitados para conciliación"
-        )
-          .then((data) => setEstudiantes(ordenarPorIdAsc(extraerLista(data))))
-          .catch(() => setEstudiantes([]))
-      );
-    }
-
-    if (puedeCargarConciliadores) {
-      tareas.push(
-        apiFetch(
-          "/conciliadores/activos",
-          { method: "GET" },
-          "No se pudieron cargar los conciliadores"
-        )
-          .then((data) => setConciliadores(ordenarPorIdAsc(extraerLista(data))))
-          .catch(() => setConciliadores([]))
-      );
-    }
-
-    await Promise.allSettled(tareas);
-  }
-
   async function refrescar(mensajeOk = "Información actualizada") {
-    await cargarConciliaciones();
+    setReloadKey((value) => value + 1);
     if (detalle?.id) {
       await cargarDetalle(detalle.id, { silencioso: true });
     }
@@ -290,6 +269,7 @@ export function ConciliacionesForm() {
       setDetalle(data);
       setEstudianteId(String(data?.estudianteId || ""));
       setConciliadorId(String(data?.conciliadorId || ""));
+      return data;
     } catch (err) {
       setError(
         withErrorReference(
@@ -310,9 +290,7 @@ export function ConciliacionesForm() {
       return;
     }
 
-    const consultaSeleccionada = consultas.find(
-      (consulta) => String(idConsulta(consulta)) === String(crearConsultaId)
-    );
+    const consultaSeleccionada = crearConsultaSeleccionada;
     const estadoConsulta = normalizarTexto(
       consultaSeleccionada?.estado || consultaSeleccionada?.estadoConsulta || consultaSeleccionada?.estadoNombre
     );
@@ -322,10 +300,6 @@ export function ConciliacionesForm() {
       return;
     }
 
-    if (conciliacionesActivasNoFinalizadasPorConsulta.has(String(crearConsultaId))) {
-      setError("La consulta ya tiene una conciliación activa no finalizada.");
-      return;
-    }
 
     if (!archivoEsPdf(archivoSolicitud)) {
       setError("La solicitud es obligatoria y debe ser un archivo PDF.");
@@ -347,6 +321,7 @@ export function ConciliacionesForm() {
       );
 
       setCrearConsultaId("");
+      setCrearConsultaSeleccionada(null);
       setArchivoSolicitud(null);
       const input = document.getElementById("solicitud-conciliacion");
       if (input) input.value = "";
@@ -573,14 +548,49 @@ export function ConciliacionesForm() {
     }
   }
 
-  async function descargarDocumento(fileId, conciliacionId) {
+
+  async function descargarDocumentoDesdeListado(item, campoFileId) {
+    if (!item?.id) return;
+
+    const operationKey = `${item.id}:${campoFileId}`;
+    if (descargandoDocumentos[operationKey]) return;
+
+    setDescargandoDocumentos((prev) => ({ ...prev, [operationKey]: true }));
+    let fileId = item?.[campoFileId];
+    try {
+      if (!fileId) {
+        const detalleActual = await cargarDetalle(item.id);
+        fileId = detalleActual?.[campoFileId];
+      }
+
+      if (!fileId) {
+        setError("El documento no está disponible para esta conciliación.");
+        return;
+      }
+
+      await descargarDocumento(fileId, item.id, operationKey);
+    } finally {
+      setDescargandoDocumentos((prev) => ({ ...prev, [operationKey]: false }));
+    }
+  }
+
+  async function descargarDocumento(fileId, conciliacionId, operationKey = null) {
     if (!fileId || !conciliacionId) return;
+
+    const downloadKey = operationKey || `${conciliacionId}:file:${fileId}`;
+    if (!operationKey && descargandoDocumentos[downloadKey]) return;
+
+    if (!operationKey) {
+      setDescargandoDocumentos((prev) => ({ ...prev, [downloadKey]: true }));
+    }
 
     try {
       const files = await fileApi.list({ type: "conciliacion", id: conciliacionId });
       const file = files.find((item) => Number(item.id) === Number(fileId));
       if (!file) throw new Error("El documento ya no está disponible");
-      await fileApi.download(file, { type: "conciliacion", id: conciliacionId });
+      await fileApi.downloadById(file.id, { type: "conciliacion", id: conciliacionId }, {
+        fileName: file.fileName || file.nombre,
+      });
     } catch (err) {
       setError(
         withErrorReference(
@@ -588,6 +598,10 @@ export function ConciliacionesForm() {
           err?.correlationId || null
         )
       );
+    } finally {
+      if (!operationKey) {
+        setDescargandoDocumentos((prev) => ({ ...prev, [downloadKey]: false }));
+      }
     }
   }
 
@@ -595,36 +609,6 @@ export function ConciliacionesForm() {
     setPageSize(nextSize);
     setCurrentPage(1);
   }
-
-  const conciliacionesFiltradas = useMemo(() => {
-    const texto = normalizarTexto(search);
-    const ordenadas = ordenarPorIdAsc(conciliaciones);
-
-    if (!texto) return ordenadas;
-
-    return ordenadas.filter((item) => {
-      const contenido = [
-        item?.id,
-        item?.consultaId,
-        item?.estudianteNombre,
-        item?.conciliadorNombre,
-        item?.estadoCodigo,
-        item?.estadoNombre,
-        item?.solicitadoPorUsername,
-      ]
-        .map(normalizarTexto)
-        .join(" ");
-
-      return contenido.includes(texto);
-    });
-  }, [conciliaciones, search]);
-
-  const totalPages = Math.max(1, Math.ceil(conciliacionesFiltradas.length / pageSize));
-
-  const conciliacionesPagina = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return conciliacionesFiltradas.slice(start, start + pageSize);
-  }, [conciliacionesFiltradas, currentPage, pageSize]);
 
   if (loading) {
     return <div className="py-10 text-center text-sm text-muted-foreground">Cargando conciliaciones...</div>;
@@ -686,12 +670,23 @@ export function ConciliacionesForm() {
           </div>
 
           <form onSubmit={crearConciliacion} className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
-            <CampoConsulta
+            <RemotePagedSelect
               label="Consulta"
-              consultaId={crearConsultaId}
-              consultas={consultasDisponiblesParaConciliacion}
-              onSeleccionar={setCrearConsultaId}
+              value={crearConsultaId}
+              onChange={(id, item) => {
+                setCrearConsultaId(id ? String(id) : "");
+                setCrearConsultaSeleccionada(item);
+              }}
+            endpoint="/consultas"
+            legacyEndpoint="/consultas"
+              resourceName="consultas"
+              sortBy="fecha"
+              direction="desc"
               required
+              getOptionLabel={(consulta) =>
+                `#${consulta.id} — ${consulta.consulta || consulta.descripcion || "Sin descripción"}`
+              }
+              searchPlaceholder="Buscar consulta..."
             />
 
             <div className="space-y-1.5">
@@ -718,15 +713,78 @@ export function ConciliacionesForm() {
             <h3 className="font-semibold">Listado operativo</h3>
           </div>
 
-          <div className="relative w-full lg:w-80">
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <div className="grid w-full gap-2 lg:max-w-4xl lg:grid-cols-5">
+            <div className="relative lg:col-span-2">
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar por consulta, estado o responsable"
+                className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm"
+              />
+            </div>
+            <select
+              value={estadoFiltro}
+              onChange={(event) => {
+                setEstadoFiltro(event.target.value);
+                setCurrentPage(1);
+              }}
+              className="h-10 rounded-md border bg-background px-2 text-sm"
+            >
+              <option value="">Todos los estados</option>
+              {[...ESTADOS_NO_FINALES, ...ESTADOS_FINALES].map((estado) => (
+                <option key={estado.value} value={estado.value}>{estado.label}</option>
+              ))}
+            </select>
             <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar por id, consulta, estado o responsable"
-              className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm"
+              type="date"
+              value={fechaDesde}
+              onChange={(event) => {
+                setFechaDesde(event.target.value);
+                setCurrentPage(1);
+              }}
+              className="h-10 rounded-md border bg-background px-2 text-sm"
+              aria-label="Fecha desde"
+            />
+            <input
+              type="date"
+              value={fechaHasta}
+              onChange={(event) => {
+                setFechaHasta(event.target.value);
+                setCurrentPage(1);
+              }}
+              className="h-10 rounded-md border bg-background px-2 text-sm"
+              aria-label="Fecha hasta"
             />
           </div>
+        </div>
+
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Orden:</span>
+          <select
+            value={sortBy}
+            onChange={(event) => {
+              setSortBy(event.target.value);
+              setCurrentPage(1);
+            }}
+            className="h-8 rounded-md border bg-background px-2"
+          >
+            <option value="id">ID</option>
+            <option value="fechaCreacion">Fecha de creación</option>
+            <option value="fechaConciliacion">Fecha de conciliación</option>
+            <option value="estado">Estado</option>
+          </select>
+          <select
+            value={direction}
+            onChange={(event) => {
+              setDirection(event.target.value);
+              setCurrentPage(1);
+            }}
+            className="h-8 rounded-md border bg-background px-2"
+          >
+            <option value="desc">Descendente</option>
+            <option value="asc">Ascendente</option>
+          </select>
         </div>
 
         <div className="overflow-x-auto rounded-xl border">
@@ -743,14 +801,14 @@ export function ConciliacionesForm() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {conciliacionesPagina.length === 0 ? (
+              {conciliaciones.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
-                    No hay conciliaciones para mostrar.
+                    {loadingLista ? "Cargando conciliaciones..." : "No hay conciliaciones para mostrar."}
                   </td>
                 </tr>
               ) : (
-                conciliacionesPagina.map((item) => (
+                conciliaciones.map((item) => (
                   <tr key={item.id} className="hover:bg-muted/30">
                     <td className="px-4 py-3 font-medium">#{item.id}</td>
                     <td className="px-4 py-3">#{item.consultaId || "-"}</td>
@@ -767,19 +825,19 @@ export function ConciliacionesForm() {
                           type="button"
                           size="sm"
                           variant="outline"
-                          disabled={!item.documentoSolicitudFileId}
-                          onClick={() => descargarDocumento(item.documentoSolicitudFileId, item.id)}
+                          disabled={!!descargandoDocumentos[`${item.id}:documentoSolicitudFileId`]}
+                          onClick={() => descargarDocumentoDesdeListado(item, "documentoSolicitudFileId")}
                         >
-                          Solicitud
+                          {descargandoDocumentos[`${item.id}:documentoSolicitudFileId`] ? "Descargando..." : "Solicitud"}
                         </Button>
                         <Button
                           type="button"
                           size="sm"
                           variant="outline"
-                          disabled={!item.actaFileId}
-                          onClick={() => descargarDocumento(item.actaFileId, item.id)}
+                          disabled={!!descargandoDocumentos[`${item.id}:actaFileId`]}
+                          onClick={() => descargarDocumentoDesdeListado(item, "actaFileId")}
                         >
-                          Acta
+                          {descargandoDocumentos[`${item.id}:actaFileId`] ? "Descargando..." : "Acta"}
                         </Button>
                       </div>
                     </td>
@@ -803,7 +861,7 @@ export function ConciliacionesForm() {
           onPageChange={setCurrentPage}
           onPageSizeChange={handlePageSizeChange}
           pageSizeOptions={PAGE_SIZE_OPTIONS}
-          totalItems={conciliacionesFiltradas.length}
+          totalItems={totalElements}
         />
       </section>
 
@@ -857,20 +915,30 @@ export function ConciliacionesForm() {
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={!detalle.documentoSolicitudFileId}
+                    disabled={
+                      !detalle.documentoSolicitudFileId ||
+                      !!descargandoDocumentos[`${detalle.id}:file:${detalle.documentoSolicitudFileId}`]
+                    }
                     onClick={() => descargarDocumento(detalle.documentoSolicitudFileId, detalle.id)}
                   >
                     <Download className="mr-2 h-4 w-4" />
-                    Descargar solicitud
+                    {descargandoDocumentos[`${detalle.id}:file:${detalle.documentoSolicitudFileId}`]
+                      ? "Descargando..."
+                      : "Descargar solicitud"}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={!detalle.actaFileId}
+                    disabled={
+                      !detalle.actaFileId ||
+                      !!descargandoDocumentos[`${detalle.id}:file:${detalle.actaFileId}`]
+                    }
                     onClick={() => descargarDocumento(detalle.actaFileId, detalle.id)}
                   >
                     <Download className="mr-2 h-4 w-4" />
-                    Descargar acta
+                    {descargandoDocumentos[`${detalle.id}:file:${detalle.actaFileId}`]
+                      ? "Descargando..."
+                      : "Descargar acta"}
                   </Button>
                 </div>
               </div>
@@ -880,18 +948,25 @@ export function ConciliacionesForm() {
                   {puedeAsignarEstudiante && !detalleFinalizado && (
                     <ActionCard title="Asignar estudiante">
                       <div className="flex flex-col gap-2 sm:flex-row">
-                        <select
+                        <div className="flex-1">
+                          <RemotePagedSelect
                           value={estudianteId}
-                          onChange={(event) => setEstudianteId(event.target.value)}
-                          className="h-10 flex-1 rounded-md border bg-background px-3 text-sm"
-                        >
-                          <option value="">Selecciona estudiante</option>
-                          {estudiantes.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              #{item.id} - {nombrePersona(item)}
-                            </option>
-                          ))}
-                        </select>
+                            selectedLabel={
+                              detalle.estudianteId && String(detalle.estudianteId) === String(estudianteId)
+                                ? detalle.estudianteNombre || ""
+                                : ""
+                            }
+                            onChange={(id) => setEstudianteId(id ? String(id) : "")}
+                            endpoint="/estudiantes/conciliacion/paginados"
+                            legacyEndpoint="/estudiantes/conciliacion"
+                            resourceName="estudiantes habilitados para conciliación"
+                            sortBy="nombre"
+                            direction="asc"
+                            placeholder="Selecciona estudiante"
+                            searchPlaceholder="Buscar estudiante..."
+                            getOptionLabel={(item) => `#${item.id} - ${nombrePersona(item)}`}
+                          />
+                        </div>
                         <Button type="button" onClick={asignarEstudiante} disabled={saving}>
                           Guardar
                         </Button>
@@ -902,18 +977,26 @@ export function ConciliacionesForm() {
                   {puedeAsignarConciliador && !detalleFinalizado && (
                     <ActionCard title="Asignar conciliador">
                       <div className="flex flex-col gap-2 sm:flex-row">
-                        <select
-                          value={conciliadorId}
-                          onChange={(event) => setConciliadorId(event.target.value)}
-                          className="h-10 flex-1 rounded-md border bg-background px-3 text-sm"
-                        >
-                          <option value="">Selecciona conciliador</option>
-                          {conciliadores.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              #{item.id} - {nombrePersona(item)}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="flex-1">
+                          <RemotePagedSelect
+                            value={conciliadorId}
+                            selectedLabel={
+                              detalle.conciliadorId && String(detalle.conciliadorId) === String(conciliadorId)
+                                ? detalle.conciliadorNombre || ""
+                                : ""
+                            }
+                            onChange={(id) => setConciliadorId(id ? String(id) : "")}
+                            endpoint="/conciliadores"
+                            legacyEndpoint="/conciliadores"
+                            resourceName="conciliadores"
+                            filters={{ activo: true }}
+                            sortBy="nombre"
+                            direction="asc"
+                            placeholder="Selecciona conciliador"
+                            searchPlaceholder="Buscar conciliador..."
+                            getOptionLabel={(item) => `#${item.id} - ${item.nombre || item.usuario || "Sin nombre"}`}
+                          />
+                        </div>
                         <Button type="button" onClick={asignarConciliador} disabled={saving}>
                           Guardar
                         </Button>

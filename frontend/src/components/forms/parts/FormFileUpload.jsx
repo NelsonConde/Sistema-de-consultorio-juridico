@@ -54,15 +54,17 @@ function validarArchivo(file, maxBytes) {
  * @returns {JSX.Element}
  */
 export function FormFileUpload({
-  name,
-  label,
-  multiple = false,
-  setValue,
-  value,
-  errors,
-  maxTamanoByte = MAX_TAMANO_BYTES,
-  ...props
-}) {
+                                 name,
+                                 label,
+                                 multiple = false,
+                                 setValue,
+                                 value,
+                                 errors,
+                                 maxTamanoByte = MAX_TAMANO_BYTES,
+                                 disabled = false,
+                                 canRemoveFile = () => true,
+                                 ...props
+                               }) {
   const selectedFiles = Array.isArray(value) ? value : value ? [value] : [];
 
   /**
@@ -139,12 +141,13 @@ export function FormFileUpload({
         `}
       >
         <input
-          id={name}
-          type="file"
-          multiple={multiple}
-          onChange={handleFileChange}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-          {...props}
+            id={name}
+            type="file"
+            multiple={multiple}
+            onChange={handleFileChange}
+            disabled={disabled}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+            {...props}
         />
 
         <div className="flex flex-col items-center justify-center pt-5 pb-6 text-muted-foreground pointer-events-none">
@@ -178,10 +181,11 @@ export function FormFileUpload({
                 </span>
               </div>
               <button
-                type="button"
-                onClick={() => removeFile(file.name)}
-                className="p-1 transition-colors rounded hover:bg-destructive/10 hover:text-destructive"
-                title={`Quitar ${file.name}`}
+                  type="button"
+                  onClick={() => removeFile(file.name)}
+                  disabled={disabled || !canRemoveFile(file)}
+                  className="p-1 transition-colors rounded hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50"
+                  title={`Quitar ${file.name}`}
               >
                 <X className="w-4 h-4" />
               </button>

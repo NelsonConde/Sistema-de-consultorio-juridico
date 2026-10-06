@@ -17,8 +17,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.beans.factory.annotation.Value;
 
+import java.time.LocalDate;
+import org.springframework.beans.factory.annotation.Autowired;
 import co.edu.ufps.legal_cases.audit.aop.log.Auditable;
+import co.edu.ufps.legal_cases.business.service.acceso.consulta.ConsultaAccessService;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import co.edu.ufps.legal_cases.file_storage.dto.ExpedienteDocumentoResponse;
 import co.edu.ufps.legal_cases.file_storage.dto.FileDownloadResponse;
 import co.edu.ufps.legal_cases.file_storage.dto.FileResponse;
 import co.edu.ufps.legal_cases.file_storage.dto.FileUploadRequest;
@@ -37,15 +41,18 @@ public class FileResourceService {
     private final FileResourceAuthorizationService authorizationService;
     private final StorageProvider storageProvider;
     private final UsuarioActualService usuarioActualService;
+    private final ConsultaAccessService consultaAccessService;
     private final Duration uploadUrlValidity;
     private final Duration downloadUrlValidity;
 
+    @Autowired
     public FileResourceService(
             FileAssetService fileAssetService,
             FileValidationService validationService,
             FileResourceAuthorizationService authorizationService,
             StorageProvider storageProvider,
             UsuarioActualService usuarioActualService,
+            ConsultaAccessService consultaAccessService,
             @Value("${file.storage.upload-url-validity:PT10M}") Duration uploadUrlValidity,
             @Value("${file.storage.download-url-validity:PT5M}") Duration downloadUrlValidity) {
         this.fileAssetService = fileAssetService;
@@ -53,8 +60,21 @@ public class FileResourceService {
         this.authorizationService = authorizationService;
         this.storageProvider = storageProvider;
         this.usuarioActualService = usuarioActualService;
+        this.consultaAccessService = consultaAccessService;
         this.uploadUrlValidity = uploadUrlValidity;
         this.downloadUrlValidity = downloadUrlValidity;
+    }
+
+    public FileResourceService(
+            FileAssetService fileAssetService,
+            FileValidationService validationService,
+            FileResourceAuthorizationService authorizationService,
+            StorageProvider storageProvider,
+            UsuarioActualService usuarioActualService,
+            Duration uploadUrlValidity,
+            Duration downloadUrlValidity) {
+        this(fileAssetService, validationService, authorizationService, storageProvider,
+                usuarioActualService, null, uploadUrlValidity, downloadUrlValidity);
     }
 
     @Transactional
@@ -76,7 +96,9 @@ public class FileResourceService {
                 request.fileName(),
                 request.contentType(),
                 request.size(),
-                request.checksum());
+                request.checksum(),
+                request.documentoLogico(),
+                request.tipoDocumental());
 
         try {
             StorageProvider.PresignedUpload upload = storageProvider.createUploadUrl(
@@ -102,6 +124,17 @@ public class FileResourceService {
             Long resourceId,
             Long parentId,
             MultipartFile file) {
+        return storeMultipartAfterAuthorization(type, resourceId, parentId, file, null, null);
+    }
+
+    @Transactional
+    public FileAsset storeMultipartAfterAuthorization(
+            FileResourceType type,
+            Long resourceId,
+            Long parentId,
+            MultipartFile file,
+            UUID documentoLogico,
+            String tipoDocumental) {
         if (type == FileResourceType.CONCILIACION) {
             validationService.validatePdf(file);
         } else {
@@ -113,7 +146,9 @@ public class FileResourceService {
                 file.getOriginalFilename(),
                 file.getContentType() == null ? "application/octet-stream" : file.getContentType(),
                 file.getSize(),
-                null);
+                null,
+                documentoLogico,
+                tipoDocumental);
         try {
             storageProvider.store(file, asset.getObjectKey());
             StorageProvider.StorageObjectMetadata metadata = storageProvider.head(asset.getObjectKey());
@@ -234,12 +269,97 @@ public class FileResourceService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public List<FileResponse> listVersions(UUID documentoLogico, Long parentId) {
+        List<FileAsset> versions = fileAssetService.listVersions(documentoLogico);
+        if (!versions.isEmpty()) {
+            authorizationService.authorizeRead(versions.get(0), parentId);
+        }
+        return versions.stream()
+                .map(FileResourceService::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    @Auditable(
+            action = "READ_EXPEDIENTE_FILES",
+            entityName = "Consulta",
+            entityId = "#consultaId")
+    public List<ExpedienteDocumentoResponse> listExpedienteFiles(
+            Long consultaId,
+            String tipoDocumental,
+            String resourceType,
+            String origen,
+            String autor,
+            LocalDate fechaDesde,
+            LocalDate fechaHasta) {
+        if (consultaAccessService != null) {
+            consultaAccessService.validarPuedeVerConsulta(consultaId);
+        }
+
+        if (fechaDesde != null && fechaHasta != null && fechaDesde.isAfter(fechaHasta)) {
+            throw new BusinessException("La fecha desde no puede ser posterior a la fecha hasta");
+        }
+
+        java.time.LocalDateTime desde = fechaDesde != null ? fechaDesde.atStartOfDay() : null;
+        java.time.LocalDateTime hasta = fechaHasta != null ? fechaHasta.atTime(23, 59, 59, 999999999) : null;
+
+        List<FileAsset> assets = fileAssetService.findExpedienteFiles(
+                consultaId,
+                tipoDocumental,
+                resourceType,
+                origen,
+                autor,
+                desde,
+                hasta);
+
+        return assets.stream()
+                .map(FileResourceService::toExpedienteResponse)
+                .toList();
+    }
+
+    private static ExpedienteDocumentoResponse toExpedienteResponse(FileAsset asset) {
+        String status = asset.getStatus() == null ? null : asset.getStatus().name();
+        Long referenciaAnteriorId = (asset.getReferenciaAnterior() != null)
+                ? asset.getReferenciaAnterior().getId()
+                : null;
+        long size = (asset.getSize() != null) ? asset.getSize() : 0L;
+        Long autorId = asset.getUploadedBy() != null ? asset.getUploadedBy().getId() : null;
+        String autorUsername = asset.getUploadedBy() != null ? asset.getUploadedBy().getUsername() : null;
+
+        return new ExpedienteDocumentoResponse(
+                asset.getId(),
+                asset.getDocumentoLogico(),
+                asset.getVersion(),
+                asset.getTipoDocumental(),
+                asset.getOrigen(),
+                referenciaAnteriorId,
+                asset.getResourceType(),
+                asset.getResourceId(),
+                asset.getOriginalFileName(),
+                size,
+                asset.getContentType(),
+                status,
+                autorId,
+                autorUsername,
+                asset.getCreatedAt());
+    }
+
     private static FileResponse toResponse(FileAsset asset) {
         String status = asset.getStatus() == null ? null : asset.getStatus().name();
+        Long referenciaAnteriorId = (asset.getReferenciaAnterior() != null)
+                ? asset.getReferenciaAnterior().getId()
+                : null;
+        long size = (asset.getSize() != null) ? asset.getSize() : 0L;
         return new FileResponse(
                 asset.getId(),
+                asset.getDocumentoLogico(),
+                asset.getVersion(),
+                asset.getTipoDocumental(),
+                asset.getOrigen(),
+                referenciaAnteriorId,
                 asset.getOriginalFileName(),
-                asset.getSize(),
+                size,
                 asset.getContentType(),
                 status,
                 asset.getCreatedAt());

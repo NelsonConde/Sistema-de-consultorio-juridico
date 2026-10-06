@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 
 import co.edu.ufps.legal_cases.business.service.acceso.conciliacion.ConciliacionAccessService;
 import co.edu.ufps.legal_cases.business.service.acceso.consulta.ConsultaAccessService;
+import co.edu.ufps.legal_cases.business.service.acceso.proceso.ProcesoAccessService;
 import co.edu.ufps.legal_cases.business.service.acceso.seguimiento.SeguimientoAccessService;
 import co.edu.ufps.legal_cases.business.service.acceso.seguimiento.SeguimientoRespuestaAccessService;
 import co.edu.ufps.legal_cases.file_storage.model.FileAsset;
@@ -18,16 +19,19 @@ public class FileResourceAuthorizationService {
     private final SeguimientoAccessService seguimientoAccessService;
     private final SeguimientoRespuestaAccessService respuestaAccessService;
     private final ConciliacionAccessService conciliacionAccessService;
+    private final ProcesoAccessService procesoAccessService;
 
     public FileResourceAuthorizationService(
             ConsultaAccessService consultaAccessService,
             SeguimientoAccessService seguimientoAccessService,
             SeguimientoRespuestaAccessService respuestaAccessService,
-            ConciliacionAccessService conciliacionAccessService) {
+            ConciliacionAccessService conciliacionAccessService,
+            ProcesoAccessService procesoAccessService) {
         this.consultaAccessService = consultaAccessService;
         this.seguimientoAccessService = seguimientoAccessService;
         this.respuestaAccessService = respuestaAccessService;
         this.conciliacionAccessService = conciliacionAccessService;
+        this.procesoAccessService = procesoAccessService;
     }
 
     public void authorizeUpload(FileResourceType type, Long resourceId, Long parentId) {
@@ -40,6 +44,7 @@ public class FileResourceAuthorizationService {
                 respuestaAccessService.validarPuedeSubirArchivoRespuesta(parentId, resourceId);
             }
             case CONCILIACION -> conciliacionAccessService.validarPuedeReemplazarSolicitud(resourceId);
+            case PROCESO -> procesoAccessService.validarPuedeActualizarProceso(resourceId);
         }
     }
 
@@ -55,6 +60,7 @@ public class FileResourceAuthorizationService {
                 respuestaAccessService.validarPuedeLeerArchivoRespuesta(parentId, resourceId);
             }
             case CONCILIACION -> conciliacionAccessService.validarPuedeVerConciliacion(resourceId);
+            case PROCESO -> procesoAccessService.validarPuedeVerProceso(resourceId);
         }
     }
 
@@ -68,6 +74,7 @@ public class FileResourceAuthorizationService {
                 respuestaAccessService.validarPuedeLeerArchivoRespuesta(parentId, resourceId);
             }
             case CONCILIACION -> conciliacionAccessService.validarPuedeVerConciliacion(resourceId);
+            case PROCESO -> procesoAccessService.validarPuedeVerProceso(resourceId);
         }
     }
 

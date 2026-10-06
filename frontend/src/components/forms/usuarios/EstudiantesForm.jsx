@@ -1,68 +1,58 @@
-"use client"
+"use client";
 
-/**
- * Form handling.
- *
- * Handles list pagination consistently.
- * Implementation detail.
- *
- * Permission and authorization handling.
- * User flow detail.
- *
- * @module components/forms/usuarios/EstudiantesForm
- */
-
-import { apiClient } from "@/lib/apiClient";
 import React, { useEffect, useState } from "react";
-import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { API_URL_BASE } from "@/lib/config";
+import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import Pagination from "@/components/ui/Pagination";
+import { useDebouncedPageSearch } from "@/hooks/useDebouncedValue";
+import { apiClient } from "@/lib/apiClient";
+import { API_URL_BASE } from "@/lib/config";
+import { fetchPaged, isAbortError } from "@/lib/pagedApi";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
-import { getTotalPages, paginateItems, sortByIdAsc } from "@/lib/list-utils";
 
-/**
- * List and table handling.
- * @returns {JSX.Element} Result value.
- */
+const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
+
 export function EstudiantesForm() {
   const router = useRouter();
 
+  const [autorizado, setAutorizado] = useState(false);
   const [estudiantes, setEstudiantes] = useState([]);
   const [busqueda, setBusqueda] = useState("");
-  const [cargando, setCargando] = useState(true);
-  const [puedeCambiarEstado, setPuedeCambiarEstado] = useState(false);
-
   const [paginaActual, setPaginaActual] = useState(1);
+  const busquedaAplicada = useDebouncedPageSearch(busqueda, setPaginaActual, 300).trim();
+  const [activo, setActivo] = useState("");
+  const [sortBy, setSortBy] = useState("id");
+  const [direction, setDirection] = useState("desc");
+  const [cargando, setCargando] = useState(true);
+  const [errorLista, setErrorLista] = useState("");
+  const [puedeCambiarEstado, setPuedeCambiarEstado] = useState(false);
   const [registrosPorPagina, setRegistrosPorPagina] = useState(10);
-  const REGISTROS_POR_PAGINA_OPTIONS = [5, 10, 20, 50];
-
+  const [totalRegistros, setTotalRegistros] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(0);
+  const [reloadKey, setReloadKey] = useState(0);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
 
   useEffect(() => {
-    const verificarYCargar = async () => {
+    let mounted = true;
+
+    async function verificar() {
       try {
-        const res = await apiClient.request(`${API_URL_BASE}/auth/me`, {
-          method: "GET",
-          credentials: "include",
-        });
+        const res = await apiClient.get(`${API_URL_BASE}/auth/me`);
 
         if (res.status === 401) {
           router.replace("/");
           return;
         }
-
         if (!res.ok) {
           router.replace("/");
           return;
         }
 
         const usuario = await res.json();
-
         const puedeEntrar =
           tienePermiso(usuario, PERMISOS.ACCEDER_ESTUDIANTES) &&
           tienePermiso(usuario, PERMISOS.VER_ESTUDIANTES);
@@ -72,66 +62,86 @@ export function EstudiantesForm() {
           return;
         }
 
+        if (!mounted) return;
         setPuedeCambiarEstado(
           tienePermiso(usuario, PERMISOS.CAMBIAR_ESTADO_ESTUDIANTES)
         );
+        setAutorizado(true);
+      } catch {
+        router.replace("/");
+      }
+    }
 
-        let url = `${API_URL_BASE}/estudiantes/activos`;
+    verificar();
+    return () => {
+      mounted = false;
+    };
+  }, [router]);
 
-        if (usuario.tipoPerfil === "ASESOR" && usuario.perfilId) {
-          url = `${API_URL_BASE}/estudiantes/activos/asesor/${usuario.perfilId}`;
-        }
+  useEffect(() => {
+    if (!autorizado) return undefined;
 
-        const estudiantesRes = await apiClient.request(url, {
-          credentials: "include",
+    const controller = new AbortController();
+
+    async function cargar() {
+      setCargando(true);
+      setErrorLista("");
+
+      try {
+        const page = await fetchPaged("/estudiantes", {
+          search: busquedaAplicada,
+          page: paginaActual,
+          size: registrosPorPagina,
+          sortBy,
+          direction,
+          filters: { activo },
+          signal: controller.signal,
+          resourceName: "estudiantes",
         });
 
-        if (estudiantesRes.status === 401) {
+        setEstudiantes(page.content);
+        setTotalRegistros(page.totalElements);
+        setTotalPaginas(page.totalPages);
+
+        if (page.totalPages > 0 && page.page > page.totalPages) {
+          setPaginaActual(page.totalPages);
+        } else if (page.page !== paginaActual) {
+          setPaginaActual(page.page);
+        }
+      } catch (error) {
+        if (isAbortError(error)) return;
+        if (error?.status === 401) {
           router.replace("/");
           return;
         }
 
-        if (estudiantesRes.status === 403) {
-          router.replace("/inicio");
-          return;
-        }
-
-        if (!estudiantesRes.ok) {
-          toast.error("Error cargando estudiantes");
-          setEstudiantes([]);
-          return;
-        }
-
-        const data = await estudiantesRes.json();
-
-        if (Array.isArray(data)) {
-          setEstudiantes(sortByIdAsc(data));
-        } else if (Array.isArray(data.content)) {
-          setEstudiantes(sortByIdAsc(data.content));
-        } else if (Array.isArray(data.data)) {
-          setEstudiantes(sortByIdAsc(data.data));
-        } else {
-          setEstudiantes([]);
-          toast.error("La API no devolvió una lista");
-        }
-      } catch {
-
-        toast.error("Error cargando estudiantes");
+        setEstudiantes([]);
+        setTotalRegistros(0);
+        setTotalPaginas(0);
+        setErrorLista(
+          error?.status === 403
+            ? "No tienes permiso para consultar estudiantes."
+            : error?.message || "Error cargando estudiantes."
+        );
       } finally {
-        setCargando(false);
+        if (!controller.signal.aborted) setCargando(false);
       }
-    };
+    }
 
-    verificarYCargar();
-  }, [router]);
+    cargar();
+    return () => controller.abort();
+  }, [
+    autorizado,
+    busquedaAplicada,
+    paginaActual,
+    registrosPorPagina,
+    activo,
+    sortBy,
+    direction,
+    reloadKey,
+    router,
+  ]);
 
-  /**
-   * Implementation detail.
-   * Permission and authorization handling.
-   * Implementation detail.
-   *
-   * @param {object} estudiante - Student data.
-   */
   function abrirConfirmacionDesactivar(estudiante) {
     if (!puedeCambiarEstado) {
       toast.error("Sin permiso", {
@@ -139,93 +149,111 @@ export function EstudiantesForm() {
       });
       return;
     }
-
     setConfirmDialog(estudiante);
   }
 
   async function confirmarDesactivar() {
-    if (!confirmDialog?.id) return;
-
-    if (!puedeCambiarEstado) {
-      router.replace("/inicio");
-      return;
-    }
+    if (!confirmDialog?.id || !puedeCambiarEstado) return;
 
     try {
       setConfirmLoading(true);
-
-      const res = await apiClient.request(
-        `${API_URL_BASE}/estudiantes/${confirmDialog.id}/activo?activo=false`,
-        {
-          method: "PATCH",
-          credentials: "include",
-        }
+      const res = await apiClient.patch(
+        `${API_URL_BASE}/estudiantes/${confirmDialog.id}/activo?activo=false`
       );
 
       if (res.status === 401) {
         router.replace("/");
         return;
       }
-
       if (res.status === 403) {
-        router.replace("/inicio");
+        setEstudiantes([]);
+        setTotalRegistros(0);
+        setTotalPaginas(0);
+        setErrorLista("No tienes permiso para cambiar el estado de estudiantes.");
+        return;
+      }
+      if (!res.ok) {
+        toast.error("Error al desactivar");
         return;
       }
 
-      if (res.ok) {
-        toast.success("Estudiante desactivado");
-
-        setEstudiantes((prev) =>
-          sortByIdAsc(
-            prev.map((e) =>
-              e.id === confirmDialog.id ? { ...e, activo: false } : e
-            )
-          )
-        );
-
-        setConfirmDialog(null);
+      toast.success("Estudiante desactivado");
+      setConfirmDialog(null);
+      if (estudiantes.length === 1 && paginaActual > 1) {
+        setPaginaActual((page) => page - 1);
       } else {
-        toast.error("Error al desactivar");
+        setReloadKey((value) => value + 1);
       }
-    } catch (error) {
-
+    } catch {
       toast.error("Error de conexión");
     } finally {
       setConfirmLoading(false);
     }
   }
 
-  const filtrados = sortByIdAsc(
-    estudiantes.filter((e) =>
-      `${e.nombre} ${e.documento} ${e.email} ${e.codigo}`
-        .toLowerCase()
-        .includes(busqueda.toLowerCase())
-    )
-  );
-  const totalPaginas = getTotalPages(filtrados.length, registrosPorPagina);
-  const estudiantesPaginados = paginateItems(filtrados, paginaActual, registrosPorPagina);
-
-  useEffect(() => {
-    setPaginaActual(1);
-  }, [busqueda]);
-
-  useEffect(() => {
-    if (paginaActual > totalPaginas) {
-      setPaginaActual(totalPaginas);
-    }
-  }, [paginaActual, totalPaginas]);
-
-  if (cargando) {
+  if (!autorizado && cargando) {
     return <div className="text-center mt-10">Cargando...</div>;
   }
 
   return (
     <div className="space-y-6">
-      <Input
-        placeholder="Buscar por nombre, documento, email o código..."
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-      />
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <Input
+          placeholder="Buscar por nombre, documento, email o código..."
+          value={busqueda}
+          onChange={(event) => setBusqueda(event.target.value)}
+          className="md:col-span-2"
+        />
+
+        <select
+          value={activo}
+          onChange={(event) => {
+            setActivo(event.target.value);
+            setPaginaActual(1);
+          }}
+          className="h-9 rounded-md border bg-background px-3 text-sm"
+        >
+          <option value="">Todos</option>
+          <option value="true">Activos</option>
+          <option value="false">Inactivos</option>
+        </select>
+
+        <div className="flex gap-2">
+          <select
+            value={sortBy}
+            onChange={(event) => {
+              setSortBy(event.target.value);
+              setPaginaActual(1);
+            }}
+            className="h-9 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm"
+          >
+            <option value="id">ID</option>
+            <option value="nombre">Nombre</option>
+            <option value="documento">Documento</option>
+            <option value="email">Email</option>
+            <option value="codigo">Código</option>
+            <option value="activo">Estado</option>
+          </select>
+          <select
+            value={direction}
+            onChange={(event) => {
+              setDirection(event.target.value);
+              setPaginaActual(1);
+            }}
+            className="h-9 rounded-md border bg-background px-2 text-sm"
+            aria-label="Dirección de orden"
+          >
+            <option value="asc">Asc</option>
+            <option value="desc">Desc</option>
+          </select>
+        </div>
+      </div>
+
+      {errorLista && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {errorLista}
+        </div>
+      )}
 
       <div className="overflow-x-auto border rounded-xl">
         <table className="w-full text-sm">
@@ -242,64 +270,71 @@ export function EstudiantesForm() {
               <th className="p-3">Acciones</th>
             </tr>
           </thead>
-
           <tbody>
-            {estudiantesPaginados.map((e) => (
-              <tr
-                key={e.id}
-                className="border-t hover:bg-muted/30 transition"
-              >
-                <td className="p-3">{e.id}</td>
-                <td className="p-3 font-medium">{e.nombre}</td>
-                <td className="p-3">{e.documento}</td>
-                <td className="p-3">{e.email}</td>
-                <td className="p-3">{e.telefono}</td>
-                <td className="p-3">{e.codigo}</td>
-
-                <td className="p-3">
-                  <span
-                    className={`text-xs px-2 py-1 rounded ${
-                      e.conciliacion
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-600"
-                    }`}
-                  >
-                    {e.conciliacion ? "Sí" : "No"}
-                  </span>
-                </td>
-
-                <td className="p-3">
-                  <span
-                    className={`text-xs px-2 py-1 rounded ${
-                      e.activo
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
-                  >
-                    {e.activo ? "Activo" : "Inactivo"}
-                  </span>
-                </td>
-
-                <td className="p-3">
-                  {puedeCambiarEstado ? (
-                    <button
-                      type="button"
-                      onClick={() => abrirConfirmacionDesactivar(e)}
-                      disabled={!e.activo}
-                      className={`text-xs px-3 py-1 rounded ${
-                        e.activo
-                          ? "bg-red-100 text-red-700 hover:bg-red-200"
-                          : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                      }`}
-                    >
-                      {e.activo ? "Desactivar" : "Inactivo"}
-                    </button>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  )}
+            {cargando && estudiantes.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="p-6 text-center text-muted-foreground">
+                  Cargando estudiantes...
                 </td>
               </tr>
-            ))}
+            ) : estudiantes.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="p-6 text-center text-muted-foreground">
+                  No se encontraron resultados.
+                </td>
+              </tr>
+            ) : (
+              estudiantes.map((estudiante) => (
+                <tr key={estudiante.id} className="border-t hover:bg-muted/30 transition">
+                  <td className="p-3">{estudiante.id}</td>
+                  <td className="p-3 font-medium">{estudiante.nombre}</td>
+                  <td className="p-3">{estudiante.documento || "—"}</td>
+                  <td className="p-3">{estudiante.email || "—"}</td>
+                  <td className="p-3">—</td>
+                  <td className="p-3">{estudiante.codigo || "—"}</td>
+                  <td className="p-3">
+                    <span
+                      className={`text-xs px-2 py-1 rounded ${
+                        estudiante.conciliacion
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {estudiante.conciliacion ? "Sí" : "No"}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <span
+                      className={`text-xs px-2 py-1 rounded ${
+                        estudiante.activo
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {estudiante.activo ? "Activo" : "Inactivo"}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    {puedeCambiarEstado ? (
+                      <button
+                        type="button"
+                        onClick={() => abrirConfirmacionDesactivar(estudiante)}
+                        disabled={!estudiante.activo}
+                        className={`text-xs px-3 py-1 rounded ${
+                          estudiante.activo
+                            ? "bg-red-100 text-red-700 hover:bg-red-200"
+                            : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        }`}
+                      >
+                        {estudiante.activo ? "Desactivar" : "Inactivo"}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -307,18 +342,15 @@ export function EstudiantesForm() {
       <Pagination
         currentPage={paginaActual}
         totalPages={totalPaginas}
-        onPageChange={(p) => setPaginaActual(p)}
+        onPageChange={setPaginaActual}
         pageSize={registrosPorPagina}
-        onPageSizeChange={(v) => { setRegistrosPorPagina(v); setPaginaActual(1); }}
-        pageSizeOptions={REGISTROS_POR_PAGINA_OPTIONS}
-        totalItems={filtrados.length}
+        onPageSizeChange={(value) => {
+          setRegistrosPorPagina(value);
+          setPaginaActual(1);
+        }}
+        pageSizeOptions={PAGE_SIZE_OPTIONS}
+        totalItems={totalRegistros}
       />
-
-      {filtrados.length === 0 && (
-        <p className="text-center text-muted-foreground">
-          No se encontraron resultados
-        </p>
-      )}
 
       <ConfirmActionDialog
         open={Boolean(confirmDialog)}

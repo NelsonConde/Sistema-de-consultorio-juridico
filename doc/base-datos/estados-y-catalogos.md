@@ -313,3 +313,66 @@ Una consulta no se cierra si existen recursos pendientes asociados:
 | Conciliación | Conciliación activa en estado pendiente. |
 
 Además, el cierre exige resultado funcional en `Consulta.resultado`.
+
+## 15. Estados y catálogos de gestión documental
+
+### Estados de ciclo de vida de archivo (`FileAssetStatus`)
+
+Enum:
+
+```text
+FileAssetStatus
+```
+
+Valores y propósito funcional:
+
+| Estado | Uso funcional |
+|---|---|
+| `PENDING` | Archivo registrado en staging temporal a la espera de que el cliente complete la subida física al bucket. |
+| `ACTIVE` | Archivo verificado y confirmado físicamente en el almacenamiento de objetos. |
+| `VIGENTE` | Versión documental activa y válida actualmente para el documento lógico. Solo puede existir una versión en este estado por documento lógico. |
+| `HISTORICO` | Versión previa que fue reemplazada por una versión superior ($N+1$). Es de solo lectura e inmutable. |
+| `ANULADO` | Documento que fue revocado o dado de baja lógicamente por un usuario autorizado. |
+| `FAILED` | Fallo confirmado durante la subida, validación de tamaño o suma de verificación SHA-256. |
+| `DELETE_PENDING` | Objeto marcado para limpieza asíncrona o compensación por fallo en la transacción de base de datos. |
+
+### Tipos de recurso documental (`FileResourceType`)
+
+Enum:
+
+```text
+FileResourceType
+```
+
+Valores admitidos:
+
+| Recurso | Entidad de negocio asociada | Alcance y autorización |
+|---|---|---|
+| `CONSULTA` | `Consulta` | Validado mediante `ConsultaAccessService.validarPuedeVerConsulta`. |
+| `SEGUIMIENTO` | `Seguimiento` | Validado contra la consulta raíz del seguimiento. |
+| `RESPUESTA` | `SeguimientoRespuesta` | Validado contra el seguimiento y la consulta raíz asociada. |
+| `PROCESO` | `Proceso` | Validado contra la consulta raíz que originó el proceso judicial. |
+| `CONCILIACION` | `Conciliacion` | Validado contra la consulta jurídica remitida a conciliación. |
+
+### Origen del documento (`OrigenDocumento`)
+
+Valores admitidos (calculados exclusivamente en el servidor):
+
+| Origen | Descripción |
+|---|---|
+| `CARGA_USUARIO` | Archivo cargado interactivamente por un usuario autenticado en sesión mediante la interfaz web o API. |
+| `SISTEMA` | Documento generado automáticamente por servicios del backend (ej. reportes estadísticos, actas generadas). |
+| `MIGRADO` | Documento heredado de versiones anteriores del sistema o migrado desde cargas históricas. |
+
+### Clasificación por tipo documental
+
+Clasificaciones funcionales estandarizadas:
+
+- `CONSULTA_ANEXO`: Documentos probatorios o anexos de la consulta inicial.
+- `SEGUIMIENTO_DOCUMENTO`: Evidencias o requerimientos adjuntos a actuaciones de seguimiento.
+- `RESPUESTA_DOCUMENTO`: Archivos de soporte de respuestas enviadas por estudiantes.
+- `PROCESO_DOCUMENTO`: Piezas procesales, providencias, memoriales o demandas de procesos judiciales.
+- `CONCILIACION_SOLICITUD`: Formato o solicitud formal de audiencia de conciliación.
+- `CONCILIACION_ACTA`: Acta de acuerdo, no acuerdo o constancia de conciliación.
+- `GENERAL`: Archivos generales del caso sin clasificación específica.
+

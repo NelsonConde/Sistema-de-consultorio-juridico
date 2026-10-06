@@ -18,13 +18,15 @@ import { API_URL_BASE } from "@/lib/config";
 import { FormInput } from "../parts/FormInput";
 import { FormSelect } from "../parts/FormSelect";
 import { FormCheckbox } from "../parts/FormCheckbox";
+import { RemotePagedSelect } from "../parts/RemotePagedSelect";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { PERMISOS } from "@/lib/permission";
 import { tieneAlgunPermiso, tienePermiso } from "@/lib/authz";
 import { digitsOnlyRule, maxLengthRule } from "@/lib/form-validation";
 import Pagination from "@/components/ui/Pagination";
-import { sortByIdAsc } from "@/lib/list-utils";
+import { useDebouncedPageSearch } from "@/hooks/useDebouncedValue";
+import { fetchPaged, isAbortError } from "@/lib/pagedApi";
 
 import { PERMISO_GESTIONAR_USUARIOS, TIPOS_PERFIL, VALORES_INICIALES } from "./cambiar-rol.constants";
 import {
@@ -46,16 +48,20 @@ export function CambiarRolUsuarioForm() {
   const [registrosPorPaginaModal, setRegistrosPorPaginaModal] = useState(10);
   const REGISTROS_POR_PAGINA_OPTIONS_MODAL = [5, 10, 20, 50];
   const [usuarios, setUsuarios] = useState([]);
+  const [totalUsuariosModal, setTotalUsuariosModal] = useState(0);
+  const [totalPaginasModal, setTotalPaginasModal] = useState(0);
+  const [errorUsuariosModal, setErrorUsuariosModal] = useState("");
+  const [usuarioSeleccionadoCache, setUsuarioSeleccionadoCache] = useState(null);
   const [roles, setRoles] = useState([]);
   const [tiposDocumento, setTiposDocumento] = useState([]);
   const [sedes, setSedes] = useState([]);
-  const [asesores, setAsesores] = useState([]);
   const [areas, setAreas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [avisoPerfil, setAvisoPerfil] = useState(null);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [busquedaModal, setBusquedaModal] = useState("");
+  const busquedaModalAplicada = useDebouncedPageSearch(busquedaModal, setPaginaActualModal, 300).trim();
 
   const {
     register,
@@ -70,10 +76,17 @@ export function CambiarRolUsuarioForm() {
   const usuarioSistemaId = watch("usuarioSistemaId");
   const destino = watch("destino");
   const rolIdDestino = watch("rolIdDestino");
+  const asesorId = watch("asesorId") || "";
 
   const usuarioSeleccionado = useMemo(() => {
-    return usuarios.find((usuario) => String(usuario.id) === String(usuarioSistemaId));
-  }, [usuarios, usuarioSistemaId]);
+    if (
+      usuarioSeleccionadoCache &&
+      String(usuarioSeleccionadoCache.id) === String(usuarioSistemaId)
+    ) {
+      return usuarioSeleccionadoCache;
+    }
+    return usuarios.find((usuario) => String(usuario.id) === String(usuarioSistemaId)) || null;
+  }, [usuarios, usuarioSistemaId, usuarioSeleccionadoCache]);
 
   const perfilDestino = useMemo(() => buscarPerfil(destino), [destino]);
 
@@ -107,43 +120,108 @@ export function CambiarRolUsuarioForm() {
     return perfiles.filter((perfil) => perfil.value !== usuarioSeleccionado.tipoPerfil);
   }, [usuarioSeleccionado, puedeGestionarAdministradores]);
 
-  const usuariosFiltrados = useMemo(() => {
-    const activos = filtrarActivos(usuarios);
-    const q = busquedaModal.trim().toLowerCase();
-
-    const filtrados = !q ? activos : activos.filter((usuario) =>
-      `${usuario.username || ""} ${usuario.rolNombre || ""} ${usuario.tipoPerfil || ""}`
-        .toLowerCase()
-        .includes(q)
-    );
-
-    return sortByIdAsc(filtrados);
-  }, [usuarios, busquedaModal]);
-
-  const totalPaginasModal = Math.max(1, Math.ceil(usuariosFiltrados.length / registrosPorPaginaModal));
-
   useEffect(() => {
-    setPaginaActualModal(1);
-  }, [busquedaModal, registrosPorPaginaModal]);
+    if (!modalAbierto || !user) return undefined;
 
-  useEffect(() => {
-    if (paginaActualModal > totalPaginasModal) {
-      setPaginaActualModal(totalPaginasModal);
+    const controller = new AbortController();
+
+    async function cargarUsuariosModal() {
+      setErrorUsuariosModal("");
+      try {
+        const page = await fetchPaged("/usuarios-sistema", {
+          search: busquedaModalAplicada,
+          page: paginaActualModal,
+          size: registrosPorPaginaModal,
+          sortBy: "username",
+          direction: "asc",
+          filters: { activo: true },
+          signal: controller.signal,
+          resourceName: "usuarios del sistema",
+        });
+        setUsuarios(page.content);
+        setTotalUsuariosModal(page.totalElements);
+        setTotalPaginasModal(page.totalPages);
+        if (page.totalPages > 0 && page.page > page.totalPages) {
+          setPaginaActualModal(page.totalPages);
+        } else if (page.page !== paginaActualModal) {
+          setPaginaActualModal(page.page);
+        }
+      } catch (error) {
+        if (isAbortError(error)) return;
+        if (error?.status === 401) {
+          router.replace("/");
+          return;
+        }
+        setUsuarios([]);
+        setTotalUsuariosModal(0);
+        setTotalPaginasModal(0);
+        setErrorUsuariosModal(
+          error?.status === 403
+            ? "No tienes permiso para consultar usuarios."
+            : error?.message || "No fue posible cargar usuarios."
+        );
+      }
     }
-  }, [paginaActualModal, totalPaginasModal]);
+
+    cargarUsuariosModal();
+    return () => controller.abort();
+  }, [
+    modalAbierto,
+    user,
+    busquedaModalAplicada,
+    paginaActualModal,
+    registrosPorPaginaModal,
+    router,
+  ]);
 
   useEffect(() => {
     cargarDatosIniciales();
   }, []);
 
   useEffect(() => {
-    if (!usuarioSeleccionado) return;
+    if (!usuarioSistemaId) return undefined;
+
+    const controller = new AbortController();
 
     setValue("destino", "");
     setAvisoPerfil(null);
     limpiarCamposDestino();
-    cargarDatosActualesUsuario(usuarioSeleccionado);
-  }, [usuarioSeleccionado, setValue]);
+
+    async function cargarDetalleSeleccionado() {
+      try {
+        const response = await apiClient.get(`/usuarios-sistema/${usuarioSistemaId}`, {
+          signal: controller.signal,
+        });
+        const payload = await readResponseBody(response);
+
+        if (response.status === 401) {
+          router.replace("/");
+          return;
+        }
+
+        if (!response.ok) {
+          setUsuarioSeleccionadoCache(null);
+          setValue("usuarioSistemaId", "");
+          toast.error(
+            response.status === 403 || response.status === 404
+              ? "El usuario no está disponible para consulta."
+              : payload?.mensaje || payload?.message || "No se pudo cargar el detalle del usuario."
+          );
+          return;
+        }
+
+        if (controller.signal.aborted) return;
+        setUsuarioSeleccionadoCache(payload);
+        await cargarDatosActualesUsuario(payload, controller.signal);
+      } catch (error) {
+        if (isAbortError(error)) return;
+        toast.error(error?.message || "No se pudo cargar el detalle del usuario.");
+      }
+    }
+
+    cargarDetalleSeleccionado();
+    return () => controller.abort();
+  }, [usuarioSistemaId, router, setValue]);
 
   useEffect(() => {
     if (!perfilDestino) {
@@ -157,11 +235,7 @@ export function CambiarRolUsuarioForm() {
       "rolIdDestino",
       rolesCompatibles.length === 1 ? String(rolesCompatibles[0].id) : ""
     );
-    setAvisoPerfil({
-      tipo: "info",
-      mensaje:
-        "Se usarán los datos comunes cargados desde el perfil actual. Si el usuario ya tuvo el perfil destino, el backend reutilizará o reactivará ese registro al guardar.",
-    });
+    setAvisoPerfil(null);
   }, [perfilDestino, rolesCompatibles, setValue]);
 
   async function leerRespuesta(response) {
@@ -212,29 +286,17 @@ export function CambiarRolUsuarioForm() {
 
       setUser(meData);
 
-      const [usuariosData, rolesData, tiposData, sedesData, asesoresData, areasData] =
-        await Promise.all([
-          fetchJson(`${API_URL_BASE}/usuarios-sistema/activos`),
-          fetchJson(`${API_URL_BASE}/roles/activos`),
-          fetchJson(`${API_URL_BASE}/tipos-documento/activos`),
-          fetchJson(`${API_URL_BASE}/sedes`),
-          fetchJson(`${API_URL_BASE}/asesores/activos`),
-          fetchJson(`${API_URL_BASE}/areas`),
-        ]);
+      const [rolesData, tiposData, sedesData, areasData] = await Promise.all([
+        fetchJson(`${API_URL_BASE}/roles/activos`),
+        fetchJson(`${API_URL_BASE}/tipos-documento/activos`),
+        fetchJson(`${API_URL_BASE}/sedes`),
+        fetchJson(`${API_URL_BASE}/areas`),
+      ]);
 
-      setUsuarios(sortByIdAsc(filtrarActivos(usuariosData)));
       setRoles(filtrarActivos(rolesData));
       setTiposDocumento(tiposData.map(mapOption));
       setSedes(sedesData.map(mapOption));
       setAreas(areasData.map(mapOption));
-      setAsesores(
-        filtrarActivos(asesoresData).map((asesor) => ({
-          value: asesor.id,
-          label: asesor.documento
-            ? `${asesor.nombre} - ${asesor.documento}`
-            : asesor.nombre || String(asesor.id),
-        }))
-      );
     } catch (error) {
 
       toast.error("Error cargando datos");
@@ -243,7 +305,7 @@ export function CambiarRolUsuarioForm() {
     }
   }
 
-  async function cargarDatosActualesUsuario(usuario) {
+  async function cargarDatosActualesUsuario(usuario, signal) {
     const perfilActual = buscarPerfil(usuario.tipoPerfil);
 
     if (!perfilActual || !usuario.perfilId) {
@@ -254,7 +316,7 @@ export function CambiarRolUsuarioForm() {
     try {
       const res = await apiClient.request(
         `${API_URL_BASE}/${perfilActual.endpointActual}/${usuario.perfilId}`,
-        { credentials: "include" }
+        { credentials: "include", signal }
       );
 
       if (!res.ok) {
@@ -419,13 +481,7 @@ export function CambiarRolUsuarioForm() {
 
       toast.success("Perfil y rol actualizados correctamente");
 
-      setUsuarios((current) =>
-        sortByIdAsc(
-          filtrarActivos(
-            current.map((usuario) => (usuario.id === result.id ? result : usuario))
-          )
-        )
-      );
+      setUsuarioSeleccionadoCache(result);
 
       reset({
         ...VALORES_INICIALES,
@@ -444,6 +500,7 @@ export function CambiarRolUsuarioForm() {
   function seleccionarUsuario(usuario) {
     if (!usuarioActivo(usuario)) return;
 
+    setUsuarioSeleccionadoCache(usuario);
     reset({
       ...VALORES_INICIALES,
       usuarioSistemaId: String(usuario.id),
@@ -456,6 +513,7 @@ export function CambiarRolUsuarioForm() {
 
   function limpiarSeleccion() {
     reset(VALORES_INICIALES);
+    setUsuarioSeleccionadoCache(null);
     setAvisoPerfil(null);
     setBusquedaModal("");
   }
@@ -568,13 +626,32 @@ export function CambiarRolUsuarioForm() {
       case "ESTUDIANTE":
         return (
           <>
-            <FormSelect
-              name="asesorId"
+            <input
+              type="hidden"
+              {...register("asesorId", { required: REQUIRED, valueAsNumber: true })}
+            />
+            <RemotePagedSelect
               label="Asesor"
-              options={asesores}
-              register={register}
-              errors={errors}
-              rules={{ required: REQUIRED, valueAsNumber: true }}
+              value={asesorId}
+              onChange={(id) =>
+                setValue("asesorId", id ? Number(id) : "", {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                })
+              }
+              endpoint="/asesores"
+              resourceName="asesores"
+              filters={{ activo: true }}
+              sortBy="nombre"
+              direction="asc"
+              required
+              error={errors?.asesorId?.message}
+              getOptionLabel={(asesor) =>
+                asesor.documento
+                  ? `${asesor.nombre} - ${asesor.documento}`
+                  : asesor.nombre || String(asesor.id)
+              }
+              searchPlaceholder="Buscar asesor por nombre, documento o correo..."
             />
 
             <FormCheckbox
@@ -653,7 +730,10 @@ export function CambiarRolUsuarioForm() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => setModalAbierto(true)}
+              onClick={() => {
+                setPaginaActualModal(1);
+                setModalAbierto(true);
+              }}
               className="w-full justify-start"
             >
               {usuarioSeleccionado
@@ -808,10 +888,19 @@ export function CambiarRolUsuarioForm() {
             <div className="space-y-4 p-4">
               <input
                 value={busquedaModal}
-                onChange={(event) => setBusquedaModal(event.target.value)}
+                onChange={(event) => {
+                  setBusquedaModal(event.target.value);
+                  setPaginaActualModal(1);
+                }}
                 placeholder="Buscar por usuario, rol o perfil..."
                 className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
+
+              {errorUsuariosModal && (
+                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {errorUsuariosModal}
+                </div>
+              )}
 
               <div className="max-h-[420px] overflow-auto rounded-lg border">
                 <table className="w-full text-sm">
@@ -826,7 +915,7 @@ export function CambiarRolUsuarioForm() {
                   </thead>
 
                   <tbody>
-                    {usuariosFiltrados.length === 0 ? (
+                    {usuarios.length === 0 ? (
                       <tr>
                         <td
                           colSpan={5}
@@ -836,7 +925,7 @@ export function CambiarRolUsuarioForm() {
                         </td>
                       </tr>
                     ) : (
-                      usuariosFiltrados.slice((paginaActualModal - 1) * registrosPorPaginaModal, (paginaActualModal - 1) * registrosPorPaginaModal + registrosPorPaginaModal).map((usuario) => (
+                      usuarios.map((usuario) => (
                         <tr key={usuario.id} className="border-t hover:bg-muted/50">
                           <td className="px-4 py-3">{usuario.id}</td>
                           <td className="px-4 py-3">{usuario.username}</td>
@@ -869,7 +958,7 @@ export function CambiarRolUsuarioForm() {
                 pageSize={registrosPorPaginaModal}
                 onPageSizeChange={(v) => { setRegistrosPorPaginaModal(v); setPaginaActualModal(1); }}
                 pageSizeOptions={REGISTROS_POR_PAGINA_OPTIONS_MODAL}
-                totalItems={usuariosFiltrados.length}
+                totalItems={totalUsuariosModal}
               />
 
             </div>

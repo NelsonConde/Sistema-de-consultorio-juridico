@@ -1,5 +1,8 @@
 package co.edu.ufps.legal_cases.security.repository.account;
 
+import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import java.util.List;
 import java.util.Optional;
 
@@ -57,4 +60,43 @@ public interface UsuarioSistemaRepository extends JpaRepository<UsuarioSistema, 
                         "rol"
         })
         Optional<UsuarioSistema> findForPasswordResetByUsernameIgnoreCase(String username);
+
+
+    @Query(value = """
+                        SELECT u.id AS id,
+                               u.username AS username,
+                               u.activo AS activo,
+                               r.id AS rolId,
+                               r.nombre AS rolNombre,
+                               u.tipoPerfilActual AS tipoPerfil
+                        FROM UsuarioSistema u
+                        JOIN u.rol r
+                        WHERE (
+                                CAST(:search AS String) IS NULL
+                                OR LOWER(u.username)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(r.nombre)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                          )
+                          AND (:activo IS NULL OR u.activo = :activo)
+                          AND (:tipoPerfil IS NULL OR u.tipoPerfilActual = :tipoPerfil)
+                        """, countQuery = """
+                        SELECT COUNT(u.id)
+                        FROM UsuarioSistema u
+                        JOIN u.rol r
+                        WHERE (
+                                CAST(:search AS String) IS NULL
+                                OR LOWER(u.username)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                                OR LOWER(r.nombre)
+                                   LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+                          )
+                          AND (:activo IS NULL OR u.activo = :activo)
+                          AND (:tipoPerfil IS NULL OR u.tipoPerfilActual = :tipoPerfil)
+                        """)
+        Page<UsuarioSistemaResumenProjection> buscarResumenPaginado(
+                        @Param("search") String search,
+                        @Param("activo") Boolean activo,
+                        @Param("tipoPerfil") TipoPerfilUsuario tipoPerfil,
+                        Pageable pageable);
 }
