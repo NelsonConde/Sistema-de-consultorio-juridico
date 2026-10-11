@@ -25,6 +25,7 @@ import co.edu.ufps.legal_cases.audit.service.log.AuditSecurityService;
 import co.edu.ufps.legal_cases.common.exception.AdministracionInvariantException;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.common.exception.ConcurrenciaOptimistaException;
+import co.edu.ufps.legal_cases.common.exception.ConsultaReasignacionNoDisponibleException;
 import co.edu.ufps.legal_cases.common.exception.ResourceNotFoundException;
 import co.edu.ufps.legal_cases.common.exception.dto.ErrorResponseDTO;
 import co.edu.ufps.legal_cases.common.observability.CorrelationIdContext;
@@ -280,6 +281,22 @@ public class GlobalExceptionHandler {
         return construirRespuesta(
                 HttpStatus.SERVICE_UNAVAILABLE,
                 error);
+    }
+
+    @ExceptionHandler(ConsultaReasignacionNoDisponibleException.class)
+    public ResponseEntity<ErrorResponseDTO> manejarReasignacionNoDisponible(
+            ConsultaReasignacionNoDisponibleException ex,
+            HttpServletRequest request) {
+
+        ErrorResponseDTO error = construirError(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Reasignacion no disponible",
+                mensajeSeguro(
+                        ex.getMessage(),
+                        "La reasignacion no puede completarse en este momento"),
+                request);
+
+        return construirRespuesta(HttpStatus.SERVICE_UNAVAILABLE, error);
     }
 
     @ExceptionHandler(Exception.class)

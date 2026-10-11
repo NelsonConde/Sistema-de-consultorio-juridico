@@ -54,6 +54,8 @@ Incluye permisos para consultar catálogos, gestionar catálogos, ver personas, 
 
 Incluye permisos para ver, crear, editar, cambiar estado, archivar y asignar responsables de consulta.
 
+La reasignación individual usa exclusivamente `ASIGNAR_RESPONSABLES_CONSULTA` en `PATCH /api/consultas/{id}/responsable`. `ConsultaController` aplica el permiso mediante `@PreAuthorize` y `ConsultaAccessService.validarPuedeReasignarResponsable` vuelve a validarlo junto con el alcance sobre la consulta. El perfil estudiante no puede asignar responsables aunque su rol tuviera el permiso.
+
 ### Seguimientos
 
 Incluye permisos para ver, crear, editar, eliminar, responder, aprobar respuestas, ver alertas disciplinarias y gestionar categorías de seguimiento.
@@ -88,6 +90,8 @@ hasAuthority('Gestionar procesos')
 hasAnyAuthority('Ver personas', 'Gestionar personas')
 ```
 
+La autenticación HTTP es stateless: `JwtAuthenticationFilter` obtiene el token de la cookie `access_token`. Las solicitudes que modifican estado también requieren protección CSRF; el cliente solicita el token en `GET /api/auth/csrf`, conserva las cookies y envía el valor en el nombre de header retornado por ese endpoint.
+
 ## Alcance por servicios
 
 El backend no depende únicamente de la visibilidad del frontend. Cada módulo sensible tiene servicios de acceso que validan si el usuario puede operar el recurso específico.
@@ -107,6 +111,16 @@ Estos servicios permiten reglas como:
 - validar si puede asignar responsables;
 - validar si puede ver u operar recursos según su perfil;
 - validar si puede gestionar perfiles administrativos, asesores, monitores, estudiantes o conciliadores.
+
+Para reasignaciones, el alcance se calcula antes de modificar la consulta con las relaciones vigentes:
+
+- administrador: alcance global sujeto al permiso;
+- estudiante: únicamente consultas donde está asignado, aunque no puede reasignar;
+- asesor: consultas donde está asignado o donde el estudiante pertenece a su asesoría;
+- monitor: consultas donde está asignado;
+- conciliador: sin alcance general sobre consultas.
+
+Después de una reasignación, las lecturas vuelven a calcular el alcance desde los responsables persistidos. Esto evita conservar acceso por una asignación anterior y no concede acceso a consultas no relacionadas.
 
 ## Navegación frontend por permisos
 

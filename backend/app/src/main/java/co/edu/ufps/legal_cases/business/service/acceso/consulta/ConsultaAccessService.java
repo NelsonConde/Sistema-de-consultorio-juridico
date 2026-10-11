@@ -135,6 +135,16 @@ public class ConsultaAccessService {
     }
 
     @Transactional(readOnly = true)
+    public void validarPuedeReasignarResponsable(Long consultaId) {
+        validarPuedeAsignarResponsablesConsulta();
+
+        Consulta consulta = obtenerConsulta(consultaId);
+        if (!puedeAccederAConsulta(consulta)) {
+            throw new AccessDeniedException("No tiene alcance para reasignar responsables de esta consulta");
+        }
+    }
+
+    @Transactional(readOnly = true)
     public void validarPuedeAsignarResponsablesConsultaSiAplica(boolean solicitaAsignacionResponsables) {
         if (solicitaAsignacionResponsables) {
             validarPuedeAsignarResponsablesConsulta();

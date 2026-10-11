@@ -39,11 +39,26 @@ Las credenciales y configuraciones sensibles **nunca** deben incluirse en el rep
 ## 3. Procedimiento de Migración y Validación de Esquema
 
 1. **Gestión con Flyway**:
-   - Todas las modificaciones estructurales de base de datos seversionan en `backend/app/src/main/resources/db/migration/`.
+   - Las migraciones integradas al arranque se versionan en `backend/app/src/main/resources/db/migration/`.
    - Las migraciones documentales (`V23__create_file_asset_table.sql`, `V25__migrate_existing_files_to_file_asset.sql`, `V26__add_document_versioning_and_metadata.sql`) se ejecutan de forma transaccional al iniciar la aplicación.
 2. **Validación Hibernate (`ddl-auto=validate`)**:
    - En todos los entornos no locales, Hibernate se configura obligatoriamente con `validate`.
    - Si existe cualquier divergencia entre las entidades JPA (`FileAsset`, etc.) y el esquema de tablas en PostgreSQL, el arranque de la aplicación falla inmediatamente de forma segura antes de recibir tráfico.
+
+### Migración manual del historial de reasignaciones
+
+La migración `V20261011_01__create_consulta_reasignacion_historial.sql` está en `backend/app/db/migration/`, no en el directorio de recursos de Flyway. Por tanto, **no se ejecuta automáticamente al iniciar Spring Boot** y debe aplicarla manualmente el propietario del esquema antes de desplegar la versión del backend que persiste el historial.
+
+Desde la raíz del repositorio y con las variables nativas de `psql` (`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` y `PGPASSWORD`) suministradas por el entorno seguro:
+
+```bash
+psql --set ON_ERROR_STOP=1 --file backend/app/db/migration/V20261011_01__create_consulta_reasignacion_historial.sql
+psql --set ON_ERROR_STOP=1 --file backend/app/db/migration/V20261011_01__create_consulta_reasignacion_historial_verify.sql
+```
+
+El despliegue solo continúa si ambos comandos terminan sin excepciones. El segundo script comprueba columnas, restricciones, índices, triggers e invariantes existentes; no depende de `hibernate.ddl-auto=update`.
+
+El orden completo, los requisitos de respaldo y la recuperación segura se mantienen en [`backend/app/db/migration/README.md`](../../backend/app/db/migration/README.md). No se deben ejecutar estos scripts sobre una base distinta del entorno objetivo revisado.
 
 ---
 
@@ -118,6 +133,8 @@ aws --endpoint-url="${SUPABASE_STORAGE_ENDPOINT}" s3 sync \
 ## 5. Plan y Procedimiento de Rollback de Migraciones
 
 Si una migración requiere reversión controlada en un entorno de contingencia, se debe aplicar el script compensatorio documentado:
+
+Para el historial de reasignaciones, `backend/app/db/migration/V20261011_01__create_consulta_reasignacion_historial_recovery.sql` solo elimina sus objetos si la tabla está vacía. Si existen eventos, el script cancela la operación; se debe conservar la evidencia histórica, restaurar desde respaldo cuando corresponda o preparar una migración correctiva hacia adelante. No debe borrarse manualmente una tabla con eventos para forzar la reversión.
 
 - **Archivo de rollback**: [`backend/app/src/main/resources/db/rollback/U26__rollback_document_versioning.sql`](file:///home/anorak/Code/ingsoftware/Sistema-de-consultorio-juridico/backend/app/src/main/resources/db/rollback/U26__rollback_document_versioning.sql).
 - **Acciones ejecutadas en rollback**:
