@@ -1,6 +1,7 @@
 package co.edu.ufps.legal_cases.business.controller.consulta;
 
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.ARCHIVAR_CONSULTAS;
+import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.ASIGNAR_RESPONSABLES_CONSULTA;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.CREAR_CONSULTAS;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.EDITAR_CONSULTAS;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.GESTIONAR_CONSULTAS;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaBusquedaDTO;
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaDTO;
+import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaReasignacionDTO;
 import co.edu.ufps.legal_cases.business.dto.consulta.ficha.FichaExpedienteDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.business.service.consulta.ConsultaService;
@@ -99,6 +101,14 @@ public class ConsultaController {
     @PreAuthorize("hasAnyAuthority('" + EDITAR_CONSULTAS + "', '" + GESTIONAR_CONSULTAS + "')")
     public ConsultaDTO actualizar(@PathVariable Long id, @Valid @RequestBody ConsultaDTO dto) {
         return consultaService.actualizar(id, dto);
+    }
+
+    @PatchMapping("/{id}/responsable")
+    @PreAuthorize("hasAuthority('" + ASIGNAR_RESPONSABLES_CONSULTA + "')")
+    public ConsultaDTO reasignarResponsable(
+            @PathVariable Long id,
+            @Valid @RequestBody ConsultaReasignacionDTO solicitud) {
+        return consultaService.reasignarResponsable(id, solicitud);
     }
 
     @PatchMapping("/{id}/estado")
