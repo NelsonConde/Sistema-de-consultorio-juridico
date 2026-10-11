@@ -1,6 +1,6 @@
 # Backend - Consultas jurídicas
 
-El módulo de consultas jurídicas administra el registro, búsqueda, actualización, cambio de estado, archivo y desarchivo de las consultas atendidas por el consultorio jurídico. En el código fuente actual, la consulta funciona como entidad central del flujo operativo y se relaciona con personas, catálogos jurídicos, responsables internos, procesos, seguimientos, respuestas, notificaciones y conciliaciones.
+El módulo de consultas jurídicas administra el registro, búsqueda, actualización, reasignación individual de responsables, cambio de estado, archivo y desarchivo de las consultas atendidas por el consultorio jurídico. En el código fuente actual, la consulta funciona como entidad central del flujo operativo y se relaciona con personas, catálogos jurídicos, responsables internos, procesos, seguimientos, respuestas, notificaciones y conciliaciones.
 
 Este documento describe la implementación backend vigente del módulo, tomando como referencia los controladores, DTOs, entidades, servicios, validadores, repositorios y pruebas unitarias existentes en el código fuente.
 
@@ -14,6 +14,7 @@ business/repository/consulta
 business/service/acceso/consulta
 business/service/consulta
 business/service/consulta/consulta
+business/service/consulta/reasignacion
 ```
 
 ## Componentes principales
@@ -23,6 +24,9 @@ business/service/consulta/consulta
 | `ConsultaController` | Expone los endpoints HTTP del módulo bajo `/api/consultas`. |
 | `ConsultaService` | Fachada del módulo; delega lectura a `ConsultaQueryService` y escritura a `ConsultaCommandService`. |
 | `ConsultaCommandService` | Orquesta creación, actualización, cambio de estado, archivo y desarchivo. |
+| `ConsultaReasignacionService` | Orquesta autorización, validaciones, cambio individual, historial y control optimista dentro de una transacción. |
+| `ConsultaReasignacionHistorialWriter` | Define el contrato de escritura histórica con propagación transaccional obligatoria. |
+| `JpaConsultaReasignacionHistorialWriter` | Persiste el evento histórico en la transacción iniciada por la reasignación. |
 | `ConsultaQueryService` | Gestiona búsquedas, listados, consulta por id y listados archivados según alcance del usuario. |
 | `ConsultaConstruccionService` | Aplica datos del DTO sobre la entidad y normaliza textos. |
 | `ConsultaRelacionService` | Resuelve personas, catálogos y perfiles activos asociados a la consulta. |
@@ -33,6 +37,7 @@ business/service/consulta/consulta
 | `ConsultaMapper` | Convierte `Consulta` a `ConsultaDTO` y `ConsultaBusquedaDTO`. |
 | `ConsultaAccessService` | Valida permisos y alcance de usuario sobre consultas. |
 | `ConsultaRepository` | Expone consultas JPA, búsquedas por alcance, destinatarios de notificación y consultas estadísticas. |
+| `ConsultaReasignacionHistorialRepository` | Repositorio limitado a inserción del historial; no expone actualización ni borrado ordinarios. |
 
 ## Entidad principal
 
@@ -47,6 +52,7 @@ Campos principales implementados:
 | Campo | Tipo funcional | Uso |
 |---|---|---|
 | `id` | Identificador | Identificador interno de la consulta. |
+| `version` | Versión | Campo `@Version` usado para detectar actualizaciones concurrentes. |
 | `fecha` | Fecha | Fecha asociada a la consulta. |
 | `descripcion` | Texto corto | Descripción resumida de la consulta. |
 | `hechos` | Texto amplio | Relato de hechos. |
@@ -77,6 +83,8 @@ consulta_contraparte
 ```
 
 El campo `lastUpdatedAt` se actualiza automáticamente mediante métodos `@PrePersist` y `@PreUpdate`.
+
+El historial se representa mediante `ConsultaReasignacionHistorial` y se persiste en `consulta_reasignacion_historial`. La entidad está marcada con `@Immutable`; sus campos no son actualizables y el repositorio de aplicación solo permite `save`.
 
 ## Estados de consulta
 
@@ -111,6 +119,7 @@ Campos implementados:
 | Campo | Validación o uso |
 |---|---|
 | `id` | No debe enviarse en creación; si se envía en actualización debe coincidir con la ruta. |
+| `version` | Se retorna con el recurso y participa en el control de concurrencia optimista. |
 | `fecha` | Obligatoria. |
 | `descripcion` | Obligatoria; máximo 500 caracteres. |
 | `hechos` | Obligatorio. |
@@ -131,6 +140,17 @@ Campos implementados:
 | `asesorId` | Opcional; su asignación depende de permiso específico. |
 | `monitorId` | Opcional; su asignación depende de permiso específico. |
 | `estudianteId` | Opcional; su asignación depende de permiso específico. |
+
+### `ConsultaReasignacionDTO`
+
+DTO específico del endpoint de reasignación individual:
+
+| Campo | Validación o uso |
+|---|---|
+| `tipoResponsable` | Obligatorio; enum `ESTUDIANTE`, `ASESOR` o `MONITOR`. |
+| `nuevoResponsableId` | Obligatorio y positivo. |
+| `motivo` | Obligatorio, no vacío y normalizado nuevamente por el servicio. |
+| `version` | Obligatoria y no negativa; debe coincidir con `Consulta.version`. |
 
 ### `ConsultaBusquedaDTO`
 
@@ -160,6 +180,7 @@ El controlador `ConsultaController` expone endpoints bajo:
 | `GET` | `/api/consultas/{id}` | Obtiene el detalle de una consulta. |
 | `POST` | `/api/consultas` | Crea una nueva consulta. |
 | `PUT` | `/api/consultas/{id}` | Actualiza datos generales de una consulta. |
+| `PATCH` | `/api/consultas/{id}/responsable` | Reasigna un único responsable y registra el evento histórico. |
 | `PATCH` | `/api/consultas/{id}/estado?estado=` | Cambia el estado funcional de una consulta. |
 | `DELETE` | `/api/consultas/{id}` | Conservado por compatibilidad; archiva lógicamente la consulta. |
 | `PATCH` | `/api/consultas/{id}/archivar` | Archiva una consulta cerrada. |
@@ -283,6 +304,39 @@ Reglas implementadas:
 - si el asesor asociado al estudiante no existe o está inactivo, la operación se rechaza;
 - para pasar a `ACTIVO`, `EN_PROCESO` o `URGENTE`, la consulta debe tener asesor y estudiante asignados.
 
+## Reasignación individual e historial
+
+`ConsultaController.reasignarResponsable` recibe `ConsultaReasignacionDTO` y delega mediante `ConsultaService` a `ConsultaReasignacionService.reasignar`.
+
+La operación sigue este orden:
+
+1. valida el DTO y normaliza el motivo;
+2. valida permiso y alcance efectivo con `ConsultaAccessService.validarPuedeReasignarResponsable`;
+3. exige un escritor histórico administrado por Spring antes de modificar la entidad;
+4. carga la consulta y compara la versión esperada con `Consulta.version`;
+5. rechaza consultas `CERRADO` o `ARCHIVADO`;
+6. resuelve el nuevo estudiante, asesor o monitor activo y modifica únicamente esa relación;
+7. valida nuevamente la compatibilidad completa de responsables;
+8. guarda la consulta y registra el evento mediante `JpaConsultaReasignacionHistorialWriter`;
+9. ejecuta `EntityManager.flush()` para detectar el conflicto optimista antes de completar la transacción;
+10. retorna `ConsultaDTO` con la relación actualizada y la versión incrementada.
+
+`ConsultaReasignacionService.reasignar` está anotado con `@Transactional`. El escritor declara `Propagation.MANDATORY`, por lo que no puede abrir una transacción independiente ni persistir un evento fuera de la transacción de la consulta. Una excepción durante el cambio, la inserción histórica o el `flush` provoca rollback de ambas escrituras.
+
+Cada evento conserva:
+
+- consulta;
+- tipo de responsable;
+- identificador anterior, nullable cuando no había asignación;
+- identificador nuevo;
+- motivo normalizado;
+- usuario actor;
+- instante en UTC mediante `Instant`, persistido como `TIMESTAMPTZ`.
+
+Los identificadores de responsables son escalares y polimórficos: el tipo determina si se validan contra `estudiante`, `asesor` o `monitor`. La integridad correspondiente se comprueba mediante un trigger PostgreSQL, no mediante una asociación JPA incorrecta hacia una tabla común.
+
+La base de datos protege adicionalmente el historial mediante restricciones `NOT NULL` y `CHECK`, claves foráneas para consulta y actor, y un trigger que rechaza `UPDATE` y `DELETE`. No existe todavía endpoint backend de lectura del historial.
+
 ## Cambio de estado
 
 El cambio de estado se realiza por endpoint específico. La edición general no modifica `estado`.
@@ -373,3 +427,8 @@ El código fuente incluye pruebas unitarias orientadas a reglas críticas del m�
 | `ConsultaEstadoServiceTest` | Cierre con resultado, bloqueo por pendientes, archivo, desarchivo y operaciones sobre cerradas o archivadas. |
 | `ConsultaCambioEstructuralValidatorTest` | Protección de datos estructurales cuando hay actividad asociada. |
 | `ConsultaResponsableOperacionServiceTest` | Validación de responsables con consultas operativas vivas. |
+| `ConsultaReasignacionServiceTest` | Orquestación, validaciones, conservación de relaciones y propagación de fallos del historial. |
+| `ConsultaAccessServiceReasignacionTest` | Permiso y alcance efectivo para reasignar. |
+| `ConsultaValidatorReasignacionTest` | Compatibilidad de responsables después del cambio individual. |
+| `JpaConsultaReasignacionHistorialWriterPostgreSqlTest` | Persistencia, restricciones, inmutabilidad y transacción del historial sobre PostgreSQL. |
+| `ConsultaReasignacionEndpointPostgreSqlTest` | Contrato HTTP, seguridad, atomicidad, rollback y concurrencia con PostgreSQL Testcontainers. |

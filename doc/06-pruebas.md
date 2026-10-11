@@ -27,6 +27,14 @@ y scripts asociados en `frontend/package.json`.
 | `ConsultaEstadoServiceTest` | Valida cierre de consulta, pendientes operativos, archivo, desarchivo y bloqueo de operaciones en consultas cerradas o archivadas. |
 | `ConsultaCambioEstructuralValidatorTest` | Valida protección de datos estructurales cuando una consulta ya tiene actividad asociada. |
 | `ConsultaResponsableOperacionServiceTest` | Valida bloqueo de desactivación de asesor, estudiante o monitor con consultas operativas. |
+| `ConsultaReasignacionDTOTest` | Valida campos obligatorios, identificadores positivos y versión no negativa del contrato de reasignación. |
+| `ConsultaControllerAuthorizationTest` | Verifica que el endpoint de reasignación exige `ASIGNAR_RESPONSABLES_CONSULTA`. |
+| `ConsultaAccessServiceReasignacionTest` | Valida permiso, restricción del perfil estudiante y alcance efectivo sobre la consulta. |
+| `ConsultaValidatorReasignacionTest` | Valida compatibilidad entre área, asesor y estudiante después de una reasignación. |
+| `ConsultaReasignacionServiceTest` | Valida la orquestación, el cambio de un único rol, la conservación de relaciones y la propagación de errores históricos. |
+| `JpaConsultaReasignacionHistorialWriterPostgreSqlTest` | Verifica campos, eventos sucesivos, restricciones, inmutabilidad y participación transaccional en PostgreSQL. |
+| `ConsultaReasignacionEndpointPostgreSqlTest` | Ejecuta el endpoint con Spring Security, JWT, CSRF, JPA y PostgreSQL; cubre autorización, rollback y concurrencia. |
+| `GlobalExceptionHandlerReasignacionTest` | Comprueba la respuesta segura cuando el historial obligatorio no está disponible. |
 | `ProcesoValidatorTest` | Valida radicado condicional: permitido en pendiente y obligatorio en estados finales. |
 | `SeguimientoValidatorTest` | Valida que `notificarEstudiante=true` requiera estudiante asignado y activo. |
 | `SeguimientoRespuestaValidatorTest` | Valida decisiones sobre respuestas, incluyendo observación obligatoria al rechazar. |
@@ -52,6 +60,12 @@ Las pruebas actuales cubren reglas como:
 - una respuesta rechazada requiere observación;
 - un seguimiento visible para estudiante requiere estudiante asignado y activo;
 - asesor, estudiante y monitor no se desactivan si tienen consultas operativas;
+- una reasignación modifica solo el rol solicitado y conserva los demás datos de la consulta;
+- el historial registra el responsable anterior y el nuevo sin sobrescribir eventos sucesivos;
+- consultas cerradas o archivadas, responsables inválidos, motivos vacíos y versiones desactualizadas no producen eventos de éxito;
+- un fallo real al insertar el historial revierte el responsable y la versión de la consulta;
+- dos transacciones con la misma versión no producen actualizaciones perdidas: solo una se confirma y solo esa genera historial;
+- los accesos derivados cambian con la asignación vigente sin ampliar el alcance a consultas ajenas;
 - el cambio y resolución de perfil usan estrategias registradas;
 - el estado de perfil y usuario del sistema se sincroniza.
 
@@ -70,6 +84,23 @@ En Windows:
 cd backend/app
 .\mvnw.cmd test
 ```
+
+## Integración con PostgreSQL y seguridad HTTP
+
+Las pruebas `JpaConsultaReasignacionHistorialWriterPostgreSqlTest` y `ConsultaReasignacionEndpointPostgreSqlTest` usan PostgreSQL 16 mediante Testcontainers. El contenedor es efímero y crea exclusivamente el esquema de prueba; no utiliza una base persistente del desarrollador.
+
+La prueba del endpoint carga el contexto completo de Spring Boot y ejecuta `MockMvc` a través de la cadena real de seguridad. Obtiene el token CSRF desde `/api/auth/csrf`, usa el JWT en cookie y verifica respuestas `200`, `400`, `401`, `403` y `409` según el escenario.
+
+La migración `backend/app/db/migration/V20261011_01__create_consulta_reasignacion_historial.sql` se aplica dentro del contenedor antes de comprobar atomicidad e integridad. Las pruebas fuerzan una violación de clave foránea real para acreditar rollback y coordinan dos transacciones independientes para comprobar el bloqueo optimista sin depender solo de mocks.
+
+Ejecución focalizada:
+
+```bash
+cd backend/app
+./mvnw -Dtest=ConsultaReasignacionEndpointPostgreSqlTest,JpaConsultaReasignacionHistorialWriterPostgreSqlTest test
+```
+
+Se validó además el contrato mediante una operación manual: una solicitud vigente obtuvo `200 OK` y persistió el evento histórico; un segundo intento con la versión anterior obtuvo `409 Conflict` sin modificar nuevamente la consulta ni añadir otro evento.
 
 ## Ejecución frontend
 
