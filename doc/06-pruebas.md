@@ -34,6 +34,7 @@ y scripts asociados en `frontend/package.json`.
 | `ConsultaReasignacionServiceTest` | Valida la orquestación, el cambio de un único rol, la conservación de relaciones y la propagación de errores históricos. |
 | `JpaConsultaReasignacionHistorialWriterPostgreSqlTest` | Verifica campos, eventos sucesivos, restricciones, inmutabilidad y participación transaccional en PostgreSQL. |
 | `ConsultaReasignacionEndpointPostgreSqlTest` | Ejecuta el endpoint con Spring Security, JWT, CSRF, JPA y PostgreSQL; cubre autorización, rollback y concurrencia. |
+| `EstudianteSesionExpiradaPostgreSqlTest` | Comprueba con la cadena real de Spring Security que la creación de estudiante y cuenta solo ocurre con JWT y CSRF válidos, y que los intentos rechazados no persisten datos. |
 | `GlobalExceptionHandlerReasignacionTest` | Comprueba la respuesta segura cuando el historial obligatorio no está disponible. |
 | `ProcesoValidatorTest` | Valida radicado condicional: permitido en pendiente y obligatorio en estados finales. |
 | `SeguimientoValidatorTest` | Valida que `notificarEstudiante=true` requiera estudiante asignado y activo. |
@@ -101,6 +102,32 @@ cd backend/app
 ```
 
 Se validó además el contrato mediante una operación manual: una solicitud vigente obtuvo `200 OK` y persistió el evento histórico; un segundo intento con la versión anterior obtuvo `409 Conflict` sin modificar nuevamente la consulta ni añadir otro evento.
+
+### Expiración de sesión durante la creación de usuarios
+
+`EstudianteSesionExpiradaPostgreSqlTest` ejecuta `POST /api/estudiantes` mediante `MockMvc`, el contexto completo de Spring Boot, la cadena real de Spring Security y PostgreSQL 16 de Testcontainers. No sustituye la autenticación con `@WithMockUser`.
+
+La prueba cubre:
+
+- JWT vigente y CSRF válido: responde `201` y persiste un estudiante, su cuenta y la relación entre ambos;
+- JWT ausente con CSRF válido: responde `401` y no persiste datos;
+- JWT correctamente firmado pero expirado con CSRF válido: responde `401` y no persiste datos;
+- JWT inválido con CSRF válido: responde `401` y no persiste datos;
+- JWT vigente sin CSRF: responde `403` y no persiste datos;
+- sesión inicialmente válida cuyo JWT vence antes de enviar el formulario: responde `401` y no persiste datos;
+- verificación final de perfiles, cuentas, relaciones y auditorías para separar rechazos legítimos de una creación exitosa.
+
+Los escenarios obtienen el CSRF mediante `GET /api/auth/csrf` y transportan el JWT en la cookie `access_token`. El caso de expiración posterior mantiene un CSRF válido y usa un JWT de vigencia corta, por lo que distingue un rechazo de autenticación de un rechazo CSRF. Esta es una prueba HTTP automatizada, no una ejecución visual del frontend.
+
+La infraestructura heredada de `PostgreSqlIntegrationTest` dirige las propiedades de datasource al contenedor efímero. Antes de preparar datos, la prueba confirma que la conexión activa coincide con el Testcontainer y que el catálogo es `legal_cases_test`.
+
+Ejecución focalizada verificada desde `backend/app`:
+
+```powershell
+.\mvnw.cmd '-Dtest=EstudianteSesionExpiradaPostgreSqlTest' test
+```
+
+La ejecución local focalizada registró 7 pruebas aprobadas, sin fallos, errores ni pruebas omitidas. También se ejecutaron 13 pruebas existentes relacionadas con CSRF, respuestas de seguridad, sesión autenticada, rotación CSRF y registro de usuarios; las 13 fueron aprobadas. Estos resultados no equivalen a una ejecución de la suite completa.
 
 ## Ejecución frontend
 
