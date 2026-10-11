@@ -6,7 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import co.edu.ufps.legal_cases.business.model.consulta.TipoResponsableConsulta;
 
 /**
- * Puerto de integracion con el historial auditable de PB-34.
+ * Puerto de integracion con el historial auditable de reasignaciones.
  *
  * La implementacion debe persistir el registro en la misma transaccion iniciada
  * por la reasignacion. MANDATORY impide usarla accidentalmente fuera de ella.

@@ -311,7 +311,7 @@ class JpaConsultaReasignacionHistorialWriterPostgreSqlTest
         Persona persona = crearPersona(lote);
         Consulta consulta = new Consulta();
         consulta.setFecha(LocalDate.now());
-        consulta.setDescripcion("Consulta para historial SCRUM-309");
+        consulta.setDescripcion("Consulta para historial de reasignaciones");
         consulta.setHechos("Hechos de prueba");
         consulta.setPretensiones("Pretensiones de prueba");
         consulta.setConceptoJuridico("Concepto de prueba");
@@ -329,7 +329,7 @@ class JpaConsultaReasignacionHistorialWriterPostgreSqlTest
         entityManager.persist(rol);
 
         UsuarioSistema actor = new UsuarioSistema();
-        actor.setUsername("actor." + lote + "@scrum309.test");
+        actor.setUsername("actor." + lote + "@historial.test");
         actor.setPasswordHash("hash-solo-prueba");
         actor.setTipoPerfilActual(TipoPerfilUsuario.ADMINISTRATIVO);
         actor.setRol(rol);
@@ -353,7 +353,7 @@ class JpaConsultaReasignacionHistorialWriterPostgreSqlTest
         asesor.setNombre("Asesor " + sufijo);
         asesor.setTipoDocumento(tipoDocumento);
         asesor.setDocumento("ASE-DOC-" + sufijo);
-        asesor.setEmail("asesor." + sufijo + "@scrum309.test");
+        asesor.setEmail("asesor." + sufijo + "@historial.test");
         asesor.setTelefono("ASE-TEL-" + sufijo);
         asesor.setUsuario("asesor-" + sufijo);
         asesor.setSede(sede);
@@ -373,7 +373,7 @@ class JpaConsultaReasignacionHistorialWriterPostgreSqlTest
         estudiante.setNombre("Estudiante " + sufijo);
         estudiante.setTipoDocumento(tipoDocumento);
         estudiante.setDocumento("EST-DOC-" + sufijo);
-        estudiante.setEmail("estudiante." + sufijo + "@scrum309.test");
+        estudiante.setEmail("estudiante." + sufijo + "@historial.test");
         estudiante.setTelefono("EST-TEL-" + sufijo);
         estudiante.setUsuario("estudiante-" + sufijo);
         estudiante.setSede(sede);
@@ -392,7 +392,7 @@ class JpaConsultaReasignacionHistorialWriterPostgreSqlTest
         monitor.setNombre("Monitor " + sufijo);
         monitor.setTipoDocumento(tipoDocumento);
         monitor.setDocumento("MON-DOC-" + sufijo);
-        monitor.setEmail("monitor." + sufijo + "@scrum309.test");
+        monitor.setEmail("monitor." + sufijo + "@historial.test");
         monitor.setTelefono("MON-TEL-" + sufijo);
         monitor.setUsuario("monitor-" + sufijo);
         monitor.setCodigo("MON-COD-" + sufijo);
@@ -439,7 +439,7 @@ class JpaConsultaReasignacionHistorialWriterPostgreSqlTest
         Persona persona = new Persona();
         persona.setTipoPersona(tipoPersona);
         persona.setTipoDocumento("CC");
-        persona.setNumeroDocumento("S309-" + lote);
+        persona.setNumeroDocumento("HIST-" + lote);
         persona.setFechaExpedicion(LocalDate.of(2010, 1, 1));
         persona.setCiudadExpedicion("Cúcuta");
         persona.setNombres("Persona");
@@ -451,7 +451,7 @@ class JpaConsultaReasignacionHistorialWriterPostgreSqlTest
         persona.setOrientacionSexual("no informa");
         persona.setFechaNacimiento(LocalDate.of(1990, 1, 1));
         persona.setTelefono("TEL-" + lote);
-        persona.setCorreo("persona." + lote + "@scrum309.test");
+        persona.setCorreo("persona." + lote + "@historial.test");
         persona.setNacionalidad(nacionalidad);
         persona.setEstadoCivil("soltero");
         persona.setEscolaridad("universitaria");

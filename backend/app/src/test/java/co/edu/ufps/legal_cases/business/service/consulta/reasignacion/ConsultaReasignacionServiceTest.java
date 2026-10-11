@@ -258,7 +258,7 @@ class ConsultaReasignacionServiceTest {
         Consulta consulta = consultaConResponsables();
         configurarOperacionExitosa(consulta);
         when(consultaRelacionService.obtenerMonitor(13L)).thenReturn(monitor(13L));
-        org.mockito.Mockito.doThrow(new IllegalStateException("Fallo PB-34"))
+        org.mockito.Mockito.doThrow(new IllegalStateException("Fallo de persistencia historica"))
                 .when(historialWriter)
                 .registrar(any());
 

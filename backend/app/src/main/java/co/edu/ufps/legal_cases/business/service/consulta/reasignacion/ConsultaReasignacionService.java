@@ -51,7 +51,7 @@ public class ConsultaReasignacionService {
         // Valida primero permiso y alcance sobre la asignacion vigente.
         consultaAccessService.validarPuedeReasignarResponsable(consultaId);
 
-        // PB-34 es obligatorio: sin un escritor real no se modifica la entidad.
+        // El historial es obligatorio: sin un escritor real no se modifica la entidad.
         ConsultaReasignacionHistorialWriter writer = historialWriter.orElseThrow(
                 ConsultaReasignacionNoDisponibleException::new);
 

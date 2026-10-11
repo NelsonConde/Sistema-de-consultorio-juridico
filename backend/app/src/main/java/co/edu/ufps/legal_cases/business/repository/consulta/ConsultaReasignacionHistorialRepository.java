@@ -6,7 +6,8 @@ import co.edu.ufps.legal_cases.business.model.consulta.ConsultaReasignacionHisto
 
 /**
  * Repositorio deliberadamente limitado a insercion. La lectura se incorporara
- * con PB-34 y no se exponen operaciones ordinarias de actualizacion o borrado.
+ * en el modulo de consulta del historial y no se exponen operaciones ordinarias
+ * de actualizacion o borrado.
  */
 public interface ConsultaReasignacionHistorialRepository
         extends Repository<ConsultaReasignacionHistorial, Long> {
