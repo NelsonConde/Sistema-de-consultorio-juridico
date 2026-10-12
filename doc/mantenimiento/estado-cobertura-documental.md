@@ -113,11 +113,10 @@ Este documento resume la cobertura documental vigente del sistema y permite ubic
 
 | Documento | Propósito |
 |---|---|
-| `doc/especificaciones/srs-documental-rf19-rf21-rf59.md` | Especificación formal SRS (RF16-RF21, RF59), Product Backlog (PB-27 a PB-29) y Caso de Uso CU-10. |
+| `doc/especificaciones/srs-documental-rf19-rf21-rf59.md` | Especificación formal SRS (RF16-RF21, RF59), historias de usuario y Caso de Uso CU-10. |
 
 ## Evidencias y Trazabilidad
 
 | Documento | Propósito |
 |---|---|
-| `doc/evidencias/matriz-historia-pr-prueba-evidencia.md` | Matriz de trazabilidad Requisito-Historia-PR-Prueba-Evidencia, Guion de Demo y Acta de Revisión Técnica. |
-
+| `doc/evidencias/matriz-historia-pr-prueba-evidencia.md` | Matriz de trazabilidad Requisito-PR-Prueba-Evidencia, Guion de Demo y Acta de Revisión Técnica. |
