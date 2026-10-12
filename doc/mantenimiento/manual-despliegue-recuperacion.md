@@ -8,10 +8,14 @@
 
 El sistema se compone de los siguientes elementos de infraestructura en producción:
 
-- **Frontend**: Aplicación SPA servida mediante CDN / Vercel.
+- **Frontend**: Aplicación Next.js 16.3.8 con App Router. Se compila mediante `next build` y se ejecuta mediante el runtime de Next.js (`next start`) o el Dockerfile versionado del frontend.
 - **Backend**: Servicio Spring Boot empaquetado en contenedor Docker y ejecutado en Railway.
 - **Base de Datos**: Instancia gestionada de PostgreSQL (Railway / Supabase) con migraciones Flyway automáticas.
 - **Almacenamiento de Objetos**: Bucket privado `legal-documents` en Supabase Storage (API S3 compatible), con políticas de acceso privado (RLS y acceso restringido por claves de servicio).
+
+Durante la compilación deben instalarse las dependencias de desarrollo. `shadcn` está clasificado como dependencia de compilación porque `src/app/globals.css` importa `shadcn/tailwind.css`; el CSS resultante queda incorporado en la salida generada por Next.js. El workflow de GitHub Actions ejecuta `npm ci` antes de `npm run build`. De forma equivalente, el Dockerfile instala todas las dependencias en la etapa inicial, compila en la etapa `builder` y solo omite las dependencias de desarrollo en la etapa de ejecución posterior al build.
+
+El repositorio no contiene una configuración versionada de Vercel que permita acreditar su despliegue. Si se utiliza ese proveedor, deben comprobarse externamente el Root Directory del frontend y la instalación de `devDependencies` antes del build. Esta documentación no presenta esa configuración externa como verificada.
 
 ---
 

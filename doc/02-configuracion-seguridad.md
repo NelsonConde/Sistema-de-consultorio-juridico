@@ -106,6 +106,10 @@ app.mail.app-name=Consultorio Juridico
 
 Los flujos que consumen el servicio de correo incluyen recuperación de contraseña y notificaciones funcionales de otros módulos.
 
+El cambio autenticado y el restablecimiento de contraseña mantienen separadas las credenciales, la habilitación de la cuenta y el perfil operativo. Ambos modifican la cuenta cargada bajo `PESSIMISTIC_WRITE` dentro de la transacción y vuelven a validar las condiciones aplicables después del bloqueo. El restablecimiento relee también el token activo tras bloquear la cuenta, por lo que una solicitud concurrente no puede reutilizar un token ya consumido. Estos flujos no cambian `activo`, rol, permisos, `tipoPerfilActual` ni estados de perfil.
+
+La medida es preventiva ante pérdidas de actualización; no corresponde a un incidente confirmado en producción ni implica que se hayan auditado todos los escritores posibles de `UsuarioSistema`.
+
 ## CORS
 
 `CorsConfig` registra la política de CORS para todas las rutas mediante las propiedades `app.cors.*` cargadas en `CorsProperties`.
@@ -183,6 +187,14 @@ credentials: "include"
 ```
 
 en sus solicitudes para transportar la cookie de sesión.
+
+### Dependencias del frontend y validación
+
+En la validación aislada documentada, el frontend usó Node.js 22. Next.js se actualizó de 16.2.6 a 16.3.8 y `proxy-addr` de 2.0.7 a 2.0.8 en el árbol resuelto, versiones que eliminaron las dos alertas críticas identificadas en la auditoría anterior. `shadcn` está clasificado como dependencia de desarrollo porque su CLI no se necesita en ejecución; se mantiene instalado durante el build porque `src/app/globals.css` importa `shadcn/tailwind.css`.
+
+El último `npm audit` aislado reportó 7 vulnerabilidades altas y 2 moderadas en el árbol completo, y cero al omitir dependencias de desarrollo. Entre las alertas altas residuales, la principal reportada corresponde a `braces@3.0.3` (`GHSA-vfj7-8cjw-p6xm`) en la cadena de herramientas de desarrollo de `shadcn`; la resolución disponible requería un cambio mayor y no se aplicó. También permanece el aviso moderado de `uuid` (`GHSA-w5hq-g745-h8pq`) a través de `@hookform/devtools`, dependencia de desarrollo. Estos resultados describen esa ejecución de auditoría, no garantizan un estado futuro del registro.
+
+El workflow de CI instala con `npm ci`, ejecuta `npm run build` y `npm run lint`. No ejecuta `npm audit` ni Playwright; por tanto, los resultados aislados de auditoría y E2E no deben presentarse como comprobaciones de CI.
 
 ## Manejo documental de datos sensibles
 
