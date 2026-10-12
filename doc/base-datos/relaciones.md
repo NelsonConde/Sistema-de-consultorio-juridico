@@ -7,17 +7,19 @@ Este documento resume las relaciones entre entidades persistentes del sistema. L
 ```text
 rol 1---N usuario_sistema
 rol N---N permiso
-usuario_sistema 1---1 perfil real activo
+usuario_sistema 1---N registros de perfil a lo largo del tiempo
 usuario_sistema 1---N usuario_cambio_perfil_historial
 ```
 
-El perfil real activo se determina por:
+La cuenta puede conservar registros históricos en tablas de perfil distintas. El perfil vigente se determina por:
 
 ```text
 UsuarioSistema.tipoPerfilActual
 ```
 
 y se resuelve mediante estrategias por tipo de perfil.
+
+Cada relación de perfil tiene una columna `usuario_sistema_id` única en su propia tabla; esa unicidad no cruza tablas. Que solo exista un perfil activo entre los cinco tipos es una regla de aplicación, validada bajo bloqueo transaccional, no una restricción única transversal de base de datos.
 
 Relaciones por perfil:
 
@@ -253,4 +255,3 @@ Reglas de integridad y navegación:
 - Toda versión ($N+1$) referencia a su versión previa mediante `referencia_anterior_id`.
 - La autoría del archivo (`uploaded_by_id`) se vincula de manera obligatoria a la identidad del usuario del sistema autenticado.
 - La consulta documental del expediente consolida y navega estas relaciones en una única consulta optimizada (evitando el problema N+1), vinculando los documentos de todas las entidades hijas hacia la consulta raíz.
-

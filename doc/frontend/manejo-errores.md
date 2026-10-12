@@ -115,6 +115,15 @@ El frontend usa Sonner para notificaciones visuales. Los flujos revisados mantie
 | Operación sin permiso | Toast de no autorizado. |
 | Error de red | Toast de conexión. |
 
+## Conflictos de operación de perfil
+
+`src/lib/api.js` distingue el conflicto funcional de política del conflicto de concurrencia:
+
+- `isProfileOperationConflict(error)` requiere estado `409` y el código `CONFLICTO_OPERACION_PERFIL`;
+- `isConcurrencyConflict(error)` identifica los demás `409`.
+
+Los formularios de perfiles, usuarios y reactivación presentan mensajes diferentes para cada caso y no muestran éxito cuando el backend rechaza la operación. El detalle de la política y su respuesta se documenta en `doc/api/perfiles.md`.
+
 ## Relación con backend
 
 El frontend consume los contratos de respuesta de cada endpoint. Las reglas de validación, autorización y procesamiento se ejecutan en backend; la interfaz presenta los resultados mediante mensajes locales, contadores o toasts según el flujo.

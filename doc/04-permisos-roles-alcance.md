@@ -136,7 +136,19 @@ La operación conserva historial de cambio de perfil mediante `UsuarioCambioPerf
 
 ## Estado operativo del perfil
 
-Los perfiles tienen estado activo. El backend sincroniza el estado del perfil con el `UsuarioSistema` cuando un perfil se desactiva o reactiva desde los servicios de perfiles.
+La política abarca ADMINISTRATIVO, ASESOR, ESTUDIANTE, MONITOR y CONCILIADOR:
+
+| Regla | Resultado |
+|---|---|
+| Una cuenta conserva un solo perfil operativo activo. | Los perfiles anteriores se mantienen como registros históricos inactivos. |
+| Las operaciones directas de perfil no cambian cuenta, rol, permisos, `tipoPerfilActual` ni historial. | El estado de cuenta y el estado de perfil son independientes. |
+| La activación directa de un perfil histórico se rechaza. | Para recuperarlo como perfil vigente se usa el cambio explícito. |
+| La desactivación o eliminación lógica directa de un perfil histórico se rechaza. | No afecta la cuenta ni al perfil actual. |
+| `UsuarioSistema.activo` se administra por separado. | Habilitar la cuenta no activa un perfil y activar un perfil no habilita la cuenta. |
+| Los cambios de tipo usan la operación explícita. | Se preservan validaciones, transacción, rol, perfil actual e historial. |
+| El perfil actual no puede desactivarse o eliminarse lógicamente de forma directa. | Para impedir acceso se suspende la cuenta; para cambiar de cargo se usa el cambio explícito. |
+
+Las operaciones incompatibles responden `409 Conflict` con `detalles.codigo = CONFLICTO_OPERACION_PERFIL` y no producen efectos parciales. Si hay varios perfiles activos preexistentes, se rechaza la operación sin corrección automática. Activar directamente el perfil actual solo se permite si no hay otro perfil operativo activo.
 
 Además, asesor, estudiante y monitor no pueden desactivarse si tienen consultas operativas vivas asociadas. Esta regla protege la continuidad operativa de las consultas.
 

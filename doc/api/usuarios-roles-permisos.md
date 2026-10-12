@@ -82,6 +82,10 @@ El flujo implementado es:
 9. actualizar rol y tipo de perfil actual del usuario;
 10. registrar historial del cambio.
 
+El flujo se ejecuta dentro de una transacción y toma un bloqueo pesimista de la cuenta antes de leer y modificar los perfiles. Valida la exclusividad antes de ejecutar los handlers; un estado preexistente con más de un perfil activo se rechaza, sin escoger un perfil ni reparar registros automáticamente. Las restricciones operativas del perfil anterior, como consultas vivas, siguen aplicando.
+
+Las operaciones directas de estado del perfil también se serializan por cuenta. Los conflictos de política responden HTTP `409 Conflict` con `detalles.codigo = CONFLICTO_OPERACION_PERFIL`; otros `409`, como los de concurrencia optimista, no tienen ese código y no deben confundirse con el rechazo funcional.
+
 ### Campos transversales del cambio
 
 Los DTOs de cambio de perfil extienden `CambiarPerfilBaseDTO` y comparten datos básicos como:
