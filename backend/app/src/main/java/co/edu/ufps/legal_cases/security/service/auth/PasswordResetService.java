@@ -83,10 +83,17 @@ public class PasswordResetService {
 
         // Se genera el hash del token recibido para compararlo con el hash guardado en BD.
         PasswordResetToken resetToken = passwordResetTokenService.obtenerTokenActivo(dto.getToken());
+        Long usuarioId = resetToken.getUsuarioSistema().getId();
 
+        UsuarioSistema usuario = usuarioSistemaRepository.findByIdForUpdate(usuarioId)
+                .orElseThrow(() -> new BusinessException("Token inválido o expirado"));
+
+        // Relee el token después del bloqueo para impedir reutilizaciones concurrentes.
+        resetToken = passwordResetTokenService.obtenerTokenActivo(dto.getToken());
+        if (!usuarioId.equals(resetToken.getUsuarioSistema().getId())) {
+            throw new BusinessException("Token inválido o expirado");
+        }
         passwordResetTokenService.validarNoExpirado(resetToken);
-
-        UsuarioSistema usuario = resetToken.getUsuarioSistema();
 
         // Valida que el usuario, su rol y su perfil sigan activos.
         if (!passwordResetValidator.usuarioPuedeRecuperarPassword(usuario)) {
