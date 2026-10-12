@@ -1,16 +1,14 @@
-# Evidencia de Pruebas QA — Consolidar Datos y Generar Ficha PDF Autorizada (PB-35 / CC-OPT-004)
+# Evidencia de Pruebas QA — Consolidar Datos y Generar Ficha PDF Autorizada
 
-- **Solicitud / Épica:** CC-OPT-004 — Consolidación de datos y generación de expediente en formato PDF
-- **Ticket Jira:** SCRUM-307 — BE — Consolidar datos y generar ficha PDF autorizada (PB-35)
-- **Rama:** `feature/cc-opt-004-expediente-pdf`
+- **Alcance funcional:** Consolidación de datos y generación de expediente en formato PDF
 - **Fecha de ejecución:** 03/10/2026
 - **Responsable:** Equipo de Desarrollo Backend y QA
 
 ---
 
-## 1. Alcance y Requisitos del Ticket
+## 1. Alcance y requisitos funcionales
 
-Implementación y verificación de la consulta de datos vigentes y generación en memoria de la ficha de expediente PDF bajo demanda para el caso legal (PB-35).
+Implementación y verificación de la consulta de datos vigentes y generación en memoria de la ficha de expediente PDF bajo demanda.
 
 ### Invariantes y Criterios de Aceptación
 1. **Consolidación completa de datos vigentes:**
@@ -165,7 +163,7 @@ Content-Type: application/json
 
 ## 6. Conclusión
 
-El ticket **SCRUM-307 (PB-35 / CC-OPT-004)** cumple al 100% con todos los criterios de aceptación técnicos y de seguridad:
+La implementación de la ficha PDF cumple al 100% con todos los criterios de aceptación técnicos y de seguridad:
 - Consulta y consolidación ordenada de todos los datos vigentes del expediente.
 - Generación de PDF en memoria con maquetación institucional y manejo robusto de valores nulos/opcionales.
 - Rechazo inmediato de terceros y usuarios anónimos antes de cualquier operación de I/O.

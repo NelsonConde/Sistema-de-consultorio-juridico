@@ -123,7 +123,7 @@ public class UsuarioSistemaService {
                 .validarCambioEstadoUsuario(id, activo);
 
         UsuarioSistema usuario =
-                buscarUsuarioConRolYPermisos(id);
+                buscarUsuarioParaActualizar(id);
 
         usuarioSistemaValidator.validarCambioEstado(usuario, activo);
 
@@ -136,6 +136,15 @@ public class UsuarioSistemaService {
     private UsuarioSistema buscarUsuarioConRolYPermisos(Long id) {
         return usuarioSistemaRepository
                 .findWithRolAndPermisosById(id)
+                .orElseThrow(() ->
+                        new BusinessException(
+                                "Usuario del sistema no encontrado con id: "
+                                        + id));
+    }
+
+    private UsuarioSistema buscarUsuarioParaActualizar(Long id) {
+        return usuarioSistemaRepository
+                .findByIdForUpdate(id)
                 .orElseThrow(() ->
                         new BusinessException(
                                 "Usuario del sistema no encontrado con id: "

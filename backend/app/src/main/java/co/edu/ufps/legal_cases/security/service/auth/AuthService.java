@@ -79,7 +79,7 @@ public class AuthService {
 
     @Transactional
     public void cambiarPassword(String token, CambiarPasswordRequestDTO dto) {
-        UsuarioSistema usuario = obtenerUsuarioAutenticado(token); // Con el token esta el usuario.
+        UsuarioSistema usuario = obtenerUsuarioAutenticadoParaActualizar(token);
 
         cambioPasswordValidator.validarDatosCambioPassword(dto);
 
@@ -95,6 +95,21 @@ public class AuthService {
 
         usuario.setPasswordHash(passwordEncoder.encode(dto.getPasswordNueva()));
         usuarioSistemaRepository.save(usuario);
+    }
+
+    private UsuarioSistema obtenerUsuarioAutenticadoParaActualizar(String token) {
+        if (token == null || token.isBlank()) {
+            throw new BusinessException("No hay sesión activa");
+        }
+
+        String username = jwtService.obtenerUsername(token);
+        Long usuarioId = usuarioSistemaRepository.findIdByUsernameIgnoreCase(username)
+                .orElseThrow(() -> new BusinessException("Usuario no encontrado"));
+        UsuarioSistema usuario = usuarioSistemaRepository.findByIdForUpdate(usuarioId)
+                .orElseThrow(() -> new BusinessException("Usuario no encontrado"));
+
+        loginValidator.validarUsuarioPuedeAutenticarse(usuario);
+        return usuario;
     }
 
     // Obtiene el usuario logueado a partir del token enviado en la cookie.

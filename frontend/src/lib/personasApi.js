@@ -138,7 +138,7 @@ function normalizarPaginaPaginada(payload) {
 
 /**
  * Compatibility fallback for branches where the backend still returns an array.
- * The preferred SEC-07 contract is the paginated object handled above.
+ * The preferred response contract is the paginated object handled above.
  * This fallback only prevents the existing frontend from breaking while the
  * backend remains unchanged.
  */

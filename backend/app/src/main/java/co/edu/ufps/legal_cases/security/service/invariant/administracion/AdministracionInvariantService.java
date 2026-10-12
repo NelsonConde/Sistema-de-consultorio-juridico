@@ -47,6 +47,9 @@ public class AdministracionInvariantService {
             TipoPerfilUsuario tipoDestino) {
 
         if (tipoDestino == TipoPerfilUsuario.ADMINISTRATIVO) {
+            // Aunque esta transicion no reduce la capacidad administrativa,
+            // participa del mismo orden global de bloqueos: roles y luego cuenta.
+            snapshotFactory.cargarBajoBloqueo();
             return;
         }
 

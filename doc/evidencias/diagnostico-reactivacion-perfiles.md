@@ -1,10 +1,10 @@
 # Diagnóstico de reactivación de perfiles operativos
 
-## Estado del documento
+## Estado histórico del diagnóstico
 
-Este documento consolida un diagnóstico técnico y una propuesta funcional preliminar. Las pruebas demuestran el comportamiento existente, pero un resultado PASS no significa que ese comportamiento sea funcionalmente correcto.
+Este documento conserva el diagnóstico técnico realizado sobre la versión indicada en la sección siguiente. Las pruebas P01 a P12 demuestran el comportamiento que existía en esa versión, pero un resultado PASS no significa que ese comportamiento fuera funcionalmente correcto.
 
-Las reglas `RF-P01` a `RF-P06` son una propuesta de solución aceptada preliminarmente para continuar el análisis. No representan una política implementada ni acreditan aprobación formal de un responsable funcional.
+En el momento del diagnóstico, `RF-P01` a `RF-P06` eran una propuesta preliminar y todavía no estaban implementadas. Su aprobación e implementación posteriores se registran al final sin alterar la evidencia original.
 
 ## Contexto
 
@@ -212,3 +212,25 @@ No debe desactivarse automáticamente un perfil solo por introducir la nueva pol
 El comportamiento actual quedó reproducido y documentado. `RF-P01` a `RF-P06` permanecen pendientes de formalización funcional y de implementación.
 
 Antes de corregir debe definirse formalmente la autoridad sobre la cuenta, el tratamiento de perfiles históricos, la semántica de activación y desactivación, el contrato `409`, la estrategia para datos existentes y los criterios de aceptación de la nueva política.
+
+## Seguimiento posterior a la evidencia original
+
+Las frases anteriores describen el estado de la decisión al cerrar el diagnóstico sobre `develop` y el commit documentado. Posteriormente se comunicó la aprobación funcional de `RF-P01` a `RF-P06` y una séptima regla: el perfil actual tampoco puede desactivarse directamente; para impedir el acceso se suspende la cuenta y para cambiar de cargo se usa el cambio explícito de perfil.
+
+La implementación posterior aplica estas reglas a ESTUDIANTE, ASESOR, MONITOR, CONCILIADOR y ADMINISTRATIVO:
+
+1. una cuenta conserva un único perfil operativo activo y mantiene los anteriores como históricos inactivos;
+2. las operaciones directas de perfil no cambian rol, permisos, `tipoPerfilActual` ni `UsuarioSistema.activo`;
+3. activar un perfil histórico se rechaza sin modificaciones;
+4. desactivar o eliminar lógicamente un perfil histórico se rechaza sin afectar la cuenta o el perfil vigente;
+5. la habilitación o suspensión de la cuenta se administra por separado;
+6. las transiciones usan el cambio explícito, con validaciones, transacción e historial;
+7. desactivar o eliminar lógicamente el perfil actual se rechaza.
+
+El rechazo funcional responde `409 Conflict` con `detalles.codigo = CONFLICTO_OPERACION_PERFIL`. Las operaciones directas y los cambios explícitos se serializan mediante bloqueo pesimista de `UsuarioSistema`; el cambio explícito valida la exclusividad antes de modificar perfiles, rol, tipo actual e historial. Los estados preexistentes con varios perfiles activos se rechazan y no se sanean automáticamente.
+
+La regresión de perfiles contiene 50 escenarios de integración: P45 a P49 usan transacciones concurrentes coordinadas y P50 verifica el rechazo de múltiples perfiles activos preexistentes. En validaciones posteriores se reportaron 50/50 aprobadas para esa clase y 116/116 para una selección focalizada de backend. La ejecución ampliada posterior contabilizó 529 pruebas: 526 aprobadas, cero fallos de aserción y tres errores de entorno relacionados con variables de almacenamiento ausentes y LocalStack no disponible. Las pruebas operacionales y `LoggingSafetyConfigurationTest` se aprobaron luego en ejecuciones aisladas; esta última usó configuración sintética y no valida la configuración privada. Estos resultados no equivalen a una única suite Maven completa aprobada.
+
+En frontend se aprobaron 26 de 26 pruebas Playwright y el build con Node.js 22 y Next.js 16.3.8. En una ejecución previa, el lint global se reportó como no satisfactorio y no se presentó como validación aprobada. Una validación posterior con Node.js 22 y npm 10.9.4 confirmó que `npm run lint` finaliza con código 0, sin errores, con 186 advertencias preexistentes y 5 diagnósticos informativos. La comparación con `HEAD` no identificó diagnósticos nuevos; por tanto, el lint no bloquea el workflow actual de CI. Esta comprobación aislada no equivale a una ejecución integral aprobada de Maven o de CI.
+
+Esta actualización técnica no acredita que la documentación oficial externa del responsable funcional haya sido actualizada ni representa un resultado de CI. El detalle vigente y las limitaciones se mantienen en `doc/backend/perfiles.md`, `doc/api/perfiles.md`, `doc/04-permisos-roles-alcance.md`, `doc/decisiones/estrategia-perfiles.md` y `doc/06-pruebas.md`.

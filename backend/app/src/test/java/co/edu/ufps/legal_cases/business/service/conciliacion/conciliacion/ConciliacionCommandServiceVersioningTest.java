@@ -31,7 +31,7 @@ import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaReposit
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.OptimisticLockException;
 
-class ConciliacionCommandServiceDb03Test {
+class ConciliacionCommandServiceVersioningTest {
 
     private ConciliacionRepository conciliacionRepository;
     private ConciliacionRelacionService relacionService;

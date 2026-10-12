@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import co.edu.ufps.legal_cases.file_storage.model.FileAsset;
 import co.edu.ufps.legal_cases.security.service.context.UsuarioActualService;
 
-class FileResourceServiceDb03Test {
+class FileResourceServiceStoredAssetCleanupTest {
 
     @Test
     void discardStoredAssetEliminaObjetoFisicoYMarcaMetadataFallida() {

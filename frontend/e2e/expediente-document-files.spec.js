@@ -218,7 +218,7 @@ async function abrirDocumentos(page) {
     }).click()
 }
 
-test.describe("SCRUM-277 - Documentos del expediente", () => {
+test.describe("Documentos del expediente", () => {
     test("muestra documentos agregados del expediente", async ({
                                                                    page,
                                                                }) => {

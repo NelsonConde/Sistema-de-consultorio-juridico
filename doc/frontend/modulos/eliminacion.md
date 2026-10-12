@@ -175,7 +175,7 @@ Este documento describe la pantalla frontend de eliminación/reactivación. No d
 
 ## 11. Precisión sobre UsuarioSistema y perfiles reales
 
-La pantalla permite reactivar distintos tipos de registros mediante endpoints de estado. Cuando se reactiva un perfil operativo desde su endpoint propio, el backend sincroniza el estado del `UsuarioSistema` asociado.
+La pantalla permite reactivar distintos tipos de registros mediante endpoints de estado. Para un perfil vinculado a una cuenta, el backend rechaza la reactivación directa si es histórico o si existe otro perfil operativo activo. El conflicto se identifica con `CONFLICTO_OPERACION_PERFIL` y la interfaz informa que corresponde usar el cambio explícito de perfil.
 
 Cuando se reactiva directamente un `UsuarioSistema` mediante:
 
@@ -183,4 +183,6 @@ Cuando se reactiva directamente un `UsuarioSistema` mediante:
 PATCH /api/usuarios-sistema/{id}/activo?activo=true
 ```
 
-se modifica la cuenta de acceso. Esa operación no reactiva automáticamente el perfil real asociado. Por esa razón, la pantalla diferencia entre reactivación de cuentas y reactivación de perfiles o registros operativos.
+se modifica únicamente la cuenta de acceso. Esa operación no reactiva automáticamente el perfil real asociado. De igual forma, reactivar un perfil permitido no habilita una cuenta suspendida. Por esa razón, la pantalla diferencia entre reactivación de cuentas y reactivación de perfiles o registros operativos.
+
+La desactivación directa del perfil actual también se rechaza con el conflicto funcional de política; para impedir autenticación se suspende `UsuarioSistema`, y para cambiar de tipo de perfil se usa el flujo explícito de usuarios y roles. La interfaz conserva la vista y presenta el rechazo sin notificar una operación exitosa.

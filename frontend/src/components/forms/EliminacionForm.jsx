@@ -1,7 +1,14 @@
 "use client"
 
 import { apiClient } from "@/lib/apiClient";
-import { ApiError, isConcurrencyConflict, readResponseBody, requireResourceVersion } from "@/lib/api";
+import {
+  ApiError,
+  isConcurrencyConflict,
+  isProfileOperationConflict,
+  readResponseBody,
+  requireResourceVersion,
+  toProfileOperationConflict,
+} from "@/lib/api";
 /**
  * Form handling.
  *
@@ -388,6 +395,17 @@ export function EliminacionForm() {
       );
       await cargarTodo();
     } catch (error) {
+
+      if (isProfileOperationConflict(error)) {
+        const conflict = toProfileOperationConflict(
+          error,
+          "Este perfil histórico no puede reactivarse directamente. Utiliza la operación de cambio de perfil."
+        );
+        toast.error("No se puede reactivar el perfil", {
+          description: conflict.message,
+        });
+        return;
+      }
 
       if (isConcurrencyConflict(error)) {
         toast.error("El registro cambió antes de reactivarlo", {

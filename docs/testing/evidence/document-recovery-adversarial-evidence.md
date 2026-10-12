@@ -1,10 +1,8 @@
-# SCRUM-285 — Restauración y suite adversarial documental
+# Restauración y suite adversarial documental
 
-## Identificación
+## Contexto de la ejecución
 
-- **Ticket:** SCRUM-285
-- **Historia relacionada:** PB-29 / SCRUM-260
-- **Rama:** `test/scrum-285-document-recovery-adversarial`
+- **Alcance funcional relacionado:** recuperación documental
 - **Responsable:** Nelson
 - **Fecha de ejecución:** 03/10/2026, zona `America/Bogota`
 - **Ambiente:** Windows 11 local; Docker Desktop / WSL2; LocalStack Community 4.4.0 para S3 compatible; recuperación sintética en memoria y backup operacional en archivo temporal del host externo al repositorio; Mockito para fronteras de autorización
@@ -22,7 +20,7 @@ documentales existentes.
 La ejecución cubre autorización por recurso, nombres hostiles, colisiones de nombre,
 límites de tamaño, validación de checksum, tamaño almacenado, firma PDF, propagación
 del TTL, conciliación de estados y una restauración controlada con datos sintéticos.
-No se contactó producción, Supabase real ni una base de datos real. QA-DOC-13 usó
+No se contactó producción, Supabase real ni una base de datos real. El caso QA-DOC-13 usó
 URLs firmadas reales emitidas exclusivamente contra LocalStack aislado. No se usaron
 datos del consultorio, credenciales reales, tokens ni cookies.
 
@@ -39,7 +37,7 @@ datos del consultorio, credenciales reales, tokens ni cookies.
 | QA-DOC-07 | Archivo mayor de 10 MiB | Rechazo | Rechazado antes de persistir o firmar | PASS | `archivoSuperiorAlLimiteEsRechazado` |
 | QA-DOC-08 | Tamaño declarado diferente al almacenado | Fallo; no READY; marcar fallida | `complete` lanzó excepción, llamó `markUploadFailed` y no llamó `markReady` | PASS | `tamanoAlmacenadoDistintoFallaCarga` |
 | QA-DOC-09 | Checksum con formato inválido | Rechazo | SHA-256 mal formado rechazado antes de persistir o firmar | PASS | `checksumConFormatoInvalidoEsRechazado` |
-| QA-DOC-10 | SHA-256 válido pero distinto a los bytes | Rechazo por integridad | `complete()` aceptó la carga y no lanzó excepción | FAIL | SCRUM-313; reproducción explícita en `DocumentChecksumIntegrityIT.checksumValidoPeroDistintoDebeSerRechazado` |
+| QA-DOC-10 | SHA-256 válido pero distinto a los bytes | Rechazo por integridad | `complete()` aceptó la carga y no lanzó excepción | FAIL | Defecto de integridad reproducido explícitamente en `DocumentChecksumIntegrityIT.checksumValidoPeroDistintoDebeSerRechazado` |
 | QA-DOC-11 | `.pdf` y `application/pdf` sin firma `%PDF-` | Rechazo y carga fallida | Contenido rechazado, objeto eliminado y carga marcada fallida | PASS | `pdfSinFirmaEsRechazadoDuranteComplete` |
 | QA-DOC-12 | TTL de descarga | Entregar al proveedor el `Duration` configurado | Se entregó exactamente `PT5M` | PASS | `descargaEntregaTtlConfiguradoAlProveedor` |
 | QA-DOC-13 | URL vencida | Primera URL HTTP 200; la misma URL vencida distinta de 200; URL nueva HTTP 200 con bytes idénticos | LocalStack devolvió HTTP 200 antes y después de vencer; una URL nueva devolvió HTTP 200 y 38 bytes idénticos | BLOCKED | INCONCLUSIVE: LocalStack 4.4.0 no reproduce de forma confiable la expiración; no se registra como defecto del producto |
@@ -75,14 +73,14 @@ comportamiento de Supabase/S3 real y no se registra como defecto del producto.
 ## QA-DOC-16 — Reemplazo real de contenedor backend
 
 - **Proveedor:** LocalStack Community 4.4.0 / S3 compatible
-- **Ambiente:** Docker Desktop + WSL2 local; red `scrum285-net`
+- **Ambiente:** Docker Desktop + WSL2 local; identificador de red omitido en la versión pública
 - **Tipo:** prueba operacional de reemplazo de contenedor
 - **Datos:** 100 % sintéticos
 - **Sesión:** `305ba3c1ed2b498fbc43ec30b60b24b7`
-- **Contenedor A:** nombre `scrum285-doc16-write-305ba3c1ed2b`; ID `61ff8650ee25`
+- **Contenedor A:** nombre omitido en la versión pública; ID `61ff8650ee25`
 - **Resultado WRITE:** PASS; objeto almacenado, releído y validado
 - **Contenedor A destruido:** sí; `docker run --rm` y ausencia confirmada antes de B
-- **Contenedor B:** nombre `scrum285-doc16-verify-305ba3c1ed2b`; ID `fc4c0fd117a3`
+- **Contenedor B:** nombre omitido en la versión pública; ID `fc4c0fd117a3`
 - **Nuevo contenedor confirmado:** sí; nombre e ID diferentes de A
 - **Carga desde B:** no; la fase VERIFY no invoca `store()` (`storeCalled=false`)
 - **Resultado VERIFY:** PASS
@@ -94,6 +92,8 @@ comportamiento de Supabase/S3 real y no se registra como defecto del producto.
 - **Cleanup:** objeto eliminado y ausencia confirmada mediante `head()`
 - **Estado:** PASS
 
+Los nombres originales de red, contenedores y ObjectKey se omiten en esta versión
+pública; los valores genéricos no representan los identificadores usados en la ejecución.
 Los contenedores se ejecutaron desde la misma imagen Java 21 inmutable, sin Spring
 Context, sin montar el workspace y sin volúmenes o archivos compartidos. El contexto
 temporal de construcción excluyó `src/main/resources`; la única continuidad documental
@@ -111,7 +111,7 @@ se limitó al identificador de sesión y la configuración S3 sintética.
 - **Datos:** 100 % sintéticos
 - **Sesión:** `c9d88b92-27e0-43e4-bda2-51ba6974aa4b`
 - **Bucket:** `legal-documents`
-- **ObjectKey original/restaurado:** `scrum285/qa-doc-17/c9d88b92-27e0-43e4-bda2-51ba6974aa4b/evidencia.txt`
+- **ObjectKey original/restaurado:** omitido en la versión pública; el mismo objeto se eliminó y restauró
 - **Cantidad de objetos:** 1
 - **Backup:** descarga real desde `StorageProvider.load()` a un archivo temporal del host externo al repositorio; manifiesto independiente con `objectKey`, `contentType`, `size` y `sha256`, sin secretos
 - **Backup material confirmado:** sí; archivo existente y SHA-256 recalculado igual al original
@@ -162,7 +162,7 @@ BUILD SUCCESS
 ```
 
 Suite nueva aislada histórica, antes de incorporar las clases IT
-(`.\mvnw.cmd "-Dtest=Scrum285*" test`):
+(selector histórico por prefijo de la suite documental):
 
 ```text
 Tests run: 19, Failures: 1, Errors: 0, Skipped: 0
@@ -170,10 +170,10 @@ BUILD FAILURE
 ```
 
 Regresión documental conjunta histórica, antes de separar QA-DOC-10
-(`.\mvnw.cmd "-Dtest=FileValidationServiceTest,FileResourceServiceDb03Test,Scrum285*" test`):
+(selectores históricos de las pruebas documentales):
 
 ```text
-FileResourceServiceDb03Test: Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+FileResourceServiceStoredAssetCleanupTest: Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
 FileValidationServiceTest: Tests run: 7, Failures: 0, Errors: 0, Skipped: 0
 DocumentAdversarialTest: Tests run: 15, Failures: 1, Errors: 0, Skipped: 0
 DocumentReconciliationTest: Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
@@ -212,14 +212,13 @@ Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
-La suite adversarial con el fallo conocido QA-DOC-10 / SCRUM-313 no se volvió a
+La suite adversarial con el fallo conocido de integridad de QA-DOC-10 no se volvió a
 ejecutar durante esta operación. Los resultados QA-DOC-13 y QA-DOC-16 se conservaron.
 
 ## Preparación para integración — separación de QA-DOC-10
 
 Fecha: 03/10/2026, `America/Bogota`. Java confirmado: `21.0.12.1`;
-Maven Wrapper confirmado: `3.9.14`. Rama conservada:
-`test/scrum-285-document-recovery-adversarial`.
+Maven Wrapper confirmado: `3.9.14`. La rama de pruebas no se modificó.
 
 Se movió exclusivamente QA-DOC-10 a `DocumentChecksumIntegrityIT`, conservando
 los datos, los dobles y la aserción de rechazo originales. No se usó `@Disabled`,
@@ -229,17 +228,17 @@ Las IT operacionales y diagnósticas requieren selección explícita mediante `-
 | Ejecución | Tests run | Failures | Errors | Skipped | Resultado |
 |---|---:|---:|---:|---:|---|
 | `test-compile` | No aplica; 80 fuentes de test compiladas | — | — | — | BUILD SUCCESS |
-| Suite SCRUM-285 normal | 18 | 0 | 0 | 0 | BUILD SUCCESS |
+| Suite documental normal | 18 | 0 | 0 | 0 | BUILD SUCCESS |
 | Regresión documental conjunta | 26 | 0 | 0 | 0 | BUILD SUCCESS |
 | `mvnw.cmd test` completo | 320 | 1 | 7 | 0 | BUILD FAILURE |
-| `DocumentChecksumIntegrityIT` explícita | 1 | 1 | 0 | 0 | BUILD FAILURE: SCRUM-313 reproducido |
+| `DocumentChecksumIntegrityIT` explícita | 1 | 1 | 0 | 0 | BUILD FAILURE: defecto de integridad reproducido |
 
 Comandos de selección:
 
 ```powershell
 .\mvnw.cmd "-DskipTests" test-compile
 .\mvnw.cmd "-Dtest=DocumentAdversarialTest,DocumentReconciliationTest,DocumentRecoveryTest" test
-.\mvnw.cmd "-Dtest=FileValidationServiceTest,FileResourceServiceDb03Test,DocumentAdversarialTest,DocumentReconciliationTest,DocumentRecoveryTest" test
+.\mvnw.cmd "-Dtest=FileValidationServiceTest,FileResourceServiceStoredAssetCleanupTest,DocumentAdversarialTest,DocumentReconciliationTest,DocumentRecoveryTest" test
 .\mvnw.cmd test
 .\mvnw.cmd "-Dtest=DocumentChecksumIntegrityIT" test
 ```
@@ -249,7 +248,7 @@ Para la suite completa se establecieron solo en el proceso:
 `SPRING_CONFIG_LOCATION=classpath:/application-test.properties`.
 Esto evitó cargar la configuración local protegida como configuración de Spring.
 Los contenedores PostgreSQL de la suite preexistente usaron datos sintéticos de test.
-Surefire no ejecutó ninguna `Scrum285*IT` durante `mvnw.cmd test`.
+Surefire no ejecutó las pruebas de integración operacional durante `mvnw.cmd test`.
 QA-DOC-13 no se volvió a ejecutar ni se convirtió en PASS o FAIL de producto.
 
 Fallos de la suite completa, sin relación con el traslado de QA-DOC-10:
@@ -281,7 +280,7 @@ esa matriz.
 
 ## Defectos encontrados
 
-### SCRUM-313 — No se comprueba el checksum contra el contenido almacenado
+### Defecto de integridad del checksum
 
 `FileResourceService.complete()` valida que el tamaño almacenado coincida con el
 declarado, pero no carga los bytes ni recalcula SHA-256 para compararlo con
@@ -292,19 +291,19 @@ activo como listo. Evidencia reproducible:
 La reproducción fue trasladada desde `DocumentAdversarialTest` a esta IT sin
 cambiar la expectativa de rechazo ni duplicar el caso. El sufijo IT mantiene la prueba
 fuera de la detección normal de Surefire; se ejecuta mediante selección explícita.
-QA-DOC-10 sigue siendo FAIL y SCRUM-313 sigue abierto funcionalmente; una regresión
+QA-DOC-10 sigue siendo FAIL y el defecto permanece pendiente; una regresión
 normal exitosa no significa que el sistema verifique correctamente el SHA-256.
 
-Los patrones explícitos amplios como `-Dtest=Scrum285*` pueden seleccionar también
-las IT. Para regresión normal de este ticket se deben usar los tres nombres Test
-exactos documentados en la sección de preparación para integración.
+Los patrones explícitos amplios de selección de clases pueden seleccionar también
+las IT. Para la regresión normal se deben usar los tres nombres Test exactos
+documentados en la sección de preparación para integración.
 
-No se modificó código productivo para corregirlo dentro de SCRUM-285.
+No se modificó código productivo para corregirlo durante esta ejecución.
 
 ## Conclusión
 
 Se obtuvieron **15 PASS, 1 FAIL y 1 BLOCKED** sobre los 17 casos. QA-DOC-10 mantiene
-el defecto de integridad SCRUM-313. QA-DOC-13 queda BLOCKED / INCONCLUSIVE porque
+el defecto de integridad descrito arriba. QA-DOC-13 queda BLOCKED / INCONCLUSIVE porque
 LocalStack 4.4.0 no reproduce confiablemente la expiración de URL y no se dispone de
 otro proveedor aislado adecuado. QA-DOC-16 pasó mediante reemplazo real de contenedores
 efímeros y confirmó que bytes y metadata permanecieron en Storage externo.
@@ -314,12 +313,11 @@ completa. Los totales siguen siendo **15 PASS, 1 FAIL y 1 BLOCKED**.
 
 ## Nombres neutrales del código documental
 
-Se renombraron las siete clases y los dos scripts operacionales para retirar los
-identificadores internos de Jira del código. La trazabilidad SCRUM-285 / SCRUM-313
-permanece en este documento. Las referencias a clases y scripts anteriores se muestran
-con sus nombres actuales; los datos históricos, hashes, tiempos y estados no cambian.
-Los nombres históricos de contenedores y objectKeys registrados arriba corresponden
-a las ejecuciones originales y se conservan como evidencia.
+Se renombraron las siete clases y los dos scripts operacionales para usar nombres
+funcionales. La relación con incidencias se conserva exclusivamente en Jira.
+Los datos históricos, hashes, tiempos y estados no cambian. Los identificadores
+históricos de recursos Docker y el ObjectKey no se publican; se conservan los IDs de
+contenedor, resultados y hashes registrados que permiten verificar las operaciones.
 
 Las variables de entorno usan ahora el prefijo `DOCUMENT_`; los logs operacionales
 usan `QA_DOC_16` y `QA_DOC_17`. Los nuevos objetos sintéticos usan el prefijo
@@ -330,10 +328,15 @@ neutral y su propio hash; no se atribuyen a los hashes de las ejecuciones histó
 Para reutilizar la infraestructura actual, proporcionar externamente:
 
 ```powershell
-$env:DOCUMENT_S3_CONTAINER = 'scrum285-localstack'
-$env:DOCUMENT_DOCKER_NETWORK = 'scrum285-net'
-$env:DOCUMENT_QA_BRANCH = 'test/scrum-285-document-recovery-adversarial'
+# Marcadores: sustituir por los nombres originales requeridos para la infraestructura existente.
+$env:DOCUMENT_S3_CONTAINER = '<NOMBRE_ORIGINAL_CONTENEDOR_LOCALSTACK>'
+$env:DOCUMENT_DOCKER_NETWORK = '<NOMBRE_ORIGINAL_RED_DOCKER>'
+$env:DOCUMENT_QA_BRANCH = (git branch --show-current)
 ```
+
+Los valores entre corchetes son marcadores no ejecutables, no nombres reales de recursos.
+Para reproducir la ejecución histórica se requieren los nombres originales, que se
+omitieron de esta versión pública.
 
 Las demás variables son `DOCUMENT_PHASE`, `DOCUMENT_SESSION_ID`,
 `DOCUMENT_S3_ENDPOINT`, `DOCUMENT_S3_REGION`, `DOCUMENT_S3_ACCESS_KEY`,
@@ -347,8 +350,8 @@ Verificación después del renombre (03/10/2026, Bogotá; Java 21.0.12.1 y Maven
 |---|---|
 | `.\mvnw.cmd "-DskipTests" test-compile` | BUILD SUCCESS; 80 fuentes de test |
 | `.\mvnw.cmd "-Dtest=DocumentAdversarialTest,DocumentReconciliationTest,DocumentRecoveryTest" test` | Tests run: 18, Failures: 0, Errors: 0, Skipped: 0; BUILD SUCCESS |
-| `.\mvnw.cmd "-Dtest=FileValidationServiceTest,FileResourceServiceDb03Test,DocumentAdversarialTest,DocumentReconciliationTest,DocumentRecoveryTest" test` | Tests run: 26, Failures: 0, Errors: 0, Skipped: 0; BUILD SUCCESS |
-| `.\mvnw.cmd "-Dtest=DocumentChecksumIntegrityIT" test` | Tests run: 1, Failures: 1, Errors: 0, Skipped: 0; BUILD FAILURE; SCRUM-313 reproducido |
+| `.\mvnw.cmd "-Dtest=FileValidationServiceTest,FileResourceServiceStoredAssetCleanupTest,DocumentAdversarialTest,DocumentReconciliationTest,DocumentRecoveryTest" test` | Tests run: 26, Failures: 0, Errors: 0, Skipped: 0; BUILD SUCCESS |
+| `.\mvnw.cmd "-Dtest=DocumentChecksumIntegrityIT" test` | Tests run: 1, Failures: 1, Errors: 0, Skipped: 0; BUILD FAILURE; defecto de integridad reproducido |
 
 Los scripts renombrados pasaron el parser de PowerShell sin errores. No se repitieron
 las operaciones Docker de QA-DOC-16/17 en esta fase de renombre; sus tiempos y hashes

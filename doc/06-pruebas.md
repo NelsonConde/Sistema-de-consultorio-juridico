@@ -35,7 +35,7 @@ y scripts asociados en `frontend/package.json`.
 | `JpaConsultaReasignacionHistorialWriterPostgreSqlTest` | Verifica campos, eventos sucesivos, restricciones, inmutabilidad y participación transaccional en PostgreSQL. |
 | `ConsultaReasignacionEndpointPostgreSqlTest` | Ejecuta el endpoint con Spring Security, JWT, CSRF, JPA y PostgreSQL; cubre autorización, rollback y concurrencia. |
 | `EstudianteSesionExpiradaPostgreSqlTest` | Comprueba con la cadena real de Spring Security que la creación de estudiante y cuenta solo ocurre con JWT y CSRF válidos, y que los intentos rechazados no persisten datos. |
-| `PerfilEstudianteReactivacionPostgreSqlTest` | Caracteriza identidad compartida, reactivación, autenticación, autorización, desactivación y cambio explícito entre perfiles ESTUDIANTE y ASESOR sobre PostgreSQL real. |
+| `PerfilEstudianteReactivacionPostgreSqlTest` | Verifica 53 escenarios (P01-P53) de identidad, política de estado, autenticación, autorización, cambios explícitos y concurrencia para los cinco perfiles sobre PostgreSQL real. |
 | `GlobalExceptionHandlerReasignacionTest` | Comprueba la respuesta segura cuando el historial obligatorio no está disponible. |
 | `ProcesoValidatorTest` | Valida radicado condicional: permitido en pendiente y obligatorio en estados finales. |
 | `SeguimientoValidatorTest` | Valida que `notificarEstudiante=true` requiera estudiante asignado y activo. |
@@ -44,7 +44,8 @@ y scripts asociados en `frontend/package.json`.
 | `PerfilUsuarioResolverServiceTest` | Valida delegación por Strategy para resolver perfil activo del usuario. |
 | `PerfilEstadoHandlerRegistryTest` | Valida registro y resolución de handlers de estado de perfil. |
 | `PerfilUsuarioActivoResolverRegistryTest` | Valida registro y resolución de resolvers de perfil activo. |
-| `UsuarioSistemaPerfilEstadoServiceTest` | Valida sincronización entre perfil y usuario del sistema. |
+| `PerfilOperacionEstadoValidatorTest` | Valida la política central para activación y desactivación directa de los cinco tipos de perfil. |
+| `UsuarioSistemaPerfilEstadoServiceTest` | Conserva cobertura del componente legado; los cinco command services ya no lo usan en operaciones directas de perfil. |
 | `LegalCasesApplicationTests.contextLoads()` | Verifica que el contexto principal de Spring Boot pueda cargarse durante la ejecución de pruebas. |
 
 `LegalCasesApplicationTests.contextLoads()` utiliza `@SpringBootTest` para validar la carga del contexto de la aplicación. Las demás pruebas listadas se orientan a reglas funcionales, validadores y estrategias del backend.
@@ -69,7 +70,9 @@ Las pruebas actuales cubren reglas como:
 - dos transacciones con la misma versión no producen actualizaciones perdidas: solo una se confirma y solo esa genera historial;
 - los accesos derivados cambian con la asignación vigente sin ampliar el alcance a consultas ajenas;
 - el cambio y resolución de perfil usan estrategias registradas;
-- el estado de perfil y usuario del sistema se sincroniza.
+- el estado del perfil y la habilitación de la cuenta son independientes;
+- las operaciones directas incompatibles responden `409` sin efectos parciales;
+- el cambio explícito serializa por cuenta, conserva historial y rechaza estados con múltiples perfiles activos sin sanearlos.
 
 ## Ejecución de pruebas backend
 
@@ -132,21 +135,42 @@ La ejecución local focalizada registró 7 pruebas aprobadas, sin fallos, errore
 
 ### Reactivación y cambio explícito de perfiles
 
-`PerfilEstudianteReactivacionPostgreSqlTest` caracteriza la interacción entre una cuenta compartida y sus perfiles ESTUDIANTE y ASESOR. Usa el contexto completo de Spring Boot, `MockMvc`, la cadena real de Spring Security, JWT en cookie, CSRF válido, JPA y PostgreSQL 16 mediante Testcontainers. No sustituye la autenticación con `@WithMockUser`.
+`PerfilEstudianteReactivacionPostgreSqlTest` verifica la política implementada para los cinco tipos de perfil. Usa el contexto completo de Spring Boot, `MockMvc`, la cadena real de Spring Security, JWT en cookie, CSRF válido, JPA y PostgreSQL 16 mediante Testcontainers. No sustituye la autenticación con `@WithMockUser`.
 
 Los casos P01 a P12 cubren:
 
 - identidad compartida comprobada mediante `usuario_sistema_id` y diferenciación frente a cuentas distintas;
 - estado inicial con ASESOR como `tipoPerfilActual` y estudiante histórico inactivo;
-- reactivación directa del estudiante y comprobación de ambos perfiles activos;
-- respuesta de `/api/auth/me` y permisos efectivos del rol asesor;
+- rechazo de reactivación, desactivación y rehabilitación indirecta del estudiante histórico;
+- conservación de `/api/auth/me`, la cuenta, el rol y los permisos del perfil asesor tras los rechazos;
 - rechazo por falta de permiso y rechazo por falta de alcance como controles diferentes;
 - cambio explícito ASESOR a ESTUDIANTE, conservación de cuenta, actualización de rol y perfil actual, e historial;
-- desactivación directa del estudiante no actual y del asesor actual;
-- rehabilitación indirecta de una cuenta inactiva al reactivar un perfil histórico;
+- rechazo de desactivación directa del estudiante histórico y del asesor actual;
 - rechazo de autenticación cuando el perfil indicado por `tipoPerfilActual` está inactivo;
 - bloqueo y rollback del cambio explícito cuando el asesor tiene consultas operativas;
 - aislamiento respecto de cuentas y perfiles con información sintética semejante.
+
+P13 a P44 extienden la regresión a:
+
+- independencia de una cuenta suspendida respecto de la activación del perfil actual;
+- protección de `PATCH /activo` y `DELETE` para ESTUDIANTE, ASESOR, MONITOR, CONCILIADOR y ADMINISTRATIVO;
+- rechazo de perfiles históricos y de coexistencia con otro perfil activo;
+- transiciones explícitas de ida y regreso, con rol, `tipoPerfilActual` e historial coherentes;
+- restricciones por consultas operativas y continuidad del último administrador habilitado.
+
+P45 a P49 y P51 a P53 son pruebas coordinadas con transacciones independientes y tiempos máximos controlados. P50 completa la revisión de integridad con un estado preexistente incompatible:
+
+| Caso | Concurrencia o estado previo | Resultado verificado |
+|---|---|---|
+| P45 | Dos cambios explícitos simultáneos sobre la misma cuenta. | Las transiciones se serializan por cuenta; el estado final y el historial quedan coherentes, sin bloqueo indefinido. |
+| P46 | Activación histórica durante un cambio explícito. | La activación espera el bloqueo y luego se rechaza; no deja cambios parciales ni historial adicional. |
+| P47 | Activación del perfil actual concurrente con un cambio explícito. | Ambas operaciones se ordenan atómicamente y la transición conserva un único perfil activo. |
+| P48 | Suspensión de cuenta concurrente con activación directa. | La cuenta permanece suspendida; la operación de perfil no la rehabilita. |
+| P49 | Transición desde ADMINISTRATIVO concurrente con retiro de directora. | No hay interbloqueo y se conserva la continuidad administrativa. |
+| P50 | Cambio explícito con múltiples perfiles activos preexistentes. | Responde `409`, no genera historial ni sanea automáticamente los perfiles. |
+| P51 | Transición no administrativa hacia ADMINISTRATIVO concurrente con suspensión de la misma cuenta. | Las operaciones se serializan sin interbloqueo ni pérdida de actualización; la cuenta termina suspendida, con rol y perfil actual administrativos, un único perfil activo y un único historial de transición. |
+| P52 | Cambio autenticado de contraseña concurrente con transición explícita hacia ADMINISTRATIVO. | Ambas transacciones se serializan por la cuenta; se conserva la nueva contraseña, el rol y perfil de destino, un único perfil activo y un único historial. |
+| P53 | Restablecimiento de contraseña concurrente con suspensión de la misma cuenta. | Se conserva la nueva contraseña y la cuenta termina suspendida sin alterar rol, perfil vigente ni historial; el token consumido no puede reutilizarse. |
 
 Antes de crear datos, la prueba confirma que el datasource activo coincide exactamente con la URL del Testcontainer, que el catálogo es `legal_cases_test`, que el producto es PostgreSQL y que su versión mayor es 16.
 
@@ -156,20 +180,47 @@ Ejecución focalizada verificada desde `backend/app`:
 .\mvnw.cmd '-Dtest=PerfilEstudianteReactivacionPostgreSqlTest' test
 ```
 
-La ejecución local del diagnóstico registró:
+La ejecución histórica del diagnóstico registró:
 
 - 12 pruebas de integración de reactivación de perfiles aprobadas;
 - 24 pruebas unitarias relacionadas con estado, resolución y cambio de perfil aprobadas;
 - 7 pruebas de seguridad por expiración de sesión aprobadas;
 - 43 pruebas en total, sin fallos, errores ni omisiones.
 
-Este total corresponde a ejecuciones focalizadas locales y no a CI ni a la suite completa.
+Este total de 43 corresponde al diagnóstico original y no a la regresión actual, a CI ni a la suite completa.
 
-Los casos P01 a P12 son pruebas de caracterización: acreditan de forma reproducible lo que hace la implementación actual, incluso cuando el resultado revela un riesgo o un vacío funcional. Un resultado PASS no afirma que la conducta observada sea la política de negocio correcta.
+P01 a P12 comenzaron como pruebas de caracterización del comportamiento anterior. Sus resultados originales se conservan en `doc/evidencias/diagnostico-reactivacion-perfiles.md`; las expectativas automatizadas fueron actualizadas después de implementar la política aprobada. Un resultado PASS demuestra el comportamiento esperado por la prueba, no sustituye la revisión funcional o de QA.
 
-Si se formalizan nuevas reglas de exclusividad, rechazo de activación histórica o control independiente de la cuenta, algunas expectativas actuales deberán cambiar. En ese momento se requerirán pruebas de regresión que esperen el nuevo contrato, por ejemplo `409 Conflict` sin mutaciones para una activación incompatible.
+La ejecución focalizada histórica de `PerfilEstudianteReactivacionPostgreSqlTest` registró 51 pruebas aprobadas (P01-P51), sin fallos, errores ni omisiones. Incluye Java 21, PostgreSQL 16 Testcontainers, seguridad HTTP real, concurrencia coordinada en P45 a P49 y P51, y el rechazo de inconsistencia en P50. Esta ejecución precede a la incorporación de P52 y P53.
+
+Una segunda ejecución focalizada e independiente cubrió continuidad administrativa, repositorios de invariantes, cambio explícito, suspensión y sesiones, validadores y operaciones de los cinco perfiles: 72 pruebas aprobadas, sin fallos, errores ni omisiones. El resultado agregado de ambas ejecuciones fue 123/123, pero no corresponde a una única invocación de Maven, a la suite completa ni a CI.
+
+Tras incorporar la protección preventiva de credenciales, una ejecución focalizada posterior y separada cubrió `PerfilEstudianteReactivacionPostgreSqlTest` (53), `EstudianteSesionExpiradaPostgreSqlTest` (7) y `AuthControllerCsrfTest` (3): 63/63 aprobadas, sin fallos, errores ni omisiones, con Java 21 y PostgreSQL 16 Testcontainers donde correspondía. P52 y P53 verificaron persistencia real, transacciones independientes y coordinación determinista; este resultado no reemplaza ni se suma como una única suite a las ejecuciones históricas anteriores.
+
+En una ejecución puntual adicional de P52 y P53, ambas pruebas de concurrencia de credenciales aprobaron (2/2), con Java 21 y PostgreSQL 16 Testcontainers. Este resultado solo acredita esas dos pruebas y no representa una ejecución conjunta de 53/53.
+
+Una ejecución histórica de la suite de backend registró 528 pruebas: 527 aprobadas y una fallida, `LoggingSafetyConfigurationTest`, asociada a la configuración local protegida. Ese resultado pertenece a esa ejecución y no se presenta como la validación posterior. El archivo protegido no se modificó como parte de esta implementación.
 
 El detalle de escenarios, resultados HTTP, persistencia, riesgos, vacíos y propuesta funcional se encuentra en `doc/evidencias/diagnostico-reactivacion-perfiles.md`.
+
+### Validaciones aisladas posteriores
+
+Los resultados siguientes pertenecen a ejecuciones focalizadas y aisladas; no se suman para afirmar que una única suite completa haya pasado:
+
+| Área | Ejecución | Resultado reportado |
+|---|---|---|
+| Backend focalizado anterior | Selección de pruebas de perfiles, servicios, validación y concurrencia | 116/116 aprobadas en su ejecución histórica. |
+| Reactivación y concurrencia de perfiles, ejecución histórica | `PerfilEstudianteReactivacionPostgreSqlTest` P01-P51 con Java 21 y PostgreSQL 16 efímero | 51/51 aprobadas, incluidos P45 a P51. |
+| Regresiones relacionadas posteriores | Continuidad administrativa, repositorios de invariantes, cambio explícito, suspensión y sesiones, validadores y operaciones de perfiles | 72/72 aprobadas en una segunda ejecución independiente. Total aritmético de ambas ejecuciones posteriores: 123/123. |
+| Credenciales y concurrencia | Perfiles/concurrencia P01-P53, sesiones expiradas y contrato CSRF, en ejecución focalizada posterior | 63/63 aprobadas: 53 de perfiles, 7 de sesión y 3 de CSRF; no equivale a suite Maven completa ni a CI. |
+| Concurrencia de credenciales, ejecución puntual | P52 y P53 de `PerfilEstudianteReactivacionPostgreSqlTest`, con Java 21 y PostgreSQL 16 Testcontainers | 2/2 aprobadas; resultado limitado a estos dos escenarios, no una ejecución conjunta de 53/53. |
+| Recuperación de documentos | `DocumentBackupRestoreIT` contra LocalStack aislado y cuenta sintética | Aprobada. |
+| Persistencia entre contenedores | `DocumentContainerPersistenceIT`, fases `WRITE`, `VERIFY` y `CLEANUP` | Las tres fases aprobadas en invocaciones separadas. |
+| Vencimiento de URL prefirmada | `DocumentPresignedUrlExpirationIT` con LocalStack 4.14.0 y `S3_SKIP_SIGNATURE_VALIDATION=0` | URL vigente: HTTP 200; vencida: HTTP 403; renovada: HTTP 200 con los bytes esperados. |
+| Seguridad de logging | `LoggingSafetyConfigurationTest` con Java 21 y `application.properties` sintético en una copia temporal | 3/3 aprobadas. Valida la prueba con configuración sintética; no valida el archivo privado original ni la configuración de CI. |
+| Suite Maven ampliada posterior | Ejecución aislada con 529 pruebas contabilizadas | 526 aprobadas, cero fallos de aserción y 3 errores de ejecución: faltaban `DOCUMENT_S3_ENDPOINT`, `DOCUMENT_PHASE` y LocalStack en `localhost:4566`. Los errores impiden declarar verde esa ejecución; las pruebas operacionales se aprobaron después, por separado. |
+
+No se reportó una nueva ejecución completa de Maven después de las ejecuciones aisladas que resolvieron esos pre-requisitos. Por ello, no hay evidencia de una suite backend completa, limpia y aprobada en una sola corrida.
 
 ## Ejecución frontend
 
@@ -181,6 +232,24 @@ npm run test:ui
 npm run test:debug
 npm run test:headed
 ```
+
+La validación local de esta implementación registró:
+
+| Comando | Resultado |
+|---|---|
+| `npm run test` | 26 de 26 pruebas Playwright aprobadas, incluidas las que distinguen `CONFLICTO_OPERACION_PERFIL` de conflictos de concurrencia. |
+| `npm run build` | Build de producción satisfactorio. |
+| `npm run lint` | Código 0, sin errores: 186 advertencias no bloqueantes y 5 diagnósticos informativos. |
+
+Estas cifras corresponden a ejecuciones locales, no a resultados de CI ni a una aprobación de QA.
+
+La validación frontend posterior a la actualización compatible de dependencias usó Node.js 22 y Next.js 16.3.8: Playwright pasó 26/26, el build de producción terminó correctamente y el lint finalizó con código 0, cero errores y 186 advertencias preexistentes. La auditoría de dependencias de esa ejecución reportó 7 vulnerabilidades altas y 2 moderadas en el árbol completo, y 0 vulnerabilidades en el árbol de dependencias instalado omitiendo `devDependencies` (`npm audit --omit=dev`); estos resultados y los riesgos residuales se detallan en `doc/02-configuracion-seguridad.md`. El resultado de `npm audit --omit=dev` no garantiza por sí solo la seguridad del bundle generado, la configuración de despliegue ni la infraestructura de ejecución.
+
+La comprobación aislada de lint usó Node.js 22 y npm 10.9.4. Tanto `npm ci` como `npm run lint` finalizaron con código 0. El frontend actual analizó 150 archivos y registró 186 advertencias, 5 diagnósticos informativos y ningún error. La comparación reproducible contra `HEAD`, con 149 archivos analizados, registró las mismas 186 advertencias y los mismos 5 diagnósticos informativos, también sin errores y con código 0. No se identificaron diagnósticos nuevos en los cambios locales. Las advertencias existentes no bloquean el comando de lint ni acreditan por sí solas una ejecución integral satisfactoria de Maven o de CI.
+
+## Alcance de CI
+
+El workflow versionado configura Java 21 y ejecuta `./mvnw test` y el empaquetado backend; para frontend configura Node.js 22, ejecuta `npm ci`, `npm run build` y `npm run lint`. No incluye un arranque explícito de LocalStack, la generación de la configuración sintética usada por `LoggingSafetyConfigurationTest`, `npm audit` ni Playwright. Las pruebas operacionales `*IT` se ejecutaron explícitamente y en infraestructura efímera; las validaciones locales descritas arriba no acreditan un resultado de CI.
 
 ## Criterio documental
 

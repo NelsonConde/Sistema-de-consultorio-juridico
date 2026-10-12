@@ -421,11 +421,11 @@ class EstudianteSesionExpiradaPostgreSqlTest extends PostgreSqlIntegrationTest {
     private void seedScenario() {
         Permiso createUsers = new Permiso();
         createUsers.setNombre(CREAR_USUARIOS);
-        createUsers.setDescripcion("Permiso sintetico SCRUM-372");
+        createUsers.setDescripcion("Permiso sintetico de integracion");
         entityManager.persist(createUsers);
 
         Rol administratorRole = new Rol();
-        administratorRole.setNombre("Administrador SCRUM-372 " + executionId);
+        administratorRole.setNombre("Administrador de prueba " + executionId);
         administratorRole.setDescripcion("Rol sintetico de integracion");
         administratorRole.setTipoPerfil(TipoPerfilUsuario.ADMINISTRATIVO);
         administratorRole.setCodigoBase(CodigoRolBase.ADMINISTRADOR);
@@ -433,26 +433,26 @@ class EstudianteSesionExpiradaPostgreSqlTest extends PostgreSqlIntegrationTest {
         entityManager.persist(administratorRole);
 
         Rol studentRole = new Rol();
-        studentRole.setNombre("Estudiante SCRUM-372 " + executionId);
+        studentRole.setNombre("Estudiante de prueba " + executionId);
         studentRole.setDescripcion("Rol base sintetico de integracion");
         studentRole.setTipoPerfil(TipoPerfilUsuario.ESTUDIANTE);
         studentRole.setCodigoBase(CodigoRolBase.ESTUDIANTE);
         entityManager.persist(studentRole);
 
         Sede campus = new Sede();
-        campus.setNombre("Sede SCRUM-372 " + executionId);
+        campus.setNombre("Sede de prueba " + executionId);
         entityManager.persist(campus);
 
         TipoDocumento documentType = new TipoDocumento();
-        documentType.setNombre("Tipo SCRUM-372 " + executionId);
+        documentType.setNombre("Tipo documental de prueba " + executionId);
         entityManager.persist(documentType);
 
         Area area = new Area();
-        area.setNombre("Area SCRUM-372 " + executionId);
+        area.setNombre("Area de prueba " + executionId);
         entityManager.persist(area);
 
         Asesor advisor = new Asesor();
-        advisor.setNombre("Asesor sintetico SCRUM-372");
+        advisor.setNombre("Asesor sintetico de prueba");
         advisor.setTipoDocumento(documentType);
         advisor.setDocumento("ASE-DOC-" + executionId);
         advisor.setEmail("advisor." + executionId + "@integration.test");
@@ -472,7 +472,7 @@ class EstudianteSesionExpiradaPostgreSqlTest extends PostgreSqlIntegrationTest {
         entityManager.persist(administrator);
 
         Administrativo administratorProfile = new Administrativo();
-        administratorProfile.setNombre("Administrador sintetico SCRUM-372");
+        administratorProfile.setNombre("Administrador sintetico de prueba");
         administratorProfile.setTipoDocumento(documentType);
         administratorProfile.setDocumento("ADM-DOC-" + executionId);
         administratorProfile.setEmail(administratorUsername);

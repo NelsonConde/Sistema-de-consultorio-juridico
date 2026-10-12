@@ -15,7 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 class GlobalExceptionHandlerReasignacionTest {
 
     @Test
-    void respondeServiceUnavailableCuandoPb34NoEstaIntegrado() {
+    void respondeServiceUnavailableCuandoElServicioNoEstaIntegrado() {
         GlobalExceptionHandler handler = new GlobalExceptionHandler();
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getRequestURI()).thenReturn("/api/consultas/10/responsable");

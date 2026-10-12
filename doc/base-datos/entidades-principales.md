@@ -57,7 +57,10 @@ Criterio operativo:
 - el usuario del sistema es la entidad de autenticación;
 - el perfil real aporta datos funcionales del rol humano;
 - el sistema resuelve el perfil activo mediante estrategias por tipo de perfil;
-- al desactivar o reactivar perfiles desde sus servicios de comando, el estado se sincroniza con `UsuarioSistema`.
+- `UsuarioSistema.activo` representa el estado independiente de la cuenta y no se sincroniza desde operaciones directas de perfil;
+- una cuenta debe conservar un único perfil operativo activo; las inconsistencias preexistentes se rechazan sin saneamiento automático.
+
+Cada entidad de perfil declara una relación uno a uno con `UsuarioSistema` y unicidad de `usuario_sistema_id` dentro de su propia tabla. Esto evita duplicar una cuenta dentro de una misma tabla de perfil, pero no impone unicidad entre las cinco tablas. La exclusividad de perfil activo entre tipos se valida en la aplicación y se serializa con bloqueo transaccional; no se documenta una restricción de base de datos transversal ni una migración para esa regla.
 
 ### `rol`
 
@@ -1256,6 +1259,7 @@ La integridad se protege mediante:
 - bloqueo de cierre de consulta con pendientes;
 - bloqueo de cambio estructural de consulta con actividad asociada;
 - validación condicional de radicado en procesos;
-- sincronización entre perfil y usuario del sistema;
+- separación entre estado de cuenta y estado de perfil;
+- bloqueo pesimista por cuenta y validación de exclusividad en operaciones de perfil;
 - estrategias para cambio y resolución de perfil activo;
 - auditoría de acciones relevantes.

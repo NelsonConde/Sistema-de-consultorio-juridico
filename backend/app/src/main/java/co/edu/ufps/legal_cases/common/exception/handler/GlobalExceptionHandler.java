@@ -26,6 +26,7 @@ import co.edu.ufps.legal_cases.common.exception.AdministracionInvariantException
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.common.exception.ConcurrenciaOptimistaException;
 import co.edu.ufps.legal_cases.common.exception.ConsultaReasignacionNoDisponibleException;
+import co.edu.ufps.legal_cases.common.exception.PerfilOperacionConflictException;
 import co.edu.ufps.legal_cases.common.exception.ResourceNotFoundException;
 import co.edu.ufps.legal_cases.common.exception.dto.ErrorResponseDTO;
 import co.edu.ufps.legal_cases.common.observability.CorrelationIdContext;
@@ -47,6 +48,24 @@ public class GlobalExceptionHandler {
             AuditSecurityService auditSecurityService) {
 
         this.auditSecurityService = auditSecurityService;
+    }
+
+    @ExceptionHandler(PerfilOperacionConflictException.class)
+    public ResponseEntity<ErrorResponseDTO>
+    manejarPerfilOperacionConflictException(
+            PerfilOperacionConflictException ex,
+            HttpServletRequest request) {
+
+        ErrorResponseDTO error = construirErrorConDetalles(
+                HttpStatus.CONFLICT,
+                "Conflicto de operacion de perfil",
+                mensajeSeguro(
+                        ex.getMessage(),
+                        "La operacion no es compatible con el perfil actual"),
+                request,
+                Map.of("codigo", ex.getCodigo()));
+
+        return construirRespuesta(HttpStatus.CONFLICT, error);
     }
 
     @ExceptionHandler(AdministracionInvariantException.class)

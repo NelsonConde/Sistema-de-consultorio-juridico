@@ -10,7 +10,7 @@ La gestión documental del Sistema de Gestión de Casos Jurídicos del Consultor
 
 Este documento formaliza la ingeniería de requisitos correspondiente a:
 1. **Requerimientos Funcionales del SRS** (RF16, RF17, RF18, RF19, RF20, RF21, RF59, RF78, RF79, RF80).
-2. **Historias de Usuario del Product Backlog** (PB-27, PB-28, PB-29).
+2. **Historias de usuario** asociadas a los requerimientos funcionales.
 3. **Casos de Uso Detallados** (CU-10: *Administrar y consultar acervo probatorio y documental del expediente*).
 
 ---
@@ -120,10 +120,10 @@ Este documento formaliza la ingeniería de requisitos correspondiente a:
 
 ## 3. Historias de Usuario del Product Backlog (PB)
 
-### PB-27 (HU-27 / HU-31) — Modelo documental versionado y migración de metadatos
+### Modelo documental versionado y migración de metadatos
 
 ```gherkin
-Criterios de Aceptación (PB-27):
+Criterios de aceptación:
 
 Escenario: Primera versión de un documento
   Dado un recurso del dominio (Consulta, Seguimiento, Respuesta, Proceso o Conciliación)
@@ -146,10 +146,10 @@ Escenario: Nueva versión de un documento existente (Reemplazo controlado)
 
 ---
 
-### PB-28 (HU-28 / HU-34) — Flujo idempotente de carga y compensación
+### Flujo idempotente de carga y compensación
 
 ```gherkin
-Criterios de Aceptación (PB-28):
+Criterios de aceptación:
 
 Escenario: Reintento idempotente de finalización de carga
   Dado un uploadId que ya fue completado exitosamente previamente
@@ -167,10 +167,10 @@ Escenario: Falla de almacenamiento o cancelación de subida
 
 ---
 
-### PB-29 (HU-29 / HU-32 / HU-33) — Consulta documental agregada por expediente
+### Consulta documental agregada por expediente
 
 ```gherkin
-Criterios de Aceptación (PB-29):
+Criterios de aceptación:
 
 Escenario: Consulta integral del acervo probatorio del expediente
   Dado una consulta jurídica con identificador {consultaId}

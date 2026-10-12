@@ -1,7 +1,7 @@
 const { test, expect } = require("@playwright/test")
 
 const CONSULTA_ID = 281
-const UPLOAD_ID = "upload-scrum-281"
+const UPLOAD_ID = "upload-document-test-session"
 
 const PERSONA = {
     id: 501,
@@ -322,7 +322,7 @@ async function completarConsultaMinima(page) {
 
 async function adjuntarArchivo(page) {
     const content = Buffer.from(
-        "contenido documental SCRUM-281",
+        "contenido documental de prueba",
         "utf8",
     )
 
@@ -337,7 +337,7 @@ async function adjuntarArchivo(page) {
     return content
 }
 
-test.describe("SCRUM-281 - carga documental", () => {
+test.describe("Carga documental de nueva consulta", () => {
     test(
         "doble envío no duplica consulta ni sesión de carga",
         async ({ page }) => {
