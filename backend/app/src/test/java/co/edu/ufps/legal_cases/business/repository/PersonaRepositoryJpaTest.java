@@ -283,36 +283,36 @@ class PersonaRepositoryJpaTest extends PostgreSqlIntegrationTest {
 
     private void crearPerfiles() {
         asesor = new Asesor();
-        asesor.setNombre("Asesor SEC-07");
+        asesor.setNombre("Asesor de prueba");
         asesor.setTipoDocumento(tipoDocumentoPerfil);
         asesor.setDocumento("A-100");
-        asesor.setEmail("asesor.sec07@example.com");
+        asesor.setEmail("asesor.prueba@example.com");
         asesor.setTelefono("3000000100");
-        asesor.setUsuario("asesor.sec07");
+        asesor.setUsuario("asesor.prueba");
         asesor.setSede(sede);
         asesor.setCodigo("ASE-100");
         asesor.setArea(area);
         entityManager.persist(asesor);
 
         estudiante = new Estudiante();
-        estudiante.setNombre("Estudiante SEC-07");
+        estudiante.setNombre("Estudiante de prueba");
         estudiante.setTipoDocumento(tipoDocumentoPerfil);
         estudiante.setDocumento("E-100");
-        estudiante.setEmail("estudiante.sec07@example.com");
+        estudiante.setEmail("estudiante.prueba@example.com");
         estudiante.setTelefono("3000000200");
-        estudiante.setUsuario("estudiante.sec07");
+        estudiante.setUsuario("estudiante.prueba");
         estudiante.setSede(sede);
         estudiante.setCodigo("EST-100");
         estudiante.setAsesor(asesor);
         entityManager.persist(estudiante);
 
         monitor = new Monitor();
-        monitor.setNombre("Monitor SEC-07");
+        monitor.setNombre("Monitor de prueba");
         monitor.setTipoDocumento(tipoDocumentoPerfil);
         monitor.setDocumento("M-100");
-        monitor.setEmail("monitor.sec07@example.com");
+        monitor.setEmail("monitor.prueba@example.com");
         monitor.setTelefono("3000000300");
-        monitor.setUsuario("monitor.sec07");
+        monitor.setUsuario("monitor.prueba");
         monitor.setCodigo("MON-100");
         monitor.setSede(sede);
         entityManager.persist(monitor);

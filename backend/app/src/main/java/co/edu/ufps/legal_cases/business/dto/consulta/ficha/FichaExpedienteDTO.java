@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * DTO que consolida la totalidad de la información vigente del expediente (PB-35).
+ * DTO que consolida la totalidad de la información vigente del expediente.
  * Agrupa identificación, estado/resultado, partes, clasificación, responsables,
  * seguimientos, proceso judicial, conciliación e índice documental sin exponer
  * rutas internas ni copias de archivos.

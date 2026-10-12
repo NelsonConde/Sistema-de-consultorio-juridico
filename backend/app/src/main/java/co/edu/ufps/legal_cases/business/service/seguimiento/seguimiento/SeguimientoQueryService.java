@@ -65,7 +65,7 @@ public class SeguimientoQueryService {
                 this.seguimientoValidator = seguimientoValidator;
         }
 
-        // Listado paginado principal – Bloque A (SCRUM-269).
+        // Listado paginado principal.
         @Transactional(readOnly = true)
         public PageResponseDTO<SeguimientoResumenDTO> buscarParaUsuarioActual(
                         String search,
@@ -127,7 +127,7 @@ public class SeguimientoQueryService {
                                 resultado.getTotalPages());
         }
 
-        // Calendario por rango – Bloque B (SCRUM-269).
+        // Calendario por rango.
         // Reemplaza listarParaCalendario() que usaba findAll() + filtros en memoria.
         // El endpoint GET /api/seguimientos/calendario ahora requiere from y to.
         @Transactional(readOnly = true)
@@ -200,7 +200,7 @@ public class SeguimientoQueryService {
                                 .toList();
         }
 
-        // Listar por autor con scope de consulta en SQL – Bloque B (SCRUM-269).
+        // Listar por autor con scope de consulta en SQL.
         // La validación de autorId (ADMIN vs no-admin) se preserva en SeguimientoAccessService.
         // El post-filtrado puedeVerSeguimiento fue eliminado: el scope está en la query.
         @Transactional(readOnly = true)
@@ -254,7 +254,7 @@ public class SeguimientoQueryService {
                                 .toList();
         }
 
-        // Listar por fecha de entrega con scope en SQL – Bloque B (SCRUM-269).
+        // Listar por fecha de entrega con scope en SQL.
         // El post-filtrado puedeVerSeguimiento fue eliminado.
         @Transactional(readOnly = true)
         public List<SeguimientoResponseDTO> listarPorFechaEntrega(LocalDate fechaEntrega) {
@@ -285,7 +285,7 @@ public class SeguimientoQueryService {
                                 .toList();
         }
 
-        // Consulta para Agenda: rango y scope resueltos en SQL – Bloque B (SCRUM-269).
+        // Consulta para Agenda: rango y scope resueltos en SQL.
         // AgendaQueryService llama este método; no filtra fechaEntrega en Java.
         @Transactional(readOnly = true)
         public List<SeguimientoAgendaProjection> buscarParaAgenda(LocalDate from, LocalDate to) {

@@ -137,7 +137,7 @@ public class UsuarioSistemaRegistroService {
         /*
          * Comportamiento existente:
          * la contraseña inicial se deriva actualmente del documento y se almacena cifrada.
-         * Su revisión corresponde a otro hallazgo y queda fuera del alcance de SEC-10.
+         * La revisión de este comportamiento queda fuera del alcance de este servicio.
          */
         usuario.setPasswordHash(passwordEncoder.encode(passwordInicial));
 

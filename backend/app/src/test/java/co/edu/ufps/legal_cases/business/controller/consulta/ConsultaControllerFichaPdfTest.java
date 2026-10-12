@@ -80,7 +80,7 @@ class ConsultaControllerFichaPdfTest {
     }
 
     @Test
-    @DisplayName("GET /api/consultas/{id}/ficha retorna 200 OK con datos consolidados JSON de PB-35")
+    @DisplayName("GET /api/consultas/{id}/ficha retorna 200 OK con datos consolidados")
     void debeConsultarDatosVigentesFichaJson() throws Exception {
         Long consultaId = 10L;
         FichaExpedienteDTO dto = FichaExpedienteDTO.builder()

@@ -21,7 +21,7 @@ import co.edu.ufps.legal_cases.common.concurrency.ConcurrenciaOptimistaValidator
 import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaRepository;
 import jakarta.persistence.EntityManager;
 
-class SeguimientoCommandServiceDb03Test {
+class SeguimientoCommandServiceVersioningTest {
 
     @Test
     void eliminarCancelaNotificacionesSoloDespuesDeFlushVersionado() {

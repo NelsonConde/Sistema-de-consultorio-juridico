@@ -8,14 +8,14 @@ import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaBusquedaDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.Consulta;
 import co.edu.ufps.legal_cases.business.model.persona.Persona;
 
-class ConsultaMapperDb03Test {
+class ConsultaMapperVersionTest {
 
     @Test
     void busquedaExponeVersionParaAccionesOptimistasDesdeListados() {
         Consulta consulta = new Consulta();
         consulta.setId(10L);
         consulta.setVersion(7L);
-        consulta.setDescripcion("Consulta DB-03");
+        consulta.setDescripcion("Consulta con control de version");
 
         Persona persona = new Persona();
         persona.setNombres("Ana");
@@ -28,6 +28,6 @@ class ConsultaMapperDb03Test {
 
         assertEquals(10L, dto.getId());
         assertEquals(7L, dto.getVersion());
-        assertEquals("Consulta DB-03", dto.getConsulta());
+        assertEquals("Consulta con control de version", dto.getConsulta());
     }
 }

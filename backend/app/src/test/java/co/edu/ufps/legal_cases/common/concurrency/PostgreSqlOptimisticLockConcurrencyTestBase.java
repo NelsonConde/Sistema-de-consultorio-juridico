@@ -7,13 +7,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 @Testcontainers(disabledWithoutDocker = true)
-abstract class Db03PostgreSqlTestBase {
+abstract class PostgreSqlOptimisticLockConcurrencyTestBase {
 
     @SuppressWarnings("resource")
     @Container
     static final PostgreSQLContainer POSTGRESQL =
             new PostgreSQLContainer("postgres:16-alpine")
-                    .withDatabaseName("legal_cases_db03")
+                    .withDatabaseName("legal_cases_concurrency_test")
                     .withUsername("legal_cases")
                     .withPassword("legal_cases");
 

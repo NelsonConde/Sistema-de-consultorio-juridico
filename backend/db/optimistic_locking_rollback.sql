@@ -1,7 +1,7 @@
-﻿-- DB-03 - Plan de recuperacion para control de concurrencia optimista
+-- Plan de recuperacion para control de concurrencia optimista
 --
 -- IMPORTANTE:
--- Este script elimina las columnas de version agregadas por DB-03.
+-- Este script elimina las columnas de version agregadas por el control de concurrencia optimista.
 -- Solo debe ejecutarse si tambien se revierte el codigo de aplicacion
 -- que utiliza @Version y los contratos HTTP que envian/validan version.
 --

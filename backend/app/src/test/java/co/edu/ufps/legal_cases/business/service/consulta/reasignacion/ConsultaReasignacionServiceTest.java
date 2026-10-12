@@ -149,7 +149,7 @@ class ConsultaReasignacionServiceTest {
     }
 
     @Test
-    void bloqueaLaOperacionAntesDeModificarCuandoPb34NoEstaIntegrado() {
+    void bloqueaLaOperacionAntesDeModificarCuandoElServicioNoEstaIntegrado() {
         service = crearService(Optional.empty());
 
         assertThrows(
