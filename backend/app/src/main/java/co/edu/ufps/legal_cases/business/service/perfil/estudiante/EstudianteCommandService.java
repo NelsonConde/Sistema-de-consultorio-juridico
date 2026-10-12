@@ -24,8 +24,11 @@ import co.edu.ufps.legal_cases.business.repository.perfil.EstudianteRepository;
 import co.edu.ufps.legal_cases.business.service.acceso.perfil.EstudianteAccessService;
 import co.edu.ufps.legal_cases.business.service.consulta.consulta.ConsultaResponsableOperacionService;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
-import co.edu.ufps.legal_cases.security.service.account.usuario.UsuarioSistemaPerfilEstadoService;
+import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaRepository;
+import co.edu.ufps.legal_cases.security.service.account.perfil.OperacionEstadoPerfil;
+import co.edu.ufps.legal_cases.security.service.account.perfil.PerfilOperacionEstadoValidator;
 import co.edu.ufps.legal_cases.security.service.account.usuario.UsuarioSistemaRegistroService;
 
 @Service
@@ -36,7 +39,8 @@ public class EstudianteCommandService {
     private final SedeRepository sedeRepository;
     private final AsesorRepository asesorRepository;
     private final UsuarioSistemaRegistroService usuarioSistemaRegistroService;
-    private final UsuarioSistemaPerfilEstadoService usuarioSistemaPerfilEstadoService;
+    private final UsuarioSistemaRepository usuarioSistemaRepository;
+    private final PerfilOperacionEstadoValidator perfilOperacionEstadoValidator;
     private final EstudianteAccessService estudianteAccessService;
     private final EstudianteValidator estudianteValidator;
     private final EstudianteMapper estudianteMapper;
@@ -48,7 +52,8 @@ public class EstudianteCommandService {
             SedeRepository sedeRepository,
             AsesorRepository asesorRepository,
             UsuarioSistemaRegistroService usuarioSistemaRegistroService,
-            UsuarioSistemaPerfilEstadoService usuarioSistemaPerfilEstadoService,
+            UsuarioSistemaRepository usuarioSistemaRepository,
+            PerfilOperacionEstadoValidator perfilOperacionEstadoValidator,
             EstudianteAccessService estudianteAccessService,
             EstudianteValidator estudianteValidator,
             EstudianteMapper estudianteMapper,
@@ -58,7 +63,8 @@ public class EstudianteCommandService {
         this.sedeRepository = sedeRepository;
         this.asesorRepository = asesorRepository;
         this.usuarioSistemaRegistroService = usuarioSistemaRegistroService;
-        this.usuarioSistemaPerfilEstadoService = usuarioSistemaPerfilEstadoService;
+        this.usuarioSistemaRepository = usuarioSistemaRepository;
+        this.perfilOperacionEstadoValidator = perfilOperacionEstadoValidator;
         this.estudianteAccessService = estudianteAccessService;
         this.estudianteValidator = estudianteValidator;
         this.estudianteMapper = estudianteMapper;
@@ -135,7 +141,13 @@ public class EstudianteCommandService {
     public EstudianteDTO cambiarEstado(Long id, Boolean activo) {
         estudianteAccessService.validarPuedeCambiarEstadoEstudiante();
 
-        Estudiante estudiante = buscarPorId(id);
+        Estudiante estudiante = buscarPorIdConUsuarioBloqueado(id);
+
+        if (activo == null) {
+            estudianteValidator.validarCambioEstado(estudiante, null);
+        }
+
+        validarOperacionDirectaSiTieneUsuario(estudiante, activo);
 
         estudianteValidator.validarCambioEstado(estudiante, activo);
 
@@ -145,15 +157,8 @@ public class EstudianteCommandService {
 
         estudiante.setActivo(activo);
 
-        Estudiante guardado = estudianteRepository.save(estudiante);
-
-        // El estado operativo del perfil y del usuario de acceso deben permanecer
-        // sincronizados.
-        usuarioSistemaPerfilEstadoService.sincronizarEstadoSiExiste(
-                guardado.getUsuarioSistema(),
-                activo);
-
-        return estudianteMapper.convertirADTO(guardado);
+        return estudianteMapper.convertirADTO(
+                estudianteRepository.save(estudiante));
     }
 
     @Transactional
@@ -180,7 +185,9 @@ public class EstudianteCommandService {
     public void eliminar(Long id) {
         estudianteAccessService.validarPuedeGestionarEstudiantes();
 
-        Estudiante estudiante = buscarPorId(id);
+        Estudiante estudiante = buscarPorIdConUsuarioBloqueado(id);
+
+        validarOperacionDirectaSiTieneUsuario(estudiante, false);
 
         // Se conserva el perfil y se desactiva porque puede estar asociado a consultas
         // y seguimientos.
@@ -189,11 +196,39 @@ public class EstudianteCommandService {
 
         estudiante.setActivo(false);
 
-        Estudiante guardado = estudianteRepository.save(estudiante);
+        estudianteRepository.save(estudiante);
+    }
 
-        usuarioSistemaPerfilEstadoService.sincronizarEstadoSiExiste(
-                guardado.getUsuarioSistema(),
-                false);
+    private Estudiante buscarPorIdConUsuarioBloqueado(Long id) {
+        estudianteRepository.findUsuarioSistemaIdById(id)
+                .ifPresent(this::bloquearUsuarioSistema);
+
+        return buscarPorId(id);
+    }
+
+    private void bloquearUsuarioSistema(Long usuarioSistemaId) {
+        usuarioSistemaRepository.findByIdForUpdate(usuarioSistemaId)
+                .orElseThrow(() -> new BusinessException(
+                        "Usuario del sistema no encontrado con id: "
+                                + usuarioSistemaId));
+    }
+
+    private void validarOperacionDirectaSiTieneUsuario(
+            Estudiante estudiante,
+            Boolean activo) {
+
+        UsuarioSistema usuarioSistema = estudiante.getUsuarioSistema();
+
+        if (usuarioSistema == null) {
+            return;
+        }
+
+        perfilOperacionEstadoValidator.validarOperacionDirecta(
+                usuarioSistema,
+                TipoPerfilUsuario.ESTUDIANTE,
+                Boolean.TRUE.equals(activo)
+                        ? OperacionEstadoPerfil.ACTIVAR
+                        : OperacionEstadoPerfil.DESACTIVAR);
     }
 
     private DatosEstudiante prepararDatos(

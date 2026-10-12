@@ -3,6 +3,7 @@ package co.edu.ufps.legal_cases.business.service.perfil.administrativo;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -14,7 +15,8 @@ import co.edu.ufps.legal_cases.business.repository.catalogo.TipoDocumentoReposit
 import co.edu.ufps.legal_cases.business.repository.perfil.AdministrativoRepository;
 import co.edu.ufps.legal_cases.business.service.acceso.perfil.AdministrativoAccessService;
 import co.edu.ufps.legal_cases.common.exception.AdministracionInvariantException;
-import co.edu.ufps.legal_cases.security.service.account.usuario.UsuarioSistemaPerfilEstadoService;
+import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaRepository;
+import co.edu.ufps.legal_cases.security.service.account.perfil.PerfilOperacionEstadoValidator;
 import co.edu.ufps.legal_cases.security.service.account.usuario.UsuarioSistemaRegistroService;
 import co.edu.ufps.legal_cases.security.service.invariant.administracion.AdministracionInvariantService;
 
@@ -40,8 +42,11 @@ class AdministrativoCommandServiceInvariantTest {
         UsuarioSistemaRegistroService registroService =
                 mock(UsuarioSistemaRegistroService.class);
 
-        UsuarioSistemaPerfilEstadoService perfilEstadoService =
-                mock(UsuarioSistemaPerfilEstadoService.class);
+        UsuarioSistemaRepository usuarioSistemaRepository =
+                mock(UsuarioSistemaRepository.class);
+
+        PerfilOperacionEstadoValidator perfilOperacionEstadoValidator =
+                mock(PerfilOperacionEstadoValidator.class);
 
         accessService =
                 mock(AdministrativoAccessService.class);
@@ -60,7 +65,8 @@ class AdministrativoCommandServiceInvariantTest {
                 tipoDocumentoRepository,
                 sedeRepository,
                 registroService,
-                perfilEstadoService,
+                usuarioSistemaRepository,
+                perfilOperacionEstadoValidator,
                 accessService,
                 validator,
                 mapper,
@@ -93,8 +99,10 @@ class AdministrativoCommandServiceInvariantTest {
                         id,
                         false);
 
-        verifyNoInteractions(
-                administrativoRepository);
+        verify(administrativoRepository)
+                .findUsuarioSistemaIdById(id);
+        verify(administrativoRepository, never())
+                .findById(id);
     }
 
     @Test
@@ -141,7 +149,9 @@ class AdministrativoCommandServiceInvariantTest {
         verify(invariantService)
                 .validarEliminacionAdministrativo(id);
 
-        verifyNoInteractions(
-                administrativoRepository);
+        verify(administrativoRepository)
+                .findUsuarioSistemaIdById(id);
+        verify(administrativoRepository, never())
+                .findById(id);
     }
 }

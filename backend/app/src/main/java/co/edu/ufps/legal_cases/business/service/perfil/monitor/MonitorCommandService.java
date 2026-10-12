@@ -22,8 +22,11 @@ import co.edu.ufps.legal_cases.business.repository.perfil.MonitorRepository;
 import co.edu.ufps.legal_cases.business.service.acceso.perfil.AsesorMonitorAccessService;
 import co.edu.ufps.legal_cases.business.service.consulta.consulta.ConsultaResponsableOperacionService;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
-import co.edu.ufps.legal_cases.security.service.account.usuario.UsuarioSistemaPerfilEstadoService;
+import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaRepository;
+import co.edu.ufps.legal_cases.security.service.account.perfil.OperacionEstadoPerfil;
+import co.edu.ufps.legal_cases.security.service.account.perfil.PerfilOperacionEstadoValidator;
 import co.edu.ufps.legal_cases.security.service.account.usuario.UsuarioSistemaRegistroService;
 
 @Service
@@ -33,7 +36,8 @@ public class MonitorCommandService {
     private final TipoDocumentoRepository tipoDocumentoRepository;
     private final SedeRepository sedeRepository;
     private final UsuarioSistemaRegistroService usuarioSistemaRegistroService;
-    private final UsuarioSistemaPerfilEstadoService usuarioSistemaPerfilEstadoService;
+    private final UsuarioSistemaRepository usuarioSistemaRepository;
+    private final PerfilOperacionEstadoValidator perfilOperacionEstadoValidator;
     private final AsesorMonitorAccessService asesorMonitorAccessService;
     private final MonitorValidator monitorValidator;
     private final MonitorMapper monitorMapper;
@@ -44,7 +48,8 @@ public class MonitorCommandService {
             TipoDocumentoRepository tipoDocumentoRepository,
             SedeRepository sedeRepository,
             UsuarioSistemaRegistroService usuarioSistemaRegistroService,
-            UsuarioSistemaPerfilEstadoService usuarioSistemaPerfilEstadoService,
+            UsuarioSistemaRepository usuarioSistemaRepository,
+            PerfilOperacionEstadoValidator perfilOperacionEstadoValidator,
             AsesorMonitorAccessService asesorMonitorAccessService,
             MonitorValidator monitorValidator,
             MonitorMapper monitorMapper,
@@ -53,7 +58,8 @@ public class MonitorCommandService {
         this.tipoDocumentoRepository = tipoDocumentoRepository;
         this.sedeRepository = sedeRepository;
         this.usuarioSistemaRegistroService = usuarioSistemaRegistroService;
-        this.usuarioSistemaPerfilEstadoService = usuarioSistemaPerfilEstadoService;
+        this.usuarioSistemaRepository = usuarioSistemaRepository;
+        this.perfilOperacionEstadoValidator = perfilOperacionEstadoValidator;
         this.asesorMonitorAccessService = asesorMonitorAccessService;
         this.monitorValidator = monitorValidator;
         this.monitorMapper = monitorMapper;
@@ -128,7 +134,13 @@ public class MonitorCommandService {
     public MonitorDTO cambiarEstado(Long id, Boolean activo) {
         asesorMonitorAccessService.validarPuedeGestionarAsesoresYMonitores();
 
-        Monitor monitor = buscarPorId(id);
+        Monitor monitor = buscarPorIdConUsuarioBloqueado(id);
+
+        if (activo == null) {
+            monitorValidator.validarCambioEstado(monitor, null);
+        }
+
+        validarOperacionDirectaSiTieneUsuario(monitor, activo);
 
         monitorValidator.validarCambioEstado(monitor, activo);
 
@@ -138,15 +150,8 @@ public class MonitorCommandService {
 
         monitor.setActivo(activo);
 
-        Monitor guardado = monitorRepository.save(monitor);
-
-        // El estado operativo del perfil y del usuario de acceso deben permanecer
-        // sincronizados.
-        usuarioSistemaPerfilEstadoService.sincronizarEstadoSiExiste(
-                guardado.getUsuarioSistema(),
-                activo);
-
-        return monitorMapper.convertirADTO(guardado);
+        return monitorMapper.convertirADTO(
+                monitorRepository.save(monitor));
     }
 
     @Transactional
@@ -154,7 +159,9 @@ public class MonitorCommandService {
     public void eliminar(Long id) {
         asesorMonitorAccessService.validarPuedeGestionarAsesoresYMonitores();
 
-        Monitor monitor = buscarPorId(id);
+        Monitor monitor = buscarPorIdConUsuarioBloqueado(id);
+
+        validarOperacionDirectaSiTieneUsuario(monitor, false);
 
         // Se conserva el perfil y se desactiva porque puede estar asociado a consultas
         // o seguimientos.
@@ -163,11 +170,39 @@ public class MonitorCommandService {
 
         monitor.setActivo(false);
 
-        Monitor guardado = monitorRepository.save(monitor);
+        monitorRepository.save(monitor);
+    }
 
-        usuarioSistemaPerfilEstadoService.sincronizarEstadoSiExiste(
-                guardado.getUsuarioSistema(),
-                false);
+    private Monitor buscarPorIdConUsuarioBloqueado(Long id) {
+        monitorRepository.findUsuarioSistemaIdById(id)
+                .ifPresent(this::bloquearUsuarioSistema);
+
+        return buscarPorId(id);
+    }
+
+    private void bloquearUsuarioSistema(Long usuarioSistemaId) {
+        usuarioSistemaRepository.findByIdForUpdate(usuarioSistemaId)
+                .orElseThrow(() -> new BusinessException(
+                        "Usuario del sistema no encontrado con id: "
+                                + usuarioSistemaId));
+    }
+
+    private void validarOperacionDirectaSiTieneUsuario(
+            Monitor monitor,
+            Boolean activo) {
+
+        UsuarioSistema usuarioSistema = monitor.getUsuarioSistema();
+
+        if (usuarioSistema == null) {
+            return;
+        }
+
+        perfilOperacionEstadoValidator.validarOperacionDirecta(
+                usuarioSistema,
+                TipoPerfilUsuario.MONITOR,
+                Boolean.TRUE.equals(activo)
+                        ? OperacionEstadoPerfil.ACTIVAR
+                        : OperacionEstadoPerfil.DESACTIVAR);
     }
 
     private DatosMonitor prepararDatos(MonitorDTO dto, Boolean activo) {

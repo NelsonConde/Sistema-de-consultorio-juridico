@@ -21,8 +21,11 @@ import co.edu.ufps.legal_cases.business.repository.catalogo.TipoDocumentoReposit
 import co.edu.ufps.legal_cases.business.repository.perfil.AdministrativoRepository;
 import co.edu.ufps.legal_cases.business.service.acceso.perfil.AdministrativoAccessService;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
-import co.edu.ufps.legal_cases.security.service.account.usuario.UsuarioSistemaPerfilEstadoService;
+import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaRepository;
+import co.edu.ufps.legal_cases.security.service.account.perfil.OperacionEstadoPerfil;
+import co.edu.ufps.legal_cases.security.service.account.perfil.PerfilOperacionEstadoValidator;
 import co.edu.ufps.legal_cases.security.service.account.usuario.UsuarioSistemaRegistroService;
 import co.edu.ufps.legal_cases.security.service.invariant.administracion.AdministracionInvariantService;
 
@@ -33,7 +36,8 @@ public class AdministrativoCommandService {
     private final TipoDocumentoRepository tipoDocumentoRepository;
     private final SedeRepository sedeRepository;
     private final UsuarioSistemaRegistroService usuarioSistemaRegistroService;
-    private final UsuarioSistemaPerfilEstadoService usuarioSistemaPerfilEstadoService;
+    private final UsuarioSistemaRepository usuarioSistemaRepository;
+    private final PerfilOperacionEstadoValidator perfilOperacionEstadoValidator;
     private final AdministrativoAccessService administrativoAccessService;
     private final AdministrativoValidator administrativoValidator;
     private final AdministrativoMapper administrativoMapper;
@@ -44,7 +48,8 @@ public class AdministrativoCommandService {
             TipoDocumentoRepository tipoDocumentoRepository,
             SedeRepository sedeRepository,
             UsuarioSistemaRegistroService usuarioSistemaRegistroService,
-            UsuarioSistemaPerfilEstadoService usuarioSistemaPerfilEstadoService,
+            UsuarioSistemaRepository usuarioSistemaRepository,
+            PerfilOperacionEstadoValidator perfilOperacionEstadoValidator,
             AdministrativoAccessService administrativoAccessService,
             AdministrativoValidator administrativoValidator,
             AdministrativoMapper administrativoMapper,
@@ -53,7 +58,8 @@ public class AdministrativoCommandService {
         this.tipoDocumentoRepository = tipoDocumentoRepository;
         this.sedeRepository = sedeRepository;
         this.usuarioSistemaRegistroService = usuarioSistemaRegistroService;
-        this.usuarioSistemaPerfilEstadoService = usuarioSistemaPerfilEstadoService;
+        this.usuarioSistemaRepository = usuarioSistemaRepository;
+        this.perfilOperacionEstadoValidator = perfilOperacionEstadoValidator;
         this.administrativoAccessService = administrativoAccessService;
         this.administrativoValidator = administrativoValidator;
         this.administrativoMapper = administrativoMapper;
@@ -133,22 +139,14 @@ public class AdministrativoCommandService {
     public AdministrativoDTO cambiarEstado(Long id, Boolean activo) {
         administrativoAccessService.validarPuedeGestionarAdministradores();
 
-        administracionInvariantService.validarCambioEstadoAdministrativo(id, activo);
-        Administrativo administrativo = buscarPorId(id);
+        Administrativo administrativo = buscarParaOperacionDirecta(id, activo, false);
 
         administrativoValidator.validarCambioEstado(administrativo, activo);
 
         administrativo.setActivo(activo);
 
-        Administrativo guardado = administrativoRepository.save(administrativo);
-
-        // El estado operativo del perfil y del usuario de acceso deben permanecer
-        // sincronizados.
-        usuarioSistemaPerfilEstadoService.sincronizarEstadoSiExiste(
-                guardado.getUsuarioSistema(),
-                activo);
-
-        return administrativoMapper.convertirADTO(guardado);
+        return administrativoMapper.convertirADTO(
+                administrativoRepository.save(administrativo));
     }
 
     @Transactional
@@ -176,8 +174,7 @@ public class AdministrativoCommandService {
     public void eliminar(Long id) {
         administrativoAccessService.validarPuedeGestionarAdministradores();
 
-        administracionInvariantService.validarEliminacionAdministrativo(id);
-        Administrativo administrativo = buscarPorId(id);
+        Administrativo administrativo = buscarParaOperacionDirecta(id, false, true);
 
         // Se conserva el perfil y se desactiva porque tiene usuario del sistema
         // asociado.
@@ -185,11 +182,57 @@ public class AdministrativoCommandService {
 
         administrativo.setActivo(false);
 
-        Administrativo guardado = administrativoRepository.save(administrativo);
+        administrativoRepository.save(administrativo);
+    }
 
-        usuarioSistemaPerfilEstadoService.sincronizarEstadoSiExiste(
-                guardado.getUsuarioSistema(),
-                false);
+    private Administrativo buscarParaOperacionDirecta(
+            Long id,
+            Boolean activo,
+            boolean eliminacion) {
+
+        var usuarioSistemaId = administrativoRepository
+                .findUsuarioSistemaIdById(id);
+
+        if (usuarioSistemaId.isEmpty()) {
+            validarContinuidadAdministrativa(id, activo, eliminacion);
+            return buscarPorId(id);
+        }
+
+        bloquearUsuarioSistema(usuarioSistemaId.get());
+        Administrativo administrativo = buscarPorId(id);
+
+        if (activo == null) {
+            administrativoValidator.validarCambioEstado(administrativo, null);
+        }
+
+        perfilOperacionEstadoValidator.validarOperacionDirecta(
+                administrativo.getUsuarioSistema(),
+                TipoPerfilUsuario.ADMINISTRATIVO,
+                Boolean.TRUE.equals(activo)
+                        ? OperacionEstadoPerfil.ACTIVAR
+                        : OperacionEstadoPerfil.DESACTIVAR);
+
+        return administrativo;
+    }
+
+    private void bloquearUsuarioSistema(Long usuarioSistemaId) {
+        usuarioSistemaRepository.findByIdForUpdate(usuarioSistemaId)
+                .orElseThrow(() -> new BusinessException(
+                        "Usuario del sistema no encontrado con id: "
+                                + usuarioSistemaId));
+    }
+
+    private void validarContinuidadAdministrativa(
+            Long id,
+            Boolean activo,
+            boolean eliminacion) {
+
+        if (eliminacion) {
+            administracionInvariantService.validarEliminacionAdministrativo(id);
+            return;
+        }
+
+        administracionInvariantService.validarCambioEstadoAdministrativo(id, activo);
     }
 
     private DatosAdministrativo prepararDatos(

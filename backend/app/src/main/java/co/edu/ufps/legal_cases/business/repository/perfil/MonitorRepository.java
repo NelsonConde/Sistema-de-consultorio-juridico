@@ -44,6 +44,9 @@ public interface MonitorRepository extends JpaRepository<Monitor, Long> {
 
     Optional<Monitor> findByUsuarioSistema_Id(Long usuarioSistemaId);
 
+    @Query("SELECT m.usuarioSistema.id FROM Monitor m WHERE m.id = :id")
+    Optional<Long> findUsuarioSistemaIdById(@Param("id") Long id);
+
     // Para obtener los datos de notificar
     @Query("""
             SELECT new co.edu.ufps.legal_cases.business.dto.seguimiento.notificacion.SeguimientoDestinatarioDTO(
