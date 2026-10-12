@@ -35,6 +35,7 @@ y scripts asociados en `frontend/package.json`.
 | `JpaConsultaReasignacionHistorialWriterPostgreSqlTest` | Verifica campos, eventos sucesivos, restricciones, inmutabilidad y participación transaccional en PostgreSQL. |
 | `ConsultaReasignacionEndpointPostgreSqlTest` | Ejecuta el endpoint con Spring Security, JWT, CSRF, JPA y PostgreSQL; cubre autorización, rollback y concurrencia. |
 | `EstudianteSesionExpiradaPostgreSqlTest` | Comprueba con la cadena real de Spring Security que la creación de estudiante y cuenta solo ocurre con JWT y CSRF válidos, y que los intentos rechazados no persisten datos. |
+| `PerfilEstudianteReactivacionPostgreSqlTest` | Caracteriza identidad compartida, reactivación, autenticación, autorización, desactivación y cambio explícito entre perfiles ESTUDIANTE y ASESOR sobre PostgreSQL real. |
 | `GlobalExceptionHandlerReasignacionTest` | Comprueba la respuesta segura cuando el historial obligatorio no está disponible. |
 | `ProcesoValidatorTest` | Valida radicado condicional: permitido en pendiente y obligatorio en estados finales. |
 | `SeguimientoValidatorTest` | Valida que `notificarEstudiante=true` requiera estudiante asignado y activo. |
@@ -88,7 +89,7 @@ cd backend/app
 
 ## Integración con PostgreSQL y seguridad HTTP
 
-Las pruebas `JpaConsultaReasignacionHistorialWriterPostgreSqlTest` y `ConsultaReasignacionEndpointPostgreSqlTest` usan PostgreSQL 16 mediante Testcontainers. El contenedor es efímero y crea exclusivamente el esquema de prueba; no utiliza una base persistente del desarrollador.
+Las pruebas `JpaConsultaReasignacionHistorialWriterPostgreSqlTest`, `ConsultaReasignacionEndpointPostgreSqlTest`, `EstudianteSesionExpiradaPostgreSqlTest` y `PerfilEstudianteReactivacionPostgreSqlTest` usan PostgreSQL 16 mediante Testcontainers. El contenedor es efímero y crea exclusivamente el esquema de prueba; no utiliza una base persistente del desarrollador.
 
 La prueba del endpoint carga el contexto completo de Spring Boot y ejecuta `MockMvc` a través de la cadena real de seguridad. Obtiene el token CSRF desde `/api/auth/csrf`, usa el JWT en cookie y verifica respuestas `200`, `400`, `401`, `403` y `409` según el escenario.
 
@@ -128,6 +129,47 @@ Ejecución focalizada verificada desde `backend/app`:
 ```
 
 La ejecución local focalizada registró 7 pruebas aprobadas, sin fallos, errores ni pruebas omitidas. También se ejecutaron 13 pruebas existentes relacionadas con CSRF, respuestas de seguridad, sesión autenticada, rotación CSRF y registro de usuarios; las 13 fueron aprobadas. Estos resultados no equivalen a una ejecución de la suite completa.
+
+### Reactivación y cambio explícito de perfiles
+
+`PerfilEstudianteReactivacionPostgreSqlTest` caracteriza la interacción entre una cuenta compartida y sus perfiles ESTUDIANTE y ASESOR. Usa el contexto completo de Spring Boot, `MockMvc`, la cadena real de Spring Security, JWT en cookie, CSRF válido, JPA y PostgreSQL 16 mediante Testcontainers. No sustituye la autenticación con `@WithMockUser`.
+
+Los casos P01 a P12 cubren:
+
+- identidad compartida comprobada mediante `usuario_sistema_id` y diferenciación frente a cuentas distintas;
+- estado inicial con ASESOR como `tipoPerfilActual` y estudiante histórico inactivo;
+- reactivación directa del estudiante y comprobación de ambos perfiles activos;
+- respuesta de `/api/auth/me` y permisos efectivos del rol asesor;
+- rechazo por falta de permiso y rechazo por falta de alcance como controles diferentes;
+- cambio explícito ASESOR a ESTUDIANTE, conservación de cuenta, actualización de rol y perfil actual, e historial;
+- desactivación directa del estudiante no actual y del asesor actual;
+- rehabilitación indirecta de una cuenta inactiva al reactivar un perfil histórico;
+- rechazo de autenticación cuando el perfil indicado por `tipoPerfilActual` está inactivo;
+- bloqueo y rollback del cambio explícito cuando el asesor tiene consultas operativas;
+- aislamiento respecto de cuentas y perfiles con información sintética semejante.
+
+Antes de crear datos, la prueba confirma que el datasource activo coincide exactamente con la URL del Testcontainer, que el catálogo es `legal_cases_test`, que el producto es PostgreSQL y que su versión mayor es 16.
+
+Ejecución focalizada verificada desde `backend/app`:
+
+```powershell
+.\mvnw.cmd '-Dtest=PerfilEstudianteReactivacionPostgreSqlTest' test
+```
+
+La ejecución local del diagnóstico registró:
+
+- 12 pruebas de integración de reactivación de perfiles aprobadas;
+- 24 pruebas unitarias relacionadas con estado, resolución y cambio de perfil aprobadas;
+- 7 pruebas de seguridad por expiración de sesión aprobadas;
+- 43 pruebas en total, sin fallos, errores ni omisiones.
+
+Este total corresponde a ejecuciones focalizadas locales y no a CI ni a la suite completa.
+
+Los casos P01 a P12 son pruebas de caracterización: acreditan de forma reproducible lo que hace la implementación actual, incluso cuando el resultado revela un riesgo o un vacío funcional. Un resultado PASS no afirma que la conducta observada sea la política de negocio correcta.
+
+Si se formalizan nuevas reglas de exclusividad, rechazo de activación histórica o control independiente de la cuenta, algunas expectativas actuales deberán cambiar. En ese momento se requerirán pruebas de regresión que esperen el nuevo contrato, por ejemplo `409 Conflict` sin mutaciones para una activación incompatible.
+
+El detalle de escenarios, resultados HTTP, persistencia, riesgos, vacíos y propuesta funcional se encuentra en `doc/evidencias/diagnostico-reactivacion-perfiles.md`.
 
 ## Ejecución frontend
 
