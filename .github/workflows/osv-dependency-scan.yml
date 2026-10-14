@@ -1,0 +1,26 @@
+name: OSV dependency vulnerability scan
+
+on:
+  pull_request:
+    branches: [develop, staging, main]
+  schedule:
+    - cron: "39 6 * * 3"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  osv-scan:
+    name: Scan Maven and npm dependency manifests
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.7.0
+    with:
+      # Limit inspection to the two public dependency manifests.
+      # No recursive traversal of application configuration or source files.
+      scan-args: |-
+        --lockfile=frontend/package-lock.json
+        --lockfile=backend/app/pom.xml
+      fail-on-vuln: true
+      upload-sarif: false
