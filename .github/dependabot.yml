@@ -1,0 +1,25 @@
+version: 2
+
+# GitHub reads this configuration from the default branch (main).
+# Version-update PRs target develop; security updates use the default branch.
+updates:
+  - package-ecosystem: "maven"
+    directory: "/backend/app"
+    schedule:
+      interval: "weekly"
+    target-branch: "develop"
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    target-branch: "develop"
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "develop"
+    open-pull-requests-limit: 3
