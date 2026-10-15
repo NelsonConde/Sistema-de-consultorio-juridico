@@ -16,6 +16,9 @@ on:
       - staging
       - main
 
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: Backend
