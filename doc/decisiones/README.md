@@ -14,6 +14,7 @@ Las decisiones aquí descritas explican criterios transversales que aparecen en 
 | `documentacion-vigente.md` | Criterio de mantener la documentación alineada con código fuente vigente. |
 | `conciliacion.md` | Decisiones del flujo de conciliación, reuniones, documentos y notificaciones. |
 | `estrategia-perfiles.md` | Uso de Strategy para cambio de perfil, desactivación del perfil anterior y resolución del perfil activo. |
+| `estrategia-migraciones.md` | SCRUM-331: propuesta de adopción de Flyway, baseline y controles; pendiente de validación antes de SCRUM-332. |
 
 ## Uso de estas decisiones
 

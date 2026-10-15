@@ -1,6 +1,6 @@
 # Especificación de Requisitos y Trazabilidad Documental: SRS, Product Backlog y Casos de Uso
 
-> Documento alineado con el Informe Final ([`.env.informe_final.docx`](file:///home/anorak/Code/ingsoftware/Sistema-de-consultorio-juridico/.env.informe_final.docx)), el código fuente implementado y las migraciones de base de datos Flyway (`V23__create_file_asset_table.sql`, `V25__migrate_existing_files_to_file_asset.sql`, `V26__add_document_versioning_and_metadata.sql`).
+> Especificación documental. Los SQL operativos reales están en `backend/app/db/migration/`; Flyway no está integrado en esta versión. La propuesta de [SCRUM-331](../decisiones/estrategia-migraciones.md) requiere validación antes de su implementación en SCRUM-332. Las antiguas referencias V23/V25/V26 no identifican scripts existentes.
 
 ---
 
