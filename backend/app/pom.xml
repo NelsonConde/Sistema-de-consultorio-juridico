@@ -26,6 +26,14 @@
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
         <!-- API REST principal del backend -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -185,6 +193,7 @@
     </dependencies>
 
     <build>
+        <finalName>legal-cases-backend</finalName>
         <plugins>
             <!-- Toolchain policy for reproducible local and CI builds -->
             <plugin>
@@ -215,7 +224,18 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>migration-command</id>
+                        <goals><goal>repackage</goal></goals>
+                        <configuration>
+                            <classifier>migrations</classifier>
+                            <mainClass>co.edu.ufps.legal_cases.migration.DatabaseMigrationCommand</mainClass>
+                        </configuration>
+                    </execution>
+                </executions>
                 <configuration>
+                    <mainClass>co.edu.ufps.legal_cases.App</mainClass>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>

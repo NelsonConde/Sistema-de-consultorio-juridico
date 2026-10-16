@@ -19,6 +19,8 @@ abstract class PostgreSqlOptimisticLockConcurrencyTestBase {
 
     @DynamicPropertySource
     static void configurarPostgreSql(DynamicPropertyRegistry registry) {
+        // This concurrency fixture owns a Hibernate create-drop schema, without an applied history.
+        registry.add("spring.flyway.enabled", () -> "false");
         registry.add(
                 "spring.datasource.url",
                 POSTGRESQL::getJdbcUrl);
