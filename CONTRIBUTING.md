@@ -112,6 +112,18 @@ El destino ordinario es `develop`. El autor no puede ser su único revisor ni ap
 
 La integración hacia `staging` y `main` requiere revisión, comprobaciones satisfactorias y autorización de los responsables del repositorio. La existencia de una rama, un Pull Request o una etiqueta no demuestra por sí sola que un cambio esté desplegado en producción.
 
+### Control de título de Pull Request (SCRUM-346)
+
+Para **nuevos** PR de ramas temporales se comprobará la forma `[SCRUM-123] type(scope): english description` o `[CC-OPT-004] type: english description`. Los tipos admitidos son `feat`, `fix`, `test`, `docs`, `refactor`, `chore` y `style`; el scope es opcional en el título del PR (pero sigue siendo obligatorio en el mensaje de commit conforme al manual). La descripción debe ser específica, en inglés, con al menos dos palabras y doce caracteres.
+
+Ejemplo de trabajo: `[SCRUM-346] chore(ci): validate future PR titles`.
+
+Las promociones entre ramas permanentes `develop` → `staging` y `staging` → `main` pueden usar `chore(release): promote validated build to main` sin un identificador de trabajo individual, ya que consolidan varios PR. Los demás cambios, incluidos los hotfix, mantienen el identificador en el título.
+
+El workflow [PR Title Convention](.github/workflows/pr-title-convention.yml) valida títulos de PR al abrir, editar, reabrir, actualizar o marcar como listo para revisión, con permisos de lectura. No revisa ni reescribe commits históricos y no valida mensajes de commit de manera automática: se seleccionó el título de PR como punto de control estable porque GitHub puede crear mensajes de integración diferentes según la estrategia de merge. La revisión de commits sigue siendo responsabilidad del autor y revisor.
+
+Verificación local: `node --test .github/scripts/validate-pr-title.test.mjs`. Un título que no cumple hace fallar el job. La configuración de **check requerido** en reglas de protección debe acreditarse por separado por un mantenedor autorizado; crear este workflow por sí solo no demuestra que GitHub impida un merge con la comprobación fallida.
+
 ## Base de datos, API y documentación
 
 - Conservar las migraciones versionadas y sus instrucciones de ejecución, verificación y recuperación. Consultar [`backend/app/db/migration/README.md`](backend/app/db/migration/README.md).
