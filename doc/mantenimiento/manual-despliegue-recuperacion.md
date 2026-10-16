@@ -10,7 +10,7 @@ El sistema se compone de los siguientes elementos de infraestructura en producci
 
 - **Frontend**: Aplicación Next.js con App Router. En `develop`, `package.json` declara `^16.4.1` y el lockfile resuelve `16.4.1`; en `main`, ambos archivos conservan `16.2.6`. Se compila mediante `next build` y se ejecuta mediante el runtime de Next.js (`next start`) o el Dockerfile versionado del frontend. Estas versiones describen la configuración de cada rama y no acreditan cuál está desplegada en producción.
 - **Backend**: Servicio Spring Boot empaquetado en contenedor Docker y ejecutado en Railway.
-- **Base de Datos**: Instancia gestionada de PostgreSQL (Railway / Supabase) con migraciones Flyway automáticas.
+- **Base de Datos**: Instancia gestionada de PostgreSQL (Railway / Supabase). En esta versión los SQL operativos se aplican manualmente; Flyway no está integrado.
 - **Almacenamiento de Objetos**: Bucket privado `legal-documents` en Supabase Storage (API S3 compatible), con políticas de acceso privado (RLS y acceso restringido por claves de servicio).
 
 Durante la compilación deben instalarse las dependencias de desarrollo. `shadcn` está declarado en `devDependencies` porque su CLI no forma parte del runtime, pero debe estar disponible en el entorno de build mientras `src/app/globals.css` importe `shadcn/tailwind.css`; el CSS resultante queda incorporado en la salida generada por Next.js. En `develop`, el rango declarado es `^4.2.0` y el lockfile resuelve `4.21.4`. El workflow de GitHub Actions ejecuta `npm ci` antes de `npm run build`. De forma equivalente, el Dockerfile instala todas las dependencias en la etapa inicial, compila en la etapa `builder` y solo omite las dependencias de desarrollo en la etapa de ejecución posterior al build.
@@ -42,12 +42,23 @@ Las credenciales y configuraciones sensibles **nunca** deben incluirse en el rep
 
 ## 3. Procedimiento de Migración y Validación de Esquema
 
-1. **Gestión con Flyway**:
-   - Las migraciones integradas al arranque se versionan en `backend/app/src/main/resources/db/migration/`.
-   - Las migraciones documentales (`V23__create_file_asset_table.sql`, `V25__migrate_existing_files_to_file_asset.sql`, `V26__add_document_versioning_and_metadata.sql`) se ejecutan de forma transaccional al iniciar la aplicación.
-2. **Validación Hibernate (`ddl-auto=validate`)**:
-   - En todos los entornos no locales, Hibernate se configura obligatoriamente con `validate`.
-   - Si existe cualquier divergencia entre las entidades JPA (`FileAsset`, etc.) y el esquema de tablas en PostgreSQL, el arranque de la aplicación falla inmediatamente de forma segura antes de recibir tráfico.
+Los SQL reales están en `backend/app/db/migration/` y `backend/db/`.
+No hay dependencias Flyway/Liquibase en el POM ni ejecución automática de esos
+scripts al iniciar Spring Boot. `spring.jpa.hibernate.ddl-auto` usa
+`${DB_DDL_AUTO:validate}` por defecto; `validate` verifica el esquema y no aplica
+migraciones.
+
+[SCRUM-331: estrategia de migraciones](../decisiones/estrategia-migraciones.md)
+propone adoptar Flyway con baseline controlado. **Está pendiente de validación**;
+SCRUM-332 implementará y ensayará la decisión después de aprobarla. El directorio
+`backend/app/src/main/resources/db/migration/` y las rutas V23/V25/V26 mencionadas
+anteriormente no existen en esta versión. No constituyen instrucciones de
+operación válidas.
+
+Hasta contar con el mecanismo aprobado, consultar el inventario real y revisar
+expresamente orden, precondiciones, respaldo y resultado de cada SQL. No aplicar
+un glob de archivos: los verificadores y scripts de recuperación no son
+migraciones ordinarias.
 
 ### Migración manual del historial de reasignaciones
 
@@ -140,13 +151,13 @@ Si una migración requiere reversión controlada en un entorno de contingencia, 
 
 Para el historial de reasignaciones, `backend/app/db/migration/V20261011_01__create_consulta_reasignacion_historial_recovery.sql` solo elimina sus objetos si la tabla está vacía. Si existen eventos, el script cancela la operación; se debe conservar la evidencia histórica, restaurar desde respaldo cuando corresponda o preparar una migración correctiva hacia adelante. No debe borrarse manualmente una tabla con eventos para forzar la reversión.
 
-- **Archivo de rollback**: [`backend/app/src/main/resources/db/rollback/U26__rollback_document_versioning.sql`](file:///home/anorak/Code/ingsoftware/Sistema-de-consultorio-juridico/backend/app/src/main/resources/db/rollback/U26__rollback_document_versioning.sql).
-- **Acciones ejecutadas en rollback**:
-  1. Elimina el índice único parcial `uk_file_asset_doc_vigente`.
-  2. Elimina la clave foránea `fk_file_asset_referencia_anterior`.
-  3. Remueve las columnas agregadas (`version`, `documento_logico`, `tipo_documental`, `origen`, `referencia_anterior_id`).
-  4. Restablece el estado previo de los registros en `file_asset`.
-  5. Elimina el registro correspondiente en la tabla `flyway_schema_history`.
+La recuperación documental disponible es
+`backend/app/db/migration/V20260905_01__version_document_model_rollback.sql`.
+Debe revisarse antes de usar: elimina metadatos del versionado y no equivale a
+recuperar todos los datos. Preferir restauración verificada o una compensación
+revisada cuando haya datos posteriores. No existe el archivo U26 citado en
+versiones anteriores de este manual ni una tabla Flyway creada por el arranque
+actual. No borrar registros de un historial de migraciones para ocultar fallos.
 
 ---
 
@@ -155,7 +166,5 @@ Para el historial de reasignaciones, `backend/app/db/migration/V20261011_01__cre
 Para mitigar fallos durante subidas de archivos o desconexiones del cliente antes de confirmar la carga:
 
 1. El servicio `FileAssetReconciliationService` se ejecuta de forma periódica (`cron = "0 0 * * * *"` cada hora).
-2. Detecta registros en estado `PENDING` cuya fecha de creación exceda el tiempo límite (24 horas).
-3. Marca el registro como `FAILED` o `DELETE_PENDING`.
-4. Emite la instrucción de eliminación física (`storageProvider.delete(objectKey)`) para evitar costos innecesarios y presencia de bytes huérfanos.
-5. Registra el evento detallado en la tabla de auditoría del sistema.
+2. Compara `updatedAt` con la hora actual menos **una hora** (`STALE_HOURS = 1`) para `PENDING`, `UPLOADING`, `DELETE_PENDING` y `DELETING`. La comparación es estrictamente anterior al corte.
+3. Delega en el flujo de reconciliación o eliminación según el estado. Consultar `FileAssetReconciliationService` para el resultado de cada rama y sus fallos; la periodicidad no demuestra que un objeto concreto haya sido limpiado.
