@@ -112,6 +112,18 @@ El destino ordinario es `develop`. El autor no puede ser su único revisor ni ap
 
 La integración hacia `staging` y `main` requiere revisión, comprobaciones satisfactorias y autorización de los responsables del repositorio. La existencia de una rama, un Pull Request o una etiqueta no demuestra por sí sola que un cambio esté desplegado en producción.
 
+### Control de título de Pull Request (SCRUM-346)
+
+El manual de ramas mantiene para los **mensajes de commit** la forma obligatoria `type(scope): description`, con una descripción específica en inglés y en presente. Los títulos de **nuevos Pull Requests** se controlan de forma prospectiva usando `[SCRUM-123] type(scope): description` o `[CC-OPT-004] type: description`. Para los títulos de PR el scope es opcional; para los commits sigue siendo obligatorio conforme al manual. Se admiten `feat`, `fix`, `test`, `docs`, `refactor`, `chore` y `style`. La comprobación automática rechaza el formato incorrecto, títulos vacíos o multilínea y descripciones genéricas identificadas expresamente por el manual; la revisión humana sigue evaluando la calidad semántica y el idioma. No se impone un mínimo artificial de palabras o caracteres.
+
+Ejemplo de cambio: `[SCRUM-346] chore(ci): validate future PR titles`.
+
+Las promociones `develop` → `staging` y `staging` → `main` pueden usar `chore(release): promote validated build to main` sin un identificador de trabajo individual **solo cuando ambas ramas pertenecen al mismo repositorio**; un fork con una rama llamada `develop` o `staging` no recibe esa excepción. Todos los demás PR, incluidos hotfix, usan identificador de tarea/cambio.
+
+El workflow [PR Title Convention](.github/workflows/pr-title-convention.yml) utiliza `pull_request_target` con permiso `contents: read` y ejecuta **exclusivamente el validador y las pruebas de la revisión SHA de la rama destino**: no hace checkout ni ejecuta código de la rama propuesta por el PR. Recibe el título y los datos de las ramas como variables de entorno. El control se activa para PR dirigidos a `develop`, `staging` y `main` una vez que el workflow haya sido aprobado e integrado en la rama de destino; su ejecución no puede acreditarse por el solo hecho de aparecer en el PR que lo introduce.
+
+Verificación local: `node --test .github/scripts/validate-pr-title.test.mjs`. Un título inválido produce una salida diferente de cero. El control automatizado se aplica a **títulos de PR, no a mensajes individuales de commits ni a commits de merge automáticos**; los mensajes de commit permanecen bajo revisión del autor/revisor. Convertir el job `Validate PR title` en un **check requerido** en las protecciones de ramas debe comprobarlo y, si es necesario, configurarlo un mantenedor con permisos autorizados. Un workflow que se ejecuta satisfactoriamente no demuestra por sí solo que los merges estén bloqueados si el check falla.
+
 ## Base de datos, API y documentación
 
 - Conservar las migraciones versionadas y sus instrucciones de ejecución, verificación y recuperación. Consultar [`backend/app/db/migration/README.md`](backend/app/db/migration/README.md).
