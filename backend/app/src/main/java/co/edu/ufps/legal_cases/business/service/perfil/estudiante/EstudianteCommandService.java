@@ -77,7 +77,12 @@ public class EstudianteCommandService {
         estudianteAccessService.validarPuedeGestionarEstudiantes();
         estudianteValidator.validarIdNoEnviadoEnCreacion(dto.getId());
 
-        DatosEstudiante datos = prepararDatos(dto, true, false);
+        Boolean conciliacionInicial = Boolean.TRUE.equals(dto.getConciliacion());
+
+        DatosEstudiante datos = prepararDatos(
+                dto,
+                true,
+                conciliacionInicial);
 
         estudianteValidator.validarDuplicadosCreacion(
                 datos.documento(),
