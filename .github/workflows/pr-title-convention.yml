@@ -1,8 +1,10 @@
 name: PR Title Convention
 
-# Trusted-base check: do not run scripts, workflows, or actions from the PR branch.
+# On pull_request, use the base SHA for scripts (not PR code).
+# Workflow definitions can be changed by a PR; keep permissions read-only
+# and require independent review of workflow edits before integration.
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, edited, reopened, synchronize, ready_for_review]
     branches: [develop, staging, main]
 
