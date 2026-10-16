@@ -1,5 +1,7 @@
 # Especificación de Requisitos y Trazabilidad Documental: SRS, Product Backlog y Casos de Uso
 
+> **Control de vigencia (16/10/2026):** Documento técnico histórico. No sustituye el SRS, EP3 ni EP5 consolidados de Sprint 1. Se concilia aquí solo el cierre de CP-09; la numeración y los enlaces restantes se revisarán en las tareas documentales correspondientes.
+
 > Documento alineado con el Informe Final ([`.env.informe_final.docx`](file:///home/anorak/Code/ingsoftware/Sistema-de-consultorio-juridico/.env.informe_final.docx)), el código fuente implementado y las migraciones de base de datos Flyway (`V23__create_file_asset_table.sql`, `V25__migrate_existing_files_to_file_asset.sql`, `V26__add_document_versioning_and_metadata.sql`).
 
 ---
@@ -9,7 +11,7 @@
 La gestión documental del Sistema de Gestión de Casos Jurídicos del Consultorio Jurídico proporciona un acervo probatorio íntegro, versionado, auditable y seguro para los procesos jurídicos, consultas, conciliaciones y actuaciones de seguimiento.
 
 Este documento formaliza la ingeniería de requisitos correspondiente a:
-1. **Requerimientos Funcionales del SRS** (RF16, RF17, RF18, RF19, RF20, RF21, RF59, RF78, RF79, RF80).
+1. **Referencias de requisitos registradas históricamente** (RF16, RF17, RF18, RF19, RF20, RF21, RF59, RF78, RF79, RF80). Para el cierre rige RF05; la vigencia de los demás identificadores deberá verificarse con el SRS consolidado antes de citarlos como actuales.
 2. **Historias de usuario** asociadas a los requerimientos funcionales.
 3. **Casos de Uso Detallados** (CU-10: *Administrar y consultar acervo probatorio y documental del expediente*).
 
@@ -59,16 +61,19 @@ Este documento formaliza la ingeniería de requisitos correspondiente a:
 
 ---
 
-### RF19 — Cerrar consulta jurídica y preservación probatoria
+### RF05 — Cierre y archivo lógico de consulta (conciliación CP-09)
+
+> **Nota de trazabilidad (16/10/2026).** En la versión histórica de este archivo el cierre se identificaba como RF19. En el SRS y EP5 aprobados de Sprint 1, **RF05** se refiere al cierre/archivo de consultas y **RF19** a la carga de archivos asociados. No se modifican aquí los demás identificadores históricos.
 
 | Atributo | Detalle |
 |---|---|
-| **Identificador** | `RF19` |
-| **Nombre** | Cerrar consulta jurídica |
-| **Módulo** | Consultas jurídicas / Cierre |
-| **Prioridad** | Muy alta |
-| **Descripción** | El sistema debe permitir cerrar una consulta jurídica indicando motivo, conclusión o resultado final, verificando que no existan actuaciones pendientes y asegurando la inmutabilidad de todos los documentos y evidencias probatorias adjuntas al expediente. |
-| **Condición documental** | Una vez cerrada la consulta, los documentos del expediente quedan bloqueados para modificaciones o nuevas versiones destructivas; todo el acervo se preserva para consulta histórica. |
+| **Identificador vigente** | `RF05` (SRS/EP5 consolidados). |
+| **Descripción funcional** | Cerrar o archivar lógicamente la consulta si satisface las condiciones del flujo y preservando la información y trazabilidad. Referencias: RN-05, CU-03 y PB-09. |
+| **Cierre (`CERRADO`)** | `ConsultaEstadoService` exige resultado/conclusión final y ausencia de procesos, seguimientos, respuestas, notificaciones o conciliaciones pendientes; `ConsultaAccessService` controla permiso y alcance. |
+| **Archivo (`ARCHIVADO`)** | Operación distinta que requiere consulta previamente cerrada, ausencia de pendientes, rol Administrador y permiso `ARCHIVAR_CONSULTAS`. |
+| **Motivo/observaciones** | No se identificó un `motivo_cierre` independiente ni observaciones obligatorias en la línea base revisada. El motivo exigido por RF64/CU-12/PB-33 aplica a la reasignación de responsables. |
+| **Evidencia disponible** | Contraste documental e inspección estática del backend y frontend en `develop`; **no representa pruebas automatizadas ni pruebas de extremo a extremo ejecutadas**. |
+| **Registro único** | `Registro_de_revision_y_conciliacion_de_hallazgos.docx`, Sprint 2, sección CP-09; conservar la auditoría histórica sin modificación. |
 
 ---
 
