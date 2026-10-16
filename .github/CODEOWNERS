@@ -1,0 +1,15 @@
+# Default reviewers for repository changes.
+* @NelsonConde @AnorakTeam
+
+# Backend services, security and database-related code.
+/backend/ @NelsonConde @AnorakTeam
+
+# Frontend application.
+/frontend/ @juandiegosb @AnorakTeam
+
+# GitHub Actions and repository governance.
+/.github/ @NelsonConde @AnorakTeam
+
+# Versioned technical documentation.
+/doc/ @NelsonConde @AnorakTeam
+/docs/ @NelsonConde @AnorakTeam
