@@ -26,6 +26,7 @@ export function RemotePagedSelect({
   required = false,
   error = "",
   emptyMessage = "No se encontraron resultados.",
+  filterItem = null,
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -37,6 +38,7 @@ export function RemotePagedSelect({
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   const filtersKey = useMemo(() => JSON.stringify(filters || {}), [filters]);
   const stableFilters = useMemo(() => JSON.parse(filtersKey), [filtersKey]);
@@ -56,6 +58,7 @@ export function RemotePagedSelect({
     }
   }, [value, selectedItem]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: retryNonce repite intencionalmente la misma solicitud
   useEffect(() => {
     if (!open || disabled) return undefined;
 
@@ -77,6 +80,7 @@ export function RemotePagedSelect({
           resourceName,
           allowLegacyArray: Boolean(legacyEndpoint),
           legacyPath: legacyEndpoint,
+          filterItem,
         });
 
         setItems(result.content);
@@ -113,6 +117,8 @@ export function RemotePagedSelect({
     direction,
     stableFilters,
     resourceName,
+    filterItem,
+    retryNonce,
   ]);
 
   const currentLabel = selectedItem
@@ -146,6 +152,8 @@ export function RemotePagedSelect({
         <button
           type="button"
           disabled={disabled}
+          aria-label={label || placeholder}
+          aria-expanded={open}
           onClick={() => setOpen((current) => !current)}
           className={`flex h-8 w-full items-center justify-between rounded-lg border bg-background px-2.5 py-1 text-left text-sm ${
             error ? "border-red-500" : ""
@@ -188,7 +196,17 @@ export function RemotePagedSelect({
             {loading ? (
               <p className="py-4 text-center text-sm text-muted-foreground">Cargando...</p>
             ) : loadError ? (
-              <p className="py-3 text-sm text-red-600">{loadError}</p>
+              <div className="space-y-2 py-3" role="alert">
+                <p className="text-sm text-red-600">{loadError}</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setRetryNonce((current) => current + 1)}
+                >
+                  Reintentar
+                </Button>
+              </div>
             ) : items.length === 0 ? (
               <p className="py-4 text-center text-sm text-muted-foreground">{emptyMessage}</p>
             ) : (
