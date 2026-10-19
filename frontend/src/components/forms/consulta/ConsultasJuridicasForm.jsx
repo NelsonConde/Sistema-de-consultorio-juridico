@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/tabs";
 
 import { DocumentosExpedienteTab } from "./documentos/DocumentosExpedienteTab";
+import { HistorialResponsablesTab } from "./responsables/HistorialResponsablesTab";
+import { ResponsablesConsultaPanel } from "./responsables/ResponsablesConsultaPanel";
   /**
    * List and table handling.
    *
@@ -57,15 +59,12 @@ import {
   mensajeErrorDesdeRespuesta,
   normalizarConsultaFila,
   normalizarEstadoConsulta,
-  obtenerAreaIdAsesor,
   obtenerArrayDesdeRespuesta,
-  obtenerAsesorIdEstudiante,
   textoNormalizado,
   textoVacio,
   validarCoherenciaConsultaFrontend,
 } from "./consultas-juridicas.utils";
 import { ModalMultiple, ModalSimple } from "./ConsultaSelectionModals";
-import { RemotePagedSelect } from "../parts/RemotePagedSelect";
 
 export function ConsultasJuridicasForm() {
   const router = useRouter();
@@ -84,6 +83,7 @@ export function ConsultasJuridicasForm() {
   const [form, setForm] = useState(VACIOS);
   const [guardando, setGuardando] = useState(false);
   const [resultadoGuardado, setResultadoGuardado] = useState("");
+  const [historialRefreshKey, setHistorialRefreshKey] = useState(0);
 
   const [personasResultado, setPersonasResultado] = useState([]);
   const [personasBusquedaAplicada, setPersonasBusquedaAplicada] = useState("");
@@ -123,6 +123,14 @@ export function ConsultasJuridicasForm() {
   const estudianteSeleccionado = useMemo(
     () => estudiantes.find((e) => idNormalizado(e.id) === idNormalizado(form.estudianteId)) || null,
     [estudiantes, form.estudianteId]
+  );
+  const responsablesActuales = useMemo(
+    () => ({
+      ASESOR: asesorSeleccionado,
+      MONITOR: monitorSeleccionado,
+      ESTUDIANTE: estudianteSeleccionado,
+    }),
+    [asesorSeleccionado, estudianteSeleccionado, monitorSeleccionado]
   );
   const parteSeleccionada = useMemo(
     () =>
@@ -323,6 +331,56 @@ export function ConsultasJuridicasForm() {
       }
       return next;
     });
+  }
+
+  async function hidratarResponsablesSeleccionados(data) {
+    const perfiles = [
+      {
+        tipo: "asesores",
+        id: data?.asesorId ?? data?.asesor?.id,
+        embebido: data?.asesor,
+      },
+      {
+        tipo: "monitores",
+        id: data?.monitorId ?? data?.monitor?.id,
+        embebido: data?.monitor,
+      },
+      {
+        tipo: "estudiantes",
+        id: data?.estudianteId ?? data?.estudiante?.id,
+        embebido: data?.estudiante,
+      },
+    ];
+
+    const resultados = await Promise.all(
+      perfiles.map(async ({ tipo, id, embebido }) => {
+        if (!id) return null;
+        if (embebido?.nombre || embebido?.nombreCompleto) return embebido;
+
+        try {
+          const response = await apiClient.request(
+            `${API_URL_BASE}/${tipo}/${encodeURIComponent(String(id))}`,
+            { credentials: "include" }
+          );
+
+          if (response.status === 401) {
+            router.replace("/");
+            return null;
+          }
+
+          if (!response.ok) return null;
+
+          const payload = await leerJsonSeguro(response);
+          return payload?.data || payload?.perfil || payload;
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    setAsesores(resultados[0] ? [resultados[0]] : []);
+    setMonitores(resultados[1] ? [resultados[1]] : []);
+    setEstudiantes(resultados[2] ? [resultados[2]] : []);
   }
 
   const puedeEditarConsultas = useMemo(
@@ -658,7 +716,10 @@ export function ConsultasJuridicasForm() {
         setTipos(tiposRes.ok ? obtenerArrayDesdeRespuesta(tiposData) : []);
       }
 
-      await hidratarPersonasSeleccionadas(data);
+      await Promise.all([
+        hidratarPersonasSeleccionadas(data),
+        hidratarResponsablesSeleccionados(data),
+      ]);
 
       setForm({
         fecha: data.fecha ?? "",
@@ -692,6 +753,70 @@ export function ConsultasJuridicasForm() {
 
       toast.error("Error al cargar la consulta");
     }
+  }
+
+  async function handleReasignacionExitosa(respuesta, seleccion) {
+    const data = respuesta?.data || respuesta?.consulta || respuesta;
+    const campoPorTipo = {
+      ASESOR: "asesorId",
+      MONITOR: "monitorId",
+      ESTUDIANTE: "estudianteId",
+    };
+    const campoActualizado = campoPorTipo[seleccion.tipoResponsable];
+
+    setForm((prev) => ({
+      ...prev,
+      version: data?.version ?? prev.version,
+      asesorId: data?.asesorId ?? prev.asesorId,
+      monitorId: data?.monitorId ?? prev.monitorId,
+      estudianteId: data?.estudianteId ?? prev.estudianteId,
+      ...(campoActualizado && data?.[campoActualizado] == null
+        ? { [campoActualizado]: seleccion.nuevoResponsableId }
+        : {}),
+    }));
+
+    const responsableSeleccionado = seleccion.nuevoResponsable || {
+      id: seleccion.nuevoResponsableId,
+    };
+    if (seleccion.tipoResponsable === "ASESOR") {
+      setAsesores([responsableSeleccionado]);
+    } else if (seleccion.tipoResponsable === "MONITOR") {
+      setMonitores([responsableSeleccionado]);
+    } else if (seleccion.tipoResponsable === "ESTUDIANTE") {
+      setEstudiantes([responsableSeleccionado]);
+    }
+
+    setHistorialRefreshKey((valor) => valor + 1);
+    toast.success("Responsable reasignado correctamente");
+    await cargarConsultas();
+  }
+
+  async function refrescarConsultaTrasConflicto() {
+    const { response, data: payload } = await apiResponse(
+      `${API_URL_BASE}/consultas/${idEditando}`,
+      { method: "GET", credentials: "include" }
+    );
+
+    if (response.status === 401) {
+      router.replace("/");
+      throw new Error("La sesión terminó.");
+    }
+
+    if (!response.ok) {
+      throw new Error("No fue posible cargar la versión actual de la consulta.");
+    }
+
+    const data = payload?.data || payload?.consulta || payload;
+    setForm((prev) => ({
+      ...prev,
+      version: data.version ?? prev.version,
+      asesorId: data.asesorId ?? "",
+      monitorId: data.monitorId ?? "",
+      estudianteId: data.estudianteId ?? "",
+      estado: normalizarEstadoConsulta(data.estado ?? prev.estado),
+    }));
+    await hidratarResponsablesSeleccionados(data);
+    return data;
   }
 
   async function handleGuardar(e) {
@@ -1019,13 +1144,17 @@ export function ConsultasJuridicasForm() {
               </h2>
 
               <Tabs defaultValue="informacion" className="w-full">
-                <TabsList className="mb-4">
+                <TabsList className="mb-4 flex h-auto w-full flex-wrap justify-start">
                   <TabsTrigger value="informacion">
                     Información
                   </TabsTrigger>
 
                   <TabsTrigger value="documentos">
                     Documentos
+                  </TabsTrigger>
+
+                  <TabsTrigger value="historial-responsables">
+                    Historial de responsables
                   </TabsTrigger>
                 </TabsList>
 
@@ -1091,100 +1220,14 @@ export function ConsultasJuridicasForm() {
                 <C label="Tipo de violencia"><input name="tipoViolencia" value={form.tipoViolencia} onChange={handleChange} placeholder="Opcional" className={ic} /></C>
                 <C label="Resultado"><input name="resultado" value={form.resultado} onChange={handleChange} placeholder="Opcional" className={ic} /></C>
 
-                {puedeAsignarResponsablesConsulta ? (
-                  <>
-                    {/* ADVISOR */}
-                    <C label="Asesor">
-                      <RemotePagedSelect
-                        value={form.asesorId}
-                        selectedLabel={asesorSeleccionado
-                          ? `${asesorSeleccionado.nombre}${asesorSeleccionado.documento ? ` - ${asesorSeleccionado.documento}` : ""}`
-                          : ""}
-                        onChange={(id, item) => {
-                          if (item && obtenerAreaIdAsesor(item) !== idNormalizado(form.areaId)) {
-                            toast.error("El asesor seleccionado no pertenece al área de la consulta.");
-                            return false;
-                          }
-                          setAsesores(item ? [item] : []);
-                          setEstudiantes([]);
-                          setForm((prev) => ({
-                            ...prev,
-                            asesorId: id ? String(id) : "",
-                            estudianteId: "",
-                          }));
-                        }}
-                        endpoint="/asesores/activos/paginados"
-                        legacyEndpoint="/asesores/activos"
-                        resourceName="asesores activos"
-                        sortBy="nombre"
-                        direction="asc"
-                        placeholder={form.areaId ? "Sin asignar" : "Seleccione área primero"}
-                        searchPlaceholder="Buscar asesor..."
-                        getOptionLabel={(item) =>
-                          `${item.nombre}${item.documento ? ` - ${item.documento}` : ""}`
-                        }
-                        disabled={!form.areaId}
-                      />
-                    </C>
-
-                    {/* MONITOR */}
-                    <C label="Monitor">
-                      <RemotePagedSelect
-                        value={form.monitorId}
-                        selectedLabel={monitorSeleccionado
-                          ? `${monitorSeleccionado.nombre}${monitorSeleccionado.documento ? ` - ${monitorSeleccionado.documento}` : ""}`
-                          : ""}
-                        onChange={(id, item) => {
-                          setMonitores(item ? [item] : []);
-                          setForm((prev) => ({ ...prev, monitorId: id ? String(id) : "" }));
-                        }}
-                        endpoint="/monitores/activos/paginados"
-                        legacyEndpoint="/monitores/activos"
-                        resourceName="monitores activos"
-                        sortBy="nombre"
-                        direction="asc"
-                        placeholder="Sin asignar"
-                        searchPlaceholder="Buscar monitor..."
-                        getOptionLabel={(item) =>
-                          `${item.nombre}${item.documento ? ` - ${item.documento}` : ""}`
-                        }
-                      />
-                    </C>
-
-                    {/* STUDENT */}
-                    <C label="Estudiante">
-                      <RemotePagedSelect
-                        value={form.estudianteId}
-                        selectedLabel={estudianteSeleccionado
-                          ? `${estudianteSeleccionado.nombre}${estudianteSeleccionado.codigo ? ` - ${estudianteSeleccionado.codigo}` : ""}`
-                          : ""}
-                        onChange={(id, item) => {
-                          if (item && obtenerAsesorIdEstudiante(item) !== idNormalizado(form.asesorId)) {
-                            toast.error("El estudiante seleccionado no pertenece al asesor asignado.");
-                            return false;
-                          }
-                          setEstudiantes(item ? [item] : []);
-                          setForm((prev) => ({ ...prev, estudianteId: id ? String(id) : "" }));
-                        }}
-                        endpoint="/estudiantes/activos/paginados"
-                        legacyEndpoint="/estudiantes/activos"
-                        resourceName="estudiantes activos"
-                        sortBy="nombre"
-                        direction="asc"
-                        placeholder={form.asesorId ? "Sin asignar" : "Seleccione asesor primero"}
-                        searchPlaceholder="Buscar estudiante..."
-                        getOptionLabel={(item) =>
-                          `${item.nombre}${item.codigo ? ` - ${item.codigo}` : ""}`
-                        }
-                        disabled={!form.asesorId}
-                      />
-                    </C>
-                  </>
-                ) : (
-                  <div className="md:col-span-2 lg:col-span-3 rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-                    Los responsables no se pueden cambiar con tus permisos actuales.
-                  </div>
-                )}
+                <ResponsablesConsultaPanel
+                  consulta={{ id: idEditando, ...form }}
+                  responsables={responsablesActuales}
+                  puedeReasignar={puedeAsignarResponsablesConsulta}
+                  onSuccess={handleReasignacionExitosa}
+                  onConflict={refrescarConsultaTrasConflicto}
+                  onSessionExpired={() => router.replace("/")}
+                />
               </div>
 
               {/* PRIMARY PARTY */}
@@ -1240,6 +1283,13 @@ export function ConsultasJuridicasForm() {
                 <TabsContent value="documentos">
                   <DocumentosExpedienteTab consultaId={idEditando} />
                 </TabsContent>
+
+                <TabsContent value="historial-responsables">
+                  <HistorialResponsablesTab
+                    consultaId={idEditando}
+                    refreshKey={historialRefreshKey}
+                  />
+                </TabsContent>
               </Tabs>
           </div>
         )}
@@ -1277,15 +1327,13 @@ export function ConsultasJuridicasForm() {
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <div className="flex gap-2">
-                      {puedeEditarRegistro(row) && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => abrirEditar(row.id)}
-                        >
-                          Editar
-                        </Button>
-                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => abrirEditar(row.id)}
+                      >
+                        {puedeEditarRegistro(row) ? "Editar" : "Ver detalle"}
+                      </Button>
                       {puedeArchivarConsultas && normalizarEstadoConsulta(row.estado) !== "ARCHIVADO" && (
                         <Button
                           size="sm"
@@ -1410,3 +1458,4 @@ function C({ label, children }) {
 }
 
 const ic = "w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50";
+
