@@ -81,18 +81,20 @@ export function normalizePageResponse(payload, resourceName = "listado") {
 
 function normalizeLegacyArray(
   payload,
-  { search = "", page = 1, size = DEFAULT_REMOTE_PAGE_SIZE } = {}
+  { search = "", page = 1, size = DEFAULT_REMOTE_PAGE_SIZE, filterItem = null } = {}
 ) {
+  const availableItems =
+    typeof filterItem === "function" ? payload.filter(filterItem) : payload;
   const normalizedSearch = String(search || "").trim().toLowerCase();
   const filtered = normalizedSearch
-    ? payload.filter((item) =>
+    ? availableItems.filter((item) =>
         Object.values(item || {})
           .filter((value) => value !== null && value !== undefined)
           .join(" ")
           .toLowerCase()
           .includes(normalizedSearch)
       )
-    : payload;
+    : availableItems;
   const safeSize = Math.min(
     MAX_REMOTE_PAGE_SIZE,
     toPositiveInteger(size, DEFAULT_REMOTE_PAGE_SIZE)
@@ -125,6 +127,7 @@ export async function fetchPaged(
     resourceName = "listado",
     allowLegacyArray = false,
     legacyPath = "",
+    filterItem = null,
   } = {}
 ) {
   let response = await apiClient.get(
@@ -162,7 +165,7 @@ export async function fetchPaged(
       throw new Error(`Respuesta paginada de ${resourceName} inválida`);
     }
 
-    return normalizeLegacyArray(payload, { search, page, size });
+    return normalizeLegacyArray(payload, { search, page, size, filterItem });
   }
 
   return normalizePageResponse(payload, resourceName);
