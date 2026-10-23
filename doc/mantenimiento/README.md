@@ -12,6 +12,7 @@ Su propósito es facilitar revisiones futuras cuando cambien endpoints, DTOs, se
 | `estado-cobertura-documental.md` | Mapa de cobertura documental vigente por área del sistema. |
 | `matriz-actualizacion-documental.md` | Relación entre tipo de cambio y documentos que deben revisarse. |
 | `versionado-documentacion.md` | Criterios para versionar y registrar cambios documentales. |
+| `SCRUM-343-respaldo-restauracion-coordinada.md` | Propuesta de política y runbook coordinado BD/Storage; aprobación y ejecución pendientes. |
 
 ## Fuente de verdad
 
