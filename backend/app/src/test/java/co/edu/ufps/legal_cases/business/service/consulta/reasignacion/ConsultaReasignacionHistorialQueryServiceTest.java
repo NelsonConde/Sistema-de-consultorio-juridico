@@ -58,16 +58,16 @@ class ConsultaReasignacionHistorialQueryServiceTest {
                 "Distribución de carga",
                 "Administradora principal",
                 ocurridoEn);
-        PageRequest pageable = PageRequest.of(1, 5);
+        PageRequest pageable = PageRequest.of(1, 7);
 
         when(historialRepository.buscarResumenPorConsultaId(7L, pageable))
                 .thenReturn(new PageImpl<>(List.of(evento), pageable, 8));
 
         PageResponseDTO<ConsultaReasignacionHistorialDTO> resultado =
-                queryService.listar(7L, 2, 5);
+                queryService.listar(7L, 2, 7);
 
         assertEquals(2, resultado.page());
-        assertEquals(5, resultado.size());
+        assertEquals(7, resultado.size());
         assertEquals(8, resultado.totalElements());
         assertEquals(2, resultado.totalPages());
         assertEquals(1, resultado.content().size());
