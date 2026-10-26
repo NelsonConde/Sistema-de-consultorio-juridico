@@ -1,17 +1,19 @@
 package co.edu.ufps.legal_cases.business.service.consulta;
 
 import java.util.List;
-import co.edu.ufps.legal_cases.business.dto.consulta.ficha.FichaExpedienteDTO;
-import co.edu.ufps.legal_cases.business.service.consulta.pdf.FichaExpedienteService;
 
 import org.springframework.stereotype.Service;
 
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaBusquedaDTO;
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaDTO;
+import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaReasignacionHistorialDTO;
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaReasignacionDTO;
+import co.edu.ufps.legal_cases.business.dto.consulta.ficha.FichaExpedienteDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.business.service.consulta.consulta.ConsultaCommandService;
 import co.edu.ufps.legal_cases.business.service.consulta.consulta.ConsultaQueryService;
+import co.edu.ufps.legal_cases.business.service.consulta.pdf.FichaExpedienteService;
+import co.edu.ufps.legal_cases.business.service.consulta.reasignacion.ConsultaReasignacionHistorialQueryService;
 import co.edu.ufps.legal_cases.business.service.consulta.reasignacion.ConsultaReasignacionService;
 import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
@@ -24,16 +26,19 @@ public class ConsultaService {
     private final ConsultaCommandService consultaCommandService;
     private final FichaExpedienteService fichaExpedienteService;
     private final ConsultaReasignacionService consultaReasignacionService;
+    private final ConsultaReasignacionHistorialQueryService historialQueryService;
 
     public ConsultaService(
             ConsultaQueryService consultaQueryService,
             ConsultaCommandService consultaCommandService,
             FichaExpedienteService fichaExpedienteService,
-            ConsultaReasignacionService consultaReasignacionService) {
+            ConsultaReasignacionService consultaReasignacionService,
+            ConsultaReasignacionHistorialQueryService historialQueryService) {
         this.consultaQueryService = consultaQueryService;
         this.consultaCommandService = consultaCommandService;
         this.fichaExpedienteService = fichaExpedienteService;
         this.consultaReasignacionService = consultaReasignacionService;
+        this.historialQueryService = historialQueryService;
     }
 
     public PageResponseDTO<ConsultaBusquedaDTO> buscarParaUsuarioActual(
@@ -92,6 +97,13 @@ public class ConsultaService {
 
     public ConsultaDTO reasignarResponsable(Long id, ConsultaReasignacionDTO solicitud) {
         return consultaReasignacionService.reasignar(id, solicitud);
+    }
+
+    public PageResponseDTO<ConsultaReasignacionHistorialDTO> listarHistorialResponsables(
+            Long consultaId,
+            int page,
+            int size) {
+        return historialQueryService.listar(consultaId, page, size);
     }
 
     public ConsultaDTO cambiarEstado(Long id, EstadoConsulta estado, Long version) {

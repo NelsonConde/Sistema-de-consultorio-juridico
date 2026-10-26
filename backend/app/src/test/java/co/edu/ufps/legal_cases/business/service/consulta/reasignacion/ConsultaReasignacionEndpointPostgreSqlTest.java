@@ -209,6 +209,90 @@ class ConsultaReasignacionEndpointPostgreSqlTest
                 anteriores);
     }
 
+    @Test
+    void consultaHistorialPaginadoConNombresYOrdenEstable() throws Exception {
+        Consulta consulta = crearConsultaCompatible(
+                TipoResponsableConsulta.MONITOR, EstadoConsulta.ACTIVO);
+        Long version = consulta.getVersion();
+
+        ejecutarPatch(escenario.adminUsername(), consulta.getId(),
+                TipoResponsableConsulta.MONITOR, escenario.monitorNuevoId(),
+                "Primer cambio", version)
+                .andExpect(status().isOk());
+        ejecutarPatch(escenario.adminUsername(), consulta.getId(),
+                TipoResponsableConsulta.MONITOR, escenario.monitorAlternoId(),
+                "Segundo cambio", version + 1)
+                .andExpect(status().isOk());
+
+        String monitorNuevo = cargarNombreMonitor(escenario.monitorNuevoId());
+        String monitorAlterno = cargarNombreMonitor(escenario.monitorAlternoId());
+        String actor = jdbcTemplate.queryForObject(
+                "SELECT nombre FROM " + ESQUEMA
+                        + ".administrativo WHERE usuario_sistema_id = ?",
+                String.class,
+                escenario.adminUsuarioId());
+
+        ejecutarGetHistorial(escenario.adminUsername(), consulta.getId(), 1, 1)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").isNumber())
+                .andExpect(jsonPath("$.content[0].tipoResponsable").value("MONITOR"))
+                .andExpect(jsonPath("$.content[0].responsableAnteriorNombre")
+                        .value(monitorNuevo))
+                .andExpect(jsonPath("$.content[0].responsableNuevoNombre")
+                        .value(monitorAlterno))
+                .andExpect(jsonPath("$.content[0].motivo").value("Segundo cambio"))
+                .andExpect(jsonPath("$.content[0].actorNombre").value(actor))
+                .andExpect(jsonPath("$.content[0].ocurridoEn").isString())
+                .andExpect(jsonPath("$.content[0].consultaId").doesNotExist())
+                .andExpect(jsonPath("$.content[0].responsableAnteriorId").doesNotExist())
+                .andExpect(jsonPath("$.content[0].responsableNuevoId").doesNotExist())
+                .andExpect(jsonPath("$.content[0].actorUsuarioId").doesNotExist());
+
+        ejecutarGetHistorial(escenario.adminUsername(), consulta.getId(), 2, 1)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].motivo").value("Primer cambio"));
+    }
+
+    @Test
+    void historialVacioConservaMetadatosDePaginacion() throws Exception {
+        Consulta consulta = crearConsultaCompatible(
+                TipoResponsableConsulta.MONITOR, EstadoConsulta.ACTIVO);
+
+        ejecutarGetHistorial(escenario.adminUsername(), consulta.getId(), 1, 10)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0));
+    }
+
+    @Test
+    void historialRespetaAutenticacionAlcanceYPaginacionValida() throws Exception {
+        Consulta consulta = crearConsultaCompatible(
+                TipoResponsableConsulta.MONITOR, EstadoConsulta.ACTIVO);
+
+        mockMvc.perform(get(
+                        "/api/consultas/{id}/responsables/historial",
+                        consulta.getId()))
+                .andExpect(status().isUnauthorized());
+
+        ejecutarGetHistorial(
+                escenario.monitorSinAlcanceUsername(), consulta.getId(), 1, 10)
+                .andExpect(status().isForbidden());
+
+        ejecutarGetHistorial(escenario.adminUsername(), consulta.getId(), 0, 10)
+                .andExpect(status().isBadRequest());
+
+        ejecutarGetHistorial(escenario.adminUsername(), consulta.getId(), 1, 51)
+                .andExpect(status().isBadRequest());
+    }
+
     @ParameterizedTest
     @EnumSource(value = EstadoConsulta.class, names = {
             "PENDIENTE", "ACTIVO", "EN_PROCESO", "URGENTE"
@@ -517,6 +601,28 @@ class ConsultaReasignacionEndpointPostgreSqlTest
                 .cookie(new Cookie(
                         "access_token",
                         jwtService.generarToken(username))));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions ejecutarGetHistorial(
+            String username,
+            Long consultaId,
+            int page,
+            int size) throws Exception {
+        return mockMvc.perform(get(
+                        "/api/consultas/{id}/responsables/historial",
+                        consultaId)
+                .param("page", String.valueOf(page))
+                .param("size", String.valueOf(size))
+                .cookie(new Cookie(
+                        "access_token",
+                        jwtService.generarToken(username))));
+    }
+
+    private String cargarNombreMonitor(Long id) {
+        return jdbcTemplate.queryForObject(
+                "SELECT nombre FROM " + ESQUEMA + ".monitor WHERE id = ?",
+                String.class,
+                id);
     }
 
     private Credenciales credenciales(String username) throws Exception {

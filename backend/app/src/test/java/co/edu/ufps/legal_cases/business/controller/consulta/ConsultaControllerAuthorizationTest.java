@@ -156,6 +156,52 @@ class ConsultaControllerAuthorizationTest {
         verifyNoInteractions(consultaService);
     }
 
+    @Test
+    void usuarioConPermisoVerPuedeConsultarHistorialPaginado() {
+        autenticarCon(VER_CONSULTAS);
+        when(consultaService.listarHistorialResponsables(10L, 1, 10))
+                .thenReturn(new PageResponseDTO<>(List.of(), 1, 10, 0, 0));
+
+        assertDoesNotThrow(
+                () -> consultaController.listarHistorialResponsables(10L, 1, 10));
+
+        verify(consultaService).listarHistorialResponsables(10L, 1, 10);
+    }
+
+    @Test
+    void usuarioConPermisoGestionarPuedeConsultarHistorialPaginado() {
+        autenticarCon(GESTIONAR_CONSULTAS);
+        when(consultaService.listarHistorialResponsables(11L, 2, 5))
+                .thenReturn(new PageResponseDTO<>(List.of(), 2, 5, 0, 0));
+
+        assertDoesNotThrow(
+                () -> consultaController.listarHistorialResponsables(11L, 2, 5));
+
+        verify(consultaService).listarHistorialResponsables(11L, 2, 5);
+    }
+
+    @Test
+    void usuarioSinPermisoLecturaNoPuedeConsultarHistorial() {
+        autenticarCon(ASIGNAR_RESPONSABLES_CONSULTA);
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> consultaController.listarHistorialResponsables(10L, 1, 10));
+
+        verifyNoInteractions(consultaService);
+    }
+
+    @Test
+    void peticionSinAutenticacionNoPuedeConsultarHistorial() {
+        SecurityContextHolder.clearContext();
+
+        assertThrows(
+                AuthenticationCredentialsNotFoundException.class,
+                () -> consultaController.listarHistorialResponsables(10L, 1, 10));
+
+        verifyNoInteractions(consultaService);
+    }
+
     private void autenticarCon(String authority) {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(
