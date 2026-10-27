@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaBusquedaDTO;
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaDTO;
 import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaReasignacionDTO;
+import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaReasignacionHistorialDTO;
 import co.edu.ufps.legal_cases.business.dto.consulta.ficha.FichaExpedienteDTO;
 import co.edu.ufps.legal_cases.business.model.consulta.EstadoConsulta;
 import co.edu.ufps.legal_cases.business.service.consulta.ConsultaService;
@@ -70,6 +71,15 @@ public class ConsultaController {
     @PreAuthorize("hasAnyAuthority('" + VER_CONSULTAS + "', '" + GESTIONAR_CONSULTAS + "')")
     public ConsultaDTO obtenerPorId(@PathVariable Long id) {
         return consultaService.obtenerPorId(id);
+    }
+
+    @GetMapping("/{id}/responsables/historial")
+    @PreAuthorize("hasAnyAuthority('" + VER_CONSULTAS + "', '" + GESTIONAR_CONSULTAS + "')")
+    public PageResponseDTO<ConsultaReasignacionHistorialDTO> listarHistorialResponsables(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return consultaService.listarHistorialResponsables(id, page, size);
     }
 
     @GetMapping("/{id}/ficha")
