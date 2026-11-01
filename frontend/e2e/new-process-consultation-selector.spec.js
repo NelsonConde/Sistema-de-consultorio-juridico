@@ -248,7 +248,7 @@ test("un error de red permite reintentar sin perder los datos del formulario", a
   await selectDepartment(page);
   await page.getByRole("button", { name: "Consulta", exact: true }).click();
 
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "Reintentar" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Reintentar" })).toBeVisible();
   await expect(page.getByRole("combobox").first()).toHaveValue("7");
 
