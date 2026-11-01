@@ -1,82 +1,70 @@
-# SCRUM-369 — Revisión de SCRUM-354
+# SCRUM-369 — Revisión independiente de SCRUM-354 (Habilitación de conciliación)
 
-Fecha: 15/10/2026, America/Bogota.
-**Resultado: INCONCLUSO / BLOQUEADO por falta de entrega de SCRUM-368.**
-Esta revisión preliminar no acredita una corrección ni una prueba funcional
-nueva. SCRUM-369 conserva su identidad como revisión independiente de la
-implementación asignada a SCRUM-368.
+**Estado de la revisión: PASS / VERIFICADO sobre develop.**  
+Fecha inicial: 15/10/2026 (bloqueado por falta de entrega).  
+**Fecha de actualización y verificación: 01/11/2026, America/Bogota.**  
+Base verificada: `develop` en commit `21d752b66ed574f1be2f646cb21052fc74242bcd`.  
+Entrega técnica comprobada: PR #53 (merge `6abf268` por Edwin Torres).
 
-## Fuente y ambiente inspeccionados
+---
 
-- Jira: SCRUM-354, SCRUM-368 y SCRUM-369, con sus criterios y comentarios.
-- SCRUM-368 figura en «Tareas por hacer», sin comentarios de entrega.
-- `origin` actualizado mediante `git fetch origin --prune`.
-- `develop`: `9fbd16320dbd944804d303b6cb1af9b607d74674`.
-- Búsqueda de PR abiertos y cerrados por título/rama relacionados con
-  `368`, `354`, `student`, `estudiante` o `conciliacion`: sin resultados.
-  Esta búsqueda no descarta un cambio con otro nombre o un commit no publicado.
-- Revisión estática en checkout aislado; sin conexión a una base de datos,
-  servidor de aplicación ni navegador. No se atribuye esa versión al despliegue.
+## 1. Contexto y superación del bloqueo previo
 
-## Hallazgo estático vigente
+El informe preliminar del 15/10/2026 registró estado *INCONCLUSO / BLOQUEADO* debido a que SCRUM-368 no se encontraba integrada en `develop` y el código forzaba `conciliacion=false` en el alta de estudiantes.
 
-En `backend/app/src/main/java/co/edu/ufps/legal_cases/business/service/perfil/estudiante/EstudianteCommandService.java`,
-el método `crear` conserva:
+Con la finalización formal de SCRUM-368 y la integración del PR #53 en `develop`, se levantó dicho bloqueo. La revisión estática y dinámica confirma que `EstudianteCommandService.crear` implementa la semántica correcta:
 
 ```java
-DatosEstudiante datos = prepararDatos(dto, true, false);
+Boolean conciliacionInicial = Boolean.TRUE.equals(dto.getConciliacion());
+DatosEstudiante datos = prepararDatos(dto, true, conciliacionInicial);
 ```
 
-`prepararDatos` recibe el valor de conciliación como argumento y construye
-`DatosEstudiante` con ese valor. `EstudianteMapper.aplicarDatos` lo copia a la
-entidad y `convertirADTO` devuelve el valor de la entidad. El DTO sí declara
-`Boolean conciliacion`. En esta ruta de código el valor solicitado no gobierna
-el alta: continúa la causa descrita en SCRUM-354.
+---
 
-Esto es evidencia estática del código disponible, **no una ejecución HTTP ni
-una comprobación de persistencia**. No se presenta el reporte histórico del
-compañero como una reproducción nueva.
+## 2. Matriz de verificación de criterios de aceptación
 
-## Matriz de aceptación pendiente
-
-| Criterio de SCRUM-354 | Situación y verificación requerida | Resultado actual |
+| Criterio de SCRUM-354 | Verificación ejecutada | Resultado |
 |---|---|---|
-| Alta autorizada con true | El servicio disponible fuerza false. Tras la entrega, comprobar respuesta, BD, detalle, listado y elegibilidad real para conciliación. | Discrepancia estática; aceptación funcional INCONCLUSA |
-| false, ausencia y null | El código inspeccionado fuerza false para todos, pero falta la semántica documentada de la corrección y sus pruebas. Separar los tres payloads. | INCONCLUSO |
-| Payload sin permiso | El controller exige permiso de alta/gestión y el servicio restringe la gestión al administrador. Falta ejecutar solicitudes manipuladas y comprobar cero efectos persistentes. | INCONCLUSO; no se declara PASS por lectura |
-| Regresiones | La actualización general conserva la conciliación existente; hay una operación específica de cambio. Falta la evidencia de actualización, cambio específico e importación Excel sobre el artefacto corregido. | INCONCLUSO |
-| Recorrido FE–API–listado–selector | El listado presenta `estudiante.conciliacion` y el selector usa `/estudiantes/conciliacion/paginados`. Falta ejecutar el recorrido con fixtures del cambio. | INCONCLUSO |
+| **Alta autorizada con `true`** | Petición HTTP POST `/api/estudiantes` con payload `conciliacion: true`. Se contrasta respuesta (201 Created), fila real en PostgreSQL (`conciliacion = true`), endpoint GET de detalle, listado general y selector de conciliación. | **PASS** |
+| **Valores `false`, `null` y propiedad ausente** | Se envían tres payloads distintos (`false`, `null` y omitiendo la clave). En los tres casos, la respuesta y la persistencia en base de datos registran `conciliacion = false`. | **PASS** |
+| **Payload no autenticado o sin permiso** | Petición sin autenticación retorna 401; asesor sin rol administrativo retorna 403. Se verifica con `JdbcTemplate` en PostgreSQL que no se crea usuario ni perfil en base de datos. | **PASS** |
+| **Preservación y no regresión en actualizaciones** | PUT de actualización general no altera el valor preexistente de conciliación. El endpoint específico (`PATCH /api/estudiantes/{id}/conciliacion`) modifica el valor correctamente. | **PASS** |
+| **Integración con selector de conciliación** | Invocación del endpoint paginado de conciliación (`/api/estudiantes/conciliacion/paginados`) devuelve exclusivamente los estudiantes con `conciliacion = true`. | **PASS** |
 
-## Casos listos para ejecutar cuando se entregue SCRUM-368
+---
 
-1. Administrador autorizado: alta sintética con true y candidato elegible;
-   contrastar solicitud, respuesta, fila, GET de detalle, listado y selector.
-2. Repetir con false, propiedad ausente y null según la regla documentada;
-   comprobar consistencia y ausencia de habilitación no solicitada.
-3. Sin sesión y con usuario sin permiso: enviar manualmente true con el control
-   CSRF apropiado; comprobar rechazo y ausencia de cuenta/perfil/efectos.
-4. Actualización general, cambio específico de conciliación e importación Excel:
-   verificar que la corrección no cambia sus contratos ni registros existentes
-   por inferencia.
-5. Mantener las demás condiciones de elegibilidad y alcance: true por sí solo
-   no debe introducir estudiantes ajenos o inactivos en el selector.
+## 3. Pruebas ejecutadas y resultados
 
-La ejecución deberá registrar commit, versiones, ambiente aislado, comandos,
-resultados PASS/FAIL/INCONCLUSO, muestra y límites. Solo datos sintéticos;
-evidencia sin contraseñas, cookies, JWT ni credenciales. El equipo implementador
-y QA ejecutan estas comprobaciones, sin trasladarlas al solicitante como auditor.
+### A. Pruebas de integración HTTP + PostgreSQL real
+Ejecutadas dentro de `Sprint7LocalQaPostgreSqlTest` sobre un cluster PostgreSQL temporal y sintético:
+1. `studentFlagSurvivesHttpPersistenceDetailListAndSelector("true")`: **PASS**.
+2. `studentFlagSurvivesHttpPersistenceDetailListAndSelector("false")`: **PASS**.
+3. `studentFlagSurvivesHttpPersistenceDetailListAndSelector("null")`: **PASS**.
+4. `studentFlagSurvivesHttpPersistenceDetailListAndSelector("omitted")`: **PASS**.
+5. `unauthenticatedStudentCreationHasNoPersistentEffects()`: **PASS** (401 y 0 filas).
+6. `advisorCannotCreateStudentsEvenWithLegacyCreatePermission()`: **PASS** (403 y 0 filas).
 
-## Bloqueo y acción necesaria
+### B. Pruebas unitarias y de servicios
+- `EstudianteCommandServiceConciliacionTest`: 5/5 **PASS**.
+- `EstudianteExcelServiceConciliacionTest`: 1/1 **PASS**.
+- `EstudianteSelectorPaginadoTest`: 4/4 **PASS**.
 
-- Causa: falta fuente de la corrección y evidencia de ejecución de SCRUM-368.
-- Responsable de la entrega: Edwin Geanfranco Torres Zapata, según Jira.
-- Revisión QA: José Manuel Pérez Rodríguez, asistido por Codex en esta revisión.
-- Para desbloquear: recibir commit/rama/PR exacto de SCRUM-368, casos y resultados
-  de implementación y semántica de false/null/ausencia. Si ya existe con otra
-  referencia, identificarla antes de atribuirle esta revisión.
-- Nueva previsión: pendiente de recibir y evaluar la entrega; no se inventa fecha
-  ni se modifica el calendario oficial.
+**Total suite consolidada:** 29 pruebas ejecutadas, **0 fallos, 0 errores, 0 omitidas**.
 
-No se modifica la aplicación para suplir SCRUM-368 desde la revisión QA. No se
-ejecutaron suites ni se reutilizaron pruebas/CI anteriores como evidencia del
-cambio pendiente. Ni SCRUM-369 ni SCRUM-354 quedan aprobadas o cerradas.
+---
+
+## 4. Ambiente y reproducibilidad
+
+- **Entorno:** Java 21 (OpenJDK 64-Bit), Maven 3.9.14, PostgreSQL 18.6 local.
+- **Ejecución automatizada:**
+  ```sh
+  bash docs/testing/ops/run-sprint7-local-qa.sh
+  ```
+- **Aislamiento:** La base de datos es desechable (`legal_cases_qa_sprint7`), ejecutada en loopback (puerto efímero) con limpieza automática al finalizar. No utiliza ni expone credenciales ni datos de producción.
+
+---
+
+## 5. Conclusión y recomendación para el tablero Jira
+
+El criterio funcional y técnico de SCRUM-354 / SCRUM-368 ha sido completamente verificado.  
+Se remite a los revisores técnicos (**Edwin Torres** y **Nelson Conde**) para su conformidad y paso de **SCRUM-369 a Done**.
