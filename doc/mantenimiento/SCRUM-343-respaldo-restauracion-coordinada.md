@@ -1,15 +1,17 @@
 # SCRUM-343 — Respaldo y restauración coordinada de PostgreSQL y Storage
 
 **Estado: propuesta controlada; aceptación INCONCLUSA.**
-Fecha: 15/10/2026, America/Bogota. Fuente técnica: `develop` en
-`9fbd16320dbd944804d303b6cb1af9b607d74674`.
+Fecha de propuesta: 15/10/2026. Actualización: 01/11/2026, America/Bogota.
+Fuente técnica actual inspeccionada: `develop` en
+`21d752b66ed574f1be2f646cb21052fc74242bcd`.
 Este documento prepara el procedimiento para revisión; no acredita un respaldo
 material nuevo, una política aprobada ni una restauración ejecutada.
 
 ## Dependencias y responsables
 
-SCRUM-362 sigue pendiente: debe entregar su formato con campos y aprobaciones.
-Este borrador técnico no declara realizada esa entrega. SCRUM-332 definirá el
+SCRUM-362 figura Finalizada en Jira al 01/11/2026. Se elimina la espera por
+su ejecución. El estado de esa subtarea no aprueba los valores de política de
+este documento; el formato entregado debe cotejarse al consolidar el paquete. SCRUM-332 definirá el
 artefacto migrable usado en la restauración; no se ensaya una estrategia de
 migración sin la validación previa de SCRUM-331.
 
@@ -158,11 +160,56 @@ destino no independiente, falta de alerta o incumplimiento de RPO/RTO.
 | Respaldo programado y alerta ensayada | INCONCLUSO: sin ejecución ni canal aprobado |
 | Restauración y limpieza aisladas | Procedimiento preparado; ejecución corresponde a SCRUM-344 tras sus predecesoras |
 
-Para continuar se requiere entrega de SCRUM-362, validación de la política por
-operación/BD y revisores, destino independiente con permisos restringidos y
-canal de alerta de prueba. SCRUM-343 no se cierra y SCRUM-344 no se acepta hasta
+Para continuar se requiere validación de la política por operación/BD y
+revisores, destino independiente con permisos restringidos y canal de alerta
+de prueba. SCRUM-362 ya figura Finalizada; no se mantiene como bloqueo de
+ejecución. SCRUM-342 también figura Finalizada, pero su evidencia de rotación
+se consolida por separado en SCRUM-341. SCRUM-343 no se cierra y SCRUM-344 no se acepta hasta
 recibir la evidencia. No se reabren SCRUM-260/285/300/313 ni se atribuye una
 recuperación completa a la muestra histórica de un objeto de 91 bytes.
 
 Este documento es una propuesta versionada; no actualiza fuentes oficiales de
 Drive ni acredita rotación de credenciales o copias antiguas.
+
+
+## Hoja de entrega para aprobar y operar — 01/11/2026
+
+La propuesta ya contiene valores numéricos. Los campos siguientes permiten al
+responsable aceptar o modificar esos valores sin confundir una propuesta con
+una aprobación. No incluir credenciales ni URLs firmadas.
+
+| Dato que debe entregar el equipo | Responsable / aceptación | Situación |
+|---|---|---|
+| Frecuencia, retención y ventana de escritura | José Manuel; revisión Nelson/Edwin | Valores propuestos arriba; falta aprobación identificable |
+| RPO de 24 h y RTO de 4 h, o valores sustitutos | Operación/BD y revisores | Falta aprobación |
+| Proveedor/proyecto de respaldo independiente y recursos aislados de ensayo | Custodio técnico autorizado | Falta identificador no secreto y comprobación de acceso |
+| Custodio suplente y procedimiento de acceso | Custodio y suplente | Falta designación |
+| Receptor y canal aislado de alerta, con acuse verificable | Operación | Falta destino de prueba |
+| Scheduler y soporte explícito de zona horaria | Operación | Falta plataforma seleccionada |
+| Artefacto de BD y decisión de migraciones aceptada | SCRUM-331/332 | 331 en revisión; 332 no aceptada |
+
+### Secuencia de ejecución preparada
+
+1. Registrar aprobador, fecha, enlace de revisión y valores aceptados.
+2. Identificar origen y destino aislados; probar que la cuenta de respaldo no
+   depende de la disponibilidad del servicio activo. Una segunda carpeta del
+   mismo equipo no acredita independencia del proveedor.
+3. Crear la muestra sintética descrita arriba y registrar sus relaciones antes
+   del respaldo. No sustituir el esquema de aplicación por una tabla de ejemplo.
+4. Ejecutar una vez el job con bloqueo de escritores; conservar dump legible,
+   manifiestos no vacíos, hashes y marcador final únicamente si todo pasa.
+5. Ejecutar el fallo inducido y demostrar recepción en el canal de prueba.
+6. Registrar el scheduler, su zona horaria y el monitor de ausencia de ejecución.
+7. Entregar el conjunto y el acta a SCRUM-344 para restauración independiente.
+
+### Acta mínima de cada ejecución
+
+Registrar `backup_id`, SHA del código y script, versión de PostgreSQL y
+herramientas, ambiente, inicio/fin UTC, barrera de escritura, destino, conteos,
+resultado de lectura de dump y objetos, manifiesto SHA-256, resultado de alerta,
+limpieza y revisor. Si un paso falla, registrar FAIL/INCONCLUSO y no emitir el
+marcador íntegro. Los logs publicados deben estar sanitizados.
+
+Esta actualización es documental. No se instaló un scheduler ni se operó un
+respaldo de servicio: faltan las decisiones y recursos indicados. No se acredita
+RPO/RTO, recepción de alerta, restauración ni vencimiento real de URL.
