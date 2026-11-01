@@ -14,7 +14,7 @@
  */
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -26,8 +26,13 @@ import { API_URL_BASE } from "@/lib/config";
 import { apiResponse } from "@/lib/api";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
-import { toast } from "sonner";
-import { digitsOnlyRule, maxLengthRule, maxNumberRule, nonNegativeNumberRule, optionalEmailRule } from "@/lib/form-validation";
+import {
+  digitsOnlyRule,
+  maxLengthRule,
+  maxNumberRule,
+  nonNegativeNumberRule,
+  optionalEmailRule,
+} from "@/lib/form-validation";
 
 import {
   FORM_DEFAULTS,
@@ -44,21 +49,36 @@ import {
   sexoOptions,
   zonaOptions,
 } from "./persona-form.constants";
-import { construirPayload, toDocumentoOption, toFormValues, toOption } from "./persona-form.utils";
+import {
+  construirPayload,
+  toDocumentoOption,
+  toFormValues,
+  toOption,
+} from "./persona-form.utils";
 import { fetchCatalogo } from "./persona-form.service";
-import { FormSelectField, Seccion, optionalLabel, requiredLabel } from "./PersonaFormParts";
+import {
+  FormSelectField,
+  Seccion,
+  optionalLabel,
+  requiredLabel,
+} from "./PersonaFormParts";
+import {
+  crearErrorPersona,
+  extraerErroresLocales,
+  extraerErroresServidor,
+} from "./persona-validation";
 
 export function PersonaForm({ onSubmit, initialValues }) {
   const router = useRouter();
 
   const initialValuesKey = useMemo(
     () => JSON.stringify(initialValues ?? {}),
-    [initialValues]
+    [initialValues],
   );
 
   const defaultFormValues = useMemo(
     () => toFormValues(initialValues ?? {}),
-    [initialValuesKey]
+    [initialValuesKey],
   );
 
   const {
@@ -67,28 +87,31 @@ export function PersonaForm({ onSubmit, initialValues }) {
     reset,
     watch,
     setValue,
+    setError,
+    clearErrors,
     trigger,
     formState: { errors },
   } = useForm({
     defaultValues: defaultFormValues,
   });
 
-  const { submit, isSubmitting } = useApiForm({
-    endpoint: `${API_URL_BASE}/personas`,
-  });
-
   const [checking, setChecking] = useState(true);
   const [pasoActual, setPasoActual] = useState(0);
+  const [resumenErrores, setResumenErrores] = useState([]);
+  const [referenciaError, setReferenciaError] = useState(null);
+  const [focoPendiente, setFocoPendiente] = useState(null);
   const [catalogoMensaje, setCatalogoMensaje] = useState("");
   const [tipoDocumentoOptions, setTipoDocumentoOptions] = useState(
-    fallbackTipoDocumentoOptions
+    fallbackTipoDocumentoOptions,
   );
   const [tipoPersonaOptions, setTipoPersonaOptions] = useState(OPCIONES_VACIAS);
-  const [nacionalidadOptions, setNacionalidadOptions] = useState(OPCIONES_VACIAS);
+  const [nacionalidadOptions, setNacionalidadOptions] =
+    useState(OPCIONES_VACIAS);
   const [condicionOptions, setCondicionOptions] = useState(OPCIONES_VACIAS);
   const [ocupacionOptions, setOcupacionOptions] = useState(OPCIONES_VACIAS);
   const [empresaOptions, setEmpresaOptions] = useState(OPCIONES_VACIAS);
-  const [departamentoOptions, setDepartamentoOptions] = useState(OPCIONES_VACIAS);
+  const [departamentoOptions, setDepartamentoOptions] =
+    useState(OPCIONES_VACIAS);
   const [municipioOptions, setMunicipioOptions] = useState(OPCIONES_VACIAS);
   const [barrioOptions, setBarrioOptions] = useState(OPCIONES_VACIAS);
 
@@ -129,11 +152,39 @@ export function PersonaForm({ onSubmit, initialValues }) {
     return secciones;
   }, [esMenorEdad]);
 
+  const { submit, isSubmitting } = useApiForm({
+    endpoint: `${API_URL_BASE}/personas`,
+    onError: handleApiError,
+  });
+
+  const conteoErroresPorPaso = useMemo(() => {
+    return resumenErrores.reduce((conteo, error) => {
+      conteo[error.seccion] = (conteo[error.seccion] ?? 0) + 1;
+      return conteo;
+    }, {});
+  }, [resumenErrores]);
+
   const pasoActualNombre = pasos[pasoActual] || pasos[0];
 
   useEffect(() => {
     reset(defaultFormValues);
+    setResumenErrores([]);
+    setReferenciaError(null);
   }, [defaultFormValues, reset]);
+
+  useEffect(() => {
+    if (!focoPendiente) return undefined;
+
+    const frame = window.requestAnimationFrame(() => {
+      const campo = document.getElementById(focoPendiente.campo);
+      if (!campo) return;
+
+      campo.focus({ preventScroll: true });
+      campo.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [focoPendiente]);
 
   useEffect(() => {
     if (pasoActual >= pasos.length) {
@@ -170,12 +221,16 @@ export function PersonaForm({ onSubmit, initialValues }) {
       }
 
       const municipios = await fetchCatalogo(
-        `/municipios/departamento/${departamentoId}`
+        `/municipios/departamento/${departamentoId}`,
       );
 
       setMunicipioOptions(municipios.map(toOption));
 
-      if (!municipios.some((municipio) => String(municipio.id) === String(municipioId))) {
+      if (
+        !municipios.some(
+          (municipio) => String(municipio.id) === String(municipioId),
+        )
+      ) {
         setValue("municipioId", "");
         setValue("barrioId", "");
         setBarrioOptions([]);
@@ -199,7 +254,11 @@ export function PersonaForm({ onSubmit, initialValues }) {
 
       setBarrioOptions(barrios.map(toOption));
 
-      if (!barrios.some((barrio) => String(barrio.id) === String(formValues.barrioId))) {
+      if (
+        !barrios.some(
+          (barrio) => String(barrio.id) === String(formValues.barrioId),
+        )
+      ) {
         setValue("barrioId", "");
       }
     }
@@ -211,9 +270,12 @@ export function PersonaForm({ onSubmit, initialValues }) {
 
   async function verificarSesion() {
     try {
-      const { response: res, data } = await apiResponse(`${API_URL_BASE}/auth/me`, {
-        method: "GET",
-      });
+      const { response: res, data } = await apiResponse(
+        `${API_URL_BASE}/auth/me`,
+        {
+          method: "GET",
+        },
+      );
 
       if (res.status === 401) {
         router.replace("/");
@@ -229,7 +291,7 @@ export function PersonaForm({ onSubmit, initialValues }) {
 
       const puedeEntrarRecepcion = tienePermiso(
         user,
-        PERMISOS.ACCEDER_RECEPCION
+        PERMISOS.ACCEDER_RECEPCION,
       );
 
       const puedeCrearPersonas = tienePermiso(user, PERMISOS.CREAR_PERSONAS);
@@ -241,7 +303,6 @@ export function PersonaForm({ onSubmit, initialValues }) {
 
       await cargarCatalogos();
     } catch {
-
       router.replace("/");
     } finally {
       setChecking(false);
@@ -275,7 +336,7 @@ export function PersonaForm({ onSubmit, initialValues }) {
       setTipoDocumentoOptions(
         opcionesDocumento.length > 0
           ? opcionesDocumento
-          : fallbackTipoDocumentoOptions
+          : fallbackTipoDocumentoOptions,
       );
       setTipoPersonaOptions(tiposPersona.map(toOption));
       setNacionalidadOptions(nacionalidades.map(toOption));
@@ -293,15 +354,64 @@ export function PersonaForm({ onSubmit, initialValues }) {
         departamentos.length === 0
       ) {
         setCatalogoMensaje(
-          "Algunos catálogos no se pudieron cargar. Verifica permisos o disponibilidad del backend antes de guardar."
+          "Algunos catálogos no se pudieron cargar. Verifica permisos o disponibilidad del backend antes de guardar.",
         );
       }
     } catch {
-
       setCatalogoMensaje(
-        "No se pudieron cargar todos los catálogos necesarios para persona."
+        "No se pudieron cargar todos los catálogos necesarios para persona.",
       );
       setTipoDocumentoOptions(fallbackTipoDocumentoOptions);
+    }
+  }
+
+  function irAlCampoConError(error) {
+    const indicePaso = pasos.indexOf(error.seccion);
+
+    if (indicePaso >= 0) {
+      setPasoActual(indicePaso);
+    }
+
+    if (error.campo !== "formulario") {
+      setFocoPendiente({ campo: error.campo, solicitud: Date.now() });
+    }
+  }
+
+  function mostrarErrores(detalles, correlationId = null) {
+    setResumenErrores(detalles);
+    setReferenciaError(correlationId);
+
+    for (const detalle of detalles) {
+      if (detalle.seccion !== "Formulario") {
+        setError(detalle.campo, {
+          type: "server",
+          message: detalle.mensaje,
+        });
+      }
+    }
+
+    if (detalles[0]) {
+      irAlCampoConError(detalles[0]);
+    }
+  }
+
+  function handleApiError({ status, payload, correlationId }) {
+    if (status !== 400 && status !== 422) return false;
+
+    const detalles = extraerErroresServidor(payload);
+    if (detalles.length === 0) return false;
+
+    mostrarErrores(detalles, correlationId);
+    return true;
+  }
+
+  function handleInvalidSubmit(erroresFormulario) {
+    const detalles = extraerErroresLocales(erroresFormulario);
+    setResumenErrores(detalles);
+    setReferenciaError(null);
+
+    if (detalles[0]) {
+      irAlCampoConError(detalles[0]);
     }
   }
 
@@ -314,15 +424,19 @@ export function PersonaForm({ onSubmit, initialValues }) {
    * @returns {Promise<void>}
    */
   async function handleSubmitForm(data) {
+    setResumenErrores([]);
+    setReferenciaError(null);
+
     // Validation rule.
     const telefono = String(data.telefono ?? "").trim();
-    const correo   = String(data.correo ?? "").trim();
+    const correo = String(data.correo ?? "").trim();
 
     if (!telefono && !correo) {
-      toast.error("Contacto requerido", {
-        description: "Debe ingresar al menos un teléfono o un correo electrónico.",
-      });
-      setPasoActual(pasos.indexOf("Contacto"));
+      const errorContacto = crearErrorPersona(
+        "telefono",
+        "Debe ingresar al menos un teléfono o un correo electrónico.",
+      );
+      mostrarErrores([errorContacto]);
       return;
     }
 
@@ -363,21 +477,26 @@ export function PersonaForm({ onSubmit, initialValues }) {
   async function irSiguiente() {
     // Implementation detail.
     const camposPorPaso = {
-      "Identificación": [
-        "tipoPersonaId", "tipoDocumento", "numeroDocumento",
-        "fechaExpedicion", "ciudadExpedicion", "nombres",
-        "apellidos", "fechaNacimiento",
+      Identificación: [
+        "tipoPersonaId",
+        "tipoDocumento",
+        "numeroDocumento",
+        "fechaExpedicion",
+        "ciudadExpedicion",
+        "nombres",
+        "apellidos",
+        "fechaNacimiento",
       ],
-      "Identidad": [],
-      "Contacto": [],   // Validation rule.
-      "Vivienda": [],
-      "Economía": [],
-      "Acudiente": [],
-      "Servicio": [],
+      Identidad: [],
+      Contacto: [], // Validation rule.
+      Vivienda: [],
+      Economía: [],
+      Acudiente: [],
+      Servicio: [],
     };
 
     const campos = camposPorPaso[pasoActualNombre] ?? [];
-    const esValido = campos.length === 0 || await trigger(campos);
+    const esValido = campos.length === 0 || (await trigger(campos));
 
     if (!esValido) return;
 
@@ -386,6 +505,10 @@ export function PersonaForm({ onSubmit, initialValues }) {
 
   function limpiarFormulario() {
     reset(FORM_DEFAULTS);
+    clearErrors();
+    setResumenErrores([]);
+    setReferenciaError(null);
+    setFocoPendiente(null);
     setPasoActual(0);
     setMunicipioOptions([]);
     setBarrioOptions([]);
@@ -400,7 +523,8 @@ export function PersonaForm({ onSubmit, initialValues }) {
       <div>
         <h3 className="text-xl font-bold">Registro de persona</h3>
         <p className="text-sm text-muted-foreground">
-          Completa la información por grupos. Puedes cambiar de sección en cualquier momento.
+          Completa la información por grupos. Puedes cambiar de sección en
+          cualquier momento.
         </p>
       </div>
 
@@ -416,18 +540,85 @@ export function PersonaForm({ onSubmit, initialValues }) {
             key={paso}
             type="button"
             onClick={() => setPasoActual(index)}
+            aria-label={
+              conteoErroresPorPaso[paso]
+                ? `${paso}, ${conteoErroresPorPaso[paso]} ${
+                    conteoErroresPorPaso[paso] === 1 ? "error" : "errores"
+                  }`
+                : paso
+            }
             className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
               pasoActual === index
                 ? "border-primary bg-primary text-primary-foreground"
-                : "bg-background hover:bg-muted"
+                : conteoErroresPorPaso[paso]
+                  ? "border-destructive bg-destructive/10 text-destructive hover:bg-destructive/15"
+                  : "bg-background hover:bg-muted"
             }`}
           >
-            {paso}
+            <span className="inline-flex max-w-full items-center justify-center gap-1.5">
+              <span className="truncate">{paso}</span>
+              {conteoErroresPorPaso[paso] ? (
+                <span
+                  aria-hidden="true"
+                  className="inline-flex min-w-5 shrink-0 justify-center rounded-full bg-destructive px-1.5 text-xs text-destructive-foreground"
+                >
+                  {conteoErroresPorPaso[paso]}
+                </span>
+              ) : null}
+            </span>
           </button>
         ))}
       </div>
 
-      <form onSubmit={handleSubmit(handleSubmitForm)} className="space-y-6">
+      {resumenErrores.length > 0 && (
+        <section
+          id="resumen-errores-persona"
+          role="alert"
+          aria-live="assertive"
+          className="min-w-0 max-w-full overflow-hidden rounded-xl border border-destructive/40 bg-destructive/5 p-4"
+        >
+          <h4 className="font-semibold text-destructive">
+            Revisa{" "}
+            {resumenErrores.length === 1
+              ? "el campo indicado"
+              : "los campos indicados"}
+          </h4>
+
+          <ul className="mt-3 grid min-w-0 gap-2 sm:grid-cols-2">
+            {resumenErrores.map((error) => (
+              <li key={`${error.campo}-${error.mensaje}`} className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => irAlCampoConError(error)}
+                  className="flex w-full min-w-0 flex-col items-start gap-1 rounded-lg border bg-background px-3 py-2 text-left transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span className="max-w-full rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                    {error.seccion}
+                  </span>
+                  <span className="max-w-full break-words text-sm font-semibold">
+                    {error.etiqueta}
+                  </span>
+                  <span className="max-w-full break-words text-sm text-muted-foreground">
+                    {error.mensaje}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          {referenciaError && (
+            <p className="mt-3 break-all text-xs text-muted-foreground">
+              Referencia: {referenciaError}
+            </p>
+          )}
+        </section>
+      )}
+
+      <form
+        onSubmit={handleSubmit(handleSubmitForm, handleInvalidSubmit)}
+        className="min-w-0 space-y-6"
+        noValidate
+      >
         <div className="rounded-xl border bg-background p-5">
           {pasoActualNombre === "Identificación" && (
             <Seccion
@@ -459,7 +650,13 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 maxLength={30}
                 register={register}
                 errors={errors}
-                rules={{ required: REQUIRED_MESSAGE, ...maxLengthRule(30, "El número de documento no puede superar los 30 caracteres") }}
+                rules={{
+                  required: REQUIRED_MESSAGE,
+                  ...maxLengthRule(
+                    30,
+                    "El número de documento no puede superar los 30 caracteres",
+                  ),
+                }}
               />
 
               <FormInput
@@ -652,10 +849,7 @@ export function PersonaForm({ onSubmit, initialValues }) {
           )}
 
           {pasoActualNombre === "Contacto" && (
-            <Seccion
-              titulo="Contacto"
-              descripcion="Datos de comunicación."
-            >
+            <Seccion titulo="Contacto" descripcion="Datos de comunicación.">
               <FormInput
                 name="telefono"
                 label={optionalLabel("Teléfono")}
@@ -694,8 +888,7 @@ export function PersonaForm({ onSubmit, initialValues }) {
                     message: "El correo no puede superar los 120 caracteres",
                   },
                   validate: {
-                    formato: (value) =>
-                      optionalEmailRule().validate(value),
+                    formato: (value) => optionalEmailRule().validate(value),
                     contacto: (value) =>
                       String(value || "").trim() ||
                       String(formValues.telefono || "").trim() ||
@@ -957,7 +1150,9 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 register={register}
                 errors={errors}
                 rules={{
-                  required: esMenorEdad ? "Si la persona es menor de edad, el nombre del acudiente es obligatorio" : false,
+                  required: esMenorEdad
+                    ? "Si la persona es menor de edad, el nombre del acudiente es obligatorio"
+                    : false,
                   ...maxLengthRule(150),
                 }}
               />
@@ -970,7 +1165,9 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 register={register}
                 errors={errors}
                 rules={{
-                  required: esMenorEdad ? "Si la persona es menor de edad, la relación del acudiente es obligatoria" : false,
+                  required: esMenorEdad
+                    ? "Si la persona es menor de edad, la relación del acudiente es obligatoria"
+                    : false,
                   ...maxLengthRule(100),
                 }}
               />
@@ -1010,7 +1207,8 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 rules={{
                   maxLength: {
                     value: 120,
-                    message: "El correo del acudiente no puede superar los 120 caracteres",
+                    message:
+                      "El correo del acudiente no puede superar los 120 caracteres",
                   },
                   validate: {
                     formato: (value) => optionalEmailRule().validate(value),

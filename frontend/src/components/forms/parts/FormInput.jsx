@@ -7,7 +7,6 @@
  *
  * @module components/forms/parts/FormInput
  */
-import React from "react";
 import { Input } from "@/components/ui/input";
 import { sanitizeDigits } from "@/lib/form-validation";
 
@@ -22,7 +21,9 @@ function renderLabel(label, required) {
     return (
       <span className="inline-flex items-center gap-1">
         <span>{label}</span>
-        <span className="text-red-500" aria-hidden="true">*</span>
+        <span className="text-red-500" aria-hidden="true">
+          *
+        </span>
       </span>
     );
   }
@@ -52,6 +53,7 @@ export function FormInput({
   const registration = register(name, rules);
   const externalOnChange = props.onChange;
   const maxLength = props.maxLength;
+  const errorId = `${name}-error`;
 
   const handleChange = (event) => {
     if (digitsOnly) {
@@ -79,10 +81,17 @@ export function FormInput({
       <Input
         id={name}
         type={type}
-        aria-invalid={error ? "true" : "false"}
-        aria-required={required ? "true" : "false"}
         {...registration}
         {...inputProps}
+        aria-invalid={error ? "true" : "false"}
+        aria-required={required ? "true" : "false"}
+        aria-describedby={
+          error
+            ? [inputProps["aria-describedby"], errorId]
+                .filter(Boolean)
+                .join(" ")
+            : inputProps["aria-describedby"]
+        }
         inputMode={digitsOnly ? "numeric" : inputProps.inputMode}
         pattern={digitsOnly ? "[0-9]*" : inputProps.pattern}
         onChange={handleChange}
@@ -90,7 +99,7 @@ export function FormInput({
       />
 
       {error && (
-        <p className="text-xs text-red-500">
+        <p id={errorId} className="text-xs text-red-500">
           {error?.message}
         </p>
       )}
