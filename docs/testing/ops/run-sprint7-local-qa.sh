@@ -3,7 +3,7 @@
 set -euo pipefail
 umask 077
 repository_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)"
-for executable in initdb pg_ctl createdb python3; do
+for executable in initdb pg_ctl createdb psql python3; do
     command -v "$executable" >/dev/null || { echo "Missing executable: $executable" >&2; exit 1; }
 done
 qa_directory="$(mktemp -d "${TMPDIR:-/tmp}/legal-cases-sprint7-qa.XXXXXXXX")"
@@ -32,9 +32,14 @@ initdb -D "$qa_directory/data" -A trust --no-locale -U legal_cases_qa > "$qa_dir
 pg_ctl -D "$qa_directory/data" -l "$qa_directory/server.log" \
     -o "-h 127.0.0.1 -p $qa_port -k $qa_directory/socket" -w start
 createdb -h 127.0.0.1 -p "$qa_port" -U legal_cases_qa legal_cases_qa_sprint7
+if [[ -f "$repository_root/backend/app/src/test/resources/db/postgresql-test-init.sql" ]]; then
+    psql -h 127.0.0.1 -p "$qa_port" -U legal_cases_qa -d legal_cases_qa_sprint7 \
+        -f "$repository_root/backend/app/src/test/resources/db/postgresql-test-init.sql" >/dev/null
+fi
 export LEGAL_CASES_QA_DB_URL="jdbc:postgresql://127.0.0.1:$qa_port/legal_cases_qa_sprint7"
 printf 'Synthetic QA only; '
 pg_config --version
 cd "$repository_root/backend/app"
-bash ./mvnw -B -Dtest=Sprint7LocalQaPostgreSqlTest,EstudianteCommandServiceConciliacionTest,EstudianteExcelServiceConciliacionTest,EstudianteSelectorPaginadoTest,ConsultaControllerAuthorizationTest \
+bash ./mvnw -B \
+    -Dtest=ConsultaReasignacionHistorialQaPostgreSqlTest,Sprint7LocalQaPostgreSqlTest,EstudianteCommandServiceConciliacionTest,EstudianteExcelServiceConciliacionTest,EstudianteSelectorPaginadoTest,ConsultaControllerAuthorizationTest,ConsultaReasignacionServiceTest,ConsultaReasignacionHistorialQueryServiceTest,ConsultaAccessServiceReasignacionTest,ConsultaReasignacionDTOTest \
     -Dlogging.level.root=WARN test
