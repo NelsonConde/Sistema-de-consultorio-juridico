@@ -1,4 +1,4 @@
-# SCRUM-333 — Diagnóstico frontend del 401 en estadísticas
+# SCRUM-364 — Diagnóstico frontend del 401 en estadísticas
 
 Fecha de revisión: 2026-11-02 (America/Bogota).
 
