@@ -2,7 +2,7 @@
 
 > **Control de vigencia (16/10/2026):** Documento técnico histórico. No sustituye el SRS, EP3 ni EP5 consolidados de Sprint 1. Se concilia aquí solo el cierre de CP-09; la numeración y los enlaces restantes se revisarán en las tareas documentales correspondientes.
 
-> Especificación documental. Los SQL operativos reales están en `backend/app/db/migration/`; Flyway no está integrado en esta versión. La propuesta de [SCRUM-331](../decisiones/estrategia-migraciones.md) requiere validación antes de su implementación en SCRUM-332. Las antiguas referencias V23/V25/V26 no identifican scripts existentes.
+> Especificación documental reconciliada con `develop` el 02/11/2026. El baseline descubierto por Flyway está en `backend/app/src/main/resources/db/migration/V20261015_01__baseline_current_schema.sql` y se ejecuta mediante el artefacto separado de migraciones antes del backend. Los SQL históricos, verificadores y recuperaciones permanecen en `backend/app/db/migration/` y `backend/db/` fuera del descubrimiento automático. Las referencias V23/V25/V26/U26 no identifican archivos existentes. El procedimiento operativo vigente está en [Manual de despliegue, operación y recuperación](../mantenimiento/manual-despliegue-recuperacion.md).
 
 ---
 
@@ -282,3 +282,4 @@ sequenceDiagram
 - **404 Not Found**: El expediente o el `uploadId` especificado no existe.
 - **409 Conflict**: Conflicto de versiones concurrentes al intentar promover dos versiones vigentes en paralelo.
 - **503 Service Unavailable**: El proveedor de almacenamiento privado no se encuentra disponible temporalmente; la transacción de metadatos se compensa y revierte de forma limpia.
+
