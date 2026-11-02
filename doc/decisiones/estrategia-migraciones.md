@@ -1,8 +1,8 @@
 # SCRUM-331 — Estrategia de migraciones de PostgreSQL
 
 Estado: **propuesta técnica pendiente de validación del responsable BD y del revisor**.
-Fecha: 15/10/2026, America/Bogota. Base inspeccionada: `develop`,
-`9fbd16320dbd944804d303b6cb1af9b607d74674`.
+Fecha: 15/10/2026. Actualización y revalidación: 01/11/2026, America/Bogota.
+Base inspeccionada: `develop`, `21d752b66ed574f1be2f646cb21052fc74242bcd`.
 Esta propuesta no autoriza SCRUM-332 ni acredita ejecución en una base de datos.
 
 ## Situación comprobada
