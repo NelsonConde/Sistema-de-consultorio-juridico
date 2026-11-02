@@ -100,9 +100,23 @@ public class AuthController {
     @PatchMapping("/cambiar-password")
     public ResponseEntity<Void> cambiarPassword(
             @CookieValue(name = ACCESS_TOKEN_COOKIE, required = false) String token,
-            @Valid @RequestBody CambiarPasswordRequestDTO dto) {
+            @Valid @RequestBody CambiarPasswordRequestDTO dto,
+            HttpServletRequest request,
+            HttpServletResponse response) {
 
-        authService.cambiarPassword(token, dto);
+        String nuevoToken = authService.cambiarPassword(token, dto);
+
+        ResponseCookie authCookie = crearCookieAuth(
+                nuevoToken,
+                ACCESS_TOKEN_MAX_AGE_SECONDS);
+
+        // El token CSRF anterior pertenecía al estado autenticado previo.
+        csrfTokenRepository.saveToken(null, request, response);
+
+        // Renueva la cookie JWT con la nueva versión de autenticación.
+        response.addHeader(
+                HttpHeaders.SET_COOKIE,
+                authCookie.toString());
 
         return ResponseEntity.noContent().build();
     }

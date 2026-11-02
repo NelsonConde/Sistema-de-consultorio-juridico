@@ -12,9 +12,12 @@ import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.Claims;
 
 @Service
 public class JwtService {
+
+    private static final String AUTH_VERSION_CLAIM = "authVersion";
 
     private final String secret;
     private final long expirationMs;
@@ -28,11 +31,16 @@ public class JwtService {
     }
 
     public String generarToken(String username) {
+        return generarToken(username, 0L);
+    }
+
+    public String generarToken(String username, long authVersion) {
         Date ahora = new Date();
         Date expiracion = new Date(ahora.getTime() + expirationMs);
 
         return Jwts.builder()
                 .subject(username)
+                .claim(AUTH_VERSION_CLAIM, authVersion)
                 .issuedAt(ahora)
                 .expiration(expiracion)
                 .signWith(obtenerClave())
@@ -50,13 +58,31 @@ public class JwtService {
 
     // Para identificar de quien es el token
     public String obtenerUsername(String token) {
+        return obtenerClaims(token).getSubject();
+    }
+
+    public long obtenerAuthVersion(String token) {
+        Object claim = obtenerClaims(token).get(AUTH_VERSION_CLAIM);
+
+        // Compatibilidad con JWT emitidos antes de introducir authVersion.
+        if (claim == null) {
+            return 0L;
+        }
+
+        if (claim instanceof Number number) {
+            return number.longValue();
+        }
+
+        throw new BusinessException("Token inválido o expirado");
+    }
+
+    private Claims obtenerClaims(String token) {
         try {
             return Jwts.parser()
-                    .verifyWith(obtenerClave()) // Le dice qué clave usar para validar la firma
-                    .build() // Construye el lector ya configurado
-                    .parseSignedClaims(token) // Lee y valida el token
-                    .getPayload() // Obtiene los datos internos del token
-                    .getSubject(); // Saca el username guardado en el token
+                    .verifyWith(obtenerClave())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
         } catch (JwtException | IllegalArgumentException ex) {
             throw new BusinessException("Token inválido o expirado");
         }
