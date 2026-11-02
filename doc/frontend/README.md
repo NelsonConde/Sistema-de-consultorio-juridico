@@ -36,6 +36,7 @@ frontend/modulos/
 | `usuarios-roles.md` | Usuarios del sistema, roles, permisos y auditoría visual. |
 | `catalogos.md` | Administración de áreas, temas y tipos. |
 | `eliminacion.md` | Reactivación y gestión lógica de registros. |
+| `activacion-cuenta.md` | Flujo público y seguro para crear la contraseña inicial de una cuenta. |
 
 ## Rutas principales
 
@@ -44,6 +45,7 @@ El frontend usa App Router de Next.js. Entre las rutas implementadas se encuentr
 - `/` para login;
 - `/recuperar-password`;
 - `/restablecer-password`;
+- `/activar-cuenta`;
 - `/inicio`;
 - `/admin`;
 - `/roles`;
