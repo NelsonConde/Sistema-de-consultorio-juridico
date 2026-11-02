@@ -1,0 +1,79 @@
+{
+  "base": "21d752b66ed574f1be2f646cb21052fc74242bcd",
+  "date": "2026-11-01",
+  "backend_suites": [
+    {
+      "name": "co.edu.ufps.legal_cases.security.integration.Sprint7LocalQaPostgreSqlTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "co.edu.ufps.legal_cases.business.service.perfil.estudiante.EstudianteSelectorPaginadoTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "co.edu.ufps.legal_cases.business.service.perfil.estudiante.EstudianteExcelServiceConciliacionTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "co.edu.ufps.legal_cases.business.service.perfil.estudiante.EstudianteCommandServiceConciliacionTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "co.edu.ufps.legal_cases.business.controller.consulta.ConsultaControllerAuthorizationTest",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "co.edu.ufps.legal_cases.business.service.consulta.reasignacion.ConsultaReasignacionServiceTest",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "co.edu.ufps.legal_cases.business.service.consulta.reasignacion.ConsultaReasignacionHistorialQueryServiceTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "co.edu.ufps.legal_cases.business.service.acceso.consulta.ConsultaAccessServiceReasignacionTest",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "co.edu.ufps.legal_cases.business.dto.consulta.ConsultaReasignacionDTOTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "browser_scrum367": {
+    "passed": 5,
+    "api": "mocked"
+  },
+  "contains_raw_logs": false,
+  "browser_scrum292": {
+    "passed": 5,
+    "api": "mocked",
+    "includes_backend_password_validation": false
+  }
+}
