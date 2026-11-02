@@ -2,8 +2,7 @@
 
 > **Control de vigencia (16/10/2026):** Documento técnico histórico. No sustituye el SRS, EP3 ni EP5 consolidados de Sprint 1. Se concilia aquí solo el cierre de CP-09; la numeración y los enlaces restantes se revisarán en las tareas documentales correspondientes.
 
-> Documento alineado con el Informe Final ([`.env.informe_final.docx`](file:///home/anorak/Code/ingsoftware/Sistema-de-consultorio-juridico/.env.informe_final.docx)), el código fuente implementado y las migraciones de base de datos Flyway (`V23__create_file_asset_table.sql`, `V25__migrate_existing_files_to_file_asset.sql`, `V26__add_document_versioning_and_metadata.sql`).
-
+> **Corrección de referencias — SCRUM-321:** Se retira el enlace local al Informe Final. Las referencias anteriores `V23__create_file_asset_table.sql`, `V25__migrate_existing_files_to_file_asset.sql` y `V26__add_document_versioning_and_metadata.sql` no se localizaron en la rama revisada ni en el historial Git disponible. No se establece equivalencia entre esas tres referencias y el script de versionado identificado.
 ---
 
 ## 1. Contexto y Objetivos

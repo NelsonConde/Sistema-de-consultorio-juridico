@@ -140,8 +140,7 @@ Si una migración requiere reversión controlada en un entorno de contingencia, 
 
 Para el historial de reasignaciones, `backend/app/db/migration/V20261011_01__create_consulta_reasignacion_historial_recovery.sql` solo elimina sus objetos si la tabla está vacía. Si existen eventos, el script cancela la operación; se debe conservar la evidencia histórica, restaurar desde respaldo cuando corresponda o preparar una migración correctiva hacia adelante. No debe borrarse manualmente una tabla con eventos para forzar la reversión.
 
-- **Archivo de rollback**: [`backend/app/src/main/resources/db/rollback/U26__rollback_document_versioning.sql`](file:///home/anorak/Code/ingsoftware/Sistema-de-consultorio-juridico/backend/app/src/main/resources/db/rollback/U26__rollback_document_versioning.sql).
-- **Acciones ejecutadas en rollback**:
+- **Archivo de rollback**: [`backend/app/db/migration/V20260905_01__version_document_model_rollback.sql`](../../backend/app/db/migration/V20260905_01__version_document_model_rollback.sql).- **Acciones ejecutadas en rollback**:
   1. Elimina el índice único parcial `uk_file_asset_doc_vigente`.
   2. Elimina la clave foránea `fk_file_asset_referencia_anterior`.
   3. Remueve las columnas agregadas (`version`, `documento_logico`, `tipo_documental`, `origen`, `referencia_anterior_id`).
