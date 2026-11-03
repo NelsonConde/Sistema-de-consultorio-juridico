@@ -45,23 +45,20 @@ public class AccountActivationService {
         validator.validarSolicitud(dto);
 
         /*
-         * Esta lectura identifica el usuario. El estado definitivo
-         * vuelve a comprobarse después de adquirir los locks.
+         * Solo resolvemos el identificador antes del lock.
+         * No se carga ninguna entidad en el persistence context,
+         * evitando reutilizar estado obsoleto durante concurrencia.
          */
-        AccountActivationToken tokenInicial =
-                tokenService.obtenerToken(
+        Long usuarioId =
+                tokenService.obtenerUsuarioId(
                         dto.getToken());
 
-        validator.validarToken(tokenInicial);
-
-        Long usuarioId =
-                tokenInicial
-                        .getUsuarioSistema()
-                        .getId();
-
         /*
-         * Todas las operaciones concurrentes siguen el mismo orden:
-         * primero UsuarioSistema y después AccountActivationToken.
+         * El orden global de locks es:
+         * UsuarioSistema -> AccountActivationToken.
+         *
+         * Una segunda activación concurrente esperará aquí hasta
+         * que la primera transacción confirme sus cambios.
          */
         UsuarioSistema usuario =
                 usuarioSistemaRepository
@@ -83,8 +80,9 @@ public class AccountActivationService {
         }
 
         /*
-         * Entre la lectura inicial y los locks, otra transacción
-         * pudo consumir o revocar la invitación.
+         * Estas validaciones ocurren después de los locks.
+         * Por tanto observan el estado confirmado por cualquier
+         * transacción concurrente anterior.
          */
         validator.validarToken(tokenBloqueado);
         validator.validarCuentaPendiente(usuario);

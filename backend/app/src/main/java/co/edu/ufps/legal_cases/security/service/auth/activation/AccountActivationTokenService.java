@@ -85,15 +85,20 @@ public class AccountActivationTokenService {
                 expiracion);
     }
 
+    /*
+     * Esta consulta devuelve únicamente un valor escalar.
+     * No carga UsuarioSistema ni AccountActivationToken en el
+     * persistence context antes de adquirir los locks.
+     */
     @Transactional(readOnly = true)
-    public AccountActivationToken obtenerToken(
+    public Long obtenerUsuarioId(
             String token) {
 
         String hash =
                 secureTokenService.generarHashToken(token);
 
         return tokenRepository
-                .findByTokenHash(hash)
+                .findUsuarioIdByTokenHash(hash)
                 .orElseThrow(
                         AccountActivationException::invalido);
     }

@@ -21,13 +21,17 @@ public interface AccountActivationTokenRepository
     findByUsuarioSistemaAndUsadoFalseAndRevocadoFalse(
             UsuarioSistema usuarioSistema);
 
+    /*
+     * Obtiene únicamente el identificador del usuario para poder
+     * adquirir primero su lock sin introducir entidades obsoletas
+     * en el persistence context.
+     */
     @Query("""
-            SELECT t
+            SELECT t.usuarioSistema.id
             FROM AccountActivationToken t
-            JOIN FETCH t.usuarioSistema
             WHERE t.tokenHash = :tokenHash
             """)
-    Optional<AccountActivationToken> findByTokenHash(
+    Optional<Long> findUsuarioIdByTokenHash(
             @Param("tokenHash") String tokenHash);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
