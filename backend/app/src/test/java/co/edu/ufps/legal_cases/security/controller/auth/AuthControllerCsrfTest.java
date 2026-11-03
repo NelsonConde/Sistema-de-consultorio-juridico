@@ -25,6 +25,7 @@ import co.edu.ufps.legal_cases.security.dto.auth.login.LoginRequestDTO;
 import co.edu.ufps.legal_cases.security.dto.auth.login.LoginResponseDTO;
 import co.edu.ufps.legal_cases.security.dto.auth.login.LoginResultDTO;
 import co.edu.ufps.legal_cases.security.dto.auth.password.CambiarPasswordRequestDTO;
+import co.edu.ufps.legal_cases.security.service.auth.activation.AccountActivationService;
 import co.edu.ufps.legal_cases.security.service.auth.AuthService;
 import co.edu.ufps.legal_cases.security.service.auth.PasswordResetService;
 
@@ -34,12 +35,15 @@ class AuthControllerCsrfTest {
     private PasswordResetService passwordResetService;
     private CsrfTokenRepository csrfTokenRepository;
     private AuthController authController;
+    private AccountActivationService accountActivationService;
 
     @BeforeEach
     void setUp() {
         authService = mock(AuthService.class);
         passwordResetService = mock(PasswordResetService.class);
         csrfTokenRepository = mock(CsrfTokenRepository.class);
+        accountActivationService =
+                mock(AccountActivationService.class);
 
         AuthCookieProperties authCookieProperties =
                 new AuthCookieProperties();
@@ -50,6 +54,7 @@ class AuthControllerCsrfTest {
         authController = new AuthController(
                 authService,
                 passwordResetService,
+                accountActivationService,
                 csrfTokenRepository,
                 authCookieProperties);
     }

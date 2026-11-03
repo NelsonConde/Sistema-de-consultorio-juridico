@@ -1,2 +1,5 @@
 /mvnw text eol=lf
 *.cmd text eol=crlf
+src/main/resources/db/migration/*.sql text eol=lf
+src/main/resources/db/migration-support/*.sha256 text eol=lf
+db/tests/*.py text eol=lf
