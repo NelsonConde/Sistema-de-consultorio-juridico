@@ -13,7 +13,7 @@ APP = Path(__file__).resolve().parents[2]
 JAVA = shutil.which("java")
 MIGRATIONS = APP / "target/legal-cases-backend-migrations.jar"
 BACKEND = APP / "target/legal-cases-backend.jar"
-EXPECTED_SQL_MIGRATIONS = 2
+EXPECTED_SQL_MIGRATIONS = 3
 
 
 def docker(*arguments, input_text=None):
