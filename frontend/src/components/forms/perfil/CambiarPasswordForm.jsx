@@ -169,10 +169,10 @@ export function CambiarPasswordForm({ isActive = true }) {
 
         <ul
           id="password-policy-hints"
-          className="mt-1.5 space-y-0.5 pl-1 text-xs text-muted-foreground"
+          className="mt-2 space-y-1 text-xs leading-relaxed text-muted-foreground"
         >
           {PASSWORD_POLICY_HINTS.map((hint) => (
-            <li key={hint} className="flex items-center gap-1.5">
+            <li key={hint} className="flex items-center gap-2">
               <ShieldCheck className="h-3 w-3" aria-hidden="true" />
               {hint}
             </li>
