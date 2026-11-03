@@ -9,8 +9,8 @@ const PERFILES = [
 ];
 
 function perfilFixture(
-  tipoPerfil,
-  email = `${tipoPerfil.toLowerCase()}@prueba.local`,
+    tipoPerfil,
+    email = `${tipoPerfil.toLowerCase()}@prueba.local`,
 ) {
   return {
     username: `${tipoPerfil.toLowerCase()}.prueba`,
@@ -30,9 +30,12 @@ async function mockPerfilApi(page, tipoPerfil, options = {}) {
     passwordFailure = null,
     profileDelayMs = 0,
     profileFailures = 0,
+    profileFailureUntilReleased = false,
   } = options;
+
   let actual = perfilFixture(tipoPerfil);
   let remainingProfileFailures = profileFailures;
+  let profileFailureLocked = profileFailureUntilReleased;
   const patchBodies = [];
   const passwordBodies = [];
   const profileRequests = [];
@@ -69,8 +72,11 @@ async function mockPerfilApi(page, tipoPerfil, options = {}) {
         await new Promise((resolve) => setTimeout(resolve, profileDelayMs));
       }
 
-      if (remainingProfileFailures > 0) {
-        remainingProfileFailures -= 1;
+      if (profileFailureLocked || remainingProfileFailures > 0) {
+        if (remainingProfileFailures > 0) {
+          remainingProfileFailures -= 1;
+        }
+
         await route.fulfill({
           status: 500,
           contentType: "application/json",
@@ -142,14 +148,17 @@ async function mockPerfilApi(page, tipoPerfil, options = {}) {
     passwordBodies,
     profileRequests,
     getActual: () => actual,
+    releaseProfileFailure: () => {
+      profileFailureLocked = false;
+    },
   };
 }
 
 test.describe("Autogestión de perfil y protección de datos", () => {
   for (const tipoPerfil of PERFILES) {
     test(`Perfil ${tipoPerfil}: lectura y actualización autorizada de contacto`, async ({
-      page,
-    }) => {
+                                                                                          page,
+                                                                                        }) => {
       const api = await mockPerfilApi(page, tipoPerfil);
 
       await page.goto("/mi-perfil");
@@ -178,34 +187,40 @@ test.describe("Autogestión de perfil y protección de datos", () => {
       expect(api.getActual().codigo).toBe(`COD-${tipoPerfil}`);
       expect(api.getActual().sede).toBe("Sede Central");
       expect(api.getActual().tipoPerfil).toBe(tipoPerfil);
+
       await expect(
-        page.getByText("Los datos de contacto se guardaron correctamente."),
+          page.getByText("Los datos de contacto se guardaron correctamente."),
       ).toBeVisible();
     });
   }
 
   test("Validación de formulario: bloquea correo y teléfono inválidos antes de enviar", async ({
-    page,
-  }) => {
+                                                                                                 page,
+                                                                                               }) => {
     const api = await mockPerfilApi(page, "ESTUDIANTE");
     await page.goto("/mi-perfil");
 
     await page
-      .getByLabel("Correo electrónico")
-      .fill("correo-invalido-sin-dominio");
+        .getByLabel("Correo electrónico")
+        .fill("correo-invalido-sin-dominio");
+
     await page.getByLabel("Teléfono").fill("abc-sin-numeros");
     await page.getByRole("button", { name: "Guardar contacto" }).click();
 
     await expect(
-      page.getByText("Ingrese un correo electrónico válido"),
+        page.getByText("Ingrese un correo electrónico válido"),
     ).toBeVisible();
-    await expect(page.getByText("Ingresa un teléfono válido")).toBeVisible();
+
+    await expect(
+        page.getByText("Ingresa un teléfono válido"),
+    ).toBeVisible();
+
     expect(api.patchBodies).toHaveLength(0);
   });
 
   test("Protección de atributos: los campos protegidos no tienen inputs editables", async ({
-    page,
-  }) => {
+                                                                                             page,
+                                                                                           }) => {
     await mockPerfilApi(page, "ADMINISTRATIVO");
     await page.goto("/mi-perfil");
 
@@ -224,8 +239,8 @@ test.describe("Autogestión de perfil y protección de datos", () => {
   });
 
   test("conserva el borrador de contacto y limpia contraseñas al cambiar de pestaña", async ({
-    page,
-  }) => {
+                                                                                               page,
+                                                                                             }) => {
     await mockPerfilApi(page, "ASESOR");
     await page.goto("/mi-perfil");
 
@@ -233,49 +248,93 @@ test.describe("Autogestión de perfil y protección de datos", () => {
     await page.getByLabel("Correo electrónico").fill(draftEmail);
 
     await page.getByRole("tab", { name: "Seguridad" }).click();
-    await page.getByLabel("Contraseña actual").fill("Actual123");
-    await page.getByLabel("Nueva contraseña").fill("NuevaClave123");
-    await page.getByLabel("Confirmar nueva contraseña").fill("NuevaClave123");
+
+    await page
+        .locator('input[name="passwordActual"]')
+        .fill("Actual123");
+
+    await page
+        .locator('input[name="passwordNueva"]')
+        .fill("NuevaClave123");
+
+    await page
+        .locator('input[name="confirmarPassword"]')
+        .fill("NuevaClave123");
 
     await page.getByRole("tab", { name: "Contacto" }).click();
-    await expect(page.getByLabel("Correo electrónico")).toHaveValue(draftEmail);
+
+    await expect(
+        page.getByLabel("Correo electrónico"),
+    ).toHaveValue(draftEmail);
 
     await page.getByRole("tab", { name: "Seguridad" }).click();
-    await expect(page.getByLabel("Contraseña actual")).toHaveValue("");
-    await expect(page.getByLabel("Nueva contraseña")).toHaveValue("");
-    await expect(page.getByLabel("Confirmar nueva contraseña")).toHaveValue("");
+
+    await expect(
+        page.locator('input[name="passwordActual"]'),
+    ).toHaveValue("");
+
+    await expect(
+        page.locator('input[name="passwordNueva"]'),
+    ).toHaveValue("");
+
+    await expect(
+        page.locator('input[name="confirmarPassword"]'),
+    ).toHaveValue("");
   });
 
   test("cambia la contraseña usando únicamente el contrato vigente", async ({
-    page,
-  }) => {
+                                                                              page,
+                                                                            }) => {
     const api = await mockPerfilApi(page, "MONITOR");
     await page.goto("/mi-perfil");
+
     await page.getByRole("tab", { name: "Seguridad" }).click();
 
-    await page.getByLabel("Contraseña actual").fill("Actual123");
-    await page.getByLabel("Nueva contraseña").fill("NuevaClave123");
-    await page.getByLabel("Confirmar nueva contraseña").fill("NuevaClave123");
-    await page.getByRole("button", { name: "Cambiar contraseña" }).click();
+    await page
+        .locator('input[name="passwordActual"]')
+        .fill("Actual123");
+
+    await page
+        .locator('input[name="passwordNueva"]')
+        .fill("clave-segura");
+
+    await page
+        .locator('input[name="confirmarPassword"]')
+        .fill("clave-segura");
+
+    await page
+        .getByRole("button", { name: "Cambiar contraseña" })
+        .click();
 
     await expect.poll(() => api.passwordBodies.length).toBe(1);
+
     expect(api.passwordBodies[0]).toEqual({
       passwordActual: "Actual123",
-      passwordNueva: "NuevaClave123",
+      passwordNueva: "clave-segura",
     });
+
     await expect(
-      page.getByText("La contraseña se cambió correctamente."),
+        page.getByText("La contraseña se cambió correctamente."),
     ).toBeVisible();
-    await expect(page.getByLabel("Contraseña actual")).toHaveValue("");
-    await expect(page.getByLabel("Nueva contraseña")).toHaveValue("");
-    await expect(page.getByLabel("Confirmar nueva contraseña")).toHaveValue("");
+
+    await expect(
+        page.locator('input[name="passwordActual"]'),
+    ).toHaveValue("");
+
+    await expect(
+        page.locator('input[name="passwordNueva"]'),
+    ).toHaveValue("");
+
+    await expect(
+        page.locator('input[name="confirmarPassword"]'),
+    ).toHaveValue("");
   });
 
   test("muestra errores largos sin generar desplazamiento horizontal", async ({
-    page,
-  }) => {
+                                                                                page,
+                                                                              }) => {
     const longMessage =
-      "No fue posible actualizar el contacto porque la información recibida no cumple las reglas vigentes de validación institucional. Revise el correo y el teléfono antes de intentarlo nuevamente.";
+        "No fue posible actualizar el contacto porque la información recibida no cumple las reglas vigentes de validación institucional. Revise el correo y el teléfono antes de intentarlo nuevamente.";
 
     await mockPerfilApi(page, "CONCILIADOR", {
       contactFailure: {
@@ -283,44 +342,54 @@ test.describe("Autogestión de perfil y protección de datos", () => {
         body: { mensaje: longMessage },
       },
     });
+
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto("/mi-perfil");
     await page.getByRole("button", { name: "Guardar contacto" }).click();
 
     await expect(
-      page.getByTestId("profile-panel").getByRole("alert"),
+        page.getByTestId("profile-panel").getByRole("alert"),
     ).toContainText(longMessage);
+
     await expect
-      .poll(() =>
-        page.evaluate(
-          () =>
-            document.documentElement.scrollWidth <=
-            document.documentElement.clientWidth,
-        ),
-      )
-      .toBe(true);
+        .poll(() =>
+            page.evaluate(
+                () =>
+                    document.documentElement.scrollWidth <=
+                    document.documentElement.clientWidth,
+            ),
+        )
+        .toBe(true);
   });
 
   test("presenta loading, error y recuperación del perfil", async ({
-    page,
-  }) => {
-    await mockPerfilApi(page, "ADMINISTRATIVO", {
+                                                                     page,
+                                                                   }) => {
+    const api = await mockPerfilApi(page, "ADMINISTRATIVO", {
       profileDelayMs: 250,
-      profileFailures: 1,
+      profileFailureUntilReleased: true,
     });
+
     await page.goto("/mi-perfil");
 
     await expect(page.getByTestId("profile-loading")).toBeVisible();
+
     await expect(
-      page.getByText("No fue posible cargar tu perfil"),
+        page.getByText("No fue posible cargar tu perfil"),
     ).toBeVisible();
+
+    api.releaseProfileFailure();
+
     await page.getByRole("button", { name: "Reintentar" }).click();
-    await expect(page.getByText("Usuario ADMINISTRATIVO")).toBeVisible();
+
+    await expect(
+        page.getByText("Usuario ADMINISTRATIVO"),
+    ).toBeVisible();
   });
 
   test("mantiene una distribución responsive en 360, 768 y 1280 px", async ({
-    page,
-  }) => {
+                                                                              page,
+                                                                            }) => {
     await mockPerfilApi(page, "ESTUDIANTE");
 
     for (const width of [360, 768, 1280]) {
@@ -329,6 +398,7 @@ test.describe("Autogestión de perfil y protección de datos", () => {
 
       const summary = await page.getByTestId("profile-summary").boundingBox();
       const panel = await page.getByTestId("profile-panel").boundingBox();
+
       expect(summary).not.toBeNull();
       expect(panel).not.toBeNull();
 
@@ -339,28 +409,33 @@ test.describe("Autogestión de perfil y protección de datos", () => {
       }
 
       expect(
-        await page.evaluate(
-          () =>
-            document.documentElement.scrollWidth <=
-            document.documentElement.clientWidth,
-        ),
+          await page.evaluate(
+              () =>
+                  document.documentElement.scrollWidth <=
+                  document.documentElement.clientWidth,
+          ),
       ).toBe(true);
     }
   });
 
   test("permite navegar las pestañas con teclado en claro y oscuro", async ({
-    page,
-  }) => {
+                                                                              page,
+                                                                            }) => {
     await mockPerfilApi(page, "ADMINISTRATIVO");
     await page.goto("/mi-perfil");
 
     const contactoTab = page.getByRole("tab", { name: "Contacto" });
     const seguridadTab = page.getByRole("tab", { name: "Seguridad" });
+
     await contactoTab.focus();
     await page.keyboard.press("ArrowRight");
+
     await expect(seguridadTab).toHaveAttribute("data-state", "active");
 
-    await page.evaluate(() => document.documentElement.classList.add("dark"));
+    await page.evaluate(() =>
+        document.documentElement.classList.add("dark"),
+    );
+
     await expect(page.getByTestId("profile-summary")).toBeVisible();
     await expect(page.getByTestId("profile-panel")).toBeVisible();
   });

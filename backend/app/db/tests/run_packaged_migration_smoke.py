@@ -13,6 +13,7 @@ APP = Path(__file__).resolve().parents[2]
 JAVA = shutil.which("java")
 MIGRATIONS = APP / "target/legal-cases-backend-migrations.jar"
 BACKEND = APP / "target/legal-cases-backend.jar"
+EXPECTED_SQL_MIGRATIONS = 2
 
 
 def docker(*arguments, input_text=None):
@@ -77,8 +78,10 @@ def main():
         job("clean", environment, expected=1)
         prefix = ("exec", container, "psql", "-U", "migration_owner", "-d", "artifact_smoke", "-v", "ON_ERROR_STOP=1")
         count = docker(*prefix, "-Atc", 'SELECT count(*) FROM "DB_consultorioJuridico".flyway_schema_history WHERE type=\'SQL\' AND success')
-        if count != "1":
-            raise AssertionError("Migration was omitted or applied more than once")
+        if count != str(EXPECTED_SQL_MIGRATIONS):
+            raise AssertionError(
+                "Unexpected number of applied SQL migrations: " + count
+            )
         docker(*prefix, "-c", "CREATE ROLE app_runtime LOGIN PASSWORD 'synthetic-runtime-only'")
         # Model a legacy login that once had broad grants; normalize rather than retain TRUNCATE/TRIGGER.
         docker(*prefix, "-c", 'GRANT ALL ON ALL TABLES IN SCHEMA "DB_consultorioJuridico" TO app_runtime;'

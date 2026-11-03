@@ -33,6 +33,13 @@ public class UsuarioSistema {
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
+    /**
+     * Versión de las credenciales utilizada para invalidar JWT emitidos
+     * antes de un cambio o restablecimiento de contraseña.
+     */
+    @Column(name = "auth_version", nullable = false)
+    private long authVersion = 0L;
+
     @Column(name = "activo", nullable = false)
     private Boolean activo = true;
 

@@ -106,9 +106,13 @@ public class PasswordResetService {
                 passwordEncoder);
 
         // Cifra la nueva contraseña antes de guardarla.
-        usuario.setPasswordHash(passwordEncoder.encode(dto.getPasswordNueva()));
+        usuario.setPasswordHash(
+                passwordEncoder.encode(dto.getPasswordNueva()));
 
-        // Marca el token como usado para que no pueda reutilizarse.
+// Invalida todos los JWT emitidos antes del restablecimiento.
+        usuario.setAuthVersion(usuario.getAuthVersion() + 1L);
+
+// Marca el token como usado para que no pueda reutilizarse.
         passwordResetTokenService.marcarComoUsado(resetToken);
 
         usuarioSistemaRepository.save(usuario);

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { apiClient } from "@/lib/apiClient"
 import { getApiErrorTitle, readResponseBody } from "@/lib/api"
+import { passwordPolicyRule } from "@/lib/form-validation"
 
 /**
  * Form handling.
@@ -44,7 +45,7 @@ export function RestablecerPasswordForm({ token }) {
 
       if (!res.ok) {
         throw new Error(
-          getApiErrorTitle(result, "Error al restablecer contraseña")
+            getApiErrorTitle(result, "Error al restablecer contraseña")
         )
       }
 
@@ -69,67 +70,66 @@ export function RestablecerPasswordForm({ token }) {
   }, [success, router])
 
   return (
-    <div className="w-full max-w-md p-6 bg-card rounded-xl border shadow space-y-4">
-      <h2 className="text-2xl font-bold text-center">
-        Restablecer contraseña
-      </h2>
+      <div className="w-full max-w-md p-6 bg-card rounded-xl border shadow space-y-4">
+        <h2 className="text-2xl font-bold text-center">
+          Restablecer contraseña
+        </h2>
 
-      <input
-        type="password"
-        placeholder="Nueva contraseña"
-        {...register("passwordNueva", {
-          required: "La contraseña es obligatoria",
-          minLength: {
-            value: 8,
-            message: "Mínimo 8 caracteres",
-          },
-        })}
-        className="w-full border rounded-lg p-2"
-      />
+        <input
+            type="password"
+            placeholder="Nueva contraseña"
+            {...register(
+                "passwordNueva",
+                passwordPolicyRule({
+                  required: "La contraseña es obligatoria",
+                }),
+            )}
+            className="w-full border rounded-lg p-2"
+        />
 
-      {errors.passwordNueva && (
-        <p className="text-sm text-red-500">
-          {errors.passwordNueva.message}
-        </p>
-      )}
+        {errors.passwordNueva && (
+            <p className="text-sm text-red-500">
+              {errors.passwordNueva.message}
+            </p>
+        )}
 
-      <input
-        type="password"
-        placeholder="Confirmar contraseña"
-        {...register("confirmarPassword", {
-          required: "Debe confirmar la contraseña",
-          validate: (value) =>
-            value === watch("passwordNueva") ||
-            "Las contraseñas no coinciden",
-        })}
-        className="w-full border rounded-lg p-2"
-      />
+        <input
+            type="password"
+            placeholder="Confirmar contraseña"
+            {...register("confirmarPassword", {
+              required: "Debe confirmar la contraseña",
+              validate: (value) =>
+                  value === watch("passwordNueva") ||
+                  "Las contraseñas no coinciden",
+            })}
+            className="w-full border rounded-lg p-2"
+        />
 
-      {errors.confirmarPassword && (
-        <p className="text-sm text-red-500">
-          {errors.confirmarPassword.message}
-        </p>
-      )}
+        {errors.confirmarPassword && (
+            <p className="text-sm text-red-500">
+              {errors.confirmarPassword.message}
+            </p>
+        )}
 
-      {error && (
-        <p className="text-sm text-red-500 text-center">
-          {error}
-        </p>
-      )}
+        {error && (
+            <p className="text-sm text-red-500 text-center">
+              {error}
+            </p>
+        )}
 
-      {success && (
-        <p className="text-sm text-green-500 text-center">
-          {success}
-        </p>
-      )}
+        {success && (
+            <p className="text-sm text-green-500 text-center">
+              {success}
+            </p>
+        )}
 
-      <Button
-        className="w-full"
-        onClick={handleSubmit(onSubmit)}
-        disabled={loading}
-      >
-        {loading ? "Guardando..." : "Cambiar contraseña"}
-      </Button>
-    </div>
+        <Button
+            className="w-full"
+            onClick={handleSubmit(onSubmit)}
+            disabled={loading}
+        >
+          {loading ? "Guardando..." : "Cambiar contraseña"}
+        </Button>
+      </div>
   )
 }
