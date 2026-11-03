@@ -8,12 +8,12 @@
 
 El sistema se compone de los siguientes elementos de infraestructura en producción:
 
-- **Frontend**: Aplicación Next.js con App Router. En `develop`, `package.json` declara `^16.4.1` y el lockfile resuelve `16.4.1`; en `main`, ambos archivos conservan `16.2.6`. Se compila mediante `next build` y se ejecuta mediante el runtime de Next.js (`next start`) o el Dockerfile versionado del frontend. Estas versiones describen la configuración de cada rama y no acreditan cuál está desplegada en producción.
+- **Frontend**: Aplicación Next.js 16.3.8 con App Router. Se compila mediante `next build` y se ejecuta mediante el runtime de Next.js (`next start`) o el Dockerfile versionado del frontend.
 - **Backend**: Servicio Spring Boot empaquetado en contenedor Docker y ejecutado en Railway.
 - **Base de Datos**: Instancia gestionada de PostgreSQL (Railway / Supabase) con migraciones Flyway automáticas.
 - **Almacenamiento de Objetos**: Bucket privado `legal-documents` en Supabase Storage (API S3 compatible), con políticas de acceso privado (RLS y acceso restringido por claves de servicio).
 
-Durante la compilación deben instalarse las dependencias de desarrollo. `shadcn` está declarado en `devDependencies` porque su CLI no forma parte del runtime, pero debe estar disponible en el entorno de build mientras `src/app/globals.css` importe `shadcn/tailwind.css`; el CSS resultante queda incorporado en la salida generada por Next.js. En `develop`, el rango declarado es `^4.2.0` y el lockfile resuelve `4.21.4`. El workflow de GitHub Actions ejecuta `npm ci` antes de `npm run build`. De forma equivalente, el Dockerfile instala todas las dependencias en la etapa inicial, compila en la etapa `builder` y solo omite las dependencias de desarrollo en la etapa de ejecución posterior al build.
+Durante la compilación deben instalarse las dependencias de desarrollo. `shadcn` está clasificado como dependencia de compilación porque `src/app/globals.css` importa `shadcn/tailwind.css`; el CSS resultante queda incorporado en la salida generada por Next.js. El workflow de GitHub Actions ejecuta `npm ci` antes de `npm run build`. De forma equivalente, el Dockerfile instala todas las dependencias en la etapa inicial, compila en la etapa `builder` y solo omite las dependencias de desarrollo en la etapa de ejecución posterior al build.
 
 El repositorio no contiene una configuración versionada de Vercel que permita acreditar su despliegue. Si se utiliza ese proveedor, deben comprobarse externamente el Root Directory del frontend y la instalación de `devDependencies` antes del build. Esta documentación no presenta esa configuración externa como verificada.
 
@@ -140,7 +140,8 @@ Si una migración requiere reversión controlada en un entorno de contingencia, 
 
 Para el historial de reasignaciones, `backend/app/db/migration/V20261011_01__create_consulta_reasignacion_historial_recovery.sql` solo elimina sus objetos si la tabla está vacía. Si existen eventos, el script cancela la operación; se debe conservar la evidencia histórica, restaurar desde respaldo cuando corresponda o preparar una migración correctiva hacia adelante. No debe borrarse manualmente una tabla con eventos para forzar la reversión.
 
-- **Archivo de rollback**: [`backend/app/db/migration/V20260905_01__version_document_model_rollback.sql`](../../backend/app/db/migration/V20260905_01__version_document_model_rollback.sql).- **Acciones ejecutadas en rollback**:
+- **Archivo de rollback**: [`backend/app/src/main/resources/db/rollback/U26__rollback_document_versioning.sql`](file:///home/anorak/Code/ingsoftware/Sistema-de-consultorio-juridico/backend/app/src/main/resources/db/rollback/U26__rollback_document_versioning.sql).
+- **Acciones ejecutadas en rollback**:
   1. Elimina el índice único parcial `uk_file_asset_doc_vigente`.
   2. Elimina la clave foránea `fk_file_asset_referencia_anterior`.
   3. Remueve las columnas agregadas (`version`, `documento_logico`, `tipo_documental`, `origen`, `referencia_anterior_id`).
