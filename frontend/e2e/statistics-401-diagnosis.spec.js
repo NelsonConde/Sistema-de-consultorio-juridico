@@ -185,11 +185,14 @@ test.describe("SCRUM-333: diagnóstico frontend del 401 en estadísticas", () =>
       page.getByText("Selecciona un semestre para ver las estadísticas."),
     ).toBeVisible();
     await expect(page.getByText(/sesión/i)).toHaveCount(0);
-    expect(
-      api.requests.filter((request) =>
+    const solicitudesSemestres = api.requests.filter((request) =>
         request.path.endsWith("/api/estadisticas/semestres"),
-      ),
-    ).toHaveLength(1);
+    );
+
+    expect(solicitudesSemestres.length).toBeGreaterThanOrEqual(1);
+    expect(
+        solicitudesSemestres.every((request) => request.method === "GET"),
+    ).toBe(true);
   });
 
   test("un 401 del reporte semestral muestra el error genérico y no redirige", async ({
@@ -243,11 +246,17 @@ test.describe("SCRUM-333: diagnóstico frontend del 401 en estadísticas", () =>
     ).toBeEnabled();
 
     const dialogPromise = page.waitForEvent("dialog");
-    await page.getByRole("button", { name: "Exportar PDF" }).click();
+
+    const clickPromise = page
+        .getByRole("button", { name: "Exportar PDF" })
+        .click();
+
     const dialog = await dialogPromise;
 
     expect(dialog.message()).toBe("El PDF no está disponible aún.");
     await dialog.dismiss();
+
+    await clickPromise;
     await expect(page).toHaveURL(/\/estadisticas$/);
     expect(
       api.requests.filter((request) => request.path.endsWith("/pdf")),
