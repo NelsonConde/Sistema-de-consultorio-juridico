@@ -87,7 +87,7 @@ npx playwright install chromium
 | Instalación de Chromium | FAIL de ambiente; la descarga retornó un archivo vacío/truncado que no era un ZIP válido. |
 | Ejecución E2E | NO ACREDITADA; los seis casos fallaron antes de abrir navegador por falta del ejecutable. |
 
-El resumen sanitizado se conserva en `SCRUM-365-resultados.txt`.
+Los resultados del intento local se conservan en la tabla anterior. La ejecución posterior en Chromium consta en la sección «Ejecución posterior en GitHub Actions» y está respaldada por el [CI del commit revisado, Build #357](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/actions/runs/41918440117).
 
 ## Observaciones y límites
 
