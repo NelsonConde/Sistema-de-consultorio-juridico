@@ -107,9 +107,9 @@ async function openSecurityTab(page) {
 }
 
 async function fillPasswordForm(page, confirmation = NEW_PASSWORD) {
-  await page.getByLabel("Contraseña actual").fill(CURRENT_PASSWORD);
-  await page.getByLabel("Nueva contraseña").fill(NEW_PASSWORD);
-  await page.getByLabel("Confirmar nueva contraseña").fill(confirmation);
+  await page.locator('input[name="passwordActual"]').fill(CURRENT_PASSWORD);
+  await page.locator('input[name="passwordNueva"]').fill(NEW_PASSWORD);
+  await page.locator('input[name="confirmarPassword"]').fill(confirmation);
 }
 
 async function expectNoSecretsInBrowserStorage(page) {
@@ -147,7 +147,7 @@ test.describe("SCRUM-365: QA frontend de cambio de contraseña", () => {
     await mockPasswordChangeApi(page);
     await openSecurityTab(page);
 
-    const currentPassword = page.getByLabel("Contraseña actual");
+    const currentPassword = page.locator('input[name="passwordActual"]');
     const toggle = page.getByRole("button", {
       name: "Mostrar contraseña actual",
     });
@@ -187,9 +187,9 @@ test.describe("SCRUM-365: QA frontend de cambio de contraseña", () => {
     await expect(
       page.getByText("La contraseña se cambió correctamente."),
     ).toBeVisible();
-    await expect(page.getByLabel("Contraseña actual")).toHaveValue("");
-    await expect(page.getByLabel("Nueva contraseña")).toHaveValue("");
-    await expect(page.getByLabel("Confirmar nueva contraseña")).toHaveValue("");
+    await expect(page.locator('input[name="passwordActual"]')).toHaveValue("");
+    await expect(page.locator('input[name="passwordNueva"]')).toHaveValue("");
+    await expect(page.locator('input[name="confirmarPassword"]')).toHaveValue("");
     await expectNoSecretsInBrowserStorage(page);
 
     const consoleOutput = consoleMessages.join("\n");
@@ -216,10 +216,10 @@ test.describe("SCRUM-365: QA frontend de cambio de contraseña", () => {
     await expect(
       page.getByRole("alert").filter({ hasText: "No fue posible cambiar" }),
     ).toBeVisible();
-    await expect(page.getByLabel("Contraseña actual")).toHaveValue(
+    await expect(page.locator('input[name="passwordActual"]')).toHaveValue(
       CURRENT_PASSWORD,
     );
-    await expect(page.getByLabel("Nueva contraseña")).toHaveValue(NEW_PASSWORD);
+    await expect(page.locator('input[name="passwordNueva"]')).toHaveValue(NEW_PASSWORD);
     await expectNoSecretsInBrowserStorage(page);
   });
 
@@ -260,7 +260,7 @@ test.describe("SCRUM-365: QA frontend de cambio de contraseña", () => {
         hasText: "No fue posible cambiar la contraseña.",
       }),
     ).toBeVisible();
-    await expect(page.getByLabel("Contraseña actual")).toHaveValue(
+    await expect(page.locator('input[name="passwordActual"]')).toHaveValue(
       CURRENT_PASSWORD,
     );
     await expectNoSecretsInBrowserStorage(page);
