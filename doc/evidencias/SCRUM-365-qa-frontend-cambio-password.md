@@ -110,14 +110,41 @@ El resumen sanitizado se conserva en `SCRUM-365-resultados.txt`.
   compatibilidad del conjunto local, no un commit aislado de SCRUM-365. La rama
   limpia debe repetir build y pruebas antes de crear la PR.
 
-## Acción de desbloqueo
+## Ejecución posterior en GitHub Actions — 04/11/2026
 
-1. Ejecutar en CI o en un ambiente autorizado con Node 22 y Chromium:
+La ejecución local original descrita en la tabla anterior permanece como
+**INCONCLUSA** por falta del navegador. Posteriormente, Chromium se instaló
+correctamente en el runner de GitHub Actions y se ejecutaron las pruebas reales
+de interfaz en un servidor Next.js local del workflow, usando peticiones
+interceptadas y credenciales sintéticas. No se utilizó producción.
 
-   ```bash
-   npx playwright install --with-deps chromium
-   npx playwright test e2e/password-change-qa.spec.js
-   ```
+- **Primer intento de CI (commit `bba60f6e`):** [Build #355, ejecución 41917195932](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/actions/runs/41917195932). Resultado **FAIL**: 64 pruebas aprobadas y seis casos SCRUM-365 fallidos. El error compartido fue `strict mode violation` al utilizar `getByLabel("Contraseña actual")`, que coincidía tanto con el `input` como con el botón de visibilidad. La causa fue un selector ambiguo en la prueba, no un rechazo del endpoint.
+- **Corrección focalizada (commit `1465af86f2c52938d740dd13da371370650385f8`):** se sustituyeron únicamente los localizadores de los campos por selectores específicos `input[name="passwordActual"]`, `input[name="passwordNueva"]` e `input[name="confirmarPassword"]`. No se modificaron el formulario, la política, los permisos ni el contrato de autenticación.
+- **Segunda ejecución de CI:** [Build #356, ejecución 41918007858](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/actions/runs/41918007858), job **Playwright E2E**. Comando del workflow ejecutado desde `frontend/`:
 
-2. Registrar resultados y capturas sanitizadas sin valores de contraseña,
-   cookies ni tokens.
+  ```bash
+  npm run test -- --project=chromium --workers=1 --retries=0 --reporter=line,html
+  ```
+
+  **Resultado real: PASS — 70 pruebas aprobadas (1.3 min), cero fallidas**. El log del job muestra los seis casos de `e2e/password-change-qa.spec.js` ejecutados consecutivamente (posiciones 46–51/70), sin errores, y el job finalizó exitosamente.
+
+| Caso SCRUM-365 | Resultado en segunda CI |
+|---|---|
+| Validación de confirmación sin petición adicional | PASS |
+| Mostrar y ocultar campos mediante controles accesibles | PASS |
+| Payload permitido, CSRF, `204 No Content` y limpieza | PASS |
+| Respuesta `400` controlada y conservación de campos | PASS |
+| Respuesta `401` con única petición y redirección | PASS |
+| Fallo al obtener CSRF sin enviar PATCH | PASS |
+
+**Evidencia sanitizada:** URL de la ejecución y registro del job Playwright E2E
+de GitHub Actions, que identifica los títulos de los seis casos y el resumen
+`70 passed`. No se adjuntan cuerpos de solicitudes ni capturas con contraseñas,
+cookies o tokens. Las comprobaciones son de frontend con mocks; no validan el
+hash real del backend, su persistencia o políticas fuera del alcance de SCRUM-365.
+
+**Conclusión actualizada:** la ejecución funcional de los seis escenarios
+SCRUM-365 quedó acreditada como **PASS en CI** para el commit
+`1465af86f2c52938d740dd13da371370650385f8`; la limitación del
+primer intento local se mantiene como antecedente histórico y ya no bloquea
+esta validación de navegador.
