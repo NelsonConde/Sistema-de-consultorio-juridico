@@ -30,7 +30,8 @@ public class SecurityConfig {
             "/api/auth/login",
             "/api/auth/logout",
             "/api/auth/solicitar-recuperacion",
-            "/api/auth/restablecer-password"
+            "/api/auth/restablecer-password",
+            "/api/auth/activar-cuenta"
     };
 
     private static final String[] PUBLIC_GET_ENDPOINTS = {

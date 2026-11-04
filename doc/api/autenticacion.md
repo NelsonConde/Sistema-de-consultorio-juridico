@@ -15,7 +15,7 @@ Base path:
 | `POST` | `/api/auth/login` | Público | Autentica credenciales y crea la cookie de acceso. |
 | `GET` | `/api/auth/me` | Autenticado | Retorna el usuario asociado a la sesión actual. |
 | `POST` | `/api/auth/logout` | Público | Expira la cookie de acceso. |
-| `PATCH` | `/api/auth/cambiar-password` | Autenticado | Actualiza la contraseña del usuario autenticado. |
+| `PATCH` | `/api/auth/cambiar-password` | Autenticado | Actualiza la contraseña y renueva la sesión autenticada que realizó el cambio. |
 | `POST` | `/api/auth/solicitar-recuperacion` | Público | Procesa una solicitud de recuperación. |
 | `POST` | `/api/auth/restablecer-password` | Público | Actualiza la contraseña mediante un token de recuperación vigente. |
 
@@ -34,6 +34,7 @@ access_token
 | `SameSite` | Propiedad `app.auth.cookie.same-site`, configurada desde `AUTH_COOKIE_SAME_SITE`; valor predeterminado `None`. |
 | `Path` | `/` |
 | `Max-Age` en login | `3600` segundos. |
+| `Max-Age` en cambio de contraseña exitoso | `3600` segundos. |
 | `Max-Age` en logout | `0` segundos. |
 
 Las solicitudes frontend que requieren sesión incluyen la cookie mediante:
@@ -71,6 +72,7 @@ application/json
 | Rol | Debe estar asociado y activo. |
 | Perfil actual | Debe resolverse como perfil activo. |
 | Contraseña | Se verifica mediante `PasswordEncoder.matches(...)`. |
+| Versión de autenticación | El JWT emitido incluye el `authVersion` vigente del usuario. |
 
 El formulario web de login valida adicionalmente el formato de correo antes de ejecutar la petición.
 
@@ -143,7 +145,7 @@ Los permisos expuestos son permisos activos del rol y se ordenan por nombre en e
 
 | Estado | Situación procesada |
 |---|---|
-| `401 Unauthorized` | La petición no establece autenticación válida mediante la cookie JWT. |
+| `401 Unauthorized` | La petición no establece autenticación válida mediante la cookie JWT o utiliza una versión de autenticación que ya fue revocada. |
 
 ## `POST /api/auth/logout`
 
@@ -159,7 +161,7 @@ Set-Cookie: access_token=; HttpOnly; Secure=<configurable>; SameSite=<configurab
 
 ## `PATCH /api/auth/cambiar-password`
 
-Actualiza la contraseña del usuario autenticado.
+Actualiza la contraseña del usuario autenticado y renueva la credencial de la sesión que realizó correctamente el cambio.
 
 ### Request
 
@@ -170,25 +172,53 @@ Actualiza la contraseña del usuario autenticado.
 }
 ```
 
+La confirmación de la nueva contraseña se valida exclusivamente en frontend y no forma parte del contrato HTTP del endpoint.
+
 ### Validaciones y reglas
 
 | Campo o regla | Comportamiento implementado |
 |---|---|
 | `passwordActual` | Obligatoria y debe coincidir con el hash almacenado. |
 | `passwordNueva` | Obligatoria; longitud entre 8 y 100 caracteres. |
-| Diferencia de contraseña | La nueva contraseña no puede coincidir con la actual. |
+| Diferencia de contraseña | La nueva contraseña no puede coincidir con la contraseña vigente. |
 | Persistencia | La nueva contraseña se codifica mediante BCrypt antes de guardarse en `password_hash`. |
+| Versión de autenticación | Después del cambio exitoso se incrementa `auth_version`, invalidando los JWT emitidos con la versión anterior. |
+| Auditoría | Se registra la operación `CAMBIAR_PASSWORD_PROPIA` sin incluir contraseñas, hashes, JWT ni el contenido sensible del DTO. |
+
+La política definida para este flujo exige una longitud entre 8 y 100 caracteres. El frontend aplica la misma regla y no añade requisitos adicionales de complejidad.
+
+### Política de sesión
+
+El cambio de contraseña no obliga al navegador que realizó correctamente la operación a iniciar sesión nuevamente.
+
+Después de persistir la nueva contraseña:
+
+1. se incrementa `auth_version`;
+2. los JWT emitidos con la versión anterior dejan de ser válidos;
+3. se genera un nuevo JWT con la versión actualizada;
+4. se reemplaza la cookie `access_token` del navegador que realizó el cambio;
+5. se invalida el estado CSRF anterior.
+
+Por lo tanto, otras sesiones que continúen usando JWT anteriores quedan revocadas, mientras que la sesión que realizó correctamente el cambio recibe una credencial renovada.
 
 ### Response `204 No Content`
 
 La respuesta se entrega sin cuerpo.
 
+El backend envía una nueva cookie de autenticación:
+
+```text
+Set-Cookie: access_token=<nuevo-jwt>; HttpOnly; Secure=<configurable>; SameSite=<configurable>; Path=/; Max-Age=3600
+```
+
 ### Respuestas
 
 | Estado | Situación procesada |
 |---|---|
-| `401 Unauthorized` | No existe autenticación válida para ejecutar la operación. |
-| `400 Bad Request` | Datos inválidos, contraseña actual incorrecta o contraseña nueva igual a la actual. |
+| `401 Unauthorized` | No existe una autenticación JWT válida para ejecutar la operación o la versión de autenticación de la credencial fue revocada. |
+| `400 Bad Request` | Datos inválidos, contraseña actual incorrecta, contraseña nueva fuera del rango de 8 a 100 caracteres o contraseña nueva igual a la vigente. |
+
+Una vez realizado el cambio correctamente, la contraseña anterior deja de ser válida para autenticación y la nueva contraseña pasa a ser la credencial vigente.
 
 ## `POST /api/auth/solicitar-recuperacion`
 
@@ -268,6 +298,10 @@ Actualiza la contraseña utilizando el token recibido en el enlace de recuperaci
 | Estado del usuario | Usuario, rol y perfil asociado deben encontrarse activos. |
 | Contraseña nueva | Debe diferir de la contraseña vigente y se codifica mediante BCrypt. |
 | Consumo del token | Al restablecer exitosamente, el token se marca como usado y registra `fechaUso`. |
+| Versión de autenticación | Al restablecer correctamente la contraseña se incrementa `auth_version`, invalidando los JWT emitidos previamente para el usuario. |
+| Sesión posterior | El restablecimiento de contraseña no genera un JWT ni inicia sesión automáticamente; el usuario debe autenticarse nuevamente con la nueva contraseña. |
+
+El flujo de recuperación utiliza la misma política de contraseña del cambio autenticado: la nueva contraseña debe tener entre 8 y 100 caracteres y debe diferir de la contraseña vigente.
 
 ### Response `200 OK`
 
@@ -285,7 +319,9 @@ Actualiza la contraseña utilizando el token recibido en el enlace de recuperaci
 
 ## Relación con seguridad y frontend
 
-- `SecurityConfig` declara los cuatro endpoints `POST` públicos y protege `/me` y `/cambiar-password`.
-- `JwtAuthenticationFilter` lee la cookie y establece la autenticación con permisos activos del rol.
+- `SecurityConfig` protege `/me` y `/cambiar-password` y mantiene públicos los endpoints configurados para login y recuperación.
+- `JwtAuthenticationFilter` lee la cookie JWT, valida la credencial y comprueba que su `authVersion` coincida con la versión vigente del usuario antes de establecer la autenticación.
+- `PATCH /api/auth/cambiar-password` renueva la cookie JWT e invalida el estado CSRF anterior después de un cambio exitoso.
+- `POST /api/auth/restablecer-password` incrementa la versión de autenticación y revoca los JWT anteriores, pero no crea automáticamente una nueva sesión.
 - Los contratos de error JSON generados por seguridad se detallan en `doc/05-estandar-api-errores.md`.
 - El flujo visible de pantallas se documenta en `doc/frontend/autenticacion-sesion.md`.

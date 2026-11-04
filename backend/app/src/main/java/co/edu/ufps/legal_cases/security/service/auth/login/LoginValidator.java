@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.security.dto.account.PerfilUsuarioActual;
 import co.edu.ufps.legal_cases.security.dto.auth.login.LoginRequestDTO;
+import co.edu.ufps.legal_cases.security.model.account.EstadoActivacionCuenta;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
 import co.edu.ufps.legal_cases.security.service.account.perfil.PerfilUsuarioResolverService;
 
@@ -52,14 +53,33 @@ public class LoginValidator {
         }
     }
 
-    public PerfilUsuarioActual validarUsuarioPuedeAutenticarse(UsuarioSistema usuario) {
+    public PerfilUsuarioActual validarUsuarioPuedeAutenticarse(
+            UsuarioSistema usuario) {
+
+        validarCuentaActivada(usuario);
         validarUsuarioActivo(usuario);
         validarRolActivo(usuario);
 
-        // Se valida que el perfil real asociado también esté activo.
-        // Esta validación ya no depende de asesor_id, estudiante_id, monitor_id,
-        // administrativo_id ni conciliador_id en usuario_sistema.
-        return perfilUsuarioResolverService.obtenerPerfilActivoObligatorio(usuario);
+        return perfilUsuarioResolverService
+                .obtenerPerfilActivoObligatorio(usuario);
+    }
+
+    private void validarCuentaActivada(
+            UsuarioSistema usuario) {
+
+        if (usuario == null
+                || usuario.getEstadoActivacion()
+                != EstadoActivacionCuenta.ACTIVA
+                || usuario.getPasswordHash() == null
+                || usuario.getPasswordHash().isBlank()) {
+
+            /*
+             * No se informa si la cuenta existe o está pendiente.
+             * El login conserva una respuesta genérica.
+             */
+            throw new BusinessException(
+                    "Usuario o contraseña incorrectos");
+        }
     }
 
     private void validarUsuarioActivo(UsuarioSistema usuario) {

@@ -1,9 +1,7 @@
 package co.edu.ufps.legal_cases.security.service.account.usuario;
 
 import static co.edu.ufps.legal_cases.common.util.NormalizacionUtils.normalizarEmail;
-import static co.edu.ufps.legal_cases.common.util.NormalizacionUtils.normalizarNumeroDocumento;
 
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +13,7 @@ import co.edu.ufps.legal_cases.business.model.perfil.Monitor;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.security.model.access.CodigoRolBase;
 import co.edu.ufps.legal_cases.security.model.access.Rol;
+import co.edu.ufps.legal_cases.security.model.account.EstadoActivacionCuenta;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
 import co.edu.ufps.legal_cases.security.repository.access.RolRepository;
 import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaRepository;
@@ -29,16 +28,13 @@ public class UsuarioSistemaRegistroService {
 
     private final UsuarioSistemaRepository usuarioSistemaRepository;
     private final RolRepository rolRepository;
-    private final PasswordEncoder passwordEncoder;
 
     public UsuarioSistemaRegistroService(
             UsuarioSistemaRepository usuarioSistemaRepository,
-            RolRepository rolRepository,
-            PasswordEncoder passwordEncoder) {
+            RolRepository rolRepository) {
 
         this.usuarioSistemaRepository = usuarioSistemaRepository;
         this.rolRepository = rolRepository;
-        this.passwordEncoder = passwordEncoder;
     }
 
     public UsuarioSistema crearParaAsesor(Asesor asesor) {
@@ -46,7 +42,6 @@ public class UsuarioSistemaRegistroService {
 
         return crearYGuardarUsuarioBase(
                 asesor.getEmail(),
-                asesor.getDocumento(),
                 CodigoRolBase.ASESOR);
     }
 
@@ -55,7 +50,6 @@ public class UsuarioSistemaRegistroService {
 
         return crearYGuardarUsuarioBase(
                 estudiante.getEmail(),
-                estudiante.getDocumento(),
                 CodigoRolBase.ESTUDIANTE);
     }
 
@@ -64,7 +58,6 @@ public class UsuarioSistemaRegistroService {
 
         return crearYGuardarUsuarioBase(
                 monitor.getEmail(),
-                monitor.getDocumento(),
                 CodigoRolBase.MONITOR);
     }
 
@@ -73,7 +66,6 @@ public class UsuarioSistemaRegistroService {
 
         return crearYGuardarUsuarioBase(
                 administrativo.getEmail(),
-                administrativo.getDocumento(),
                 CodigoRolBase.ADMINISTRADOR);
     }
 
@@ -82,18 +74,15 @@ public class UsuarioSistemaRegistroService {
 
         return crearYGuardarUsuarioBase(
                 conciliador.getEmail(),
-                conciliador.getDocumento(),
                 CodigoRolBase.CONCILIADOR);
     }
 
     private UsuarioSistema crearYGuardarUsuarioBase(
             String email,
-            String documento,
             CodigoRolBase codigoRolBase) {
 
         UsuarioSistema usuario = crearUsuarioBase(
                 email,
-                documento,
                 codigoRolBase);
 
         // Arriba se creó el objeto pero aquí es donde se guarda.
@@ -103,7 +92,6 @@ public class UsuarioSistemaRegistroService {
     // Aquí se crea el objeto pero no se guarda.
     private UsuarioSistema crearUsuarioBase(
             String email,
-            String documento,
             CodigoRolBase codigoRolBase) {
 
         if (codigoRolBase == null) {
@@ -112,16 +100,10 @@ public class UsuarioSistemaRegistroService {
         }
 
         String username = normalizarEmail(email);
-        String passwordInicial = normalizarNumeroDocumento(documento);
 
         if (username == null) {
             throw new BusinessException(
                     "El correo es obligatorio para crear el usuario del sistema");
-        }
-
-        if (passwordInicial == null) {
-            throw new BusinessException(
-                    "El documento es obligatorio para crear la contraseña inicial");
         }
 
         if (usuarioSistemaRepository.existsByUsernameIgnoreCase(username)) {
@@ -135,11 +117,11 @@ public class UsuarioSistemaRegistroService {
         usuario.setUsername(username);
 
         /*
-         * Comportamiento existente:
-         * la contraseña inicial se deriva actualmente del documento y se almacena cifrada.
-         * La revisión de este comportamiento queda fuera del alcance de este servicio.
+         * La cuenta se crea sin secreto inicial. La contraseña únicamente
+         * podrá establecerse mediante el flujo seguro de activación.
          */
-        usuario.setPasswordHash(passwordEncoder.encode(passwordInicial));
+        usuario.setPasswordHash(null);
+        usuario.setEstadoActivacion(EstadoActivacionCuenta.PENDIENTE);
 
         usuario.setRol(rol);
         usuario.setActivo(true);
