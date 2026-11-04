@@ -52,6 +52,7 @@ async function mockNuevaConsultaApi(
                 permisos: [
                     "Acceder nueva consulta",
                     "Crear consultas",
+                    "Acceder consultas jurídicas",
                 ],
             })
             return
