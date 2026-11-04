@@ -142,7 +142,7 @@ históricas V23, V25, V26 y U26 no existen y no son instrucciones válidas.
 
    ```bash
    psql --set ON_ERROR_STOP=1 --set runtime_role=app_runtime \
-     --file backend/app/db/operations/grant_runtime_permissions.sql
+     --file db/operations/grant_runtime_permissions.sql
    ```
 
    El script rechaza roles privilegiados y deja al runtime sin DDL ni escritura
