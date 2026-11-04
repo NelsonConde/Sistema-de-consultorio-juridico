@@ -212,19 +212,29 @@ export function ActivarCuentaForm() {
     mode: "onBlur",
   });
 
+
   useEffect(() => {
     const currentUrl = new URL(window.location.href);
-    const token = currentUrl.searchParams.get("token")?.trim() || null;
+
+    const token =
+        tokenRef.current ??
+        currentUrl.searchParams.get("token")?.trim() ??
+        null;
 
     tokenRef.current = token;
-    window.history.replaceState(window.history.state, "", currentUrl.pathname);
+    window.history.replaceState(
+        window.history.state,
+        "",
+        currentUrl.pathname,
+    );
+
     setFlowState(token ? READY : ACTIVATION_FAILURE.INVALID);
 
     return () => {
-      tokenRef.current = null;
       submittingRef.current = false;
     };
   }, []);
+
 
   useEffect(() => {
     if (flowState !== INITIALIZING) {
