@@ -38,7 +38,9 @@ Se distinguen **prueba de comportamiento**, **inspección estática** y **no ver
 
 **Ejecución anterior (commit `a179068e`):** [GitHub Actions del commit anterior](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/commit/a179068e9af2ef0546e78b22713f0740984a7126). La ejecución de pruebas fue satisfactoria, pero el informe original sobreinterpretó el alcance de varias aserciones. Ese resultado no se reutiliza como PASS para los casos nuevos.
 
-**Ejecución de esta corrección:** **PENDIENTE DE CI**. Una vez concluida, debe registrarse el commit exacto, la URL del workflow, el número de pruebas ejecutadas y cada fallo si lo hay. No declarar `15 PASS` hasta verificar los métodos y sus resultados.
+**Ejecución de esta corrección — PASS de pruebas verificadas:** commit [`3772240f`](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/commit/3772240f53cb349f46ef6d018da76e6027b46092), workflow [Build # (ejecución `41922754394`)](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/actions/runs/41922754394), job **Backend** repetido tras fallo transitorio de descarga Maven. El log de Surefire registra **22 pruebas ejecutadas, 0 fallos, 0 errores y 0 omitidas** en `PasswordChangeCsrfPolicyQaTest`. En el backend completo constan **650 pruebas, 0 fallos, 0 errores, 10 omitidas** y `BUILD SUCCESS`. Los jobs **Frontend** y **Playwright E2E** finalizaron `success`, al igual que la comprobación del título de la PR. La primera tentativa del job Backend quedó interrumpida antes de compilar porque Maven Wrapper no pudo descargar Maven 3.9.14; la repetición sí descargó las dependencias, ejecutó las pruebas y terminó correctamente.
+
+**Límite de la conclusión:** estos PASS se refieren exclusivamente a los comportamientos comprobados por las pruebas que realmente se ejecutaron; la ausencia universal de secretos en logs operativos, un login HTTP completo y la atomicidad transaccional en PostgreSQL no quedan acreditados por estas pruebas.
 
 Comando reproducible desde la raíz:
 
