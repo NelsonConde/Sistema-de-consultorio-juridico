@@ -1062,11 +1062,11 @@ export function PersonaForm({ onSubmit, initialValues }) {
             </Seccion>
           )}
 
-          {pasoActualNombre === "Economía" && (
-            <Seccion
+          <Seccion
+              hidden={pasoActualNombre !== "Economía"}
               titulo="Aspectos económicos"
               descripcion="Datos laborales y económicos de la persona."
-            >
+          >
               <FormSelectField
                 name="ocupacionId"
                 label={requiredLabel("Ocupación")}
@@ -1131,7 +1131,6 @@ export function PersonaForm({ onSubmit, initialValues }) {
                 rules={{ ...digitsOnlyRule({ required: true, maxLength: 30 }) }}
               />
             </Seccion>
-          )}
 
           {pasoActualNombre === "Acudiente" && (
             <Seccion

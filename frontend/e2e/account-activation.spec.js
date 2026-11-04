@@ -64,8 +64,13 @@ async function mockActivationApi(
 }
 
 async function fillActivationForm(page, confirmation = PASSWORD) {
-  await page.getByLabel("Nueva contraseña").fill(PASSWORD);
-  await page.getByLabel("Confirmar nueva contraseña").fill(confirmation);
+  await page
+      .getByLabel("Nueva contraseña", { exact: true })
+      .fill(PASSWORD);
+
+  await page
+      .getByLabel("Confirmar nueva contraseña", { exact: true })
+      .fill(confirmation);
 }
 
 async function expectNoSecretsInStorage(page) {
@@ -91,7 +96,7 @@ test.describe("SCRUM-295: activación pública de cuenta", () => {
 
     await expect(page).toHaveURL(/\/activar-cuenta$/);
     await expect(
-      page.getByRole("heading", { name: "Activar cuenta" }),
+        page.getByRole("button", { name: "Activar cuenta", exact: true }),
     ).toBeVisible();
     await expectNoSecretsInStorage(page);
   });
@@ -134,8 +139,7 @@ test.describe("SCRUM-295: activación pública de cuenta", () => {
       csrfHeader: "synthetic-csrf-token",
     });
     await expect(
-      page.getByRole("heading", { name: "Cuenta activada" }),
-    ).toBeVisible();
+        page.getByText("Cuenta activada", { exact: true })    ).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Ir al inicio de sesión" }),
     ).toHaveAttribute("href", "/");
@@ -179,7 +183,7 @@ test.describe("SCRUM-295: activación pública de cuenta", () => {
       await page.getByRole("button", { name: "Activar cuenta" }).click();
 
       await expect(
-        page.getByRole("heading", { name: scenario.heading }),
+          page.getByText(scenario.heading, { exact: true })
       ).toBeVisible();
       await expect(page.locator("body")).not.toContainText(ACTIVATION_TOKEN);
       await expectNoSecretsInStorage(page);
@@ -195,13 +199,18 @@ test.describe("SCRUM-295: activación pública de cuenta", () => {
 
     await page.getByRole("button", { name: "Activar cuenta" }).click();
 
-    await expect(page.getByRole("alert")).toContainText(
-      "No pudimos completar la activación",
-    );
-    await expect(page.getByLabel("Nueva contraseña")).toHaveValue(PASSWORD);
-    await expect(page.getByLabel("Confirmar nueva contraseña")).toHaveValue(
-      PASSWORD,
-    );
+    await expect(
+        page.getByRole("alert").filter({
+          hasText: "No pudimos completar la activación",
+        }),
+    ).toBeVisible();
+    await expect(
+        page.getByLabel("Nueva contraseña", { exact: true }),
+    ).toHaveValue(PASSWORD);
+
+    await expect(
+        page.getByLabel("Confirmar nueva contraseña", { exact: true }),
+    ).toHaveValue(PASSWORD);
     await expectNoSecretsInStorage(page);
   });
 
@@ -211,10 +220,10 @@ test.describe("SCRUM-295: activación pública de cuenta", () => {
     await page.goto("/activar-cuenta");
 
     await expect(
-      page.getByRole("heading", { name: "El enlace no es válido" }),
+        page.getByText("El enlace no es válido", { exact: true })
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Activar cuenta" }),
+        page.getByRole("button", { name: "Activar cuenta", exact: true })
     ).toHaveCount(0);
   });
 
@@ -231,7 +240,7 @@ test.describe("SCRUM-295: activación pública de cuenta", () => {
       await page.setViewportSize(viewport);
       await page.goto(`/activar-cuenta?token=${ACTIVATION_TOKEN}`);
       await expect(
-        page.getByRole("heading", { name: "Activar cuenta" }),
+          page.getByRole("button", { name: "Activar cuenta", exact: true }),
       ).toBeVisible();
 
       const dimensions = await page.evaluate(() => ({

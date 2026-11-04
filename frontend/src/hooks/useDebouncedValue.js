@@ -16,20 +16,25 @@ export function useDebouncedValue(value, delay = 350) {
   return debouncedValue;
 }
 
+
 export function useDebouncedPageSearch(value, setPage, delay = 350) {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
   useEffect(() => {
+    if (value === debouncedValue) {
+      return undefined;
+    }
+
     const timeoutId = window.setTimeout(() => {
-      // Apply the stabilized search and reset its remote page in the same React batch.
       setPage(1);
       setDebouncedValue(value);
     }, delay);
 
     return () => window.clearTimeout(timeoutId);
-  }, [value, delay, setPage]);
+  }, [value, debouncedValue, delay, setPage]);
 
   return debouncedValue;
 }
+
 
 export default useDebouncedValue;
