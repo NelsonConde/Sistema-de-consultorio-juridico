@@ -1,6 +1,6 @@
 # Manual de Despliegue, Operación y Recuperación ante Desastres
 
-> Procedimiento operativo estándar para el despliegue en producción, configuración segura de variables de entorno, migraciones controladas de base de datos y protocolos ejecutados de respaldo y restauración (Backup & Restore).
+> Procedimiento operativo estándar para el despliegue, la configuración segura de variables de entorno, las migraciones controladas de base de datos y la preparación de respaldo y restauración (Backup & Restore). Los comandos de recuperación son una guía operativa; solo un acta de ensayo con ambiente, muestra y evidencia permite presentarlos como ejecutados.
 
 ---
 
@@ -8,12 +8,12 @@
 
 El sistema se compone de los siguientes elementos de infraestructura en producción:
 
-- **Frontend**: Aplicación Next.js 16.3.8 con App Router. Se compila mediante `next build` y se ejecuta mediante el runtime de Next.js (`next start`) o el Dockerfile versionado del frontend.
+- **Frontend**: Aplicación Next.js con App Router. En `develop`, `package.json` declara `^16.4.1` y el lockfile resuelve `16.4.1`; en `main`, ambos archivos conservan `16.2.6`. Se compila mediante `next build` y se ejecuta mediante el runtime de Next.js (`next start`) o el Dockerfile versionado del frontend. Estas versiones describen la configuración de cada rama y no acreditan cuál está desplegada en producción.
 - **Backend**: Servicio Spring Boot empaquetado en contenedor Docker y ejecutado en Railway.
-- **Base de Datos**: Instancia gestionada de PostgreSQL (Railway / Supabase) con migraciones Flyway automáticas.
+- **Base de Datos**: PostgreSQL 16 con migraciones Flyway ejecutadas por un artefacto separado antes de iniciar el backend. El proceso web únicamente valida el historial de Flyway y el esquema de Hibernate; no aplica DDL.
 - **Almacenamiento de Objetos**: Bucket privado `legal-documents` en Supabase Storage (API S3 compatible), con políticas de acceso privado (RLS y acceso restringido por claves de servicio).
 
-Durante la compilación deben instalarse las dependencias de desarrollo. `shadcn` está clasificado como dependencia de compilación porque `src/app/globals.css` importa `shadcn/tailwind.css`; el CSS resultante queda incorporado en la salida generada por Next.js. El workflow de GitHub Actions ejecuta `npm ci` antes de `npm run build`. De forma equivalente, el Dockerfile instala todas las dependencias en la etapa inicial, compila en la etapa `builder` y solo omite las dependencias de desarrollo en la etapa de ejecución posterior al build.
+Durante la compilación deben instalarse las dependencias de desarrollo. `shadcn` está declarado en `devDependencies` porque su CLI no forma parte del runtime, pero debe estar disponible en el entorno de build mientras `src/app/globals.css` importe `shadcn/tailwind.css`; el CSS resultante queda incorporado en la salida generada por Next.js. En `develop`, el rango declarado es `^4.2.0` y el lockfile resuelve `4.21.4`. El workflow de GitHub Actions ejecuta `npm ci` antes de `npm run build`. De forma equivalente, el Dockerfile instala todas las dependencias en la etapa inicial, compila en la etapa `builder` y solo omite las dependencias de desarrollo en la etapa de ejecución posterior al build.
 
 El repositorio no contiene una configuración versionada de Vercel que permita acreditar su despliegue. Si se utiliza ese proveedor, deben comprobarse externamente el Root Directory del frontend y la instalación de `devDependencies` antes del build. Esta documentación no presenta esa configuración externa como verificada.
 
@@ -26,10 +26,15 @@ Las credenciales y configuraciones sensibles **nunca** deben incluirse en el rep
 | Variable de Entorno | Tipo | Ejemplo de Valor Seguro | Descripción |
 |---|---|---|---|
 | `SPRING_PROFILES_ACTIVE` | Configuración | `prod` | Perfil activo de Spring Boot. |
-| `SPRING_DATASOURCE_URL` | Conexión | `jdbc:postgresql://<db-host>:5432/<db-name>` | Cadena de conexión JDBC a PostgreSQL. |
-| `SPRING_DATASOURCE_USERNAME` | Credencial | `postgres` | Usuario administrador de la base de datos. |
-| `SPRING_DATASOURCE_PASSWORD` | Secreto | `[SECRETO_CONFIGURADO_EN_RAILWAY]` | Contraseña de acceso a la base de datos. |
-| `SPRING_JPA_HIBERNATE_DDL_AUTO` | Integridad | `validate` | Valida estrictamente el esquema JPA contra la BD sin alterarla automáticamente. |
+| `DB_URL` | Conexión runtime | `jdbc:postgresql://<db-host>:5432/<db-name>` | URL JDBC usada por la aplicación. No debe incluir usuario ni contraseña. |
+| `DB_USERNAME` | Credencial runtime | `app_runtime` | Cuenta de aplicación con DML y sin permisos DDL. |
+| `DB_PASSWORD` | Secreto runtime | `[SECRETO_CONFIGURADO_EN_EL_HOST]` | Contraseña de la cuenta de aplicación. |
+| `DB_DDL_AUTO` | Integridad | `validate` | Mantiene Hibernate en validación sin alterar automáticamente el esquema. |
+| `MIGRATION_DB_URL` | Conexión de migración | `jdbc:postgresql://<db-host>:5432/<db-name>` | URL JDBC del job de migración; no admite credenciales embebidas. |
+| `MIGRATION_DB_USERNAME` | Credencial de migración | `migration_owner` | Cuenta temporal del job con propiedad/DDL sobre el esquema. No se reutiliza en el runtime. |
+| `MIGRATION_DB_PASSWORD` | Secreto de migración | `[SECRETO_DEL_JOB]` | Contraseña separada del job de migración. |
+| `MIGRATION_ENVIRONMENT` | Trazabilidad | `staging` | Identificador sanitizado del ambiente objetivo. |
+| `MIGRATION_RELEASE` | Trazabilidad | `<SHA_GIT_DE_40_HEX>` | Commit exacto del artefacto desplegado. |
 | `FILE_STORAGE_PROVIDER` | Proveedor | `supabase` | Proveedor de almacenamiento activo (`supabase` o `local`). |
 | `SUPABASE_STORAGE_ENDPOINT` | URL | `https://<project-id>.supabase.co/storage/v1/s3` | Endpoint S3 compatible de Supabase Storage. |
 | `SUPABASE_STORAGE_REGION` | Región | `us-east-1` | Región del bucket de almacenamiento. |
@@ -37,38 +42,118 @@ Las credenciales y configuraciones sensibles **nunca** deben incluirse en el rep
 | `SUPABASE_STORAGE_SECRET_KEY` | Secreto | `[SERVICE_ROLE_OR_S3_SECRET]` | Clave secreta para firma de peticiones S3. |
 | `SUPABASE_STORAGE_BUCKET` | Recurso | `legal-documents` | Nombre del bucket privado. |
 | `JWT_SECRET` | Criptográfico | `[CLAVE_HEX_256_BITS_ALEATORIA]` | Clave de firma de tokens JWT. |
+| `CORS_ALLOWED_ORIGINS` | Configuración | `https://<frontend-host>` | Orígenes frontend autorizados, separados por coma cuando exista más de uno. |
+| `AUTH_COOKIE_SECURE` | Configuración | `true` | Exige HTTPS para transportar `access_token`. |
+| `AUTH_COOKIE_SAME_SITE` | Configuración | `None` | Política SameSite de la cookie JWT. |
+| `CSRF_COOKIE_SECURE` | Configuración | `true` | Exige HTTPS para transportar la cookie CSRF. |
+| `CSRF_COOKIE_SAME_SITE` | Configuración | `None` | Política SameSite de la cookie CSRF. |
+| `FRONTEND_URL` | Configuración | `https://<frontend-host>` | Base usada para construir enlaces públicos de recuperación. |
+| `BREVO_API_KEY` | Secreto runtime | `[SECRETO_CONFIGURADO_EN_EL_HOST]` | Credencial del proveedor de correo transaccional. |
+| `MAIL_FROM_EMAIL` | Identidad de envío | `no-reply@<dominio-verificado>` | Remitente verificado utilizado por el backend. |
+
+---
+
+### Procedimiento de configuración y cambio de credenciales
+
+1. Registrar cada secreto en el almacén de variables del ambiente objetivo; no
+   incluirlo en `.env.example`, commits, URLs, capturas ni logs.
+2. Mantener separadas las credenciales de runtime y migración de PostgreSQL.
+3. Al cambiar `DB_PASSWORD`, actualizar la cuenta de PostgreSQL y después la
+   variable del servicio que utiliza esa cuenta.
+4. Al cambiar `JWT_SECRET`, actualizar el secreto del backend; los JWT firmados
+   con el valor anterior dejan de ser aceptados.
+5. Al cambiar `BREVO_API_KEY`, crear o rotar la clave en el proveedor y
+   reemplazar `BREVO_API_KEY` en el backend conservando `MAIL_FROM_EMAIL` como
+   remitente verificado.
+6. Al cambiar las credenciales S3, reemplazar conjuntamente
+   `SUPABASE_STORAGE_ACCESS_KEY` y `SUPABASE_STORAGE_SECRET_KEY` en el backend.
+7. Mantener `CORS_ALLOWED_ORIGINS`, `FRONTEND_URL`, atributos de cookies y URL
+   pública del frontend consistentes con el ambiente desplegado.
+8. Reiniciar el servicio después de modificar variables y verificar inicio de
+   sesión, consulta de sesión, correo transaccional y acceso al almacenamiento
+   con datos sintéticos.
+
+La configuración versionada usa marcadores y valores no sensibles. Las
+contraseñas de usuarios, documentos de identidad, tokens de recuperación y
+tokens de activación no son variables de despliegue ni credenciales que deban
+compartirse con operadores.
 
 ---
 
 ## 3. Procedimiento de Migración y Validación de Esquema
 
-1. **Gestión con Flyway**:
-   - Las migraciones integradas al arranque se versionan en `backend/app/src/main/resources/db/migration/`.
-   - Las migraciones documentales (`V23__create_file_asset_table.sql`, `V25__migrate_existing_files_to_file_asset.sql`, `V26__add_document_versioning_and_metadata.sql`) se ejecutan de forma transaccional al iniciar la aplicación.
-2. **Validación Hibernate (`ddl-auto=validate`)**:
-   - En todos los entornos no locales, Hibernate se configura obligatoriamente con `validate`.
-   - Si existe cualquier divergencia entre las entidades JPA (`FileAsset`, etc.) y el esquema de tablas en PostgreSQL, el arranque de la aplicación falla inmediatamente de forma segura antes de recibir tráfico.
+El mecanismo vigente usa Flyway de forma controlada, pero **no migra desde el
+arranque web**. El build produce `backend/app/target/legal-cases-backend.jar` y
+`backend/app/target/legal-cases-backend-migrations.jar`. El segundo artefacto es
+el único autorizado para ejecutar `migrate`, `validate`, `baseline` o `inspect`;
+el backend aplica solamente `flyway.validate()` antes de crear el
+`EntityManagerFactory` y conserva `${DB_DDL_AUTO:validate}`.
 
-### Migración manual del historial de reasignaciones
+La única ubicación descubierta automáticamente es
+`backend/app/src/main/resources/db/migration/`. Actualmente contiene el baseline
+`V20261015_01__baseline_current_schema.sql`, cubierto por el manifiesto de hashes
+empaquetado. `backend/app/db/migration/` y `backend/db/` contienen SQL históricos,
+verificadores y recuperaciones para consulta o ejecución explícita revisada; no
+se deben pasar completos a Flyway ni ejecutar mediante un glob. Las referencias
+históricas V23, V25, V26 y U26 no existen y no son instrucciones válidas.
 
-La migración `V20261011_01__create_consulta_reasignacion_historial.sql` está en `backend/app/db/migration/`, no en el directorio de recursos de Flyway. Por tanto, **no se ejecuta automáticamente al iniciar Spring Boot** y debe aplicarla manualmente el propietario del esquema antes de desplegar la versión del backend que persiste el historial.
+### Secuencia controlada de despliegue
 
-Desde la raíz del repositorio y con las variables nativas de `psql` (`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` y `PGPASSWORD`) suministradas por el entorno seguro:
+1. Identificar el commit de 40 caracteres, el ambiente y el artefacto exacto.
+2. Crear y verificar un respaldo antes de modificar una base con datos. Registrar
+   el SHA-256, la ubicación protegida, la muestra verificada y el responsable.
+3. Construir una sola vez desde `backend/app/`:
 
-```bash
-psql --set ON_ERROR_STOP=1 --file backend/app/db/migration/V20261011_01__create_consulta_reasignacion_historial.sql
-psql --set ON_ERROR_STOP=1 --file backend/app/db/migration/V20261011_01__create_consulta_reasignacion_historial_verify.sql
-```
+   ```bash
+   ./mvnw -DskipTests package
+   ```
 
-El despliegue solo continúa si ambos comandos terminan sin excepciones. El segundo script comprueba columnas, restricciones, índices, triggers e invariantes existentes; no depende de `hibernate.ddl-auto=update`.
+4. Inyectar `MIGRATION_DB_URL`, `MIGRATION_DB_USERNAME`,
+   `MIGRATION_DB_PASSWORD`, `MIGRATION_ENVIRONMENT` y `MIGRATION_RELEASE` en el
+   job aislado. No reutilizar `DB_USERNAME`/`DB_PASSWORD` ni incluir secretos en
+   la URL o el log.
+5. Para una base vacía, ejecutar y validar el artefacto empaquetado:
 
-El orden completo, los requisitos de respaldo y la recuperación segura se mantienen en [`backend/app/db/migration/README.md`](../../backend/app/db/migration/README.md). No se deben ejecutar estos scripts sobre una base distinta del entorno objetivo revisado.
+   ```bash
+   java -jar target/legal-cases-backend-migrations.jar migrate
+   java -jar target/legal-cases-backend-migrations.jar validate
+   ```
+
+6. Para una base legada, ejecutar primero `inspect` y comparar el contrato. Solo
+   si la equivalencia fue revisada, el respaldo fue comprobado y no existe
+   `flyway_schema_history`, autorizar `baseline` con
+   `MIGRATION_BASELINE_ACK=20261015.01` y `MIGRATION_BACKUP_SHA256=<64-hex>`.
+   Una base divergente se detiene y requiere una migración correctiva nueva.
+
+   ```bash
+   java -jar target/legal-cases-backend-migrations.jar inspect
+   java -jar target/legal-cases-backend-migrations.jar baseline
+   java -jar target/legal-cases-backend-migrations.jar validate
+   ```
+
+7. Aplicar con el propietario del esquema
+   [`backend/app/db/operations/grant_runtime_permissions.sql`](../../backend/app/db/operations/grant_runtime_permissions.sql)
+   mediante:
+
+   ```bash
+   psql --set ON_ERROR_STOP=1 --set runtime_role=app_runtime \
+     --file backend/app/db/operations/grant_runtime_permissions.sql
+   ```
+
+   El script rechaza roles privilegiados y deja al runtime sin DDL ni escritura
+   sobre `flyway_schema_history`.
+8. Iniciar `legal-cases-backend.jar` con `DB_USERNAME` de runtime. El despliegue
+   se detiene si Flyway o Hibernate no validan; el arranque no corrige el esquema.
+
+Un resultado correcto del job comienza por `MIGRATION_OK` e identifica operación,
+ambiente, release, versión y hashes sin publicar URL ni contraseña. Conservar ese
+log sanitizado junto con los hashes del artefacto y del respaldo.
 
 ---
 
-## 4. Procedimiento Ejecutado de Respaldo y Restauración (Backup & Restore)
+## 4. Procedimiento Recomendado de Respaldo y Restauración (Backup & Restore)
 
-Para garantizar la continuidad operativa y la resiliencia del acervo probatorio, se diseñó y ejecutó exitosamente el protocolo de recuperación ante desastres:
+Los siguientes comandos son una plantilla para un ensayo autorizado en un ambiente aislado. Esta documentación no acredita su ejecución en producción ni una restauración completa. Cada ensayo debe registrar ambiente, commit, muestra, hashes, tiempos, responsable y resultado.
 
 ```mermaid
 flowchart LR
@@ -108,7 +193,7 @@ aws --endpoint-url="${SUPABASE_STORAGE_ENDPOINT}" s3 sync \
   --exact-timestamps
 ```
 
-### Paso 3: Protocolo de Restauración Probado
+### Paso 3: Ensayo controlado de restauración
 
 1. **Restauración de Esquema y Datos**:
    ```bash
@@ -128,25 +213,27 @@ aws --endpoint-url="${SUPABASE_STORAGE_ENDPOINT}" s3 sync \
      "/backups/storage_20260905_snapshot/" \
      "s3://${RESTORE_STORAGE_BUCKET}"
    ```
-3. **Verificación Automatizada de Integridad**:
-   - Se ejecuta el script de comprobación que calcula el hash SHA-256 de los objetos restaurados y los contrasta contra el campo `checksum` de la tabla `file_asset`.
-   - **Resultado del ensayo**: 100% de coincidencias en sumas criptográficas sin objetos faltantes ni alterados.
+3. **Verificación de integridad**:
+   - Calcular el SHA-256 de la muestra de objetos restaurados y contrastarlo con el campo `checksum` de `file_asset`.
+   - Registrar cantidad total, tamaño de la muestra, coincidencias, diferencias y objetos ausentes. No declarar coincidencia total sin ambiente, muestra y evidencia adjunta.
+   - Verificar que el dump sea legible antes del ensayo y ejecutar la restauración únicamente sobre un destino desechable o expresamente autorizado; `--clean` elimina objetos existentes del destino.
 
 ---
 
 ## 5. Plan y Procedimiento de Rollback de Migraciones
 
-Si una migración requiere reversión controlada en un entorno de contingencia, se debe aplicar el script compensatorio documentado:
+Flyway no ejecuta migraciones descendentes automáticas en este repositorio. Ante un fallo, detener el despliegue y elegir entre restaurar el respaldo verificado o preparar una migración correctiva hacia adelante. No ejecutar `clean`, no borrar `flyway_schema_history` y no editar un SQL ya aplicado.
 
 Para el historial de reasignaciones, `backend/app/db/migration/V20261011_01__create_consulta_reasignacion_historial_recovery.sql` solo elimina sus objetos si la tabla está vacía. Si existen eventos, el script cancela la operación; se debe conservar la evidencia histórica, restaurar desde respaldo cuando corresponda o preparar una migración correctiva hacia adelante. No debe borrarse manualmente una tabla con eventos para forzar la reversión.
 
-- **Archivo de rollback**: [`backend/app/src/main/resources/db/rollback/U26__rollback_document_versioning.sql`](file:///home/anorak/Code/ingsoftware/Sistema-de-consultorio-juridico/backend/app/src/main/resources/db/rollback/U26__rollback_document_versioning.sql).
-- **Acciones ejecutadas en rollback**:
-  1. Elimina el índice único parcial `uk_file_asset_doc_vigente`.
-  2. Elimina la clave foránea `fk_file_asset_referencia_anterior`.
-  3. Remueve las columnas agregadas (`version`, `documento_logico`, `tipo_documental`, `origen`, `referencia_anterior_id`).
-  4. Restablece el estado previo de los registros en `file_asset`.
-  5. Elimina el registro correspondiente en la tabla `flyway_schema_history`.
+La recuperación documental histórica disponible es
+`backend/app/db/migration/V20260905_01__version_document_model_rollback.sql`.
+Debe revisarse antes de usar: elimina metadatos del versionado y no equivale a
+recuperar todos los datos. Preferir restauración verificada o una compensación
+revisada cuando haya datos posteriores. No existe el archivo U26 citado en
+versiones anteriores de este manual. El historial Flyway pertenece al job de
+migración y el runtime solo puede leerlo; no borrar sus registros para ocultar
+fallos.
 
 ---
 
@@ -155,7 +242,6 @@ Para el historial de reasignaciones, `backend/app/db/migration/V20261011_01__cre
 Para mitigar fallos durante subidas de archivos o desconexiones del cliente antes de confirmar la carga:
 
 1. El servicio `FileAssetReconciliationService` se ejecuta de forma periódica (`cron = "0 0 * * * *"` cada hora).
-2. Detecta registros en estado `PENDING` cuya fecha de creación exceda el tiempo límite (24 horas).
-3. Marca el registro como `FAILED` o `DELETE_PENDING`.
-4. Emite la instrucción de eliminación física (`storageProvider.delete(objectKey)`) para evitar costos innecesarios y presencia de bytes huérfanos.
-5. Registra el evento detallado en la tabla de auditoría del sistema.
+2. Compara `updatedAt` con la hora actual menos **una hora** (`STALE_HOURS = 1`) para `PENDING`, `UPLOADING`, `DELETE_PENDING` y `DELETING`. La comparación es estrictamente anterior al corte.
+3. Delega en el flujo de reconciliación o eliminación según el estado. Consultar `FileAssetReconciliationService` para el resultado de cada rama y sus fallos; la periodicidad no demuestra que un objeto concreto haya sido limpiado.
+

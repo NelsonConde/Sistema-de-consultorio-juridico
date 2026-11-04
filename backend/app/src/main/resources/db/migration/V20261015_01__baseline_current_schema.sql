@@ -1,0 +1,2915 @@
+-- SCRUM-332: reviewed baseline candidate, PostgreSQL 16, schema only.
+-- Origin: Hibernate mappings at develop 9fbd163 plus historical SQL listed in the runbook.
+-- No account data, credentials, or operational objects are imported. Never edit after application.
+--
+-- PostgreSQL database dump
+--
+
+
+-- Dumped from database version 16.15
+-- Dumped by pg_dump version 16.15
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: DB_consultorioJuridico; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA IF NOT EXISTS "DB_consultorioJuridico";
+
+
+--
+-- Name: prevenir_modificacion_historial_reasignacion(); Type: FUNCTION; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE FUNCTION "DB_consultorioJuridico".prevenir_modificacion_historial_reasignacion() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RAISE EXCEPTION 'El historial de reasignaciones es inmutable: no se permite %', TG_OP
+        USING ERRCODE = '55000';
+END;
+$$;
+
+
+--
+-- Name: prevent_audit_modification(); Type: FUNCTION; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE FUNCTION "DB_consultorioJuridico".prevent_audit_modification() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RAISE EXCEPTION 'Los registros de auditoría son inmutables: UPDATE y DELETE están prohibidos';
+END
+$$;
+
+
+--
+-- Name: validar_responsables_reasignacion_consulta(); Type: FUNCTION; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE FUNCTION "DB_consultorioJuridico".validar_responsables_reasignacion_consulta() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    responsable_nuevo_existe BOOLEAN;
+    responsable_anterior_existe BOOLEAN := TRUE;
+BEGIN
+    CASE NEW.tipo_responsable
+        WHEN 'ESTUDIANTE' THEN
+            SELECT EXISTS (
+                SELECT 1 FROM "DB_consultorioJuridico".estudiante
+                WHERE id = NEW.responsable_nuevo_id
+            ) INTO responsable_nuevo_existe;
+            IF NEW.responsable_anterior_id IS NOT NULL THEN
+                SELECT EXISTS (
+                    SELECT 1 FROM "DB_consultorioJuridico".estudiante
+                    WHERE id = NEW.responsable_anterior_id
+                ) INTO responsable_anterior_existe;
+            END IF;
+        WHEN 'ASESOR' THEN
+            SELECT EXISTS (
+                SELECT 1 FROM "DB_consultorioJuridico".asesor
+                WHERE id = NEW.responsable_nuevo_id
+            ) INTO responsable_nuevo_existe;
+            IF NEW.responsable_anterior_id IS NOT NULL THEN
+                SELECT EXISTS (
+                    SELECT 1 FROM "DB_consultorioJuridico".asesor
+                    WHERE id = NEW.responsable_anterior_id
+                ) INTO responsable_anterior_existe;
+            END IF;
+        WHEN 'MONITOR' THEN
+            SELECT EXISTS (
+                SELECT 1 FROM "DB_consultorioJuridico".monitor
+                WHERE id = NEW.responsable_nuevo_id
+            ) INTO responsable_nuevo_existe;
+            IF NEW.responsable_anterior_id IS NOT NULL THEN
+                SELECT EXISTS (
+                    SELECT 1 FROM "DB_consultorioJuridico".monitor
+                    WHERE id = NEW.responsable_anterior_id
+                ) INTO responsable_anterior_existe;
+            END IF;
+        ELSE
+            RAISE EXCEPTION 'Tipo de responsable no soportado: %', NEW.tipo_responsable
+                USING ERRCODE = '23514';
+    END CASE;
+
+    IF NOT responsable_nuevo_existe THEN
+        RAISE EXCEPTION 'El responsable nuevo % no existe para el tipo %',
+            NEW.responsable_nuevo_id, NEW.tipo_responsable
+            USING ERRCODE = '23503';
+    END IF;
+
+    IF NOT responsable_anterior_existe THEN
+        RAISE EXCEPTION 'El responsable anterior % no existe para el tipo %',
+            NEW.responsable_anterior_id, NEW.tipo_responsable
+            USING ERRCODE = '23503';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: administrativo; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".administrativo (
+    activo boolean NOT NULL,
+    directora boolean NOT NULL,
+    id bigint NOT NULL,
+    sede bigint NOT NULL,
+    tipo_documento bigint NOT NULL,
+    usuario_sistema_id bigint,
+    codigo character varying(30) NOT NULL,
+    documento character varying(30) NOT NULL,
+    telefono character varying(30) NOT NULL,
+    usuario character varying(50) NOT NULL,
+    email character varying(120) NOT NULL,
+    nombre character varying(150) NOT NULL
+);
+
+
+--
+-- Name: administrativo_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".administrativo ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".administrativo_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: area; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".area (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    nombre character varying(50) NOT NULL
+);
+
+
+--
+-- Name: area_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".area ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".area_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: asesor; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".asesor (
+    activo boolean NOT NULL,
+    area_id bigint NOT NULL,
+    id bigint NOT NULL,
+    sede bigint NOT NULL,
+    tipo_documento bigint NOT NULL,
+    usuario_sistema_id bigint,
+    codigo character varying(30) NOT NULL,
+    documento character varying(30) NOT NULL,
+    telefono character varying(30) NOT NULL,
+    usuario character varying(50) NOT NULL,
+    email character varying(120) NOT NULL,
+    nombre character varying(150) NOT NULL
+);
+
+
+--
+-- Name: asesor_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".asesor ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".asesor_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: audit_logs; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".audit_logs (
+    id bigint NOT NULL,
+    occurred_at timestamp(6) with time zone NOT NULL,
+    outcome character varying(20) NOT NULL,
+    source character varying(20) NOT NULL,
+    ip_address character varying(45),
+    action character varying(100) NOT NULL,
+    correlation_id character varying(100) NOT NULL,
+    entity_name character varying(100) NOT NULL,
+    reason_code character varying(120),
+    actor_username character varying(150) NOT NULL,
+    entity_id character varying(150),
+    user_agent character varying(512),
+    after_state_json text,
+    before_state_json text,
+    metadata_json text,
+    reason text,
+    CONSTRAINT audit_logs_outcome_check CHECK (((outcome)::text = ANY ((ARRAY['SUCCESS'::character varying, 'FAILURE'::character varying, 'DENIED'::character varying])::text[]))),
+    CONSTRAINT audit_logs_source_check CHECK (((source)::text = ANY ((ARRAY['HTTP'::character varying, 'SYSTEM'::character varying])::text[])))
+);
+
+
+--
+-- Name: audit_logs_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".audit_logs ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".audit_logs_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: barrio; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".barrio (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    municipio_id bigint NOT NULL,
+    nombre character varying(100) NOT NULL
+);
+
+
+--
+-- Name: barrio_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".barrio ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".barrio_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: categoria_seguimiento; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".categoria_seguimiento (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    nombre character varying(50) NOT NULL
+);
+
+
+--
+-- Name: categoria_seguimiento_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".categoria_seguimiento ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".categoria_seguimiento_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: conciliacion; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".conciliacion (
+    activo boolean NOT NULL,
+    acta_file_id bigint,
+    conciliador_id bigint,
+    consulta_id bigint NOT NULL,
+    documento_solicitud_file_id bigint,
+    estado_id bigint NOT NULL,
+    estudiante_id bigint,
+    fecha_actualizacion timestamp(6) without time zone,
+    fecha_conciliacion timestamp(6) without time zone,
+    fecha_creacion timestamp(6) without time zone NOT NULL,
+    fecha_finalizacion timestamp(6) without time zone,
+    id bigint NOT NULL,
+    solicitado_por_id bigint NOT NULL,
+    version bigint DEFAULT 0 NOT NULL
+);
+
+
+--
+-- Name: conciliacion_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".conciliacion ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".conciliacion_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: conciliador; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".conciliador (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    sede bigint NOT NULL,
+    tipo_documento bigint NOT NULL,
+    usuario_sistema_id bigint,
+    tipo_conciliador character varying(20) NOT NULL,
+    codigo character varying(30) NOT NULL,
+    documento character varying(30) NOT NULL,
+    telefono character varying(30) NOT NULL,
+    usuario character varying(50) NOT NULL,
+    email character varying(120) NOT NULL,
+    nombre character varying(150) NOT NULL,
+    CONSTRAINT conciliador_tipo_conciliador_check CHECK (((tipo_conciliador)::text = ANY ((ARRAY['INTERNO'::character varying, 'EXTERNO'::character varying])::text[])))
+);
+
+
+--
+-- Name: conciliador_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".conciliador ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".conciliador_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: condicion; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".condicion (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    nombre character varying(100) NOT NULL
+);
+
+
+--
+-- Name: condicion_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".condicion ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".condicion_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: consulta; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".consulta (
+    fecha date NOT NULL,
+    last_updated_at date NOT NULL,
+    area_id bigint NOT NULL,
+    asesor_id bigint,
+    estudiante_id bigint,
+    id bigint NOT NULL,
+    monitor_id bigint,
+    persona_id bigint NOT NULL,
+    sede_id bigint NOT NULL,
+    tema_id bigint NOT NULL,
+    tipo_id bigint,
+    version bigint DEFAULT 0 NOT NULL,
+    estado character varying(50) NOT NULL,
+    resultado character varying(100),
+    tipo_violencia character varying(100),
+    tramite character varying(100) NOT NULL,
+    descripcion character varying(500) NOT NULL,
+    concepto_juridico text NOT NULL,
+    hechos text NOT NULL,
+    observaciones text,
+    pretensiones text NOT NULL,
+    CONSTRAINT consulta_estado_check CHECK (((estado)::text = ANY ((ARRAY['ACTIVO'::character varying, 'EN_PROCESO'::character varying, 'PENDIENTE'::character varying, 'URGENTE'::character varying, 'CERRADO'::character varying, 'ARCHIVADO'::character varying])::text[])))
+);
+
+
+--
+-- Name: consulta_contraparte; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".consulta_contraparte (
+    consulta_id bigint NOT NULL,
+    persona_id bigint NOT NULL
+);
+
+
+--
+-- Name: consulta_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".consulta ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".consulta_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: consulta_parte; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".consulta_parte (
+    consulta_id bigint NOT NULL,
+    persona_id bigint NOT NULL
+);
+
+
+--
+-- Name: consulta_reasignacion_historial; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".consulta_reasignacion_historial (
+    actor_usuario_id bigint NOT NULL,
+    consulta_id bigint NOT NULL,
+    id bigint NOT NULL,
+    ocurrido_en timestamp(6) with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    responsable_anterior_id bigint,
+    responsable_nuevo_id bigint NOT NULL,
+    tipo_responsable character varying(20) NOT NULL,
+    motivo text NOT NULL,
+    CONSTRAINT ck_reasignacion_historial_anterior_positivo CHECK (((responsable_anterior_id IS NULL) OR (responsable_anterior_id > 0))),
+    CONSTRAINT ck_reasignacion_historial_motivo CHECK ((length(btrim(motivo)) > 0)),
+    CONSTRAINT ck_reasignacion_historial_nuevo_positivo CHECK ((responsable_nuevo_id > 0)),
+    CONSTRAINT ck_reasignacion_historial_responsables_distintos CHECK (((responsable_anterior_id IS NULL) OR (responsable_anterior_id <> responsable_nuevo_id))),
+    CONSTRAINT ck_reasignacion_historial_tipo CHECK (((tipo_responsable)::text = ANY ((ARRAY['ESTUDIANTE'::character varying, 'ASESOR'::character varying, 'MONITOR'::character varying])::text[]))),
+    CONSTRAINT consulta_reasignacion_historial_tipo_responsable_check CHECK (((tipo_responsable)::text = ANY ((ARRAY['ESTUDIANTE'::character varying, 'ASESOR'::character varying, 'MONITOR'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE consulta_reasignacion_historial; Type: COMMENT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+COMMENT ON TABLE "DB_consultorioJuridico".consulta_reasignacion_historial IS 'Eventos inmutables de reasignación individual de responsables de consultas jurídicas.';
+
+
+--
+-- Name: COLUMN consulta_reasignacion_historial.responsable_anterior_id; Type: COMMENT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+COMMENT ON COLUMN "DB_consultorioJuridico".consulta_reasignacion_historial.responsable_anterior_id IS 'Identificador polimórfico validado contra la tabla correspondiente a tipo_responsable.';
+
+
+--
+-- Name: COLUMN consulta_reasignacion_historial.responsable_nuevo_id; Type: COMMENT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+COMMENT ON COLUMN "DB_consultorioJuridico".consulta_reasignacion_historial.responsable_nuevo_id IS 'Identificador polimórfico validado contra la tabla correspondiente a tipo_responsable.';
+
+
+--
+-- Name: consulta_reasignacion_historial_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".consulta_reasignacion_historial ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".consulta_reasignacion_historial_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: departamento; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".departamento (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    nombre character varying(80) NOT NULL
+);
+
+
+--
+-- Name: departamento_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".departamento ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".departamento_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: empresas; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".empresas (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    nombre character varying(150) NOT NULL
+);
+
+
+--
+-- Name: empresas_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".empresas ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".empresas_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: especialidad; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".especialidad (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    organo_control_id bigint NOT NULL,
+    nombre character varying(80) NOT NULL
+);
+
+
+--
+-- Name: especialidad_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".especialidad ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".especialidad_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: estado_conciliacion; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".estado_conciliacion (
+    activo boolean NOT NULL,
+    orden integer,
+    id bigint NOT NULL,
+    codigo character varying(40) NOT NULL,
+    nombre character varying(100) NOT NULL
+);
+
+
+--
+-- Name: estado_conciliacion_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".estado_conciliacion ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".estado_conciliacion_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: estudiante; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".estudiante (
+    activo boolean NOT NULL,
+    conciliacion boolean NOT NULL,
+    asesor_id bigint NOT NULL,
+    id bigint NOT NULL,
+    sede bigint NOT NULL,
+    tipo_documento bigint NOT NULL,
+    usuario_sistema_id bigint,
+    codigo character varying(30) NOT NULL,
+    documento character varying(30) NOT NULL,
+    telefono character varying(30) NOT NULL,
+    usuario character varying(50) NOT NULL,
+    email character varying(120) NOT NULL,
+    nombre character varying(150) NOT NULL
+);
+
+
+--
+-- Name: estudiante_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".estudiante ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".estudiante_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: file_asset; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".file_asset (
+    active boolean NOT NULL,
+    version integer NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    id bigint NOT NULL,
+    referencia_anterior_id bigint,
+    resource_id bigint NOT NULL,
+    size bigint NOT NULL,
+    updated_at timestamp(6) without time zone,
+    uploaded_by_id bigint NOT NULL,
+    documento_logico uuid NOT NULL,
+    upload_id uuid,
+    status character varying(20) NOT NULL,
+    origen character varying(40) NOT NULL,
+    resource_type character varying(40) NOT NULL,
+    tipo_documental character varying(60) NOT NULL,
+    checksum character varying(64) NOT NULL,
+    bucket character varying(100) NOT NULL,
+    content_type character varying(150) NOT NULL,
+    object_key character varying(500) NOT NULL,
+    original_file_name character varying(255) NOT NULL,
+    CONSTRAINT chk_file_asset_version CHECK ((version >= 1)),
+    CONSTRAINT file_asset_status_check CHECK (((status)::text = ANY ((ARRAY['UPLOADING'::character varying, 'READY'::character varying, 'DELETING'::character varying, 'DELETED'::character varying, 'ORPHANED'::character varying, 'PENDING'::character varying, 'ACTIVE'::character varying, 'FAILED'::character varying, 'DELETE_PENDING'::character varying, 'VIGENTE'::character varying, 'HISTORICO'::character varying])::text[])))
+);
+
+
+--
+-- Name: file_asset_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".file_asset ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".file_asset_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: monitor; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".monitor (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    sede bigint NOT NULL,
+    tipo_documento bigint NOT NULL,
+    usuario_sistema_id bigint,
+    codigo character varying(30) NOT NULL,
+    documento character varying(30) NOT NULL,
+    telefono character varying(30) NOT NULL,
+    usuario character varying(50) NOT NULL,
+    email character varying(120) NOT NULL,
+    nombre character varying(150) NOT NULL
+);
+
+
+--
+-- Name: monitor_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".monitor ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".monitor_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: municipio; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".municipio (
+    activo boolean NOT NULL,
+    departamento_id bigint NOT NULL,
+    id bigint NOT NULL,
+    nombre character varying(100) NOT NULL
+);
+
+
+--
+-- Name: municipio_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".municipio ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".municipio_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: nacionalidades; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".nacionalidades (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    nombre character varying(100) NOT NULL
+);
+
+
+--
+-- Name: nacionalidades_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".nacionalidades ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".nacionalidades_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: ocupacion; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".ocupacion (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    nombre character varying(100) NOT NULL
+);
+
+
+--
+-- Name: ocupacion_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".ocupacion ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".ocupacion_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: organo_control; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".organo_control (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    nombre character varying(80) NOT NULL
+);
+
+
+--
+-- Name: organo_control_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".organo_control ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".organo_control_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: password_reset_token; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".password_reset_token (
+    usado boolean NOT NULL,
+    fecha_creacion timestamp(6) without time zone NOT NULL,
+    fecha_expiracion timestamp(6) without time zone NOT NULL,
+    fecha_uso timestamp(6) without time zone,
+    id bigint NOT NULL,
+    usuario_sistema_id bigint NOT NULL,
+    token_hash character varying(64) NOT NULL
+);
+
+
+--
+-- Name: password_reset_token_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".password_reset_token ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".password_reset_token_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: permiso; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".permiso (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    nombre character varying(100) NOT NULL,
+    descripcion character varying(255)
+);
+
+
+--
+-- Name: permiso_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".permiso ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".permiso_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: persona; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".persona (
+    activo boolean NOT NULL,
+    acueducto boolean NOT NULL,
+    alcantarillado boolean NOT NULL,
+    energia_electrica boolean NOT NULL,
+    estrato integer NOT NULL,
+    fecha_expedicion date NOT NULL,
+    fecha_nacimiento date NOT NULL,
+    ingresos_adicionales boolean NOT NULL,
+    necesita_ajuste_pcd boolean NOT NULL,
+    numero_personas_a_cargo integer NOT NULL,
+    sabe_leer_escribir boolean NOT NULL,
+    salario integer NOT NULL,
+    barrio_id bigint NOT NULL,
+    condicion_actual_id bigint NOT NULL,
+    empresa_id bigint NOT NULL,
+    id bigint NOT NULL,
+    municipio_id bigint NOT NULL,
+    nacionalidad_id bigint NOT NULL,
+    ocupacion_id bigint NOT NULL,
+    tipo_persona_id bigint NOT NULL,
+    version bigint DEFAULT 0 NOT NULL,
+    tipo_documento character varying(10) NOT NULL,
+    genero character varying(20) NOT NULL,
+    sexo character varying(20) NOT NULL,
+    estado_civil character varying(30) NOT NULL,
+    numero_documento character varying(30) NOT NULL,
+    telefono character varying(30),
+    telefono_acudiente character varying(30),
+    telefono_empresa character varying(30) NOT NULL,
+    orientacion_sexual character varying(50) NOT NULL,
+    pronombre character varying(50) NOT NULL,
+    zona character varying(50) NOT NULL,
+    apellidos character varying(100) NOT NULL,
+    cargo character varying(100) NOT NULL,
+    ciudad_expedicion character varying(100) NOT NULL,
+    comuna character varying(100) NOT NULL,
+    discapacidad character varying(100) NOT NULL,
+    escolaridad character varying(100) NOT NULL,
+    grupo_etnico character varying(100) NOT NULL,
+    localidad character varying(100) NOT NULL,
+    nombre_identitario character varying(100) NOT NULL,
+    nombres character varying(100) NOT NULL,
+    relacion character varying(100),
+    tenencia character varying(100) NOT NULL,
+    tipo_vivienda character varying(100) NOT NULL,
+    correo character varying(120),
+    correo_acudiente character varying(120),
+    caracterizacion_pcd character varying(150) NOT NULL,
+    como_se_entero character varying(150) NOT NULL,
+    direccion character varying(150) NOT NULL,
+    direccion_acudiente character varying(150),
+    direccion_empresa character varying(150) NOT NULL,
+    nombre_completo character varying(150),
+    relacion_con_universidad character varying(150) NOT NULL
+);
+
+
+--
+-- Name: persona_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".persona ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".persona_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: proceso; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".proceso (
+    activo boolean NOT NULL,
+    consulta_id bigint NOT NULL,
+    departamento_id bigint NOT NULL,
+    especialidad_id bigint,
+    fecha_creacion timestamp(6) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    id bigint NOT NULL,
+    organo_control_id bigint,
+    version bigint DEFAULT 0 NOT NULL,
+    numero_radicado character varying(23),
+    estado character varying(40) NOT NULL,
+    CONSTRAINT proceso_estado_check CHECK (((estado)::text = ANY ((ARRAY['PENDIENTE'::character varying, 'SENTENCIA_FAVORABLE'::character varying, 'SENTENCIA_DESFAVORABLE'::character varying, 'DESISTIMIENTO'::character varying, 'RECHAZO'::character varying, 'PRESCRIPCION'::character varying])::text[])))
+);
+
+
+--
+-- Name: proceso_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".proceso ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".proceso_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: reunion_conciliacion; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".reunion_conciliacion (
+    conciliacion_id bigint NOT NULL,
+    fecha_actualizacion timestamp(6) without time zone,
+    fecha_creacion timestamp(6) without time zone NOT NULL,
+    fecha_reunion timestamp(6) without time zone NOT NULL,
+    sede_id bigint NOT NULL,
+    version bigint DEFAULT 0 NOT NULL,
+    observaciones character varying(300)
+);
+
+
+--
+-- Name: reunion_conciliacion_historial; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".reunion_conciliacion_historial (
+    conciliacion_id bigint NOT NULL,
+    fecha_evento timestamp(6) without time zone NOT NULL,
+    fecha_reunion_anterior timestamp(6) without time zone,
+    fecha_reunion_nueva timestamp(6) without time zone NOT NULL,
+    id bigint NOT NULL,
+    realizado_por_id bigint NOT NULL,
+    sede_anterior_id bigint,
+    sede_nueva_id bigint NOT NULL,
+    tipo_evento character varying(30) NOT NULL,
+    observaciones_anteriores character varying(300),
+    observaciones_nuevas character varying(300),
+    CONSTRAINT reunion_conciliacion_historial_tipo_evento_check CHECK (((tipo_evento)::text = ANY ((ARRAY['PROGRAMACION'::character varying, 'REPROGRAMACION'::character varying])::text[])))
+);
+
+
+--
+-- Name: reunion_conciliacion_historial_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".reunion_conciliacion_historial ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".reunion_conciliacion_historial_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: reunion_conciliacion_notificacion; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".reunion_conciliacion_notificacion (
+    activa boolean NOT NULL,
+    enviada boolean NOT NULL,
+    intentos integer NOT NULL,
+    conciliacion_id bigint NOT NULL,
+    fecha_actualizacion timestamp(6) without time zone,
+    fecha_cancelacion timestamp(6) without time zone,
+    fecha_creacion timestamp(6) without time zone NOT NULL,
+    fecha_envio timestamp(6) without time zone,
+    fecha_programada timestamp(6) without time zone NOT NULL,
+    id bigint NOT NULL,
+    momento_notificacion character varying(30) NOT NULL,
+    motivo character varying(40) NOT NULL,
+    tipo_destinatario character varying(40) NOT NULL,
+    destinatario_email character varying(150),
+    destinatario_nombre character varying(150),
+    error character varying(500),
+    CONSTRAINT reunion_conciliacion_notificacion_momento_notificacion_check CHECK (((momento_notificacion)::text = ANY ((ARRAY['INMEDIATA'::character varying, 'RECORDATORIO'::character varying])::text[]))),
+    CONSTRAINT reunion_conciliacion_notificacion_motivo_check CHECK (((motivo)::text = ANY ((ARRAY['PROGRAMACION'::character varying, 'REPROGRAMACION'::character varying, 'ERROR_ENVIO'::character varying])::text[]))),
+    CONSTRAINT reunion_conciliacion_notificacion_tipo_destinatario_check CHECK (((tipo_destinatario)::text = ANY ((ARRAY['CONSULTANTE'::character varying, 'PARTE'::character varying, 'CONTRAPARTE'::character varying, 'ADMINISTRATIVO'::character varying])::text[])))
+);
+
+
+--
+-- Name: reunion_conciliacion_notificacion_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".reunion_conciliacion_notificacion ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".reunion_conciliacion_notificacion_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: rol; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".rol (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    codigo_base character varying(30),
+    tipo_perfil character varying(30) NOT NULL,
+    nombre character varying(50) NOT NULL,
+    descripcion character varying(255),
+    CONSTRAINT rol_base_activo_check CHECK (((codigo_base IS NULL) OR (activo = true))),
+    CONSTRAINT rol_codigo_base_check CHECK (((codigo_base)::text = ANY ((ARRAY['ADMINISTRADOR'::character varying, 'ASESOR'::character varying, 'ESTUDIANTE'::character varying, 'MONITOR'::character varying, 'CONCILIADOR'::character varying])::text[]))),
+    CONSTRAINT rol_codigo_base_tipo_perfil_check CHECK (((codigo_base IS NULL) OR (((codigo_base)::text = 'ADMINISTRADOR'::text) AND ((tipo_perfil)::text = 'ADMINISTRATIVO'::text)) OR (((codigo_base)::text = 'ASESOR'::text) AND ((tipo_perfil)::text = 'ASESOR'::text)) OR (((codigo_base)::text = 'ESTUDIANTE'::text) AND ((tipo_perfil)::text = 'ESTUDIANTE'::text)) OR (((codigo_base)::text = 'MONITOR'::text) AND ((tipo_perfil)::text = 'MONITOR'::text)) OR (((codigo_base)::text = 'CONCILIADOR'::text) AND ((tipo_perfil)::text = 'CONCILIADOR'::text)))),
+    CONSTRAINT rol_tipo_perfil_check CHECK (((tipo_perfil)::text = ANY ((ARRAY['ASESOR'::character varying, 'ESTUDIANTE'::character varying, 'MONITOR'::character varying, 'ADMINISTRATIVO'::character varying, 'CONCILIADOR'::character varying])::text[])))
+);
+
+
+--
+-- Name: rol_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".rol ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".rol_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: rol_permiso; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".rol_permiso (
+    permiso_id bigint NOT NULL,
+    rol_id bigint NOT NULL
+);
+
+
+--
+-- Name: sede; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".sede (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    nombre character varying(100) NOT NULL
+);
+
+
+--
+-- Name: sede_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".sede ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".sede_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: seguimiento; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".seguimiento (
+    activo boolean NOT NULL,
+    alerta_disciplinaria boolean NOT NULL,
+    dias_notificacion integer,
+    fecha_entrega date,
+    notificar_estudiante boolean NOT NULL,
+    notificar_partes boolean NOT NULL,
+    autor bigint NOT NULL,
+    categoria_seguimiento bigint NOT NULL,
+    consulta bigint NOT NULL,
+    fecha_actualizacion timestamp(6) without time zone,
+    fecha_creacion timestamp(6) without time zone NOT NULL,
+    id bigint NOT NULL,
+    version bigint DEFAULT 0 NOT NULL,
+    estado character varying(30) NOT NULL,
+    descripcion character varying(200) NOT NULL,
+    CONSTRAINT seguimiento_estado_check CHECK (((estado)::text = ANY ((ARRAY['PENDIENTE'::character varying, 'COMPLETADO'::character varying, 'CANCELADO'::character varying])::text[])))
+);
+
+
+--
+-- Name: seguimiento_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".seguimiento ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".seguimiento_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: seguimiento_notificacion; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".seguimiento_notificacion (
+    activa boolean NOT NULL,
+    enviada boolean NOT NULL,
+    fecha_programada date NOT NULL,
+    intentos integer NOT NULL,
+    fecha_actualizacion timestamp(6) without time zone,
+    fecha_cancelacion timestamp(6) without time zone,
+    fecha_creacion timestamp(6) without time zone NOT NULL,
+    fecha_envio timestamp(6) without time zone,
+    id bigint NOT NULL,
+    seguimiento_id bigint NOT NULL,
+    momento_notificacion character varying(30) NOT NULL,
+    tipo_notificacion character varying(40) NOT NULL,
+    error character varying(500),
+    CONSTRAINT seguimiento_notificacion_momento_notificacion_check CHECK (((momento_notificacion)::text = ANY ((ARRAY['INMEDIATA'::character varying, 'RECORDATORIO'::character varying])::text[]))),
+    CONSTRAINT seguimiento_notificacion_tipo_notificacion_check CHECK (((tipo_notificacion)::text = ANY ((ARRAY['PARTES'::character varying, 'ESTUDIANTE'::character varying, 'ALERTA_DISCIPLINARIA'::character varying, 'AUTOR'::character varying])::text[])))
+);
+
+
+--
+-- Name: seguimiento_notificacion_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".seguimiento_notificacion ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".seguimiento_notificacion_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: seguimiento_respuesta; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".seguimiento_respuesta (
+    activo boolean NOT NULL,
+    fuera_plazo boolean NOT NULL,
+    estudiante_id bigint NOT NULL,
+    fecha_actualizacion timestamp(6) without time zone,
+    fecha_creacion timestamp(6) without time zone NOT NULL,
+    fecha_decision timestamp(6) without time zone,
+    id bigint NOT NULL,
+    revisado_por_id bigint,
+    seguimiento_id bigint NOT NULL,
+    version bigint DEFAULT 0 NOT NULL,
+    estado character varying(20) NOT NULL,
+    observacion_revision character varying(500),
+    contenido character varying(1000) NOT NULL,
+    CONSTRAINT seguimiento_respuesta_estado_check CHECK (((estado)::text = ANY ((ARRAY['PENDIENTE'::character varying, 'APROBADA'::character varying, 'RECHAZADA'::character varying])::text[])))
+);
+
+
+--
+-- Name: seguimiento_respuesta_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".seguimiento_respuesta ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".seguimiento_respuesta_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: tema; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".tema (
+    activo boolean NOT NULL,
+    area_id bigint NOT NULL,
+    id bigint NOT NULL,
+    nombre character varying(80) NOT NULL
+);
+
+
+--
+-- Name: tema_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".tema ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".tema_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: tipo; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".tipo (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    tema_id bigint NOT NULL,
+    nombre character varying(80) NOT NULL
+);
+
+
+--
+-- Name: tipo_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".tipo ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".tipo_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: tipo_persona; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".tipo_persona (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    nombre character varying(80) NOT NULL
+);
+
+
+--
+-- Name: tipo_persona_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".tipo_persona ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".tipo_persona_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: tipodoc; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".tipodoc (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    displayname character varying(100) NOT NULL
+);
+
+
+--
+-- Name: tipodoc_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".tipodoc ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".tipodoc_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: usuario_cambio_perfil_historial; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".usuario_cambio_perfil_historial (
+    cambiado_por_usuario_id bigint,
+    fecha_cambio timestamp(6) without time zone NOT NULL,
+    id bigint NOT NULL,
+    perfil_anterior_id bigint NOT NULL,
+    perfil_nuevo_id bigint NOT NULL,
+    rol_anterior_id bigint,
+    rol_nuevo_id bigint,
+    usuario_sistema_id bigint NOT NULL,
+    tipo_perfil_anterior character varying(30) NOT NULL,
+    tipo_perfil_nuevo character varying(30) NOT NULL,
+    rol_anterior_nombre character varying(100) NOT NULL,
+    rol_nuevo_nombre character varying(100) NOT NULL,
+    cambiado_por_username character varying(120),
+    motivo character varying(500) NOT NULL,
+    CONSTRAINT usuario_cambio_perfil_historial_tipo_perfil_anterior_check CHECK (((tipo_perfil_anterior)::text = ANY ((ARRAY['ASESOR'::character varying, 'ESTUDIANTE'::character varying, 'MONITOR'::character varying, 'ADMINISTRATIVO'::character varying, 'CONCILIADOR'::character varying])::text[]))),
+    CONSTRAINT usuario_cambio_perfil_historial_tipo_perfil_nuevo_check CHECK (((tipo_perfil_nuevo)::text = ANY ((ARRAY['ASESOR'::character varying, 'ESTUDIANTE'::character varying, 'MONITOR'::character varying, 'ADMINISTRATIVO'::character varying, 'CONCILIADOR'::character varying])::text[])))
+);
+
+
+--
+-- Name: usuario_cambio_perfil_historial_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".usuario_cambio_perfil_historial ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".usuario_cambio_perfil_historial_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: usuario_sistema; Type: TABLE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TABLE "DB_consultorioJuridico".usuario_sistema (
+    activo boolean NOT NULL,
+    id bigint NOT NULL,
+    rol_id bigint NOT NULL,
+    tipo_perfil_actual character varying(30),
+    username character varying(120) NOT NULL,
+    password_hash character varying(255) NOT NULL,
+    CONSTRAINT usuario_sistema_tipo_perfil_actual_check CHECK (((tipo_perfil_actual)::text = ANY ((ARRAY['ASESOR'::character varying, 'ESTUDIANTE'::character varying, 'MONITOR'::character varying, 'ADMINISTRATIVO'::character varying, 'CONCILIADOR'::character varying])::text[])))
+);
+
+
+--
+-- Name: usuario_sistema_id_seq; Type: SEQUENCE; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE "DB_consultorioJuridico".usuario_sistema ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "DB_consultorioJuridico".usuario_sistema_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: administrativo administrativo_codigo_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".administrativo
+    ADD CONSTRAINT administrativo_codigo_key UNIQUE (codigo);
+
+
+--
+-- Name: administrativo administrativo_documento_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".administrativo
+    ADD CONSTRAINT administrativo_documento_key UNIQUE (documento);
+
+
+--
+-- Name: administrativo administrativo_email_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".administrativo
+    ADD CONSTRAINT administrativo_email_key UNIQUE (email);
+
+
+--
+-- Name: administrativo administrativo_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".administrativo
+    ADD CONSTRAINT administrativo_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: administrativo administrativo_telefono_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".administrativo
+    ADD CONSTRAINT administrativo_telefono_key UNIQUE (telefono);
+
+
+--
+-- Name: administrativo administrativo_usuario_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".administrativo
+    ADD CONSTRAINT administrativo_usuario_key UNIQUE (usuario);
+
+
+--
+-- Name: administrativo administrativo_usuario_sistema_id_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".administrativo
+    ADD CONSTRAINT administrativo_usuario_sistema_id_key UNIQUE (usuario_sistema_id);
+
+
+--
+-- Name: area area_nombre_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".area
+    ADD CONSTRAINT area_nombre_key UNIQUE (nombre);
+
+
+--
+-- Name: area area_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".area
+    ADD CONSTRAINT area_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: asesor asesor_codigo_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".asesor
+    ADD CONSTRAINT asesor_codigo_key UNIQUE (codigo);
+
+
+--
+-- Name: asesor asesor_documento_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".asesor
+    ADD CONSTRAINT asesor_documento_key UNIQUE (documento);
+
+
+--
+-- Name: asesor asesor_email_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".asesor
+    ADD CONSTRAINT asesor_email_key UNIQUE (email);
+
+
+--
+-- Name: asesor asesor_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".asesor
+    ADD CONSTRAINT asesor_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: asesor asesor_telefono_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".asesor
+    ADD CONSTRAINT asesor_telefono_key UNIQUE (telefono);
+
+
+--
+-- Name: asesor asesor_usuario_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".asesor
+    ADD CONSTRAINT asesor_usuario_key UNIQUE (usuario);
+
+
+--
+-- Name: asesor asesor_usuario_sistema_id_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".asesor
+    ADD CONSTRAINT asesor_usuario_sistema_id_key UNIQUE (usuario_sistema_id);
+
+
+--
+-- Name: audit_logs audit_logs_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".audit_logs
+    ADD CONSTRAINT audit_logs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: barrio barrio_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".barrio
+    ADD CONSTRAINT barrio_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: categoria_seguimiento categoria_seguimiento_nombre_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".categoria_seguimiento
+    ADD CONSTRAINT categoria_seguimiento_nombre_key UNIQUE (nombre);
+
+
+--
+-- Name: categoria_seguimiento categoria_seguimiento_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".categoria_seguimiento
+    ADD CONSTRAINT categoria_seguimiento_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: conciliacion conciliacion_acta_file_id_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliacion
+    ADD CONSTRAINT conciliacion_acta_file_id_key UNIQUE (acta_file_id);
+
+
+--
+-- Name: conciliacion conciliacion_documento_solicitud_file_id_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliacion
+    ADD CONSTRAINT conciliacion_documento_solicitud_file_id_key UNIQUE (documento_solicitud_file_id);
+
+
+--
+-- Name: conciliacion conciliacion_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliacion
+    ADD CONSTRAINT conciliacion_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: conciliador conciliador_codigo_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliador
+    ADD CONSTRAINT conciliador_codigo_key UNIQUE (codigo);
+
+
+--
+-- Name: conciliador conciliador_documento_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliador
+    ADD CONSTRAINT conciliador_documento_key UNIQUE (documento);
+
+
+--
+-- Name: conciliador conciliador_email_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliador
+    ADD CONSTRAINT conciliador_email_key UNIQUE (email);
+
+
+--
+-- Name: conciliador conciliador_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliador
+    ADD CONSTRAINT conciliador_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: conciliador conciliador_telefono_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliador
+    ADD CONSTRAINT conciliador_telefono_key UNIQUE (telefono);
+
+
+--
+-- Name: conciliador conciliador_usuario_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliador
+    ADD CONSTRAINT conciliador_usuario_key UNIQUE (usuario);
+
+
+--
+-- Name: conciliador conciliador_usuario_sistema_id_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliador
+    ADD CONSTRAINT conciliador_usuario_sistema_id_key UNIQUE (usuario_sistema_id);
+
+
+--
+-- Name: condicion condicion_nombre_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".condicion
+    ADD CONSTRAINT condicion_nombre_key UNIQUE (nombre);
+
+
+--
+-- Name: condicion condicion_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".condicion
+    ADD CONSTRAINT condicion_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: consulta consulta_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".consulta
+    ADD CONSTRAINT consulta_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: consulta_reasignacion_historial consulta_reasignacion_historial_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".consulta_reasignacion_historial
+    ADD CONSTRAINT consulta_reasignacion_historial_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: departamento departamento_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".departamento
+    ADD CONSTRAINT departamento_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: empresas empresas_nombre_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".empresas
+    ADD CONSTRAINT empresas_nombre_key UNIQUE (nombre);
+
+
+--
+-- Name: empresas empresas_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".empresas
+    ADD CONSTRAINT empresas_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: especialidad especialidad_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".especialidad
+    ADD CONSTRAINT especialidad_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: estado_conciliacion estado_conciliacion_codigo_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".estado_conciliacion
+    ADD CONSTRAINT estado_conciliacion_codigo_key UNIQUE (codigo);
+
+
+--
+-- Name: estado_conciliacion estado_conciliacion_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".estado_conciliacion
+    ADD CONSTRAINT estado_conciliacion_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: estudiante estudiante_codigo_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".estudiante
+    ADD CONSTRAINT estudiante_codigo_key UNIQUE (codigo);
+
+
+--
+-- Name: estudiante estudiante_documento_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".estudiante
+    ADD CONSTRAINT estudiante_documento_key UNIQUE (documento);
+
+
+--
+-- Name: estudiante estudiante_email_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".estudiante
+    ADD CONSTRAINT estudiante_email_key UNIQUE (email);
+
+
+--
+-- Name: estudiante estudiante_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".estudiante
+    ADD CONSTRAINT estudiante_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: estudiante estudiante_telefono_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".estudiante
+    ADD CONSTRAINT estudiante_telefono_key UNIQUE (telefono);
+
+
+--
+-- Name: estudiante estudiante_usuario_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".estudiante
+    ADD CONSTRAINT estudiante_usuario_key UNIQUE (usuario);
+
+
+--
+-- Name: estudiante estudiante_usuario_sistema_id_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".estudiante
+    ADD CONSTRAINT estudiante_usuario_sistema_id_key UNIQUE (usuario_sistema_id);
+
+
+--
+-- Name: file_asset file_asset_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".file_asset
+    ADD CONSTRAINT file_asset_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: file_asset file_asset_upload_id_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".file_asset
+    ADD CONSTRAINT file_asset_upload_id_key UNIQUE (upload_id);
+
+
+--
+-- Name: monitor monitor_codigo_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".monitor
+    ADD CONSTRAINT monitor_codigo_key UNIQUE (codigo);
+
+
+--
+-- Name: monitor monitor_documento_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".monitor
+    ADD CONSTRAINT monitor_documento_key UNIQUE (documento);
+
+
+--
+-- Name: monitor monitor_email_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".monitor
+    ADD CONSTRAINT monitor_email_key UNIQUE (email);
+
+
+--
+-- Name: monitor monitor_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".monitor
+    ADD CONSTRAINT monitor_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: monitor monitor_telefono_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".monitor
+    ADD CONSTRAINT monitor_telefono_key UNIQUE (telefono);
+
+
+--
+-- Name: monitor monitor_usuario_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".monitor
+    ADD CONSTRAINT monitor_usuario_key UNIQUE (usuario);
+
+
+--
+-- Name: monitor monitor_usuario_sistema_id_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".monitor
+    ADD CONSTRAINT monitor_usuario_sistema_id_key UNIQUE (usuario_sistema_id);
+
+
+--
+-- Name: municipio municipio_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".municipio
+    ADD CONSTRAINT municipio_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: nacionalidades nacionalidades_nombre_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".nacionalidades
+    ADD CONSTRAINT nacionalidades_nombre_key UNIQUE (nombre);
+
+
+--
+-- Name: nacionalidades nacionalidades_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".nacionalidades
+    ADD CONSTRAINT nacionalidades_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ocupacion ocupacion_nombre_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".ocupacion
+    ADD CONSTRAINT ocupacion_nombre_key UNIQUE (nombre);
+
+
+--
+-- Name: ocupacion ocupacion_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".ocupacion
+    ADD CONSTRAINT ocupacion_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organo_control organo_control_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".organo_control
+    ADD CONSTRAINT organo_control_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: password_reset_token password_reset_token_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".password_reset_token
+    ADD CONSTRAINT password_reset_token_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: password_reset_token password_reset_token_token_hash_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".password_reset_token
+    ADD CONSTRAINT password_reset_token_token_hash_key UNIQUE (token_hash);
+
+
+--
+-- Name: permiso permiso_nombre_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".permiso
+    ADD CONSTRAINT permiso_nombre_key UNIQUE (nombre);
+
+
+--
+-- Name: permiso permiso_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".permiso
+    ADD CONSTRAINT permiso_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: persona persona_numero_documento_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".persona
+    ADD CONSTRAINT persona_numero_documento_key UNIQUE (numero_documento);
+
+
+--
+-- Name: persona persona_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".persona
+    ADD CONSTRAINT persona_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: proceso proceso_numero_radicado_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".proceso
+    ADD CONSTRAINT proceso_numero_radicado_key UNIQUE (numero_radicado);
+
+
+--
+-- Name: proceso proceso_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".proceso
+    ADD CONSTRAINT proceso_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: reunion_conciliacion_historial reunion_conciliacion_historial_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".reunion_conciliacion_historial
+    ADD CONSTRAINT reunion_conciliacion_historial_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: reunion_conciliacion_notificacion reunion_conciliacion_notificacion_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".reunion_conciliacion_notificacion
+    ADD CONSTRAINT reunion_conciliacion_notificacion_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: reunion_conciliacion reunion_conciliacion_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".reunion_conciliacion
+    ADD CONSTRAINT reunion_conciliacion_pkey PRIMARY KEY (conciliacion_id);
+
+
+--
+-- Name: rol rol_codigo_base_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".rol
+    ADD CONSTRAINT rol_codigo_base_key UNIQUE (codigo_base);
+
+
+--
+-- Name: rol rol_nombre_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".rol
+    ADD CONSTRAINT rol_nombre_key UNIQUE (nombre);
+
+
+--
+-- Name: rol_permiso rol_permiso_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".rol_permiso
+    ADD CONSTRAINT rol_permiso_pkey PRIMARY KEY (permiso_id, rol_id);
+
+
+--
+-- Name: rol rol_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".rol
+    ADD CONSTRAINT rol_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sede sede_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".sede
+    ADD CONSTRAINT sede_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: seguimiento_notificacion seguimiento_notificacion_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".seguimiento_notificacion
+    ADD CONSTRAINT seguimiento_notificacion_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: seguimiento seguimiento_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".seguimiento
+    ADD CONSTRAINT seguimiento_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: seguimiento_respuesta seguimiento_respuesta_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".seguimiento_respuesta
+    ADD CONSTRAINT seguimiento_respuesta_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tema tema_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".tema
+    ADD CONSTRAINT tema_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tipo_persona tipo_persona_nombre_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".tipo_persona
+    ADD CONSTRAINT tipo_persona_nombre_key UNIQUE (nombre);
+
+
+--
+-- Name: tipo_persona tipo_persona_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".tipo_persona
+    ADD CONSTRAINT tipo_persona_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tipo tipo_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".tipo
+    ADD CONSTRAINT tipo_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tipodoc tipodoc_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".tipodoc
+    ADD CONSTRAINT tipodoc_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: file_asset uk_file_asset_bucket_object_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".file_asset
+    ADD CONSTRAINT uk_file_asset_bucket_object_key UNIQUE (bucket, object_key);
+
+
+--
+-- Name: file_asset uk_file_asset_doc_version; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".file_asset
+    ADD CONSTRAINT uk_file_asset_doc_version UNIQUE (documento_logico, version);
+
+
+--
+-- Name: rol uk_rol_codigo_base; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".rol
+    ADD CONSTRAINT uk_rol_codigo_base UNIQUE (codigo_base);
+
+
+--
+-- Name: seguimiento_notificacion uk_seguimiento_notificacion_tipo_momento; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".seguimiento_notificacion
+    ADD CONSTRAINT uk_seguimiento_notificacion_tipo_momento UNIQUE (seguimiento_id, tipo_notificacion, momento_notificacion);
+
+
+--
+-- Name: usuario_cambio_perfil_historial usuario_cambio_perfil_historial_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".usuario_cambio_perfil_historial
+    ADD CONSTRAINT usuario_cambio_perfil_historial_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: usuario_sistema usuario_sistema_pkey; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".usuario_sistema
+    ADD CONSTRAINT usuario_sistema_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: usuario_sistema usuario_sistema_username_key; Type: CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".usuario_sistema
+    ADD CONSTRAINT usuario_sistema_username_key UNIQUE (username);
+
+
+--
+-- Name: idx_audit_logs_actor_occurred_at; Type: INDEX; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE INDEX idx_audit_logs_actor_occurred_at ON "DB_consultorioJuridico".audit_logs USING btree (actor_username, occurred_at DESC);
+
+
+--
+-- Name: idx_audit_logs_correlation_id; Type: INDEX; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE INDEX idx_audit_logs_correlation_id ON "DB_consultorioJuridico".audit_logs USING btree (correlation_id);
+
+
+--
+-- Name: idx_audit_logs_occurred_at; Type: INDEX; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE INDEX idx_audit_logs_occurred_at ON "DB_consultorioJuridico".audit_logs USING btree (occurred_at DESC);
+
+
+--
+-- Name: idx_file_asset_doc_logico; Type: INDEX; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE INDEX idx_file_asset_doc_logico ON "DB_consultorioJuridico".file_asset USING btree (documento_logico);
+
+
+--
+-- Name: idx_file_asset_ref_anterior; Type: INDEX; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE INDEX idx_file_asset_ref_anterior ON "DB_consultorioJuridico".file_asset USING btree (referencia_anterior_id);
+
+
+--
+-- Name: idx_file_asset_resource; Type: INDEX; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE INDEX idx_file_asset_resource ON "DB_consultorioJuridico".file_asset USING btree (resource_type, resource_id, status);
+
+
+--
+-- Name: idx_file_asset_status; Type: INDEX; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE INDEX idx_file_asset_status ON "DB_consultorioJuridico".file_asset USING btree (status);
+
+
+--
+-- Name: idx_reasignacion_historial_actor_fecha; Type: INDEX; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE INDEX idx_reasignacion_historial_actor_fecha ON "DB_consultorioJuridico".consulta_reasignacion_historial USING btree (actor_usuario_id, ocurrido_en DESC);
+
+
+--
+-- Name: idx_reasignacion_historial_consulta_fecha; Type: INDEX; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE INDEX idx_reasignacion_historial_consulta_fecha ON "DB_consultorioJuridico".consulta_reasignacion_historial USING btree (consulta_id, ocurrido_en DESC, id DESC);
+
+
+--
+-- Name: uk_file_asset_doc_vigente; Type: INDEX; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_file_asset_doc_vigente ON "DB_consultorioJuridico".file_asset USING btree (documento_logico) WHERE ((status)::text = 'VIGENTE'::text);
+
+
+--
+-- Name: consulta_reasignacion_historial trg_historial_reasignacion_inmutable; Type: TRIGGER; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TRIGGER trg_historial_reasignacion_inmutable BEFORE DELETE OR UPDATE ON "DB_consultorioJuridico".consulta_reasignacion_historial FOR EACH ROW EXECUTE FUNCTION "DB_consultorioJuridico".prevenir_modificacion_historial_reasignacion();
+
+
+--
+-- Name: consulta_reasignacion_historial trg_validar_responsables_reasignacion; Type: TRIGGER; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TRIGGER trg_validar_responsables_reasignacion BEFORE INSERT ON "DB_consultorioJuridico".consulta_reasignacion_historial FOR EACH ROW EXECUTE FUNCTION "DB_consultorioJuridico".validar_responsables_reasignacion_consulta();
+
+
+--
+-- Name: audit_logs trigger_prevent_audit_mod; Type: TRIGGER; Schema: DB_consultorioJuridico; Owner: -
+--
+
+CREATE TRIGGER trigger_prevent_audit_mod BEFORE DELETE OR UPDATE ON "DB_consultorioJuridico".audit_logs FOR EACH ROW EXECUTE FUNCTION "DB_consultorioJuridico".prevent_audit_modification();
+
+
+--
+-- Name: seguimiento_respuesta fk1e2yhn2bnur76icjjmdjgtxxl; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".seguimiento_respuesta
+    ADD CONSTRAINT fk1e2yhn2bnur76icjjmdjgtxxl FOREIGN KEY (revisado_por_id) REFERENCES "DB_consultorioJuridico".usuario_sistema(id);
+
+
+--
+-- Name: consulta fk2a69hj452exeh8rmy3hpsaomc; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".consulta
+    ADD CONSTRAINT fk2a69hj452exeh8rmy3hpsaomc FOREIGN KEY (monitor_id) REFERENCES "DB_consultorioJuridico".monitor(id);
+
+
+--
+-- Name: persona fk2oh5xxj90kqnahm291rw0u8f3; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".persona
+    ADD CONSTRAINT fk2oh5xxj90kqnahm291rw0u8f3 FOREIGN KEY (ocupacion_id) REFERENCES "DB_consultorioJuridico".ocupacion(id);
+
+
+--
+-- Name: usuario_cambio_perfil_historial fk30tp1yd2rdx93cbtw863d15kl; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".usuario_cambio_perfil_historial
+    ADD CONSTRAINT fk30tp1yd2rdx93cbtw863d15kl FOREIGN KEY (rol_nuevo_id) REFERENCES "DB_consultorioJuridico".rol(id);
+
+
+--
+-- Name: consulta fk35rf8fc64yy3358xrjds4vt5e; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".consulta
+    ADD CONSTRAINT fk35rf8fc64yy3358xrjds4vt5e FOREIGN KEY (area_id) REFERENCES "DB_consultorioJuridico".area(id);
+
+
+--
+-- Name: proceso fk3l0crncgdrrmrlpehrx7cfesd; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".proceso
+    ADD CONSTRAINT fk3l0crncgdrrmrlpehrx7cfesd FOREIGN KEY (especialidad_id) REFERENCES "DB_consultorioJuridico".especialidad(id);
+
+
+--
+-- Name: consulta_contraparte fk3lprkk7ll34veekxn6tiixqha; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".consulta_contraparte
+    ADD CONSTRAINT fk3lprkk7ll34veekxn6tiixqha FOREIGN KEY (persona_id) REFERENCES "DB_consultorioJuridico".persona(id);
+
+
+--
+-- Name: seguimiento_respuesta fk3v528mrriflvoa6xi222bbe8x; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".seguimiento_respuesta
+    ADD CONSTRAINT fk3v528mrriflvoa6xi222bbe8x FOREIGN KEY (seguimiento_id) REFERENCES "DB_consultorioJuridico".seguimiento(id);
+
+
+--
+-- Name: estudiante fk4l338j8k4s39rgnv9ryfnqlas; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".estudiante
+    ADD CONSTRAINT fk4l338j8k4s39rgnv9ryfnqlas FOREIGN KEY (usuario_sistema_id) REFERENCES "DB_consultorioJuridico".usuario_sistema(id);
+
+
+--
+-- Name: conciliacion fk51lkcrsxcuto82nvg1ss7h6w; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliacion
+    ADD CONSTRAINT fk51lkcrsxcuto82nvg1ss7h6w FOREIGN KEY (conciliador_id) REFERENCES "DB_consultorioJuridico".conciliador(id);
+
+
+--
+-- Name: seguimiento_respuesta fk5oqh3iyb6di53h67ywet1kbkv; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".seguimiento_respuesta
+    ADD CONSTRAINT fk5oqh3iyb6di53h67ywet1kbkv FOREIGN KEY (estudiante_id) REFERENCES "DB_consultorioJuridico".estudiante(id);
+
+
+--
+-- Name: rol_permiso fk6o522368i97la9m9cqn0gul2e; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".rol_permiso
+    ADD CONSTRAINT fk6o522368i97la9m9cqn0gul2e FOREIGN KEY (rol_id) REFERENCES "DB_consultorioJuridico".rol(id);
+
+
+--
+-- Name: persona fk6ocn9qkspgjo4oinhtca6u0e4; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".persona
+    ADD CONSTRAINT fk6ocn9qkspgjo4oinhtca6u0e4 FOREIGN KEY (empresa_id) REFERENCES "DB_consultorioJuridico".empresas(id);
+
+
+--
+-- Name: conciliacion fk6uu3lkjwyuo4v672at4c9p4ip; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliacion
+    ADD CONSTRAINT fk6uu3lkjwyuo4v672at4c9p4ip FOREIGN KEY (documento_solicitud_file_id) REFERENCES "DB_consultorioJuridico".file_asset(id);
+
+
+--
+-- Name: persona fk70r45r8si4ob0b7ob6b6iyyne; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".persona
+    ADD CONSTRAINT fk70r45r8si4ob0b7ob6b6iyyne FOREIGN KEY (barrio_id) REFERENCES "DB_consultorioJuridico".barrio(id);
+
+
+--
+-- Name: proceso fk7coynt6fmsp1fa8536arum9ey; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".proceso
+    ADD CONSTRAINT fk7coynt6fmsp1fa8536arum9ey FOREIGN KEY (departamento_id) REFERENCES "DB_consultorioJuridico".departamento(id);
+
+
+--
+-- Name: conciliacion fk7m07owuib9s2ng721ll1e2aq6; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliacion
+    ADD CONSTRAINT fk7m07owuib9s2ng721ll1e2aq6 FOREIGN KEY (estudiante_id) REFERENCES "DB_consultorioJuridico".estudiante(id);
+
+
+--
+-- Name: especialidad fk7vh1kwwx72ascca6qd7t2c17s; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".especialidad
+    ADD CONSTRAINT fk7vh1kwwx72ascca6qd7t2c17s FOREIGN KEY (organo_control_id) REFERENCES "DB_consultorioJuridico".organo_control(id);
+
+
+--
+-- Name: consulta_parte fk8lrmpgu54jb45m0ckk401d66i; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".consulta_parte
+    ADD CONSTRAINT fk8lrmpgu54jb45m0ckk401d66i FOREIGN KEY (persona_id) REFERENCES "DB_consultorioJuridico".persona(id);
+
+
+--
+-- Name: reunion_conciliacion_historial fk8y4s7ju5f90klhth7umdlulax; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".reunion_conciliacion_historial
+    ADD CONSTRAINT fk8y4s7ju5f90klhth7umdlulax FOREIGN KEY (sede_nueva_id) REFERENCES "DB_consultorioJuridico".sede(id);
+
+
+--
+-- Name: asesor fk9catby71qamf4s3imriwa0uus; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".asesor
+    ADD CONSTRAINT fk9catby71qamf4s3imriwa0uus FOREIGN KEY (tipo_documento) REFERENCES "DB_consultorioJuridico".tipodoc(id);
+
+
+--
+-- Name: file_asset fk_file_asset_referencia_anterior; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".file_asset
+    ADD CONSTRAINT fk_file_asset_referencia_anterior FOREIGN KEY (referencia_anterior_id) REFERENCES "DB_consultorioJuridico".file_asset(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: consulta_reasignacion_historial fk_reasignacion_historial_actor; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".consulta_reasignacion_historial
+    ADD CONSTRAINT fk_reasignacion_historial_actor FOREIGN KEY (actor_usuario_id) REFERENCES "DB_consultorioJuridico".usuario_sistema(id) ON UPDATE RESTRICT ON DELETE RESTRICT;
+
+
+--
+-- Name: consulta_reasignacion_historial fk_reasignacion_historial_consulta; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".consulta_reasignacion_historial
+    ADD CONSTRAINT fk_reasignacion_historial_consulta FOREIGN KEY (consulta_id) REFERENCES "DB_consultorioJuridico".consulta(id) ON UPDATE RESTRICT ON DELETE RESTRICT;
+
+
+--
+-- Name: monitor fka15mjqaabhwpde3skea9vgqc9; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".monitor
+    ADD CONSTRAINT fka15mjqaabhwpde3skea9vgqc9 FOREIGN KEY (sede) REFERENCES "DB_consultorioJuridico".sede(id);
+
+
+--
+-- Name: proceso fkamsfbtpd2bmmgahkrihs1jtf5; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".proceso
+    ADD CONSTRAINT fkamsfbtpd2bmmgahkrihs1jtf5 FOREIGN KEY (consulta_id) REFERENCES "DB_consultorioJuridico".consulta(id);
+
+
+--
+-- Name: password_reset_token fkar59foxax3tki502gkc8ib76b; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".password_reset_token
+    ADD CONSTRAINT fkar59foxax3tki502gkc8ib76b FOREIGN KEY (usuario_sistema_id) REFERENCES "DB_consultorioJuridico".usuario_sistema(id);
+
+
+--
+-- Name: reunion_conciliacion fkb2sfel23b6l72byeodrkgt0sh; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".reunion_conciliacion
+    ADD CONSTRAINT fkb2sfel23b6l72byeodrkgt0sh FOREIGN KEY (conciliacion_id) REFERENCES "DB_consultorioJuridico".conciliacion(id);
+
+
+--
+-- Name: administrativo fkb3os8n705un4ajdpxvdhstr9r; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".administrativo
+    ADD CONSTRAINT fkb3os8n705un4ajdpxvdhstr9r FOREIGN KEY (sede) REFERENCES "DB_consultorioJuridico".sede(id);
+
+
+--
+-- Name: file_asset fkb3tycgn0y4cu7uehcfd7qdcqr; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".file_asset
+    ADD CONSTRAINT fkb3tycgn0y4cu7uehcfd7qdcqr FOREIGN KEY (referencia_anterior_id) REFERENCES "DB_consultorioJuridico".file_asset(id);
+
+
+--
+-- Name: consulta fkb9yyh8iw0dutj62gpl3c76b1p; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".consulta
+    ADD CONSTRAINT fkb9yyh8iw0dutj62gpl3c76b1p FOREIGN KEY (tipo_id) REFERENCES "DB_consultorioJuridico".tipo(id);
+
+
+--
+-- Name: usuario_cambio_perfil_historial fkbswrhhk72htj8h9jklsvhrrtu; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".usuario_cambio_perfil_historial
+    ADD CONSTRAINT fkbswrhhk72htj8h9jklsvhrrtu FOREIGN KEY (usuario_sistema_id) REFERENCES "DB_consultorioJuridico".usuario_sistema(id);
+
+
+--
+-- Name: barrio fkd778rf8rgom9l0g3s5qw5pa5y; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".barrio
+    ADD CONSTRAINT fkd778rf8rgom9l0g3s5qw5pa5y FOREIGN KEY (municipio_id) REFERENCES "DB_consultorioJuridico".municipio(id);
+
+
+--
+-- Name: administrativo fkdhsnhv00rheaay0rlglp49dd3; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".administrativo
+    ADD CONSTRAINT fkdhsnhv00rheaay0rlglp49dd3 FOREIGN KEY (tipo_documento) REFERENCES "DB_consultorioJuridico".tipodoc(id);
+
+
+--
+-- Name: persona fkdi79i63e89tfmhv2ipwh9lnvn; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".persona
+    ADD CONSTRAINT fkdi79i63e89tfmhv2ipwh9lnvn FOREIGN KEY (nacionalidad_id) REFERENCES "DB_consultorioJuridico".nacionalidades(id);
+
+
+--
+-- Name: consulta fkdkr0qh8cn1j7syiidvegn99u9; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".consulta
+    ADD CONSTRAINT fkdkr0qh8cn1j7syiidvegn99u9 FOREIGN KEY (persona_id) REFERENCES "DB_consultorioJuridico".persona(id);
+
+
+--
+-- Name: consulta fkdqkus512hlyw84jnd3kb59mfx; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".consulta
+    ADD CONSTRAINT fkdqkus512hlyw84jnd3kb59mfx FOREIGN KEY (sede_id) REFERENCES "DB_consultorioJuridico".sede(id);
+
+
+--
+-- Name: estudiante fke4gxbqax0mxv9x1t43nuqlvqy; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".estudiante
+    ADD CONSTRAINT fke4gxbqax0mxv9x1t43nuqlvqy FOREIGN KEY (asesor_id) REFERENCES "DB_consultorioJuridico".asesor(id);
+
+
+--
+-- Name: conciliacion fkervnp36340nihpwvji8bchqjo; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliacion
+    ADD CONSTRAINT fkervnp36340nihpwvji8bchqjo FOREIGN KEY (acta_file_id) REFERENCES "DB_consultorioJuridico".file_asset(id);
+
+
+--
+-- Name: tipo fkf1p2vhuko2c4b8xcl38b06btc; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".tipo
+    ADD CONSTRAINT fkf1p2vhuko2c4b8xcl38b06btc FOREIGN KEY (tema_id) REFERENCES "DB_consultorioJuridico".tema(id);
+
+
+--
+-- Name: tema fkfoomnsekik6pc7qnqf41jgoi9; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".tema
+    ADD CONSTRAINT fkfoomnsekik6pc7qnqf41jgoi9 FOREIGN KEY (area_id) REFERENCES "DB_consultorioJuridico".area(id);
+
+
+--
+-- Name: rol_permiso fkfyao8wd0o5tsyem1w55s3141k; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".rol_permiso
+    ADD CONSTRAINT fkfyao8wd0o5tsyem1w55s3141k FOREIGN KEY (permiso_id) REFERENCES "DB_consultorioJuridico".permiso(id);
+
+
+--
+-- Name: reunion_conciliacion_historial fkgle1vle4ujptaln03a8hbc46x; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".reunion_conciliacion_historial
+    ADD CONSTRAINT fkgle1vle4ujptaln03a8hbc46x FOREIGN KEY (conciliacion_id) REFERENCES "DB_consultorioJuridico".conciliacion(id);
+
+
+--
+-- Name: administrativo fkgmfr439unuxn8j6mmdn6r1w8s; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".administrativo
+    ADD CONSTRAINT fkgmfr439unuxn8j6mmdn6r1w8s FOREIGN KEY (usuario_sistema_id) REFERENCES "DB_consultorioJuridico".usuario_sistema(id);
+
+
+--
+-- Name: reunion_conciliacion fkgq11x5pe4nx0xvqud47l0blwc; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".reunion_conciliacion
+    ADD CONSTRAINT fkgq11x5pe4nx0xvqud47l0blwc FOREIGN KEY (sede_id) REFERENCES "DB_consultorioJuridico".sede(id);
+
+
+--
+-- Name: conciliacion fkh10h1gsngldj4vleoutyglvot; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliacion
+    ADD CONSTRAINT fkh10h1gsngldj4vleoutyglvot FOREIGN KEY (solicitado_por_id) REFERENCES "DB_consultorioJuridico".usuario_sistema(id);
+
+
+--
+-- Name: conciliacion fkh46jot2noopfrcub98j902ljy; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliacion
+    ADD CONSTRAINT fkh46jot2noopfrcub98j902ljy FOREIGN KEY (consulta_id) REFERENCES "DB_consultorioJuridico".consulta(id);
+
+
+--
+-- Name: conciliacion fkh4i7bhpxyt3vh2ftnyc4gwrb1; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliacion
+    ADD CONSTRAINT fkh4i7bhpxyt3vh2ftnyc4gwrb1 FOREIGN KEY (estado_id) REFERENCES "DB_consultorioJuridico".estado_conciliacion(id);
+
+
+--
+-- Name: consulta fkh6qipq9tpkdvehhayk0bnt8mb; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".consulta
+    ADD CONSTRAINT fkh6qipq9tpkdvehhayk0bnt8mb FOREIGN KEY (tema_id) REFERENCES "DB_consultorioJuridico".tema(id);
+
+
+--
+-- Name: estudiante fkhn4c0uluqnx24f3mmta6m2nas; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".estudiante
+    ADD CONSTRAINT fkhn4c0uluqnx24f3mmta6m2nas FOREIGN KEY (tipo_documento) REFERENCES "DB_consultorioJuridico".tipodoc(id);
+
+
+--
+-- Name: estudiante fkhpe3chkalkabgclmyapqgwybf; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".estudiante
+    ADD CONSTRAINT fkhpe3chkalkabgclmyapqgwybf FOREIGN KEY (sede) REFERENCES "DB_consultorioJuridico".sede(id);
+
+
+--
+-- Name: conciliador fkhr1uuwwort5lwfe8dsirk8uh3; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliador
+    ADD CONSTRAINT fkhr1uuwwort5lwfe8dsirk8uh3 FOREIGN KEY (usuario_sistema_id) REFERENCES "DB_consultorioJuridico".usuario_sistema(id);
+
+
+--
+-- Name: seguimiento fkibdu6259tua8u6ynqu6h2q0ec; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".seguimiento
+    ADD CONSTRAINT fkibdu6259tua8u6ynqu6h2q0ec FOREIGN KEY (autor) REFERENCES "DB_consultorioJuridico".usuario_sistema(id);
+
+
+--
+-- Name: monitor fkimtw711lof7koysdupsipy09c; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".monitor
+    ADD CONSTRAINT fkimtw711lof7koysdupsipy09c FOREIGN KEY (usuario_sistema_id) REFERENCES "DB_consultorioJuridico".usuario_sistema(id);
+
+
+--
+-- Name: reunion_conciliacion_notificacion fkjxaakqxw3fvipxmxs2qfhllox; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".reunion_conciliacion_notificacion
+    ADD CONSTRAINT fkjxaakqxw3fvipxmxs2qfhllox FOREIGN KEY (conciliacion_id) REFERENCES "DB_consultorioJuridico".conciliacion(id);
+
+
+--
+-- Name: consulta fkkbs1jc65cl5j897a2nvxw57f3; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".consulta
+    ADD CONSTRAINT fkkbs1jc65cl5j897a2nvxw57f3 FOREIGN KEY (estudiante_id) REFERENCES "DB_consultorioJuridico".estudiante(id);
+
+
+--
+-- Name: consulta fkmgmj6n7vnfm3t94xo3ax10si1; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".consulta
+    ADD CONSTRAINT fkmgmj6n7vnfm3t94xo3ax10si1 FOREIGN KEY (asesor_id) REFERENCES "DB_consultorioJuridico".asesor(id);
+
+
+--
+-- Name: persona fkmigva2e4swt1som4w6ehtikc8; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".persona
+    ADD CONSTRAINT fkmigva2e4swt1som4w6ehtikc8 FOREIGN KEY (condicion_actual_id) REFERENCES "DB_consultorioJuridico".condicion(id);
+
+
+--
+-- Name: seguimiento_notificacion fkmkg1bgqrt9myjlh8t3mxiwb5; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".seguimiento_notificacion
+    ADD CONSTRAINT fkmkg1bgqrt9myjlh8t3mxiwb5 FOREIGN KEY (seguimiento_id) REFERENCES "DB_consultorioJuridico".seguimiento(id);
+
+
+--
+-- Name: reunion_conciliacion_historial fkmn913ar4hp4987iwub2v6k2mm; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".reunion_conciliacion_historial
+    ADD CONSTRAINT fkmn913ar4hp4987iwub2v6k2mm FOREIGN KEY (sede_anterior_id) REFERENCES "DB_consultorioJuridico".sede(id);
+
+
+--
+-- Name: asesor fkn6epadx6fdmk2vexo3h008kma; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".asesor
+    ADD CONSTRAINT fkn6epadx6fdmk2vexo3h008kma FOREIGN KEY (area_id) REFERENCES "DB_consultorioJuridico".area(id);
+
+
+--
+-- Name: conciliador fknjbg4y1gx1r885ck304r6134b; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliador
+    ADD CONSTRAINT fknjbg4y1gx1r885ck304r6134b FOREIGN KEY (sede) REFERENCES "DB_consultorioJuridico".sede(id);
+
+
+--
+-- Name: usuario_sistema fknuxk0rcnesoahlv7iy5ci50u1; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".usuario_sistema
+    ADD CONSTRAINT fknuxk0rcnesoahlv7iy5ci50u1 FOREIGN KEY (rol_id) REFERENCES "DB_consultorioJuridico".rol(id);
+
+
+--
+-- Name: seguimiento fkp3vvwsunsce8jwwc69in10tq4; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".seguimiento
+    ADD CONSTRAINT fkp3vvwsunsce8jwwc69in10tq4 FOREIGN KEY (categoria_seguimiento) REFERENCES "DB_consultorioJuridico".categoria_seguimiento(id);
+
+
+--
+-- Name: proceso fkpk1x1rpqdvhhu06ajui7ftr6p; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".proceso
+    ADD CONSTRAINT fkpk1x1rpqdvhhu06ajui7ftr6p FOREIGN KEY (organo_control_id) REFERENCES "DB_consultorioJuridico".organo_control(id);
+
+
+--
+-- Name: persona fkpkppvfld45pfc0tp5o6umk2d9; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".persona
+    ADD CONSTRAINT fkpkppvfld45pfc0tp5o6umk2d9 FOREIGN KEY (municipio_id) REFERENCES "DB_consultorioJuridico".municipio(id);
+
+
+--
+-- Name: reunion_conciliacion_historial fkpqa7kkt31k9h2cuesppb2s1a5; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".reunion_conciliacion_historial
+    ADD CONSTRAINT fkpqa7kkt31k9h2cuesppb2s1a5 FOREIGN KEY (realizado_por_id) REFERENCES "DB_consultorioJuridico".usuario_sistema(id);
+
+
+--
+-- Name: consulta_contraparte fkpw2qvggdagj2xqfbd7gyv1ldk; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".consulta_contraparte
+    ADD CONSTRAINT fkpw2qvggdagj2xqfbd7gyv1ldk FOREIGN KEY (consulta_id) REFERENCES "DB_consultorioJuridico".consulta(id);
+
+
+--
+-- Name: consulta_parte fkqb6xe0vcqv3t6v9c6ocv41i7a; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".consulta_parte
+    ADD CONSTRAINT fkqb6xe0vcqv3t6v9c6ocv41i7a FOREIGN KEY (consulta_id) REFERENCES "DB_consultorioJuridico".consulta(id);
+
+
+--
+-- Name: asesor fkr4qoc5qy9cscrtmkokqtqtjtg; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".asesor
+    ADD CONSTRAINT fkr4qoc5qy9cscrtmkokqtqtjtg FOREIGN KEY (sede) REFERENCES "DB_consultorioJuridico".sede(id);
+
+
+--
+-- Name: municipio fkr52i0ndybrnmns34vmihs292c; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".municipio
+    ADD CONSTRAINT fkr52i0ndybrnmns34vmihs292c FOREIGN KEY (departamento_id) REFERENCES "DB_consultorioJuridico".departamento(id);
+
+
+--
+-- Name: asesor fkr8cwvdprtufetla9ypui6bde9; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".asesor
+    ADD CONSTRAINT fkr8cwvdprtufetla9ypui6bde9 FOREIGN KEY (usuario_sistema_id) REFERENCES "DB_consultorioJuridico".usuario_sistema(id);
+
+
+--
+-- Name: usuario_cambio_perfil_historial fkrhpcpghiyig5b5vh12duy9qre; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".usuario_cambio_perfil_historial
+    ADD CONSTRAINT fkrhpcpghiyig5b5vh12duy9qre FOREIGN KEY (rol_anterior_id) REFERENCES "DB_consultorioJuridico".rol(id);
+
+
+--
+-- Name: seguimiento fkrnp1nod6y8iik2uqyd0b2e17f; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".seguimiento
+    ADD CONSTRAINT fkrnp1nod6y8iik2uqyd0b2e17f FOREIGN KEY (consulta) REFERENCES "DB_consultorioJuridico".consulta(id);
+
+
+--
+-- Name: monitor fkry68h61prlomfo6oh52vxdp65; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".monitor
+    ADD CONSTRAINT fkry68h61prlomfo6oh52vxdp65 FOREIGN KEY (tipo_documento) REFERENCES "DB_consultorioJuridico".tipodoc(id);
+
+
+--
+-- Name: usuario_cambio_perfil_historial fks07qu3jyas16hn5b9nwpu2fwm; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".usuario_cambio_perfil_historial
+    ADD CONSTRAINT fks07qu3jyas16hn5b9nwpu2fwm FOREIGN KEY (cambiado_por_usuario_id) REFERENCES "DB_consultorioJuridico".usuario_sistema(id);
+
+
+--
+-- Name: file_asset fkt1yrylws54cxshvy2flt4ou4q; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".file_asset
+    ADD CONSTRAINT fkt1yrylws54cxshvy2flt4ou4q FOREIGN KEY (uploaded_by_id) REFERENCES "DB_consultorioJuridico".usuario_sistema(id);
+
+
+--
+-- Name: conciliador fktcp5v29on475w9yf7r91f36cy; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".conciliador
+    ADD CONSTRAINT fktcp5v29on475w9yf7r91f36cy FOREIGN KEY (tipo_documento) REFERENCES "DB_consultorioJuridico".tipodoc(id);
+
+
+--
+-- Name: persona fkxxg7sg5rmf6yp09mn7j67mas; Type: FK CONSTRAINT; Schema: DB_consultorioJuridico; Owner: -
+--
+
+ALTER TABLE ONLY "DB_consultorioJuridico".persona
+    ADD CONSTRAINT fkxxg7sg5rmf6yp09mn7j67mas FOREIGN KEY (tipo_persona_id) REFERENCES "DB_consultorioJuridico".tipo_persona(id);
+
+
+--
+-- PostgreSQL database dump complete
+--

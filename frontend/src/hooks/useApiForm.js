@@ -23,6 +23,8 @@ import {
  * @property {string} endpoint - Parameter description.
  * @property {"GET"|"POST"|"PUT"|"PATCH"|"DELETE"} [method="POST"] - Implementation detail.
  * @property {string} [successMessage="Registro exitoso"] - Parameter description.
+ * @property {function({status: number, payload: unknown, correlationId: string|null}): boolean} [onError]
+ * Permite que un formulario represente errores estructurados sin duplicar el aviso genérico.
  */
 
 /**
@@ -53,7 +55,12 @@ import {
  *   if (result.success) reset();
  * };
  */
-export function useApiForm({ endpoint, method = "POST", successMessage = "Registro exitoso" }) {
+export function useApiForm({
+  endpoint,
+  method = "POST",
+  successMessage = "Registro exitoso",
+  onError,
+}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
@@ -67,7 +74,11 @@ export function useApiForm({ endpoint, method = "POST", successMessage = "Regist
     setIsSubmitting(true);
 
     try {
-      const { response, data: payload, correlationId } = await apiResponse(endpoint, {
+      const {
+        response,
+        data: payload,
+        correlationId,
+      } = await apiResponse(endpoint, {
         method,
         headers: {
           "Content-Type": "application/json",
@@ -81,7 +92,12 @@ export function useApiForm({ endpoint, method = "POST", successMessage = "Regist
         });
 
         router.replace("/");
-        return { success: false, error: payload, correlationId };
+        return {
+          success: false,
+          error: payload,
+          correlationId,
+          status: response.status,
+        };
       }
 
       if (response.status === 403) {
@@ -89,7 +105,12 @@ export function useApiForm({ endpoint, method = "POST", successMessage = "Regist
           description: "No tiene permisos para esta acción",
         });
 
-        return { success: false, error: payload, correlationId };
+        return {
+          success: false,
+          error: payload,
+          correlationId,
+          status: response.status,
+        };
       }
 
       if (response.ok) {
@@ -97,14 +118,28 @@ export function useApiForm({ endpoint, method = "POST", successMessage = "Regist
         return { success: true, data: payload, correlationId };
       }
 
-      toast.error(getApiErrorTitle(payload, "Error en la operación"), {
-        description: withErrorReference(
-          getApiErrorDescription(payload),
-          correlationId
-        ),
-      });
+      const errorRepresentado =
+        onError?.({
+          status: response.status,
+          payload,
+          correlationId,
+        }) === true;
 
-      return { success: false, error: payload, correlationId };
+      if (!errorRepresentado) {
+        toast.error(getApiErrorTitle(payload, "Error en la operación"), {
+          description: withErrorReference(
+            getApiErrorDescription(payload),
+            correlationId,
+          ),
+        });
+      }
+
+      return {
+        success: false,
+        error: payload,
+        correlationId,
+        status: response.status,
+      };
     } catch {
       toast.error("Error de conexión", {
         description: "Verifique que el backend esté disponible",

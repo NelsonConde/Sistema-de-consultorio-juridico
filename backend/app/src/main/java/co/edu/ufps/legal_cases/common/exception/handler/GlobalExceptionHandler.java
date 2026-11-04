@@ -22,6 +22,7 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import co.edu.ufps.legal_cases.audit.service.log.AuditSecurityService;
+import co.edu.ufps.legal_cases.common.exception.AccountActivationException;
 import co.edu.ufps.legal_cases.common.exception.AdministracionInvariantException;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.common.exception.ConcurrenciaOptimistaException;
@@ -110,6 +111,42 @@ public class GlobalExceptionHandler {
                 request);
 
         return construirRespuesta(HttpStatus.CONFLICT, error);
+    }
+
+    @ExceptionHandler(AccountActivationException.class)
+    public ResponseEntity<ErrorResponseDTO>
+    manejarAccountActivationException(
+            AccountActivationException ex,
+            HttpServletRequest request) {
+
+        HttpStatus status =
+                switch (ex.getMotivo()) {
+                    case INVALIDO ->
+                            HttpStatus.BAD_REQUEST;
+
+                    case REVOCADO ->
+                            HttpStatus.FORBIDDEN;
+
+                    case USADO ->
+                            HttpStatus.CONFLICT;
+
+                    case VENCIDO ->
+                            HttpStatus.GONE;
+                };
+
+        ErrorResponseDTO error =
+                construirErrorConDetalles(
+                        status,
+                        "Activación de cuenta no disponible",
+                        ex.getMessage(),
+                        request,
+                        Map.of(
+                                "codigo",
+                                ex.getCodigo()));
+
+        return construirRespuesta(
+                status,
+                error);
     }
 
     @ExceptionHandler(BusinessException.class)

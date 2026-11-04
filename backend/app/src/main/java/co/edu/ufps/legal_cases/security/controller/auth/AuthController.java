@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import co.edu.ufps.legal_cases.security.dto.account.UsuarioSistemaDTO;
+import co.edu.ufps.legal_cases.security.dto.auth.activation.ActivarCuentaRequestDTO;
+import co.edu.ufps.legal_cases.security.service.auth.activation.AccountActivationService;
 import co.edu.ufps.legal_cases.security.dto.auth.AuthMessageResponseDTO;
 import co.edu.ufps.legal_cases.security.dto.auth.login.LoginRequestDTO;
 import co.edu.ufps.legal_cases.security.dto.auth.login.LoginResponseDTO;
@@ -39,17 +41,32 @@ public class AuthController {
     private final PasswordResetService passwordResetService;
     private final AuthCookieProperties authCookieProperties;
     private final CsrfTokenRepository csrfTokenRepository;
+    private final AccountActivationService accountActivationService;
 
     public AuthController(
-        AuthService authService,
-        PasswordResetService passwordResetService,
-        CsrfTokenRepository csrfTokenRepository,
-        AuthCookieProperties authCookieProperties) {
+            AuthService authService,
+            PasswordResetService passwordResetService,
+            AccountActivationService accountActivationService,
+            CsrfTokenRepository csrfTokenRepository,
+            AuthCookieProperties authCookieProperties) {
 
         this.authService = authService;
         this.passwordResetService = passwordResetService;
+        this.accountActivationService =
+                accountActivationService;
         this.csrfTokenRepository = csrfTokenRepository;
         this.authCookieProperties = authCookieProperties;
+    }
+
+    @PostMapping("/activar-cuenta")
+    public ResponseEntity<Void> activarCuenta(
+            @Valid
+            @RequestBody
+            ActivarCuentaRequestDTO dto) {
+
+        accountActivationService.activarCuenta(dto);
+
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/login")
@@ -100,9 +117,23 @@ public class AuthController {
     @PatchMapping("/cambiar-password")
     public ResponseEntity<Void> cambiarPassword(
             @CookieValue(name = ACCESS_TOKEN_COOKIE, required = false) String token,
-            @Valid @RequestBody CambiarPasswordRequestDTO dto) {
+            @Valid @RequestBody CambiarPasswordRequestDTO dto,
+            HttpServletRequest request,
+            HttpServletResponse response) {
 
-        authService.cambiarPassword(token, dto);
+        String nuevoToken = authService.cambiarPassword(token, dto);
+
+        ResponseCookie authCookie = crearCookieAuth(
+                nuevoToken,
+                ACCESS_TOKEN_MAX_AGE_SECONDS);
+
+        // El token CSRF anterior pertenecía al estado autenticado previo.
+        csrfTokenRepository.saveToken(null, request, response);
+
+        // Renueva la cookie JWT con la nueva versión de autenticación.
+        response.addHeader(
+                HttpHeaders.SET_COOKIE,
+                authCookie.toString());
 
         return ResponseEntity.noContent().build();
     }

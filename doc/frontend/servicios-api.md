@@ -90,6 +90,7 @@ Esto permite manejar respuestas exitosas y errores con un patrón único.
 | `endpoint` | URL completa del endpoint. |
 | `method` | Método HTTP, por defecto `POST`. |
 | `successMessage` | Mensaje toast en caso de éxito. |
+| `onError` | Callback opcional para representar un error HTTP de forma específica. Recibe `status`, `payload` y `correlationId`; retorna `true` cuando el formulario ya presentó el error. |
 
 Devuelve:
 
@@ -97,6 +98,10 @@ Devuelve:
 |---|---|
 | `submit(data)` | Función asincrónica que envía los datos. |
 | `isSubmitting` | Estado de envío para deshabilitar botones. |
+
+Cuando la respuesta no es exitosa, `submit(data)` retorna además el estado
+HTTP como `status`. Este dato permite distinguir validación, autorización y
+otros errores sin volver a ejecutar la petición.
 
 ## Comportamiento de `useApiForm`
 
@@ -108,9 +113,15 @@ El hook:
 4. redirige a `/` si recibe `401`;
 5. muestra toast de no autorizado si recibe `403`;
 6. muestra toast de éxito si `response.ok`;
-7. muestra error del backend si la respuesta falla;
-8. muestra error de conexión si `fetch` lanza excepción;
-9. desactiva `isSubmitting` al finalizar.
+7. invoca `onError` para respuestas no exitosas distintas de `401` y `403`;
+8. omite el toast genérico solo cuando `onError` retorna `true`;
+9. muestra el error normalizado del backend cuando el callback no maneja la respuesta;
+10. muestra error de conexión si `fetch` lanza excepción;
+11. desactiva `isSubmitting` al finalizar.
+
+El callback no altera el comportamiento central de sesión o permisos. Los
+estados `401` y `403` continúan usando sus rutas existentes antes de evaluar
+`onError`.
 
 ## Manejo de FormData
 

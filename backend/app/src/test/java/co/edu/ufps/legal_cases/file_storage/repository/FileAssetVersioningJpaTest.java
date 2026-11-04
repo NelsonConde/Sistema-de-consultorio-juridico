@@ -45,6 +45,8 @@ class FileAssetVersioningJpaTest {
 
     @DynamicPropertySource
     static void configurarPostgreSql(DynamicPropertyRegistry registry) {
+        // This repository fixture owns a Hibernate create-drop schema; migration coverage is separate.
+        registry.add("spring.flyway.enabled", () -> "false");
         registry.add("spring.datasource.url", POSTGRESQL::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRESQL::getUsername);
         registry.add("spring.datasource.password", POSTGRESQL::getPassword);

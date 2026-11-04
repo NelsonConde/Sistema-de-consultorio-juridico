@@ -19,7 +19,10 @@ Los formularios del sistema siguen un patrón común:
 
 ### `FormInput`
 
-`FormInput.jsx` renderiza un input integrado con `register`. Muestra etiqueta, asterisco para campos requeridos, estado `aria-invalid`, `aria-required` y mensaje de error.
+`FormInput.jsx` renderiza un input integrado con `register`. Muestra etiqueta,
+asterisco para campos requeridos, estado `aria-invalid`, `aria-required` y
+mensaje de error. Cuando existe un error, el input referencia el mensaje con
+`aria-describedby` y un identificador estable `<nombre-del-campo>-error`.
 
 Propiedades principales:
 
@@ -41,6 +44,14 @@ Se usa para catálogos, responsables, estados y opciones controladas.
 ### `FormCheckbox`
 
 `FormCheckbox.jsx` renderiza checkboxes controlados por `react-hook-form`. Se usa para valores booleanos como activación de opciones o flags de formulario.
+
+### Select del formulario de persona
+
+`FormSelectField`, definido en `PersonaFormParts.jsx`, integra los select de
+persona con `react-hook-form`. En presencia de un error aplica
+`aria-invalid="true"` y relaciona el control con su mensaje mediante
+`aria-describedby`. Este comportamiento permite que lectores de pantalla
+anuncien la validación después de mover el foco al campo.
 
 ### `FormMultiSelect`
 
@@ -139,6 +150,27 @@ La interfaz permite configurar fecha de entrega, días de notificación, notific
 ### Conciliación
 
 La carga de solicitud y acta se realiza con archivos. La programación de reunión exige datos de programación y el backend valida fecha, sede, responsables y estado funcional.
+
+### Persona por pestañas
+
+`PersonaForm` mantiene las reglas obligatorias existentes y añade un resumen
+estructurado para errores locales y respuestas de validación del backend.
+
+El flujo implementado es:
+
+1. `handleSubmit` entrega los errores locales a `handleInvalidSubmit`;
+2. `persona-validation.js` asigna etiqueta visible y pestaña a cada campo;
+3. el resumen presenta cada error en una tarjeta independiente y ajustable;
+4. las pestañas afectadas muestran la cantidad de errores;
+5. seleccionar un error abre su pestaña, mueve el foco al control y lo desplaza
+   al centro de la vista;
+6. los valores ingresados permanecen en memoria mientras la vista siga montada;
+7. un nuevo envío explícito vuelve a ejecutar las validaciones.
+
+Para respuestas `400` o `422`, el formulario procesa los mapas de errores del
+backend y usa `setError` de `react-hook-form` para conservar también el mensaje
+junto al campo. No se elimina obligatoriedad ni se omite la validación del
+servidor.
 
 ## Relación con backend
 

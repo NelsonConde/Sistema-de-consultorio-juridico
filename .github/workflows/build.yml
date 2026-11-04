@@ -48,6 +48,10 @@ jobs:
         working-directory: backend/app
         run: ./mvnw -DskipTests package
 
+      - name: Verify packaged migration command in isolated PostgreSQL
+        working-directory: backend/app
+        run: python3 db/tests/run_packaged_migration_smoke.py
+
   frontend:
     name: Frontend
     runs-on: ubuntu-24.04

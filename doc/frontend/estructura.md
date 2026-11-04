@@ -161,6 +161,24 @@ El componente `ConfirmActionDialog.jsx` se usa para operaciones sensibles que re
 | `src/lib/list-utils.js` | Utilidades para listados. |
 | `src/lib/utils.js` | Utilidad de clases CSS `cn`. |
 
+### Utilidades específicas del formulario de persona
+
+La carpeta `src/components/forms/persona` incluye el módulo
+`persona-validation.js`. Su responsabilidad es adaptar errores locales y del
+backend a una representación visual legible sin modificar el contrato de
+`POST /api/personas`.
+
+| Exportación | Responsabilidad |
+|---|---|
+| `crearErrorPersona(campo, mensaje)` | Construye un error normalizado para un campo conocido. |
+| `extraerErroresLocales(errors)` | Convierte los errores de `react-hook-form` en elementos con campo, etiqueta, sección y mensaje. |
+| `extraerErroresServidor(payload)` | Lee `detalles`, `details`, `fieldErrors`, `validaciones` o `errors` y reemplaza los nombres técnicos por etiquetas visibles. |
+
+La tabla interna de campos conserva el vínculo entre cada propiedad del DTO y
+la pestaña donde se edita: Identificación, Identidad, Contacto, Vivienda,
+Economía, Acudiente o Servicio. Los campos desconocidos usan una etiqueta
+humanizada y se clasifican en la sección general `Formulario`.
+
 ## Convenciones de organización
 
 - Las páginas de `src/app` deben ser delgadas y delegar la lógica al componente de formulario correspondiente.
