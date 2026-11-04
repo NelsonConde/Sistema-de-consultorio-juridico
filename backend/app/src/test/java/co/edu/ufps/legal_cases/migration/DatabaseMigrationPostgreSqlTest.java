@@ -28,7 +28,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 class DatabaseMigrationPostgreSqlTest {
 
     private static final String S = "\"DB_consultorioJuridico\".";
-    private static final int EXPECTED_SQL_MIGRATIONS = 2;
+    private static final int EXPECTED_SQL_MIGRATIONS = 3;
 
     @Container
     static final PostgreSQLContainer PG =
@@ -88,6 +88,7 @@ class DatabaseMigrationPostgreSqlTest {
                                 + "WHERE type='SQL' AND success"));
 
         assertAuthVersionColumn();
+        assertAccountActivationSchema();
 
         assertTrue(
                 output.toString()
@@ -148,11 +149,20 @@ class DatabaseMigrationPostgreSqlTest {
 
         /*
          * Reconstruye el estado exacto del baseline histórico.
-         * auth_version pertenece a una migración posterior al baseline.
+         * auth_version y activación de cuenta pertenecen a migraciones posteriores.
          */
         sql(
                 database,
-                "ALTER TABLE "
+                "DROP TABLE "
+                        + S
+                        + "account_activation_token;"
+                        + "ALTER TABLE "
+                        + S
+                        + "usuario_sistema DROP COLUMN estado_activacion;"
+                        + "ALTER TABLE "
+                        + S
+                        + "usuario_sistema ALTER COLUMN password_hash SET NOT NULL;"
+                        + "ALTER TABLE "
                         + S
                         + "usuario_sistema DROP COLUMN auth_version;"
                         + "DROP TABLE "
@@ -216,8 +226,8 @@ class DatabaseMigrationPostgreSqlTest {
                 output.toString());
 
         /*
-         * Después de adoptar el baseline histórico,
-         * debe aplicarse la migración posterior de auth_version.
+         * Después de adoptar el baseline histórico deben aplicarse
+         * auth_version y la migración de activación de cuentas.
          */
         assertEquals(
                 0,
@@ -238,7 +248,7 @@ class DatabaseMigrationPostgreSqlTest {
                                 + "WHERE type='BASELINE' AND success"));
 
         assertEquals(
-                1,
+                2,
                 number(
                         "SELECT count(*) FROM "
                                 + S
@@ -246,6 +256,7 @@ class DatabaseMigrationPostgreSqlTest {
                                 + "WHERE type='SQL' AND success"));
 
         assertAuthVersionColumn();
+        assertAccountActivationSchema();
 
         assertEquals(
                 before,
@@ -297,6 +308,7 @@ class DatabaseMigrationPostgreSqlTest {
                 output.toString());
 
         assertAuthVersionColumn();
+        assertAccountActivationSchema();
 
         System.out.println(
                 "SCRUM-332 legacy backup/baseline/restore PASS "
@@ -332,7 +344,16 @@ class DatabaseMigrationPostgreSqlTest {
          */
         sql(
                 database,
-                "ALTER TABLE "
+                "DROP TABLE "
+                        + S
+                        + "account_activation_token;"
+                        + "ALTER TABLE "
+                        + S
+                        + "usuario_sistema DROP COLUMN estado_activacion;"
+                        + "ALTER TABLE "
+                        + S
+                        + "usuario_sistema ALTER COLUMN password_hash SET NOT NULL;"
+                        + "ALTER TABLE "
                         + S
                         + "usuario_sistema DROP COLUMN auth_version;"
                         + "DROP TABLE "
@@ -381,8 +402,8 @@ class DatabaseMigrationPostgreSqlTest {
                         + "\n-- checksum tamper fixture\n");
 
         /*
-         * La ubicación temporal debe contener también la segunda
-         * migración sin modificar para que la prueba falle únicamente
+         * La ubicación temporal debe contener también las migraciones
+         * posteriores sin modificar para que la prueba falle únicamente
          * por el checksum adulterado del baseline.
          */
         Files.writeString(
@@ -391,6 +412,13 @@ class DatabaseMigrationPostgreSqlTest {
                 SchemaContract.resource(
                         "/db/migration/"
                                 + "V20261102_01__add_auth_version_to_usuario_sistema.sql"));
+
+        Files.writeString(
+                temporary.resolve(
+                        "V20261102_02__add_account_activation.sql"),
+                SchemaContract.resource(
+                        "/db/migration/"
+                                + "V20261102_02__add_account_activation.sql"));
 
         var tampered =
                 DatabaseMigrationCommand
@@ -434,12 +462,12 @@ class DatabaseMigrationPostgreSqlTest {
         String before = sample();
 
         /*
-         * Debe ser posterior a V20261102_01 para que Flyway realmente
+         * Debe ser posterior a V20261102_02 para que Flyway realmente
          * intente ejecutarla y podamos verificar el rollback.
          */
         Files.writeString(
                 temporary.resolve(
-                        "V20261102_02__synthetic_failure.sql"),
+                        "V20261102_03__synthetic_failure.sql"),
                 "CREATE TABLE "
                         + "\"DB_consultorioJuridico\"."
                         + "must_rollback(id integer);"
@@ -579,11 +607,11 @@ class DatabaseMigrationPostgreSqlTest {
 
         /*
          * Crea una versión posterior a la migración real
-         * V20261102_01.
+         * V20261102_02.
          */
         Path later =
                 temporary.resolve(
-                        "V20261102_03__synthetic_later.sql");
+                        "V20261102_04__synthetic_later.sql");
 
         Files.writeString(
                 later,
@@ -607,11 +635,11 @@ class DatabaseMigrationPostgreSqlTest {
 
         /*
          * Esta migración queda por debajo de la versión ya aplicada
-         * 20261102.03 y debe ser rechazada con outOfOrder=false.
+         * 20261102.04 y debe ser rechazada con outOfOrder=false.
          */
         Path outOfOrder =
                 temporary.resolve(
-                        "V20261102_02__synthetic_out_of_order.sql");
+                        "V20261102_03__synthetic_out_of_order.sql");
 
         Files.writeString(
                 outOfOrder,
@@ -632,12 +660,12 @@ class DatabaseMigrationPostgreSqlTest {
         Files.delete(outOfOrder);
 
         /*
-         * Después crea otra migración con la misma versión 20261102.03
+         * Después crea otra migración con la misma versión 20261102.04
          * para verificar detección de duplicados.
          */
         Files.writeString(
                 temporary.resolve(
-                        "V20261102_03__synthetic_duplicate.sql"),
+                        "V20261102_04__synthetic_duplicate.sql"),
                 "SELECT 1;");
 
         assertThrows(
@@ -790,6 +818,56 @@ class DatabaseMigrationPostgreSqlTest {
                           AND data_type = 'bigint'
                           AND is_nullable = 'NO'
                           AND column_default IS NOT NULL
+                        """));
+    }
+
+    private void assertAccountActivationSchema()
+            throws Exception {
+
+        assertEquals(
+                1,
+                number(
+                        """
+                        SELECT count(*)
+                        FROM information_schema.columns
+                        WHERE table_schema = 'DB_consultorioJuridico'
+                          AND table_name = 'usuario_sistema'
+                          AND column_name = 'estado_activacion'
+                          AND data_type = 'character varying'
+                          AND is_nullable = 'NO'
+                        """));
+
+        assertEquals(
+                1,
+                number(
+                        """
+                        SELECT count(*)
+                        FROM information_schema.columns
+                        WHERE table_schema = 'DB_consultorioJuridico'
+                          AND table_name = 'usuario_sistema'
+                          AND column_name = 'password_hash'
+                          AND is_nullable = 'YES'
+                        """));
+
+        assertEquals(
+                1,
+                number(
+                        """
+                        SELECT count(*)
+                        FROM information_schema.tables
+                        WHERE table_schema = 'DB_consultorioJuridico'
+                          AND table_name = 'account_activation_token'
+                        """));
+
+        assertEquals(
+                1,
+                number(
+                        """
+                        SELECT count(*)
+                        FROM pg_indexes
+                        WHERE schemaname = 'DB_consultorioJuridico'
+                          AND tablename = 'account_activation_token'
+                          AND indexname = 'uk_account_activation_token_activo_por_usuario'
                         """));
     }
 

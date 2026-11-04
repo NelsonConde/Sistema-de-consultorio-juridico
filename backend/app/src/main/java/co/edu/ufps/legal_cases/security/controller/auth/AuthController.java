@@ -12,7 +12,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import co.edu.ufps.legal_cases.security.constant.PermisoNombre;
 import co.edu.ufps.legal_cases.security.dto.account.UsuarioSistemaDTO;
+import co.edu.ufps.legal_cases.security.dto.auth.activation.ActivarCuentaRequestDTO;
+import co.edu.ufps.legal_cases.security.dto.auth.activation.ReenviarInvitacionRequestDTO;
+import co.edu.ufps.legal_cases.security.dto.auth.activation.RevocarInvitacionRequestDTO;
+import co.edu.ufps.legal_cases.security.service.auth.activation.AccountActivationService;
+import org.springframework.security.access.prepost.PreAuthorize;
 import co.edu.ufps.legal_cases.security.dto.auth.AuthMessageResponseDTO;
 import co.edu.ufps.legal_cases.security.dto.auth.login.LoginRequestDTO;
 import co.edu.ufps.legal_cases.security.dto.auth.login.LoginResponseDTO;
@@ -39,17 +45,32 @@ public class AuthController {
     private final PasswordResetService passwordResetService;
     private final AuthCookieProperties authCookieProperties;
     private final CsrfTokenRepository csrfTokenRepository;
+    private final AccountActivationService accountActivationService;
 
     public AuthController(
-        AuthService authService,
-        PasswordResetService passwordResetService,
-        CsrfTokenRepository csrfTokenRepository,
-        AuthCookieProperties authCookieProperties) {
+            AuthService authService,
+            PasswordResetService passwordResetService,
+            AccountActivationService accountActivationService,
+            CsrfTokenRepository csrfTokenRepository,
+            AuthCookieProperties authCookieProperties) {
 
         this.authService = authService;
         this.passwordResetService = passwordResetService;
+        this.accountActivationService =
+                accountActivationService;
         this.csrfTokenRepository = csrfTokenRepository;
         this.authCookieProperties = authCookieProperties;
+    }
+
+    @PostMapping("/activar-cuenta")
+    public ResponseEntity<Void> activarCuenta(
+            @Valid
+            @RequestBody
+            ActivarCuentaRequestDTO dto) {
+
+        accountActivationService.activarCuenta(dto);
+
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/login")
@@ -140,6 +161,30 @@ public class AuthController {
 
         return ResponseEntity.ok(new AuthMessageResponseDTO(
                 "La contraseña se restableció correctamente"));
+    }
+
+    @PostMapping("/activacion/reenviar")
+    @PreAuthorize("hasAnyAuthority('" + PermisoNombre.GESTIONAR_USUARIOS + "')")
+    public ResponseEntity<AuthMessageResponseDTO> reenviarInvitacion(
+            @Valid @RequestBody ReenviarInvitacionRequestDTO dto) {
+
+        AuthMessageResponseDTO response = dto.getUsuarioId() != null
+                ? accountActivationService.reenviarInvitacion(dto.getUsuarioId())
+                : accountActivationService.reenviarInvitacionPorEmail(dto.getEmail());
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/activacion/revocar")
+    @PreAuthorize("hasAnyAuthority('" + PermisoNombre.GESTIONAR_USUARIOS + "')")
+    public ResponseEntity<AuthMessageResponseDTO> revocarInvitacion(
+            @Valid @RequestBody RevocarInvitacionRequestDTO dto) {
+
+        AuthMessageResponseDTO response = dto.getUsuarioId() != null
+                ? accountActivationService.revocarInvitacion(dto.getUsuarioId())
+                : accountActivationService.revocarInvitacionPorEmail(dto.getEmail());
+
+        return ResponseEntity.ok(response);
     }
 
     private ResponseCookie crearCookieAuth(String value, long maxAgeSeconds) {
