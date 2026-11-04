@@ -47,10 +47,9 @@ const documentos = [
     },
 ]
 
-let downloadDescriptorRequests = 0
-
 async function mockApi(page, options = {}) {
-    const expedienteStatus = options.expedienteStatus ?? 200
+    let downloadDescriptorRequests = 0;
+    const expedienteStatus = options.expedienteStatus ?? 200;
 
     await page.route("**/api/**", async (route) => {
         const request = route.request()

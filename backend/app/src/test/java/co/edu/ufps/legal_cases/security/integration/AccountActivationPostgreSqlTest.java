@@ -6,6 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -32,6 +36,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -49,6 +54,7 @@ import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
 import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaRepository;
 import co.edu.ufps.legal_cases.security.service.auth.activation.AccountActivationService;
+import co.edu.ufps.legal_cases.security.service.auth.activation.AccountActivationEmailService;
 import co.edu.ufps.legal_cases.security.service.auth.activation.AccountActivationTokenService;
 import co.edu.ufps.legal_cases.support.PostgreSqlIntegrationTest;
 import jakarta.persistence.EntityManager;
@@ -94,6 +100,9 @@ class AccountActivationPostgreSqlTest
 
     @Autowired
     private AccountActivationService activationService;
+
+    @MockitoBean
+    private AccountActivationEmailService invitationEmailService;
 
     @Autowired
     private UsuarioSistemaRepository usuarioSistemaRepository;
@@ -510,6 +519,69 @@ class AccountActivationPostgreSqlTest
                           AND fecha_uso IS NOT NULL
                         """,
                         account.usuarioId()));
+    }
+
+    @Test
+    void concurrentResendsIssueExactlyOneInvitation() throws Exception {
+        PendingAccount account = createPendingAccount("resend");
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<String> first = executor.submit(
+                    () -> concurrentResend(account.usuarioId(), ready, start));
+            Future<String> second = executor.submit(
+                    () -> concurrentResend(account.usuarioId(), ready, start));
+
+            assertTrue(ready.await(10, TimeUnit.SECONDS));
+            start.countDown();
+
+            String genericMessage =
+                    "Si la cuenta existe y se encuentra pendiente de activación, se procesará el envío de la invitación";
+            assertEquals(genericMessage, first.get(30, TimeUnit.SECONDS));
+            assertEquals(genericMessage, second.get(30, TimeUnit.SECONDS));
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
+
+        assertEquals(
+                1,
+                count(
+                        """
+                        SELECT COUNT(*)
+                        FROM "DB_consultorioJuridico".account_activation_token
+                        WHERE usuario_sistema_id = ?
+                        """,
+                        account.usuarioId()));
+
+        assertEquals(
+                1,
+                count(
+                        """
+                        SELECT COUNT(*)
+                        FROM "DB_consultorioJuridico".account_activation_token
+                        WHERE usuario_sistema_id = ?
+                          AND usado = FALSE
+                          AND revocado = FALSE
+                        """,
+                        account.usuarioId()));
+
+        verify(invitationEmailService, times(1))
+                .enviarInvitacionActivacion(eq(account.username()), anyString());
+    }
+
+    private String concurrentResend(
+            Long usuarioId,
+            CountDownLatch ready,
+            CountDownLatch start) throws InterruptedException {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) {
+            return "START_TIMEOUT";
+        }
+        return activationService.reenviarInvitacion(usuarioId).getMensaje();
     }
 
     private String concurrentActivation(

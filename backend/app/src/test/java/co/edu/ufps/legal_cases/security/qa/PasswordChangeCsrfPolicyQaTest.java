@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -16,12 +17,19 @@ import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Method;
 import java.util.Optional;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.reflect.MethodSignature;
+import org.mockito.ArgumentCaptor;
+import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -29,11 +37,26 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 
 import co.edu.ufps.legal_cases.audit.aop.log.Auditable;
+import co.edu.ufps.legal_cases.audit.aop.log.AuditAspect;
+import co.edu.ufps.legal_cases.audit.aop.log.AuditExpressionEvaluator;
+import co.edu.ufps.legal_cases.audit.aop.log.AuditStateSnapshotService;
+import co.edu.ufps.legal_cases.audit.model.log.AuditEvent;
+import co.edu.ufps.legal_cases.audit.model.log.AuditSource;
+import co.edu.ufps.legal_cases.audit.service.log.AuditLogService;
+import co.edu.ufps.legal_cases.audit.service.log.AuditRequestContext;
+import co.edu.ufps.legal_cases.config.security.CsrfConfig;
+import co.edu.ufps.legal_cases.config.security.CsrfProperties;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.config.security.AuthCookieProperties;
 import co.edu.ufps.legal_cases.security.controller.auth.AuthController;
+import co.edu.ufps.legal_cases.security.dto.account.PerfilUsuarioActual;
+import co.edu.ufps.legal_cases.security.dto.auth.login.LoginRequestDTO;
+import co.edu.ufps.legal_cases.security.dto.auth.login.LoginResponseDTO;
+import co.edu.ufps.legal_cases.security.dto.auth.login.LoginResultDTO;
 import co.edu.ufps.legal_cases.security.dto.auth.password.CambiarPasswordRequestDTO;
 import co.edu.ufps.legal_cases.security.dto.auth.password.RestablecerPasswordDTO;
 import co.edu.ufps.legal_cases.security.model.account.EstadoActivacionCuenta;
@@ -85,7 +108,7 @@ class PasswordChangeCsrfPolicyQaTest {
 
     private static final String OLD_PLAIN_PASSWORD = "OldPassword#2026";
     private static final String NEW_PLAIN_PASSWORD = "NewPassword#2026!";
-    private static final String USERNAME = "josemanuelpr@ufps.edu.co";
+    private static final String USERNAME = "qa.scrum292@example.test";
 
     @BeforeEach
     void setUp() {
@@ -213,6 +236,21 @@ class PasswordChangeCsrfPolicyQaTest {
                 exception.getMessage().contains("entre 8 y 100 caracteres"));
     }
 
+
+    @Test
+    @DisplayName("QA-PWD-04: Rechazar contraseña de más de 100 caracteres")
+    void testNuevaDemasiadoLarga_Rechaza() {
+        CambiarPasswordRequestDTO dto = new CambiarPasswordRequestDTO();
+        dto.setPasswordActual(OLD_PLAIN_PASSWORD);
+        dto.setPasswordNueva("A".repeat(101));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cambioPasswordValidator.validarDatosCambioPassword(dto));
+
+        assertTrue(exception.getMessage().contains("entre 8 y 100 caracteres"));
+    }
+
     @Test
     @DisplayName("QA-PWD-05: Aceptar nueva contraseña válida entre 8 y 100 caracteres")
     void testNuevaValida_PasaValidacion() {
@@ -269,9 +307,87 @@ class PasswordChangeCsrfPolicyQaTest {
         verify(usuarioSistemaRepository, never()).save(any(UsuarioSistema.class));
     }
 
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "   "})
+    @DisplayName("QA-PWD-07: Una sesión ausente no puede cambiar la contraseña")
+    void testSesionAusente_RechazaSinPersistir(String token) {
+        CambiarPasswordRequestDTO dto = new CambiarPasswordRequestDTO();
+        dto.setPasswordActual(OLD_PLAIN_PASSWORD);
+        dto.setPasswordNueva(NEW_PLAIN_PASSWORD);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> authService.cambiarPassword(token, dto));
+
+        assertEquals("No hay sesión activa", exception.getMessage());
+        verify(usuarioSistemaRepository, never()).save(any(UsuarioSistema.class));
+    }
+
+    @Test
+    @DisplayName("QA-PWD-07: JWT expirado real no llega a persistencia")
+    void testSesionExpirada_RechazaSinPersistir() {
+        // Un JWT firmado que ya caducó prueba la validación real de expiración.
+        JwtService expiredJwt = new JwtService(
+                "0123456789abcdef0123456789abcdef", -60_000L);
+        String expiredToken = expiredJwt.generarToken(USERNAME, 1L);
+        AuthService service = new AuthService(
+                usuarioSistemaRepository, passwordEncoder, expiredJwt,
+                loginMapper, loginValidator, cambioPasswordValidator,
+                usuarioSistemaMapper);
+
+        CambiarPasswordRequestDTO dto = new CambiarPasswordRequestDTO();
+        dto.setPasswordActual(OLD_PLAIN_PASSWORD);
+        dto.setPasswordNueva(NEW_PLAIN_PASSWORD);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.cambiarPassword(expiredToken, dto));
+
+        assertEquals("Token inválido o expirado", exception.getMessage());
+        verify(usuarioSistemaRepository, never()).save(any(UsuarioSistema.class));
+    }
+
     // =========================================================================
     // CASE 6: CSRF ausente o inválido / invalidación tras cambio
     // =========================================================================
+
+
+    @ParameterizedTest
+    @ValueSource(strings = {"missing", "invalid"})
+    @DisplayName("QA-PWD-08: El filtro CSRF bloquea PATCH sin header válido")
+    void testCsrfPatchAusenteOInvalido_Rechaza(String caseName) throws Exception {
+        CsrfProperties properties = new CsrfProperties();
+        properties.setSecure(false);
+        properties.setSameSite("Lax");
+        CsrfTokenRepository repository = new CsrfConfig().csrfTokenRepository(properties);
+        CsrfFilter filter = new CsrfFilter(repository);
+
+        MockHttpServletRequest initial = new MockHttpServletRequest("GET", "/api/auth/csrf");
+        MockHttpServletResponse initialResponse = new MockHttpServletResponse();
+        filter.doFilter(initial, initialResponse, (request, response) -> {
+            CsrfToken token = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+            assertNotNull(token);
+            token.getToken(); // Genera la cookie CSRF para simular una sesión existente.
+        });
+
+        Cookie csrfCookie = initialResponse.getCookie("XSRF-TOKEN");
+        assertNotNull(csrfCookie);
+        MockHttpServletRequest patch = new MockHttpServletRequest(
+                "PATCH", "/api/auth/cambiar-password");
+        patch.setCookies(csrfCookie);
+        if ("invalid".equals(caseName)) {
+            patch.addHeader("X-XSRF-TOKEN", "invalid-csrf-token");
+        }
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        AtomicBoolean reachedController = new AtomicBoolean(false);
+
+        filter.doFilter(patch, response,
+                (request, servletResponse) -> reachedController.set(true));
+
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, response.getStatus());
+        assertFalse(reachedController.get());
+    }
 
     @Test
     @DisplayName("QA-PWD-08: AuthController invalida token CSRF existente al cambiar contraseña exitosamente")
@@ -379,24 +495,99 @@ class PasswordChangeCsrfPolicyQaTest {
         assertEquals(0, auditable.trackedFields().length, "No debe registrar campos sensibles");
     }
 
+
+    @Test
+    @DisplayName("QA-PWD-11: El evento AOP de cambio de contraseña no contiene secretos")
+    void testEventoAuditoriaNoContieneSecretos() throws Throwable {
+        Method method = AuthService.class.getDeclaredMethod(
+                "cambiarPassword", String.class, CambiarPasswordRequestDTO.class);
+        Auditable annotation = method.getAnnotation(Auditable.class);
+
+        AuditLogService logService = mock(AuditLogService.class);
+        AuditRequestContext context = mock(AuditRequestContext.class);
+        AuditStateSnapshotService snapshots = new AuditStateSnapshotService(
+                mock(jakarta.persistence.EntityManager.class));
+        AuditAspect aspect = new AuditAspect(
+                logService, context, new AuditExpressionEvaluator(), snapshots);
+        when(context.capture()).thenReturn(new AuditRequestContext.Snapshot(
+                "qa-user", AuditSource.HTTP, "safe-correlation", "127.0.0.1", "test-agent"));
+
+        CambiarPasswordRequestDTO dto = new CambiarPasswordRequestDTO();
+        dto.setPasswordActual(OLD_PLAIN_PASSWORD);
+        dto.setPasswordNueva(NEW_PLAIN_PASSWORD);
+        ProceedingJoinPoint joinPoint = mock(ProceedingJoinPoint.class);
+        MethodSignature signature = mock(MethodSignature.class);
+        when(signature.getMethod()).thenReturn(method);
+        when(joinPoint.getSignature()).thenReturn(signature);
+        when(joinPoint.getArgs()).thenReturn(new Object[] {"old-jwt-secret", dto});
+        when(joinPoint.proceed()).thenReturn("new-jwt-secret");
+
+        aspect.audit(joinPoint, annotation);
+
+        ArgumentCaptor<AuditEvent> captured = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(logService).recordSuccess(captured.capture());
+        AuditEvent event = captured.getValue();
+        assertTrue(event.getMetadata().isEmpty());
+        assertTrue(event.getBeforeState().isEmpty());
+        assertTrue(event.getAfterState().isEmpty());
+        String serializedEvent = event.toString();
+        for (String secret : new String[] {
+                OLD_PLAIN_PASSWORD, NEW_PLAIN_PASSWORD, "old-jwt-secret", "new-jwt-secret"
+        }) {
+            assertFalse(serializedEvent.contains(secret));
+        }
+    }
+
     // =========================================================================
     // CASE 9: Login y recuperación continúan funcionales
     // =========================================================================
 
     @Test
-    @DisplayName("QA-PWD-12: Login y recuperación continúan funcionales post-cambio")
+    @DisplayName("QA-PWD-12: Cambio de contraseña permite login real de servicio con clave nueva")
     void testLoginYRecuperacionContinuanFuncionales() {
-        UsuarioSistema user = createTestUser(100L, 3L, NEW_PLAIN_PASSWORD);
+        UsuarioSistema user = createTestUser(100L, 2L, OLD_PLAIN_PASSWORD);
+        PerfilUsuarioActual perfil = mock(PerfilUsuarioActual.class);
+        LoginResponseDTO response = mock(LoginResponseDTO.class);
+        LoginValidator actualLoginValidator = new LoginValidator(perfilResolverService);
+        AuthService realLoginService = new AuthService(
+                usuarioSistemaRepository, passwordEncoder, jwtService,
+                loginMapper, actualLoginValidator, cambioPasswordValidator,
+                usuarioSistemaMapper);
 
-        // 1. Simulación de login con nueva contraseña:
-        assertTrue(passwordEncoder.matches(NEW_PLAIN_PASSWORD, user.getPasswordHash()));
-        assertFalse(passwordEncoder.matches(OLD_PLAIN_PASSWORD, user.getPasswordHash()));
-
-        // 2. Validador de login permite autenticación
-        loginValidator.validarUsuarioPuedeAutenticarse(user);
-
-        // 3. Validador de recuperación permite recuperar cuenta
+        when(perfilResolverService.obtenerPerfilActivoObligatorio(user)).thenReturn(perfil);
         when(perfilResolverService.tienePerfilActivo(user)).thenReturn(true);
+        when(loginMapper.convertirAResponse(user, perfil)).thenReturn(response);
+        when(usuarioSistemaRepository.findIdByUsernameIgnoreCase(USERNAME))
+                .thenReturn(Optional.of(100L));
+        when(usuarioSistemaRepository.findByIdForUpdate(100L))
+                .thenReturn(Optional.of(user));
+        when(usuarioSistemaRepository.findWithRolAndPermisosByUsernameIgnoreCase(USERNAME))
+                .thenReturn(Optional.of(user));
+        when(jwtService.obtenerUsername("jwt-v2")).thenReturn(USERNAME);
+        when(jwtService.obtenerAuthVersion("jwt-v2")).thenReturn(2L);
+        when(jwtService.generarToken(USERNAME, 3L)).thenReturn("jwt-v3");
+
+        CambiarPasswordRequestDTO change = new CambiarPasswordRequestDTO();
+        change.setPasswordActual(OLD_PLAIN_PASSWORD);
+        change.setPasswordNueva(NEW_PLAIN_PASSWORD);
+        assertEquals("jwt-v3", realLoginService.cambiarPassword("jwt-v2", change));
+
+        LoginRequestDTO newLogin = new LoginRequestDTO();
+        newLogin.setUsername(USERNAME);
+        newLogin.setPassword(NEW_PLAIN_PASSWORD);
+        LoginResultDTO accepted = realLoginService.login(newLogin);
+        assertSame(response, accepted.getResponse());
+        assertEquals("jwt-v3", accepted.getToken());
+
+        LoginRequestDTO oldLogin = new LoginRequestDTO();
+        oldLogin.setUsername(USERNAME);
+        oldLogin.setPassword(OLD_PLAIN_PASSWORD);
+        BusinessException rejected = assertThrows(
+                BusinessException.class,
+                () -> realLoginService.login(oldLogin));
+        assertEquals("Usuario o contraseña incorrectos", rejected.getMessage());
+
         assertTrue(passwordResetValidator.usuarioPuedeRecuperarPassword(user));
     }
+
 }

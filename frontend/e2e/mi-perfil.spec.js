@@ -50,6 +50,7 @@ async function mockPerfilApi(page, tipoPerfil, options = {}) {
   let actual = perfilFixture(tipoPerfil);
   let remainingProfileFailures = profileFailures;
   let profileFailureLocked = profileFailureUntilReleased;
+  let sessionExpired = false;
 
   const patchBodies = [];
   const passwordBodies = [];
@@ -67,13 +68,17 @@ async function mockPerfilApi(page, tipoPerfil, options = {}) {
 
     if (url.pathname.endsWith("/api/auth/me")) {
       await route.fulfill({
-        status: 200,
+        status: sessionExpired ? 401 : 200,
         contentType: "application/json",
-        body: JSON.stringify({
-          id: 1,
-          tipoPerfil,
-          permisos: [],
-        }),
+        body: JSON.stringify(
+            sessionExpired
+                ? { mensaje: "Sesión expirada" }
+                : {
+                  id: 1,
+                  tipoPerfil,
+                  permisos: [],
+                },
+        ),
       });
       return;
     }
@@ -101,6 +106,8 @@ async function mockPerfilApi(page, tipoPerfil, options = {}) {
       }
 
       if (profileUnauthorized) {
+        sessionExpired = true;
+
         await route.fulfill({
           status: 401,
           contentType: "application/json",

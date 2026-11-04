@@ -128,8 +128,13 @@ históricas V23, V25, V26 y U26 no existen y no son instrucciones válidas.
    ```bash
    java -jar target/legal-cases-backend-migrations.jar inspect
    java -jar target/legal-cases-backend-migrations.jar baseline
+   java -jar target/legal-cases-backend-migrations.jar migrate
    java -jar target/legal-cases-backend-migrations.jar validate
    ```
+
+   `baseline` registra la versión adoptada; no ejecuta las migraciones pendientes.
+   El paso `migrate` posterior aplica `V20261102_01` y las demás migraciones
+   pendientes compatibles antes de `validate` y del arranque web.
 
 7. Aplicar con el propietario del esquema
    [`backend/app/db/operations/grant_runtime_permissions.sql`](../../backend/app/db/operations/grant_runtime_permissions.sql)
@@ -137,7 +142,7 @@ históricas V23, V25, V26 y U26 no existen y no son instrucciones válidas.
 
    ```bash
    psql --set ON_ERROR_STOP=1 --set runtime_role=app_runtime \
-     --file backend/app/db/operations/grant_runtime_permissions.sql
+     --file db/operations/grant_runtime_permissions.sql
    ```
 
    El script rechaza roles privilegiados y deja al runtime sin DDL ni escritura
