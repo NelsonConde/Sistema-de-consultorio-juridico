@@ -33,4 +33,14 @@ public class EmailTemplateService {
 
         return templateEngine.process("emails/recuperacion-password", context);
     }
+
+    // Construye el contenido del correo de invitacion para activacion de cuenta (SCRUM-294)
+    public String construirInvitacionActivacion(String enlace, long horasExpiracion) {
+        Context context = new Context();
+        context.setVariable("enlace", enlace);
+        context.setVariable("nombreSistema", nombreSistema);
+        context.setVariable("horasExpiracion", horasExpiracion);
+
+        return templateEngine.process("emails/invitacion-activacion", context);
+    }
 }

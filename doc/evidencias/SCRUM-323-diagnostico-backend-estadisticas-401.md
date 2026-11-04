@@ -2,13 +2,13 @@
 # SCRUM-323 — Diagnóstico de respuestas HTTP 401 en estadísticas
 
 
-**Fecha:** 2026-11-03 (America/Bogota)
+**Fecha de caracterización inicial:** 2026-11-03 (America/Bogota). **Reconciliación con Jira y develop:** 2026-11-04.
 
 **Proyecto:** Sistema de Gestión de Casos Jurídicos
 
 **Rama de trabajo:** `test/scrum-323-statistics-401-diagnosis`
 
-**Base inicial:** `develop`, commit `ac16f63`
+**Base inicial:** `develop` en `ac16f63`. **Base de integración revisada:** `develop` en `6d637af29f8410a0a7e82ec210707a20326ae2b2`. La base inicial se conserva como antecedente; no es el HEAD actual.
 
 **Incidencia:** https://gestion-casos-juridicos.atlassian.net/browse/SCRUM-323
 
@@ -122,6 +122,29 @@ Se mantiene el resultado histórico **«Aprobó»** de CP-23, sin interpretar es
 
 La diferencia de referencias RF96/RF97 frente a RF56/RF57 se conserva como asunto de trazabilidad documental separado del diagnóstico HTTP.
 
+### 5.1. Estado explícito de aceptación de SCRUM-323
+
+| Criterio de Jira | Evidencia concreta | Estado |
+|---|---|---|
+| 1. Traza de método, endpoint, instante, sesión, estado HTTP y correlación del 401 histórico | Ninguna traza del incidente original ni ambiente autenticado aportados; los registros de MockMvc son simulados | **PENDIENTE / NO VERIFICADO** |
+| 2. Misma operación con sesión vigente y vencida, origen del 401 y resultado de la descarga PDF | Comparación real no ejecutada; el PDF de MockMvc contiene bytes sintéticos y no acredita el resultado de CP-23 | **PENDIENTE / NO VERIFICADO** |
+| 3. Clasificar rechazo legítimo o registrar Bug cuando se reproduzca | No hay causa comprobada; no corresponde abrir un Bug afirmando defecto sin reproducción | **INCONCLUSO** |
+| 4. Mantener resultado CP-23, pasos, ambiente y evidencia real | CP-23 continúa **«Aprobó»**; las ejecuciones locales simuladas tienen comando, ambiente, límites y resultado en secciones 2 y 3 | **CUMPLIDO respecto del histórico; diagnóstico causal pendiente** |
+
+**Decisión de control de calidad:** las verificaciones con MockMvc y Playwright constituyen una **caracterización parcial**; no completan los criterios 1 y 2 de SCRUM-323. El estado de Jira «Finalizada» no sustituye la evidencia de aceptación. La PR puede aportar pruebas reutilizables, pero **no debe aprobarse como cierre del diagnóstico causal** sin esa evidencia o una decisión explícita del revisor sobre el alcance parcial.
+
+### 5.2. Procedimiento de reproducción autorizado (sin ejecución atribuida)
+
+En un ambiente QA autorizado, con cuentas sintéticas y permisos conocidos:
+
+1. Registrar el ambiente y el commit desplegado. Utilizar la misma operación de estadísticas, sus parámetros no sensibles y el mismo alcance de permisos en ambas ejecuciones.
+2. Realizar una operación con sesión **vigente** y otra con sesión **vencida** mediante mecanismos normales de autenticación. No publicar ni copiar JWT, cookies, encabezados de autorización, identificadores personales, cargas jurídicas o contenido PDF.
+3. Registrar únicamente fecha y hora con zona, método, ruta sin datos personales, estado HTTP, estado de sesión (vigente/vencida), correlationId/X-Request-ID si se emitió, resultado PDF (completado/no completado/no aplica) y commit del sistema.
+4. Distinguir si el 401 proviene de /api/auth/me, del reporte JSON o del endpoint PDF y asociarlo con la respuesta observada en la interfaz. No deducir el origen a partir del mensaje visual.
+5. Publicar solo la traza sanitizada y repetir la comparación bajo los mismos parámetros; luego clasificar el resultado como **comportamiento esperado**, **defecto reproducido** o **INCONCLUSO**. Si se confirma defecto, abrir una incidencia separada con resultado esperado y observado.
+
+**Estado del procedimiento:** DOCUMENTADO, **NO EJECUTADO** dentro de esta PR. No hay autorización ni sesiones reales disponibles en las evidencias examinadas. No se introduce instrumentación en producción ni se modifica el contrato del API.
+
 ## 6. Resultado y límites
 
 ### 6.1. Resultado de las verificaciones
@@ -195,12 +218,12 @@ Este documento se utiliza como referencia y no requiere modificaciones dentro de
 |---|---|
 | Pruebas unitarias y de seguridad existentes | PASS |
 | Pruebas Playwright focalizadas | PASS |
-| Pruebas HTTP controladas con MockMvc | BUILD SUCCESS |
+| Pruebas HTTP controladas con MockMvc | PASS en ejecución inicial documentada: 9 pruebas; requiere CI del commit reconciliado |
 | Documento de diagnóstico | Preparado |
 | Reproducción del incidente histórico | INCONCLUSA |
-| Commit | Pendiente |
-| Pull Request | Pendiente |
-| Revisión independiente | Pendiente |
+| Commit | Inicial: [`bff55e4`](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/commit/bff55e4d4c1113b8d45e257f686bf63c5a75605d); revisión actual: consultar HEAD de la PR #84 |
+| Pull Request | [#84 — abierta](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/84) |
+| Revisión independiente | Observación registrada; aceptación pendiente por criterios 1 y 2, aunque el CI resulte verde |
 
 ## 9. Conclusión
 

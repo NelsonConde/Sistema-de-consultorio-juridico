@@ -2,7 +2,8 @@
 
 > **Control de vigencia (16/10/2026):** Documento técnico histórico. No sustituye el SRS, EP3 ni EP5 consolidados de Sprint 1. Se concilia aquí solo el cierre de CP-09; la numeración y los enlaces restantes se revisarán en las tareas documentales correspondientes.
 
-> Especificación documental. Los SQL operativos reales están en `backend/app/db/migration/`; Flyway no está integrado en esta versión. La propuesta de [SCRUM-331](../decisiones/estrategia-migraciones.md) requiere validación antes de su implementación en SCRUM-332. Las antiguas referencias V23/V25/V26 no identifican scripts existentes.
+> **Corrección de referencias — SCRUM-321:** Se retira el enlace local al Informe Final. Las referencias anteriores `V23__create_file_asset_table.sql`, `V25__migrate_existing_files_to_file_asset.sql` y `V26__add_document_versioning_and_metadata.sql` no se localizaron en la rama revisada ni en el historial Git disponible. No se establece equivalencia entre esas tres referencias y el script de versionado identificado.
+> **Reconciliación operativa SCRUM-333 (04/11/2026):** El job separado `legal-cases-backend-migrations.jar` es responsable de las operaciones Flyway. La ruta automática es `backend/app/src/main/resources/db/migration/`; los SQL históricos y de recuperación permanecen fuera del descubrimiento automático. La secuencia de una base legada equivalente es `inspect → baseline → migrate → validate`, conforme al [manual de despliegue](../mantenimiento/manual-despliegue-recuperacion.md). La adopción de baseline exige comparar el esquema, comprobar el respaldo y registrar autorización explícita.
 
 ---
 

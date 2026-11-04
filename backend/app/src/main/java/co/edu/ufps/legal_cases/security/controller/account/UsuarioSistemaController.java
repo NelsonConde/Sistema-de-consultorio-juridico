@@ -27,8 +27,12 @@ import co.edu.ufps.legal_cases.security.dto.account.cambio.CambiarPerfilAMonitor
 import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
 import co.edu.ufps.legal_cases.security.service.account.UsuarioCambioPerfilService;
 import co.edu.ufps.legal_cases.security.service.account.UsuarioSistemaService;
+import co.edu.ufps.legal_cases.security.service.auth.activation.AccountActivationService;
+import co.edu.ufps.legal_cases.security.dto.auth.AuthMessageResponseDTO;
 import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
 
 @RestController
 @RequestMapping("/api/usuarios-sistema")
@@ -36,12 +40,15 @@ public class UsuarioSistemaController {
 
     private final UsuarioSistemaService usuarioSistemaService;
     private final UsuarioCambioPerfilService usuarioCambioPerfilService;
+    private final AccountActivationService accountActivationService;
 
     public UsuarioSistemaController(
             UsuarioSistemaService usuarioSistemaService,
-            UsuarioCambioPerfilService usuarioCambioPerfilService) {
+            UsuarioCambioPerfilService usuarioCambioPerfilService,
+            AccountActivationService accountActivationService) {
         this.usuarioSistemaService = usuarioSistemaService;
         this.usuarioCambioPerfilService = usuarioCambioPerfilService;
+        this.accountActivationService = accountActivationService;
     }
 
     @GetMapping
@@ -148,6 +155,32 @@ public class UsuarioSistemaController {
                 id,
                 dto,
                 obtenerUsernameAutenticado(authentication));
+    }
+
+    @PostMapping("/{id}/invitacion-activacion/reenviar")
+    @PreAuthorize("hasAnyAuthority('" + GESTIONAR_USUARIOS + "')")
+    public ResponseEntity<AuthMessageResponseDTO> reenviarInvitacionActivacion(@PathVariable Long id) {
+        AuthMessageResponseDTO response = accountActivationService.reenviarInvitacion(id);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/reenviar-invitacion")
+    @PreAuthorize("hasAnyAuthority('" + GESTIONAR_USUARIOS + "')")
+    public ResponseEntity<AuthMessageResponseDTO> reenviarInvitacion(@PathVariable Long id) {
+        return reenviarInvitacionActivacion(id);
+    }
+
+    @PostMapping("/{id}/invitacion-activacion/revocar")
+    @PreAuthorize("hasAnyAuthority('" + GESTIONAR_USUARIOS + "')")
+    public ResponseEntity<AuthMessageResponseDTO> revocarInvitacionActivacion(@PathVariable Long id) {
+        AuthMessageResponseDTO response = accountActivationService.revocarInvitacion(id);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/revocar-invitacion")
+    @PreAuthorize("hasAnyAuthority('" + GESTIONAR_USUARIOS + "')")
+    public ResponseEntity<AuthMessageResponseDTO> revocarInvitacion(@PathVariable Long id) {
+        return revocarInvitacionActivacion(id);
     }
 
     private String obtenerUsernameAutenticado(Authentication authentication) {
