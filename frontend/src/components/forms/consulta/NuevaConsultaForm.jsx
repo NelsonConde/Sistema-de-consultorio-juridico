@@ -72,6 +72,7 @@ export function NuevaConsultaForm() {
   );
   const [guardando, setGuardando] = useState(false);
   const submitLockRef = useRef(false);
+  const identidadInicialRef = useRef(null);
   const [checking, setChecking] = useState(true);
   const [estadoSesion, setEstadoSesion] = useState("activa");
   const [mensajeSesion, setMensajeSesion] = useState("");
@@ -309,6 +310,29 @@ export function NuevaConsultaForm() {
     setModal({ abierto: true, busqueda: "" });
   }
 
+  function limpiarBorradorPorCambioDeCuenta() {
+    setForm({ ...VACIOS });
+    setArchivos([]);
+    setConsultaCreadaId(null);
+    setConfirmarDescarte(false);
+    setPuedeAsignarResponsables(false);
+
+    setPersonasResultado([]);
+    setPersonasCache({});
+    setPersonasBusquedaAplicada("");
+    setPersonasPagina(1);
+    setPersonasTotalPaginas(0);
+    setPersonasTotalElementos(0);
+
+    setAsesores([]);
+    setMonitores([]);
+    setEstudiantes([]);
+
+    setModalParte({ abierto: false, busqueda: "" });
+    setModalPartesAdicionales({ abierto: false, busqueda: "" });
+    setModalContrapartes({ abierto: false, busqueda: "" });
+  }
+
   function abrirInicioSesion() {
     window.open("/", "_blank", "noopener,noreferrer");
   }
@@ -343,6 +367,24 @@ export function NuevaConsultaForm() {
       }
 
       const user = await res.json();
+      const identidadActual =
+          user?.id == null ? null : String(user.id);
+
+      const cambioIdentidad =
+          identidadActual !== identidadInicialRef.current;
+
+      if (cambioIdentidad) {
+        limpiarBorradorPorCambioDeCuenta();
+        identidadInicialRef.current = identidadActual;
+      }
+
+      if (identidadActual === null) {
+        setEstadoSesion("vencida");
+        setMensajeSesion(
+            "No fue posible verificar la identidad. El borrador anterior se descartó por seguridad."
+        );
+        return;
+      }
       const puedeCrear =
         tienePermiso(user, PERMISOS.ACCEDER_NUEVA_CONSULTA) &&
         tienePermiso(user, PERMISOS.CREAR_CONSULTAS);
@@ -362,7 +404,9 @@ export function NuevaConsultaForm() {
       );
       setEstadoSesion("lista");
       setMensajeSesion(
-        "Sesión comprobada. Revisa el formulario y usa “Reintentar creación” para enviarlo."
+          cambioIdentidad
+              ? "Se detectó un cambio de cuenta. El borrador anterior se descartó por seguridad. Completa una nueva consulta antes de enviarla."
+              : "Sesión comprobada. Revisa el formulario y usa “Reintentar creación” para enviarlo."
       );
     } catch {
       setEstadoSesion("vencida");
@@ -414,6 +458,13 @@ export function NuevaConsultaForm() {
           router.replace("/inicio");
           return;
         }
+
+        if (user?.id == null) {
+          router.replace("/");
+          return;
+        }
+
+        identidadInicialRef.current = String(user.id);
 
         const puedeAsignar = tienePermiso(
           user,

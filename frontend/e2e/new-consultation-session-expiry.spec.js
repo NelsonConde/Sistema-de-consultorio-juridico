@@ -23,6 +23,7 @@ async function mockNuevaConsultaApi(
 ) {
     const state = {
         authStatus: 200,
+        authUserId: 1,
         authRequests: 0,
         csrfRequests: 0,
         consultationRequests: 0,
@@ -48,10 +49,11 @@ async function mockNuevaConsultaApi(
             }
 
             await json(route, {
-                id: 1,
+                id: state.authUserId,
                 permisos: [
                     "Acceder nueva consulta",
                     "Crear consultas",
+                    "Acceder consultas jurídicas",
                 ],
             })
             return
@@ -284,4 +286,98 @@ test.describe("CP-26: sesión vencida al crear consulta", () => {
             .click()
         await expect(page).toHaveURL(/\/consultasjuridicas$/)
     })
+
+    test("descarta el borrador cuando cambia la identidad autenticada", async ({ page }) => {
+        const api = await mockNuevaConsultaApi(page, {
+            consultationStatuses: [401, 201],
+        })
+
+        await completarConsultaMinima(page)
+
+        await page.locator('input[type="file"]#archivos').setInputFiles({
+            name: "evidencia-prueba-cambio-cuenta.txt",
+            mimeType: "text/plain",
+            buffer: Buffer.from("Contenido ficticio para prueba de seguridad"),
+        })
+
+        await expect(
+            page.getByText("evidencia-prueba-cambio-cuenta.txt"),
+        ).toBeVisible()
+
+        await page.getByRole("button", { name: "Crear consulta" }).click()
+
+        await expect.poll(() => api.consultationRequests).toBe(1)
+
+        await expect(
+            page.getByText(
+                "Tu sesión venció. Inicia sesión nuevamente para guardar esta consulta",
+            ),
+        ).toBeVisible()
+
+        // Simula que se inicia sesión con una cuenta diferente.
+        api.authUserId = 2
+
+        await page
+            .getByRole("button", { name: "Volver a comprobar sesión" })
+            .click()
+
+        // El borrador anterior no debe permanecer en el formulario.
+        await expect(
+            page.getByText(/Se detectó un cambio de cuenta/),
+        ).toBeVisible()
+
+        await expect(page).toHaveURL(/\/nuevaconsulta$/)
+
+        await expect(
+            page.getByText("evidencia-prueba-cambio-cuenta.txt"),
+        ).not.toBeVisible()
+
+// Los datos jurídicos anteriores deben desaparecer.
+        for (const campo of [
+            "descripcion",
+            "hechos",
+            "pretensiones",
+            "conceptoJuridico",
+        ]) {
+            await expect(
+                page.locator(`textarea[name="${campo}"]`),
+            ).toHaveValue("")
+        }
+
+// Los demás campos del formulario también deben limpiarse.
+        for (const campo of ["fecha", "tramite"]) {
+            await expect(
+                page.locator(`input[name="${campo}"]`),
+            ).toHaveValue("")
+        }
+
+        for (const campo of [
+            "sedeId",
+            "areaId",
+            "temaId",
+            "tipoId",
+        ]) {
+            await expect(
+                page.locator(`select[name="${campo}"]`),
+            ).toHaveValue("")
+        }
+
+// No debe permanecer seleccionada la parte principal.
+        await expect(
+            page.getByRole("button", {
+                name: /Buscar parte principal/i,
+            }),
+        ).toBeVisible()
+
+// La nueva sesión no debe reenviar la consulta anterior.
+        expect(api.consultationRequests).toBe(1)
+
+// Intentar guardar el formulario vacío tampoco debe enviar un POST.
+        await page
+            .getByRole("button", { name: "Reintentar creación" })
+            .click()
+
+        expect(api.consultationRequests).toBe(1)
+    })
+
 })
