@@ -81,3 +81,53 @@ jobs:
       - name: Lint
         working-directory: frontend
         run: npm run lint
+
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    env:
+      CI: "true"
+      PLAYWRIGHT_HTML_OPEN: never
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up npm
+        run: npm install -g npm@10.9.4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: >-
+          npm run test --
+          --project=chromium
+          --workers=1
+          --retries=0
+          --reporter=line,html
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-e2e-report
+          path: frontend/playwright-report/
+          if-no-files-found: warn
+          retention-days: 7

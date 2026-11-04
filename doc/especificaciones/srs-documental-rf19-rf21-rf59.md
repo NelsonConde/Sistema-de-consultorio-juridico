@@ -2,7 +2,8 @@
 
 > **Control de vigencia (16/10/2026):** Documento técnico histórico. No sustituye el SRS, EP3 ni EP5 consolidados de Sprint 1. Se concilia aquí solo el cierre de CP-09; la numeración y los enlaces restantes se revisarán en las tareas documentales correspondientes.
 
-> Especificación documental reconciliada con `develop` el 02/11/2026. El baseline descubierto por Flyway está en `backend/app/src/main/resources/db/migration/V20261015_01__baseline_current_schema.sql` y se ejecuta mediante el artefacto separado de migraciones antes del backend. Los SQL históricos, verificadores y recuperaciones permanecen en `backend/app/db/migration/` y `backend/db/` fuera del descubrimiento automático. Las referencias V23/V25/V26/U26 no identifican archivos existentes. El procedimiento operativo vigente está en [Manual de despliegue, operación y recuperación](../mantenimiento/manual-despliegue-recuperacion.md).
+> **Corrección de referencias — SCRUM-321:** Se retira el enlace local al Informe Final. Las referencias anteriores `V23__create_file_asset_table.sql`, `V25__migrate_existing_files_to_file_asset.sql` y `V26__add_document_versioning_and_metadata.sql` no se localizaron en la rama revisada ni en el historial Git disponible. No se establece equivalencia entre esas tres referencias y el script de versionado identificado.
+> **Reconciliación operativa SCRUM-333 (04/11/2026):** El job separado `legal-cases-backend-migrations.jar` es responsable de las operaciones Flyway. La ruta automática es `backend/app/src/main/resources/db/migration/`; los SQL históricos y de recuperación permanecen fuera del descubrimiento automático. La secuencia de una base legada equivalente es `inspect → baseline → migrate → validate`, conforme al [manual de despliegue](../mantenimiento/manual-despliegue-recuperacion.md). La adopción de baseline exige comparar el esquema, comprobar el respaldo y registrar autorización explícita.
 
 ---
 
@@ -282,4 +283,3 @@ sequenceDiagram
 - **404 Not Found**: El expediente o el `uploadId` especificado no existe.
 - **409 Conflict**: Conflicto de versiones concurrentes al intentar promover dos versiones vigentes en paralelo.
 - **503 Service Unavailable**: El proveedor de almacenamiento privado no se encuentra disponible temporalmente; la transacción de metadatos se compensa y revierte de forma limpia.
-

@@ -24,6 +24,8 @@ import co.edu.ufps.legal_cases.config.security.AuthCookieProperties;
 import co.edu.ufps.legal_cases.security.dto.auth.login.LoginRequestDTO;
 import co.edu.ufps.legal_cases.security.dto.auth.login.LoginResponseDTO;
 import co.edu.ufps.legal_cases.security.dto.auth.login.LoginResultDTO;
+import co.edu.ufps.legal_cases.security.dto.auth.password.CambiarPasswordRequestDTO;
+import co.edu.ufps.legal_cases.security.service.auth.activation.AccountActivationService;
 import co.edu.ufps.legal_cases.security.service.auth.AuthService;
 import co.edu.ufps.legal_cases.security.service.auth.PasswordResetService;
 
@@ -33,12 +35,15 @@ class AuthControllerCsrfTest {
     private PasswordResetService passwordResetService;
     private CsrfTokenRepository csrfTokenRepository;
     private AuthController authController;
+    private AccountActivationService accountActivationService;
 
     @BeforeEach
     void setUp() {
         authService = mock(AuthService.class);
         passwordResetService = mock(PasswordResetService.class);
         csrfTokenRepository = mock(CsrfTokenRepository.class);
+        accountActivationService =
+                mock(AccountActivationService.class);
 
         AuthCookieProperties authCookieProperties =
                 new AuthCookieProperties();
@@ -49,6 +54,7 @@ class AuthControllerCsrfTest {
         authController = new AuthController(
                 authService,
                 passwordResetService,
+                accountActivationService,
                 csrfTokenRepository,
                 authCookieProperties);
     }
@@ -162,4 +168,95 @@ class AuthControllerCsrfTest {
                         request,
                         response);
     }
+
+    @Test
+    void shouldRenewAuthCookieAndInvalidateCsrfAfterPasswordChange() {
+        CambiarPasswordRequestDTO passwordRequest =
+                new CambiarPasswordRequestDTO();
+
+        passwordRequest.setPasswordActual("Actual123");
+        passwordRequest.setPasswordNueva("NuevaClave123");
+
+        when(authService.cambiarPassword(
+                "jwt-version-4",
+                passwordRequest))
+                .thenReturn("jwt-version-5");
+
+        MockHttpServletRequest request =
+                new MockHttpServletRequest();
+
+        MockHttpServletResponse response =
+                new MockHttpServletResponse();
+
+        ResponseEntity<Void> result =
+                authController.cambiarPassword(
+                        "jwt-version-4",
+                        passwordRequest,
+                        request,
+                        response);
+
+        verify(csrfTokenRepository)
+                .saveToken(null, request, response);
+
+        assertEquals(
+                HttpStatus.NO_CONTENT,
+                result.getStatusCode());
+
+        List<String> cookies =
+                response.getHeaders(HttpHeaders.SET_COOKIE);
+
+        assertTrue(
+                cookies.stream()
+                        .anyMatch(cookie ->
+                                cookie.startsWith(
+                                        "access_token=jwt-version-5")));
+    }
+
+    @Test
+    void shouldNotRenewSessionWhenPasswordChangeFails() {
+        CambiarPasswordRequestDTO passwordRequest =
+                new CambiarPasswordRequestDTO();
+
+        passwordRequest.setPasswordActual("Incorrecta123");
+        passwordRequest.setPasswordNueva("NuevaClave123");
+
+        when(authService.cambiarPassword(
+                "jwt-version-4",
+                passwordRequest))
+                .thenThrow(
+                        new RuntimeException(
+                                "Cambio de contraseña rechazado"));
+
+        MockHttpServletRequest request =
+                new MockHttpServletRequest();
+
+        MockHttpServletResponse response =
+                new MockHttpServletResponse();
+
+        assertThrows(
+                RuntimeException.class,
+                () -> authController.cambiarPassword(
+                        "jwt-version-4",
+                        passwordRequest,
+                        request,
+                        response));
+
+        verify(
+                csrfTokenRepository,
+                never())
+                .saveToken(
+                        null,
+                        request,
+                        response);
+
+        List<String> cookies =
+                response.getHeaders(HttpHeaders.SET_COOKIE);
+
+        assertTrue(
+                cookies.stream()
+                        .noneMatch(cookie ->
+                                cookie.startsWith(
+                                        "access_token=")));
+    }
+
 }

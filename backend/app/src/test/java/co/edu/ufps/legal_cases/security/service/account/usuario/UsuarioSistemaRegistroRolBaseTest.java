@@ -9,13 +9,16 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
+
 
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
+import co.edu.ufps.legal_cases.security.model.account.EstadoActivacionCuenta;
 import co.edu.ufps.legal_cases.business.model.perfil.Administrativo;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.security.model.access.CodigoRolBase;
@@ -29,7 +32,6 @@ class UsuarioSistemaRegistroRolBaseTest {
 
     private UsuarioSistemaRepository usuarioSistemaRepository;
     private RolRepository rolRepository;
-    private PasswordEncoder passwordEncoder;
 
     private UsuarioSistemaRegistroService service;
 
@@ -41,16 +43,11 @@ class UsuarioSistemaRegistroRolBaseTest {
         rolRepository =
                 mock(RolRepository.class);
 
-        passwordEncoder =
-                mock(PasswordEncoder.class);
 
         service = new UsuarioSistemaRegistroService(
                 usuarioSistemaRepository,
-                rolRepository,
-                passwordEncoder);
+                rolRepository);
 
-        when(passwordEncoder.encode(any(String.class)))
-                .thenReturn("HASH_PRUEBA");
 
         when(usuarioSistemaRepository.save(any(UsuarioSistema.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -102,6 +99,12 @@ class UsuarioSistemaRegistroRolBaseTest {
         assertEquals(
                 "admin.prueba@ufps.edu.co",
                 creado.getUsername());
+
+        assertNull(creado.getPasswordHash());
+
+        assertEquals(
+                EstadoActivacionCuenta.PENDIENTE,
+                creado.getEstadoActivacion());
 
         assertTrue(
                 creado.getActivo());

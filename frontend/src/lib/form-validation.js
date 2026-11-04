@@ -14,8 +14,6 @@ export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
 export const DIGITS_PATTERN = /^\d+$/;
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 100;
-export const PASSWORD_UPPERCASE_PATTERN = /[A-Z]/;
-export const PASSWORD_NUMBER_PATTERN = /\d/;
 
 export function isBlank(value) {
   return String(value ?? "").trim() === "";
@@ -24,8 +22,8 @@ export function isBlank(value) {
 export function sanitizeDigits(value, maxLength = null) {
   const digits = String(value ?? "").replace(/\D/g, "");
   return Number.isInteger(maxLength) && maxLength >= 0
-    ? digits.slice(0, maxLength)
-    : digits;
+      ? digits.slice(0, maxLength)
+      : digits;
 }
 
 export function optionalEmailRule(message = "Ingrese un correo electrónico válido") {
@@ -65,23 +63,23 @@ export function minLengthRule(min, message = `El campo debe tener al menos ${min
 export function exactLengthRule(length, message = `El campo debe tener exactamente ${length} caracteres`) {
   return {
     validate: (value) =>
-      isBlank(value) || String(value).trim().length === length || message,
+        isBlank(value) || String(value).trim().length === length || message,
   };
 }
 
 export function digitsOnlyRule({
-  required = false,
-  maxLength = 30,
-  message = "Solo se permiten números",
-} = {}) {
+                                 required = false,
+                                 maxLength = 30,
+                                 message = "Solo se permiten números",
+                               } = {}) {
   return {
     ...(required ? { required: REQUIRED_MESSAGE } : {}),
     ...(Number.isInteger(maxLength) ? maxLengthRule(maxLength) : {}),
     validate: (value) =>
-      (!required && isBlank(value)) ||
-      (required && !isBlank(value) && DIGITS_PATTERN.test(String(value))) ||
-      (!required && DIGITS_PATTERN.test(String(value))) ||
-      message,
+        (!required && isBlank(value)) ||
+        (required && !isBlank(value) && DIGITS_PATTERN.test(String(value))) ||
+        (!required && DIGITS_PATTERN.test(String(value))) ||
+        message,
   };
 }
 
@@ -106,7 +104,7 @@ export function maxNumberRule(max, message = `El valor no puede ser mayor a ${ma
 export function integerNumberRule(message = "El valor debe ser un número entero") {
   return {
     validate: (value) =>
-      isBlank(value) || Number.isInteger(Number(value)) || message,
+        isBlank(value) || Number.isInteger(Number(value)) || message,
   };
 }
 
@@ -145,8 +143,8 @@ export function futureDateRule(message = "La fecha debe ser futura") {
  * de política distinto en frontend vs backend.
  */
 export function passwordPolicyRule({
-  required = "La nueva contraseña es obligatoria",
-} = {}) {
+                                     required = "La nueva contraseña es obligatoria",
+                                   } = {}) {
   return {
     required,
     minLength: {
@@ -157,14 +155,6 @@ export function passwordPolicyRule({
       value: PASSWORD_MAX_LENGTH,
       message: `No puede superar ${PASSWORD_MAX_LENGTH} caracteres`,
     },
-    validate: {
-      hasUppercase: (value) =>
-        PASSWORD_UPPERCASE_PATTERN.test(String(value ?? "")) ||
-        "Debe incluir al menos una letra mayúscula",
-      hasNumber: (value) =>
-        PASSWORD_NUMBER_PATTERN.test(String(value ?? "")) ||
-        "Debe incluir al menos un número",
-    },
   };
 }
 
@@ -174,8 +164,8 @@ export function passwordPolicyRule({
  * el render en que se registró la regla.
  */
 export function passwordsMatchRule(
-  getNuevaPassword,
-  message = "Las contraseñas no coinciden"
+    getNuevaPassword,
+    message = "Las contraseñas no coinciden"
 ) {
   return {
     required: "Debes confirmar la nueva contraseña",

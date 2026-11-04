@@ -76,7 +76,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .findWithRolPermisosAndPerfilByUsername(username)
                 .orElse(null);
 
-        if (usuario == null || !usuarioPuedeAutenticarse(usuario)) {
+        if (usuario == null
+                || !usuarioPuedeAutenticarse(usuario)
+                || !versionAutenticacionValida(token, usuario)) {
             return;
         }
 
@@ -112,6 +114,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return usuarioActivo(usuario)
                 && rolActivo(usuario)
                 && perfilActivo(usuario);
+    }
+
+    private boolean versionAutenticacionValida(
+            String token,
+            UsuarioSistema usuario) {
+
+        return jwtService.obtenerAuthVersion(token)
+                == usuario.getAuthVersion();
     }
 
     private boolean usuarioActivo(UsuarioSistema usuario) {

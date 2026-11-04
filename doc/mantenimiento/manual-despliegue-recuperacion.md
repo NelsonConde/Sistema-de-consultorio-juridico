@@ -42,6 +42,41 @@ Las credenciales y configuraciones sensibles **nunca** deben incluirse en el rep
 | `SUPABASE_STORAGE_SECRET_KEY` | Secreto | `[SERVICE_ROLE_OR_S3_SECRET]` | Clave secreta para firma de peticiones S3. |
 | `SUPABASE_STORAGE_BUCKET` | Recurso | `legal-documents` | Nombre del bucket privado. |
 | `JWT_SECRET` | Criptográfico | `[CLAVE_HEX_256_BITS_ALEATORIA]` | Clave de firma de tokens JWT. |
+| `CORS_ALLOWED_ORIGINS` | Configuración | `https://<frontend-host>` | Orígenes frontend autorizados, separados por coma cuando exista más de uno. |
+| `AUTH_COOKIE_SECURE` | Configuración | `true` | Exige HTTPS para transportar `access_token`. |
+| `AUTH_COOKIE_SAME_SITE` | Configuración | `None` | Política SameSite de la cookie JWT. |
+| `CSRF_COOKIE_SECURE` | Configuración | `true` | Exige HTTPS para transportar la cookie CSRF. |
+| `CSRF_COOKIE_SAME_SITE` | Configuración | `None` | Política SameSite de la cookie CSRF. |
+| `FRONTEND_URL` | Configuración | `https://<frontend-host>` | Base usada para construir enlaces públicos de recuperación. |
+| `BREVO_API_KEY` | Secreto runtime | `[SECRETO_CONFIGURADO_EN_EL_HOST]` | Credencial del proveedor de correo transaccional. |
+| `MAIL_FROM_EMAIL` | Identidad de envío | `no-reply@<dominio-verificado>` | Remitente verificado utilizado por el backend. |
+
+---
+
+### Procedimiento de configuración y cambio de credenciales
+
+1. Registrar cada secreto en el almacén de variables del ambiente objetivo; no
+   incluirlo en `.env.example`, commits, URLs, capturas ni logs.
+2. Mantener separadas las credenciales de runtime y migración de PostgreSQL.
+3. Al cambiar `DB_PASSWORD`, actualizar la cuenta de PostgreSQL y después la
+   variable del servicio que utiliza esa cuenta.
+4. Al cambiar `JWT_SECRET`, actualizar el secreto del backend; los JWT firmados
+   con el valor anterior dejan de ser aceptados.
+5. Al cambiar `BREVO_API_KEY`, crear o rotar la clave en el proveedor y
+   reemplazar `BREVO_API_KEY` en el backend conservando `MAIL_FROM_EMAIL` como
+   remitente verificado.
+6. Al cambiar las credenciales S3, reemplazar conjuntamente
+   `SUPABASE_STORAGE_ACCESS_KEY` y `SUPABASE_STORAGE_SECRET_KEY` en el backend.
+7. Mantener `CORS_ALLOWED_ORIGINS`, `FRONTEND_URL`, atributos de cookies y URL
+   pública del frontend consistentes con el ambiente desplegado.
+8. Reiniciar el servicio después de modificar variables y verificar inicio de
+   sesión, consulta de sesión, correo transaccional y acceso al almacenamiento
+   con datos sintéticos.
+
+La configuración versionada usa marcadores y valores no sensibles. Las
+contraseñas de usuarios, documentos de identidad, tokens de recuperación y
+tokens de activación no son variables de despliegue ni credenciales que deban
+compartirse con operadores.
 
 ---
 
@@ -93,8 +128,13 @@ históricas V23, V25, V26 y U26 no existen y no son instrucciones válidas.
    ```bash
    java -jar target/legal-cases-backend-migrations.jar inspect
    java -jar target/legal-cases-backend-migrations.jar baseline
+   java -jar target/legal-cases-backend-migrations.jar migrate
    java -jar target/legal-cases-backend-migrations.jar validate
    ```
+
+   `baseline` registra la versión adoptada; no ejecuta las migraciones pendientes.
+   El paso `migrate` posterior aplica `V20261102_01` y las demás migraciones
+   pendientes compatibles antes de `validate` y del arranque web.
 
 7. Aplicar con el propietario del esquema
    [`backend/app/db/operations/grant_runtime_permissions.sql`](../../backend/app/db/operations/grant_runtime_permissions.sql)
