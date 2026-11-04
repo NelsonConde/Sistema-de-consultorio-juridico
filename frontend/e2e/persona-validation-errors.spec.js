@@ -64,8 +64,11 @@ async function mockPersonaApi(page, respuestasPost = []) {
         status: respuesta.status,
         contentType: "application/json",
         headers: respuesta.requestId
-          ? { "X-Request-ID": respuesta.requestId }
-          : {},
+            ? {
+              "X-Request-ID": respuesta.requestId,
+              "Access-Control-Expose-Headers": "X-Request-ID",
+            }
+            : {},
         body: JSON.stringify(respuesta.body),
       });
       return;

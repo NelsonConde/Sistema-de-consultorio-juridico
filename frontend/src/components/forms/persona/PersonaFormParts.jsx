@@ -19,9 +19,9 @@ export function optionalLabel(label) {
  * @returns {{value:string, label:string} Result value.
  */
 
-export function Seccion({ titulo, descripcion, children }) {
+export function Seccion({ titulo, descripcion, children, hidden = false }) {
   return (
-    <section className="space-y-4">
+    <section hidden={hidden} className="space-y-4">
       <div>
         <h3 className="text-lg font-semibold border-b pb-2">{titulo}</h3>
         {descripcion && (
