@@ -1,5 +1,6 @@
 package co.edu.ufps.legal_cases.security.repository.auth;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +21,11 @@ public interface AccountActivationTokenRepository
     List<AccountActivationToken>
     findByUsuarioSistemaAndUsadoFalseAndRevocadoFalse(
             UsuarioSistema usuarioSistema);
+
+    // Incluye tokens revocados: el reenvío no debe eludir el cooldown al revocar.
+    boolean existsByUsuarioSistemaAndFechaCreacionAfter(
+            UsuarioSistema usuarioSistema,
+            LocalDateTime fechaLimite);
 
     /*
      * Obtiene únicamente el identificador del usuario para poder

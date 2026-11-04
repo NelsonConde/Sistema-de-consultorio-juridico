@@ -51,7 +51,6 @@ class AccountActivationServiceManagementTest {
                 passwordEncoder,
                 emailService);
 
-        activationService.limpiarCooldownsParaPruebas();
     }
 
     @Test
@@ -106,6 +105,8 @@ class AccountActivationServiceManagementTest {
 
         TokenActivacion tokenNuevo = new TokenActivacion("raw-token-789", LocalDateTime.now().plusHours(48));
         when(tokenService.crearTokenParaUsuario(usuario)).thenReturn(tokenNuevo);
+        when(tokenService.existeTokenReciente(eq(usuario), any(LocalDateTime.class)))
+                .thenReturn(false, true);
 
         // Primer intento
         AuthMessageResponseDTO res1 = activationService.reenviarInvitacion(3L);
@@ -118,6 +119,22 @@ class AccountActivationServiceManagementTest {
         // Solo se generó y despachó un token
         verify(tokenService, times(1)).crearTokenParaUsuario(usuario);
         verify(emailService, times(1)).enviarInvitacionActivacion(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("Cooldown persistido: no reemplaza el token anterior ni despacha correo")
+    void reenviarInvitacion_PersistedCooldown_PreservesPreviousToken() {
+        UsuarioSistema usuario = crearUsuario(20L, "qa@example.test", EstadoActivacionCuenta.PENDIENTE, true);
+        when(usuarioSistemaRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(usuario));
+        when(tokenService.existeTokenReciente(eq(usuario), any(LocalDateTime.class))).thenReturn(true);
+
+        AuthMessageResponseDTO result = activationService.reenviarInvitacion(20L);
+
+        assertEquals(
+                "Si la cuenta existe y se encuentra pendiente de activación, se procesará el envío de la invitación",
+                result.getMensaje());
+        verify(tokenService, never()).crearTokenParaUsuario(any());
+        verify(emailService, never()).enviarInvitacionActivacion(anyString(), anyString());
     }
 
     @Test

@@ -85,18 +85,23 @@ public class AccountActivationEmailService {
     }
 
     private void validarEnlaceSeguro(String enlace) {
+        final URI uri;
         try {
-            URI uri = URI.create(enlace);
-            String host = uri.getHost();
-            String scheme = uri.getScheme();
+            uri = URI.create(enlace);
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException("Configuración de URL de activación inválida");
+        }
 
-            if (host != null && !host.equalsIgnoreCase("localhost") && !host.equals("127.0.0.1")) {
-                if (scheme == null || !scheme.equalsIgnoreCase("https")) {
-                    log.warn("La URL de activación para host remoto no utiliza HTTPS: scheme={}", scheme);
-                }
-            }
-        } catch (Exception ex) {
-            log.error("Error al validar URL de activación configurada");
+        String host = uri.getHost();
+        String scheme = uri.getScheme();
+        boolean entornoLocal = host != null
+                && (host.equalsIgnoreCase("localhost") || host.equals("127.0.0.1"));
+        boolean conexionSegura = "https".equalsIgnoreCase(scheme);
+
+        if (host == null
+                || uri.getUserInfo() != null
+                || uri.getFragment() != null
+                || (!conexionSegura && !(entornoLocal && "http".equalsIgnoreCase(scheme)))) {
             throw new BusinessException("Configuración de URL de activación inválida");
         }
     }

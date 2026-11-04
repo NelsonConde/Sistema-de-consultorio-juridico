@@ -85,6 +85,13 @@ public class AccountActivationTokenService {
                 expiracion);
     }
 
+    public boolean existeTokenReciente(
+            UsuarioSistema usuario,
+            LocalDateTime fechaLimite) {
+        validarUsuarioPersistido(usuario);
+        return tokenRepository.existsByUsuarioSistemaAndFechaCreacionAfter(usuario, fechaLimite);
+    }
+
     /*
      * Esta consulta devuelve únicamente un valor escalar.
      * No carga UsuarioSistema ni AccountActivationToken en el

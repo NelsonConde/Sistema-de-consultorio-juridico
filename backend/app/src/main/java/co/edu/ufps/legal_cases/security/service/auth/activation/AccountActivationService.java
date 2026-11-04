@@ -3,9 +3,7 @@ package co.edu.ufps.legal_cases.security.service.auth.activation;
 import static co.edu.ufps.legal_cases.common.util.NormalizacionUtils.normalizarEmail;
 
 import java.time.Duration;
-import java.time.Instant;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.time.LocalDateTime;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,8 +38,6 @@ public class AccountActivationService {
     private final UsuarioSistemaRepository usuarioSistemaRepository;
     private final PasswordEncoder passwordEncoder;
     private final AccountActivationEmailService emailService;
-
-    private final Map<Long, Instant> ultimosReenviosPorUsuario = new ConcurrentHashMap<>();
 
     public AccountActivationService(
             AccountActivationTokenService tokenService,
@@ -152,12 +148,6 @@ public class AccountActivationService {
             return new AuthMessageResponseDTO(MENSAJE_GENERICO_REENVIO);
         }
 
-        Instant ultimoReenvio = ultimosReenviosPorUsuario.get(usuarioId);
-        if (ultimoReenvio != null && Duration.between(ultimoReenvio, Instant.now()).compareTo(COOLDOWN_REENVIO) < 0) {
-            log.warn("Reenvío de invitación bloqueado por rate limit cooldown para usuarioId={}", usuarioId);
-            return new AuthMessageResponseDTO(MENSAJE_GENERICO_REENVIO);
-        }
-
         UsuarioSistema usuario = usuarioSistemaRepository
                 .findByIdForUpdate(usuarioId)
                 .orElse(null);
@@ -166,10 +156,18 @@ public class AccountActivationService {
             return new AuthMessageResponseDTO(MENSAJE_GENERICO_REENVIO);
         }
 
+        /*
+         * Se comprueba tras adquirir el lock del usuario. El timestamp persistido
+         * en PostgreSQL permite aplicar el cooldown también entre réplicas.
+         */
+        LocalDateTime fechaLimite = LocalDateTime.now().minus(COOLDOWN_REENVIO);
+        if (tokenService.existeTokenReciente(usuario, fechaLimite)) {
+            log.info("Reenvío de invitación bloqueado por cooldown para usuarioId={}", usuarioId);
+            return new AuthMessageResponseDTO(MENSAJE_GENERICO_REENVIO);
+        }
+
         AccountActivationTokenService.TokenActivacion tokenActivacion =
                 tokenService.crearTokenParaUsuario(usuario);
-
-        ultimosReenviosPorUsuario.put(usuarioId, Instant.now());
 
         try {
             emailService.enviarInvitacionActivacion(usuario.getUsername(), tokenActivacion.token());
@@ -238,9 +236,5 @@ public class AccountActivationService {
         }
 
         return revocarInvitacion(usuario.getId());
-    }
-
-    void limpiarCooldownsParaPruebas() {
-        ultimosReenviosPorUsuario.clear();
     }
 }

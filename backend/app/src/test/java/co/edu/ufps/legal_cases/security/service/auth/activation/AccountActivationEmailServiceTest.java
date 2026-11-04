@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -129,4 +130,33 @@ class AccountActivationEmailServiceTest {
         assertTrue(ex.getMessage().contains("No se pudo enviar el correo de activación"));
         assertFalse(ex.getMessage().contains("Connection timeout"));
     }
+    @Test
+    @DisplayName("Remote HTTP activation link must be rejected before email dispatch")
+    void rejectsInsecureRemoteLinkWithoutSendingEmail() {
+        AccountActivationEmailService insecureService = new AccountActivationEmailService(
+                emailService,
+                emailTemplateService,
+                "http://consultorio.example.test/activar-cuenta",
+                expirationHours);
+
+        assertThrows(BusinessException.class, () ->
+                insecureService.enviarInvitacionActivacion("user@example.test", "synthetic-token"));
+
+        verifyNoInteractions(emailTemplateService, emailService);
+    }
+
+    @Test
+    @DisplayName("Remote HTTPS activation links remain valid")
+    void acceptsSecureRemoteLink() {
+        AccountActivationEmailService secureService = new AccountActivationEmailService(
+                emailService,
+                emailTemplateService,
+                "https://consultorio.example.test/activar-cuenta",
+                expirationHours);
+
+        assertEquals(
+                "https://consultorio.example.test/activar-cuenta?token=synthetic-token",
+                secureService.construirEnlaceActivacion("synthetic-token"));
+    }
+
 }
