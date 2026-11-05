@@ -69,7 +69,7 @@ Se produjo una falla intermitente anterior al localizar el campo `fecha` durante
 - Los campos jurídicos sensibles permanecen en memoria durante la recuperación **de la misma identidad**, sin persistir el borrador en `localStorage`, `sessionStorage` ni parámetros de URL según la cobertura instrumentada.
 - La prueba de cambio de identidad valida el descarte de datos y de un archivo ficticio seleccionado; no representa un ensayo de cancelación de upload en curso.
 - `401` y `403` provienen de **respuestas simuladas**. Esta evidencia **no acredita** el comportamiento del proveedor de identidad ni del backend en un entorno real.
-- No se ha ejecutado ni acreditado aquí una CI remota posterior al cambio; los resultados corresponden al entorno local reportado.
+- **CI de los commits anteriores:** los workflows `Build` (backend, frontend y Playwright E2E) y `PR Title Convention` finalizaron satisfactoriamente en el commit documental `fb53df5`, además de la verificación local registrada en la sección 5. La ejecución con respuestas simuladas **no valida** la expiración de sesiones contra el backend o el proveedor real. Las comprobaciones del commit que incorpore esta aclaración deben evaluarse por separado.
 - La presencia de un resultado PASS no sustituye revisión de código, validación independiente ni seguimiento del defecto detectado.
 
 ## 7. Trazabilidad y aprobación pendiente
@@ -80,4 +80,4 @@ Se produjo una falla intermitente anterior al localizar el campo `fecha` durante
 - **Trazabilidad del defecto:** [SCRUM-316](https://gestion-casos-juridicos.atlassian.net/browse/SCRUM-316) es el defecto padre de CP-26; [SCRUM-317](https://gestion-casos-juridicos.atlassian.net/browse/SCRUM-317), criterio 5, exige descartar el borrador al cambiar la identidad; [SCRUM-318](https://gestion-casos-juridicos.atlassian.net/browse/SCRUM-318) documenta su verificación y la regresión. No consta un Bug independiente específico del cambio de identidad; la suficiencia de esta trazabilidad queda sujeta al revisor.
 - **Revisión independiente:** pendiente de aprobación por Nelson Enrique Conde Tarazona o José Manuel Pérez Rodríguez. El comentario técnico existente no constituye aprobación.
 - **Estado de QA local:** PASS para los cinco casos instrumentados con respuestas simuladas; no representa validación del backend ni del proveedor de identidad.
-- **Estado de integración/cierre:** commit inicial y PR existentes; pendiente la validación del nuevo commit documental por CI y la aprobación independiente antes de integrar.
+- **Estado de integración/cierre:** el commit inicial, la PR y la trazabilidad documental existen; CI del commit `fb53df5` aprobada. El próximo commit documental requiere su propia comprobación de CI y la aprobación independiente sigue pendiente antes de integrar.
