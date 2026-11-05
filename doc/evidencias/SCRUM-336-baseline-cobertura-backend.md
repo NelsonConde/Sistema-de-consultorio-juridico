@@ -1,6 +1,6 @@
 # SCRUM-336 — Línea base de cobertura backend y gate JaCoCo
 
-**Estado del documento:** Evidencia local pre-PR; no acredita ejecución de CI remoto ni aprobación independiente.
+**Estado del documento:** Línea base local y validación del gate en GitHub Actions registradas para la PR #89. Los umbrales configurados están sujetos a ratificación independiente por el equipo.
 
 **Fecha de medición:** 2026-11-05 (America/Bogota).
 
@@ -10,9 +10,9 @@
 
 **Rama de trabajo:** `chore/scrum-336-jacoco-baseline`.
 
-**HEAD / base `origin/develop` verificados:** `fa3142e0d13673f93554850d2d80f202af83b20f` (`0 0` en `git rev-list --left-right --count HEAD...origin/develop` al momento de la verificación).
+**Base de la PR:** `fa3142e0d13673f93554850d2d80f202af83b20f` en `develop`. **Commit de implementación verificado:** [`a6be09b7f881a60fc4dc202efdc4f64e91c44b49`](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/commit/a6be09b7f881a60fc4dc202efdc4f64e91c44b49). La referencia `0 0` de `git rev-list --left-right --count HEAD...origin/develop` corresponde a la preparación local anterior a esta PR.
 
-**Estado de Git:** Cambios locales preparados para commit. No se ha creado ni publicado una PR.
+**Trazabilidad:** [PR #89](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/89) abierta hacia `develop`; [Build #371](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/actions/runs/42028759690) completó `Backend`, `Frontend` y `Playwright E2E` satisfactoriamente en el commit de implementación.
 
 ---
 
@@ -52,7 +52,7 @@ No se añadieron exclusiones explícitas de paquetes o clases en la configuraci�
 | JaCoCo | 0.8.16 |
 | Base de datos de pruebas | PostgreSQL 16 |
 | Contenedores | Docker Desktop y Testcontainers |
-| CI configurado | GitHub Actions |
+| CI verificado | GitHub Actions, Build #371 |
 | Runner del backend | `ubuntu-24.04` |
 
 ### 2.1. Comando de validación integral
@@ -153,9 +153,7 @@ coverage.line.minimum=0.40
 coverage.branch.minimum=0.25
 ```
 
-Los valores fueron adoptados por el ejecutor durante la actividad, tomando como referencia la cobertura medida.
-
-La revisión y aprobación independiente de los responsables designados debe acreditarse antes del cierre definitivo de Jira.
+Los valores fueron definidos por el ejecutor tomando como referencia la cobertura medida y quedaron aplicados en la PR. La conformidad del equipo con estos umbrales concretos requiere una constancia trazable de revisión independiente; esta medición y la ejecución satisfactoria del gate no constituyen por sí solas dicha constancia.
 
 ### 4.1. Configuración del gate
 
@@ -268,7 +266,7 @@ Posteriormente, `clean verify` regeneró los datos de cobertura, ejecutó la sui
 
 ## 5. Integración con GitHub Actions
 
-Se modificó localmente el archivo:
+La PR #89 modifica el archivo:
 
 `.github/workflows/build.yml`
 
@@ -300,7 +298,7 @@ Si falta alguno, el comando finaliza con un código distinto de cero y el paso f
 
 Este mecanismo complementa la ejecución del gate JaCoCo, evitando aceptar una ejecución exitosa sin evidencia básica de cobertura.
 
-**Estado:** Configurado y validado estáticamente. Su ejecución real en GitHub Actions sigue pendiente.
+**Estado:** Ejecutado satisfactoriamente en el job `Backend` de [Build #371](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/actions/runs/42028759690), paso `Validate JaCoCo artifacts`.
 
 ### 5.2. Publicación del reporte
 
@@ -369,11 +367,11 @@ True
 
 Estas comprobaciones locales acreditan existencia, no ejecución del paso `test -s` dentro de GitHub Actions.
 
-La ejecución remota del workflow y la publicación real del artefacto todavía no se han verificado.
+La ejecución remota y la publicación del artefacto `backend-jacoco-report` se verificaron en [Build #371](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/actions/runs/42028759690), commit `a6be09b7f881a60fc4dc202efdc4f64e91c44b49`. El artefacto [#13415461340](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/actions/runs/42028759690/artifacts/13415461340) contiene el reporte XML; sus contadores globales confirman 5.430/13.011 líneas (41,73 %) y 1.435/5.240 ramas (27,39 %), iguales a los de la medición local. El job ejecutó `clean verify`, superó el gate y validó la existencia de `jacoco.exec` y `jacoco.xml`.
 
 ## 6. Alcance de los cambios
 
-Los archivos preparados para SCRUM-336 son:
+Los archivos de la PR #89 correspondientes a SCRUM-336 son:
 
 | Archivo | Cambio | Relación con SCRUM-336 |
 |---|---|---|
@@ -451,7 +449,7 @@ No demuestra automáticamente:
 
 El repositorio dispone de un job Playwright independiente.
 
-La presente evidencia no acredita una nueva ejecución de ese job ni su aprobación sobre el cambio de SCRUM-336.
+El job `Playwright E2E` de Build #371 finalizó satisfactoriamente en el commit de implementación de SCRUM-336. Su resultado no equivale a cobertura de interfaz medida por JaCoCo ni a cobertura integral de requisitos.
 
 ### 7.4. Umbrales globales
 
@@ -469,34 +467,32 @@ La suite completa se ejecutó en Windows con una corrección temporal aplicada a
 
 Esa corrección quedó excluida del cambio preparado para SCRUM-336.
 
-La ejecución del backend sobre Ubuntu en GitHub Actions deberá comprobarse cuando el cambio se publique.
+El backend se ejecutó en Ubuntu en Build #371 y superó pruebas, empaquetado y el gate de cobertura en el commit de implementación. La observación sobre el ajuste temporal de Windows se conserva para interpretar correctamente la medición local.
 
 ### 7.6. Seguridad de artefactos
 
 El reporte JaCoCo se genera a partir del código instrumentado.
 
-Antes de publicar los cambios debe revisarse el contenido preparado para descartar secretos, credenciales, archivos sensibles y datos personales innecesarios.
+La revisión de contenido antes de integrar debe descartar secretos, credenciales, archivos sensibles y datos personales innecesarios. El reporte de cobertura publicado corresponde al código instrumentado del backend.
 
 La comprobación de nombres de archivos realizada en la auditoría no encontró coincidencias con patrones de secretos, pero no sustituye una revisión de contenido.
 
 ### 7.7. Revisión independiente
 
-La revisión técnica y la aprobación independiente por parte de los responsables designados, Nelson Enrique Conde Tarazona y José Manuel Pérez Rodríguez, permanecen pendientes de evidencia.
-
-La implementación de los umbrales no equivale por sí sola a esa aprobación.
+La conformidad independiente de los responsables designados, Nelson Enrique Conde Tarazona o José Manuel Pérez Rodríguez, con los umbrales de 40 % de líneas y 25 % de ramas no está documentada en esta evidencia. La configuración y el resultado satisfactorio del gate se presentan como hechos técnicos separados de esa decisión.
 
 ## 8. Matriz de aceptación de SCRUM-336
 
 | Criterio Jira | Implementación y evidencia | Estado |
 |---|---|---|
-| 1. Reportar cobertura de líneas y ramas por módulo con exclusiones justificadas | JaCoCo XML/HTML y tabla por módulos; sin exclusiones explícitas adicionales | PASS local |
-| 2. Registrar línea base y umbrales acordados | Baseline 41,73 % / 27,39 %; mínimos 40 % / 25 % configurados; revisión independiente pendiente | PARCIAL |
-| 3. Aplicar umbral y demostrar aceptación y rechazo | PASS local, FAIL intencional de líneas y ramas, `clean verify` exitoso; CI remoto pendiente | PARCIAL |
-| 4. Documentar limitaciones E2E/UI | Limitaciones descritas en la sección 7 | DOCUMENTADO, pendiente de revisión |
+| 1. Reportar cobertura de líneas y ramas por módulo con exclusiones justificadas | JaCoCo XML/HTML y tabla por módulos; sin exclusiones explícitas adicionales; XML de CI contrastado con la medición local | Verificado |
+| 2. Registrar línea base y umbrales acordados | Baseline local y CI 41,73 % / 27,39 %; mínimos 40 % / 25 % configurados; conformidad del equipo pendiente de constancia | Medición y configuración verificadas; acuerdo por acreditar |
+| 3. Aplicar umbral y demostrar aceptación y rechazo | PASS local y CI Build #371; fallos intencionales de líneas y ramas documentados localmente | Verificado en el alcance indicado |
+| 4. Documentar limitaciones E2E/UI | Limitaciones descritas en la sección 7; job Playwright E2E de Build #371 satisfactorio | Documentado |
 
-## 9. Auditoría pre-PR
+## 9. Trazabilidad de verificaciones
 
-### 9.1. Comprobaciones realizadas
+### 9.1. Preparación y comprobaciones locales realizadas
 
 - Consulta de los criterios de aceptación de SCRUM-336 en Jira.
 - Identificación de la dependencia SCRUM-335, registrada como finalizada.
@@ -515,30 +511,18 @@ La implementación de los umbrales no equivale por sí sola a esa aprobación.
 - Verificación del staging limitado a los archivos de SCRUM-336.
 - Comprobación de nombres de archivos preparados contra patrones básicos de secretos: sin coincidencias.
 
-### 9.2. Comprobaciones pendientes
+### 9.2. Comprobaciones posteriores a la publicación de la PR
 
-Antes de dar por finalizada la actividad:
+1. **Workflow, gate y artefactos:** verificados en [Build #371](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/actions/runs/42028759690) del commit `a6be09b`; el reporte `backend-jacoco-report` fue publicado.
+2. **Revisión de seguridad del contenido:** el control local de nombres de archivos se registró en la sección 9.1; la revisión independiente del contenido preparado forma parte de la revisión de la PR.
+3. **Coherencia documental con el diff:** esta actualización distingue las pruebas locales, la configuración del gate y el resultado remoto. La versión incorporada a la PR queda sujeta a la revisión del commit documental correspondiente.
+4. **Sincronización de `develop`:** la base de integración se identificó en `fa3142e0`; la comprobación de nuevos cambios corresponde al momento de integrar.
+5. **Conformidad con los umbrales:** se requiere constancia trazable del acuerdo del equipo sobre 40 % de líneas y 25 % de ramas. No se atribuye una aprobación inexistente a los revisores.
+6. **CI del commit publicado:** Build #371 verificó el commit de implementación `a6be09b`. Toda actualización documental posterior se verifica en el CI de su propio commit antes de integrar.
+7. **Observaciones de revisión:** se incorporarán las correcciones técnicas que resulten de la revisión independiente; esta verificación no sustituye la decisión del revisor.
 
-1. Verificar en GitHub Actions la ejecución real del workflow, el control de cobertura y la publicación de los artefactos.
-2. Completar la revisión final de seguridad del contenido preparado.
-3. Comprobar la coherencia definitiva del documento con el diff.
-4. Verificar si `origin/develop` incorpora nuevos cambios antes de la publicación.
-5. Registrar la revisión y aprobación independiente de los umbrales.
-6. Comprobar los resultados de CI correspondientes al commit publicado.
-7. Revisar las observaciones de los revisores y corregir cualquier hallazgo bloqueante.
+## 10. Resultado técnico y control de decisión
 
-Los resultados remotos de commits anteriores no sustituyen la validación del cambio actual.
+La instrumentación JaCoCo, la línea base global y por módulos, las pruebas positivas y negativas del gate y la validación estática del workflow cuentan con los resultados registrados. Build #371 confirma la ejecución remota de las pruebas del backend, el cumplimiento de los mínimos configurados y la publicación del reporte; el XML remoto coincide con la medición local de 41,73 % de líneas y 27,39 % de ramas.
 
-## 10. Dictamen preliminar de auditoría
-
-****Estado: APTO CON OBSERVACIONES PARA CREAR PR; NO APTO TODAVÍA PARA CIERRE DE SCRUM-336.**
-
-La instrumentación JaCoCo, la medición de cobertura, los umbrales configurados y las pruebas locales del gate cuentan con evidencia satisfactoria.
-
-Además, la configuración actual del workflow superó la validación estática de `actionlint`.
-
-La revisión técnica local permite presentar los cambios mediante una PR para revisión independiente. La aprobación formal de los umbrales por los revisores designados y la ejecución satisfactoria del CI remoto siguen pendientes. No debe cerrarse SCRUM-336 ni declararse aprobado el gate  por el equipo hasta obtener dichas evidencias.
-
-La ejecución remota de GitHub Actions se verificará después de publicar el cambio, sin presentar resultados anteriores como evidencia del nuevo commit.
-
-Este dictamen no representa un fallo de la implementación, sino la identificación de verificaciones todavía pendientes dentro del procedimiento de auditoría pre-PR.
+La decisión de adoptar formalmente los umbrales de 40 % y 25 % corresponde al equipo y se registra por el canal de revisión autorizado. Esta constancia es independiente del resultado técnico satisfactorio del gate. La revisión de la PR y el CI de cualquier commit documental posterior completan la trazabilidad de integración, sin modificar las mediciones ni los hechos históricos conservados en este documento.
