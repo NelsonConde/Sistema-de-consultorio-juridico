@@ -19,7 +19,7 @@ Durante la ampliación de las pruebas se simuló una consulta en la que el prime
 
 **Cambio implementado para revisión:** registrar el identificador inicial en una referencia de React; comparar ese identificador al revalidar; ante un cambio, vaciar los datos del formulario, las selecciones, los archivos adjuntos seleccionados y los datos auxiliares vinculados al borrador; informar el cambio de cuenta. El nuevo usuario debe completar un formulario nuevo, y la revalidación no ejecuta automáticamente otro `POST`.
 
-Esta corrección funcional fue detectada durante QA de SCRUM-318 y afecta un criterio relacionado con SCRUM-317. **Requiere trazabilidad del defecto mediante un Bug vinculado y revisión independiente antes de integrar.** No se considera cerrada esa aprobación por el solo hecho de superar las pruebas locales.
+Esta corrección funcional fue detectada durante QA de SCRUM-318 y atiende el criterio 5 de [SCRUM-317](https://gestion-casos-juridicos.atlassian.net/browse/SCRUM-317), dentro del defecto principal [SCRUM-316](https://gestion-casos-juridicos.atlassian.net/browse/SCRUM-316) (CP-26). El fallo específico de cambio de identidad se descubrió durante las pruebas de esta PR y queda documentado aquí; **no se afirma la existencia de un Bug independiente adicional ni se inventa su vínculo**. La integración requiere revisión independiente, aunque los casos locales hayan pasado.
 
 ## 3. Casos ejecutados
 
@@ -74,10 +74,10 @@ Se produjo una falla intermitente anterior al localizar el campo `fecha` durante
 
 ## 7. Trazabilidad y aprobación pendiente
 
-- **Branch de trabajo:** `test/scrum-318-new-consultation-session-qa`.
-- **Commit:** pendiente al preparar esta evidencia; registrar SHA después de crearlo.
-- **Pull request:** pendiente; registrar URL después de abrirla.
-- **Bug asociado a criterio de SCRUM-317:** pendiente de registrar y vincular.
-- **Revisión independiente:** pendiente, según los revisores indicados en SCRUM-318 (Nelson Enrique Conde Tarazona / José Manuel Pérez Rodríguez).
-- **Estado de QA local:** PASS para los cinco casos instrumentados.
-- **Estado de integración/cierre:** pendiente de commit, PR, vinculación del defecto y aprobación independiente.
+- **Rama de trabajo:** `test/scrum-318-new-consultation-session-qa`.
+- **Commit inicial de la PR:** [`63d48b3e8febd73e64269bb168b6c134cd2c618d`](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/commit/63d48b3e8febd73e64269bb168b6c134cd2c618d).
+- **Pull request:** [#85 — SCRUM-318](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/85), abierta hacia `develop`.
+- **Trazabilidad del defecto:** [SCRUM-316](https://gestion-casos-juridicos.atlassian.net/browse/SCRUM-316) es el defecto padre de CP-26; [SCRUM-317](https://gestion-casos-juridicos.atlassian.net/browse/SCRUM-317), criterio 5, exige descartar el borrador al cambiar la identidad; [SCRUM-318](https://gestion-casos-juridicos.atlassian.net/browse/SCRUM-318) documenta su verificación y la regresión. No consta un Bug independiente específico del cambio de identidad; la suficiencia de esta trazabilidad queda sujeta al revisor.
+- **Revisión independiente:** pendiente de aprobación por Nelson Enrique Conde Tarazona o José Manuel Pérez Rodríguez. El comentario técnico existente no constituye aprobación.
+- **Estado de QA local:** PASS para los cinco casos instrumentados con respuestas simuladas; no representa validación del backend ni del proveedor de identidad.
+- **Estado de integración/cierre:** commit inicial y PR existentes; pendiente la validación del nuevo commit documental por CI y la aprobación independiente antes de integrar.
