@@ -23,6 +23,8 @@
         <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
         <jjwt.version>0.12.6</jjwt.version>
         <aws.sdk.version>2.31.67</aws.sdk.version>
+        <coverage.line.minimum>0.40</coverage.line.minimum>
+        <coverage.branch.minimum>0.25</coverage.branch.minimum>
     </properties>
 
     <dependencies>
@@ -195,6 +197,59 @@
     <build>
         <finalName>legal-cases-backend</finalName>
         <plugins>
+
+            <!-- SCRUM-336: cobertura global mínima de líneas y ramas para el gate de CI. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.16</version>
+
+                <configuration>
+                    <rules>
+                        <rule>
+                            <element>BUNDLE</element>
+                            <limits>
+                                <limit>
+                                    <counter>LINE</counter>
+                                    <value>COVEREDRATIO</value>
+                                    <minimum>${coverage.line.minimum}</minimum>
+                                </limit>
+                                <limit>
+                                    <counter>BRANCH</counter>
+                                    <value>COVEREDRATIO</value>
+                                    <minimum>${coverage.branch.minimum}</minimum>
+                                </limit>
+                            </limits>
+                        </rule>
+                    </rules>
+                </configuration>
+
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+
+                    <execution>
+                        <id>coverage-report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+
+                    <execution>
+                        <id>coverage-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
             <!-- Toolchain policy for reproducible local and CI builds -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

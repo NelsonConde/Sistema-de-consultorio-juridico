@@ -40,13 +40,27 @@ jobs:
         working-directory: backend/app
         run: chmod +x mvnw
 
-      - name: Test
-        working-directory: backend/app
-        run: ./mvnw test
 
-      - name: Package
+      - name: Verify backend and generate coverage
         working-directory: backend/app
-        run: ./mvnw -DskipTests package
+        run: ./mvnw clean verify
+
+      - name: Validate JaCoCo artifacts
+        working-directory: backend/app
+        run: |
+          test -s target/jacoco.exec
+          test -s target/site/jacoco/jacoco.xml
+
+      - name: Upload JaCoCo coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jacoco-report
+          path: |
+            backend/app/target/site/jacoco/
+            backend/app/target/jacoco.exec
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Verify packaged migration command in isolated PostgreSQL
         working-directory: backend/app
