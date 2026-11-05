@@ -186,11 +186,12 @@ test.describe("SCRUM-333: diagnóstico frontend del 401 en estadísticas", () =>
     ).toBeVisible();
     await expect(page.getByText(/sesión/i)).toHaveCount(0);
     const semesterRequests = api.requests.filter((request) =>
-        request.path.endsWith("/api/estadisticas/semestres"),
+      request.path.endsWith("/api/estadisticas/semestres"),
     );
 
     expect(semesterRequests.length).toBeGreaterThanOrEqual(1);
     expect(semesterRequests.length).toBeLessThanOrEqual(2);
+    expect(semesterRequests.every((request) => request.method === "GET")).toBe(true);
   });
 
   test("un 401 del reporte semestral muestra el error genérico y no redirige", async ({
