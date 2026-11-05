@@ -1,8 +1,7 @@
 # Evidencia de Pruebas QA — Autogestión y Protección contra Edición de Terceros
 
-- **Solicitud / Épica:** CC-OPT-003 — Autogestión de perfil, contacto, contraseña e invitación
-- **Ticket Jira:** QA — Probar autogestión y protección contra edición de terceros
-- **Rama:** `test/cc-opt-003-profile-security`
+- **Alcance funcional:** Autogestión de perfil, contacto, contraseña e invitación
+- **Caso verificado:** Autogestión y protección contra edición de terceros
 - **Fecha de ejecución:** 03/10/2026
 - **Responsable de QA:** Equipo de Control de Calidad y Pruebas
 
@@ -18,7 +17,7 @@ Se garantiza que:
 3. No es posible acceder ni modificar el perfil de terceros bajo ninguna circunstancia.
 4. Las sesiones ausentes o expiradas son rechazadas inmediatamente con código HTTP 401.
 5. Los eventos probatorios de auditoría se registran adecuadamente tanto en actualizaciones exitosas como en accesos denegados.
-6. La suite E2E y el pipeline de integración continua (CI) se encuentran completamente en verde.
+6. Las validaciones focalizadas de backend, frontend E2E, build y lint registradas en este documento finalizaron satisfactoriamente. Estos resultados no acreditan una ejecución integral del pipeline de integración continua (CI).
 
 ---
 
@@ -47,7 +46,7 @@ Se garantiza que:
 | **Ningún payload altera atributos protegidos** | **CUMPLIDO** | `ActualizarContactoDTO` desconoce atributos como rol, activo, documento o código; inyecciones en JSON son descartadas sin efecto colateral. |
 | **No se filtra información ajena** | **CUMPLIDO** | La respuesta `MiPerfilDTO` expone solo información propia del actor y omite contraseñas, hashes, tokens y referencias de base de datos. |
 | **Eventos de auditoría correctos** | **CUMPLIDO** | `@Auditable(action = "ACTUALIZAR_CONTACTO_PROPIO", entityName = "UsuarioSistema", entityId = "#result.username")` audita cada modificación; accesos sin autenticación son auditados por `SecurityExceptionHandler`. |
-| **E2E completo y CI verde** | **CUMPLIDO** | Playwright ejecuta 7/7 casos exitosos (5 perfiles, validación de formulario y verificación de atributos inmutables); backend ejecuta 31/31 pruebas unitarias/integración satisfactorias; build y lint pasan sin errores. |
+| **Validaciones focalizadas de backend y frontend** | **CUMPLIDO** | Playwright ejecutó 7/7 casos exitosos (5 perfiles, validación de formulario y verificación de atributos inmutables); backend ejecutó 31/31 pruebas unitarias/integración satisfactorias; build y lint finalizaron sin errores en las ejecuciones registradas. No se verificó aquí una ejecución integral de CI. |
 
 ---
 
@@ -115,4 +114,4 @@ Resultado:
 
 ## 5. Conclusión y Recomendación
 
-La funcionalidad de autogestión de perfil y protección contra edición de terceros cumple el 100% de la matriz de verificación y de los criterios de aceptación del ticket de QA. La solución es apta para ser promovida mediante Pull Request a la rama permanente `develop` conforme al procedimiento formal de gestión de ramas.
+La funcionalidad de autogestión de perfil y protección contra edición de terceros cumplió la matriz de verificación y los criterios de aceptación evaluados en las ejecuciones focalizadas documentadas. Estos resultados respaldan el alcance probado, pero no sustituyen las validaciones integrales de CI ni constituyen por sí solos una recomendación de promoción.

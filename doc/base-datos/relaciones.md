@@ -7,17 +7,19 @@ Este documento resume las relaciones entre entidades persistentes del sistema. L
 ```text
 rol 1---N usuario_sistema
 rol N---N permiso
-usuario_sistema 1---1 perfil real activo
+usuario_sistema 1---N registros de perfil a lo largo del tiempo
 usuario_sistema 1---N usuario_cambio_perfil_historial
 ```
 
-El perfil real activo se determina por:
+La cuenta puede conservar registros históricos en tablas de perfil distintas. El perfil vigente se determina por:
 
 ```text
 UsuarioSistema.tipoPerfilActual
 ```
 
 y se resuelve mediante estrategias por tipo de perfil.
+
+Cada relación de perfil tiene una columna `usuario_sistema_id` única en su propia tabla; esa unicidad no cruza tablas. Que solo exista un perfil activo entre los cinco tipos es una regla de aplicación, validada bajo bloqueo transaccional, no una restricción única transversal de base de datos.
 
 Relaciones por perfil:
 
@@ -101,7 +103,26 @@ seguimiento activo
 conciliacion activa
 ```
 
-## 6. Relación de proceso
+## 6. Relación con el historial de reasignaciones
+
+```text
+consulta 1---N consulta_reasignacion_historial
+usuario_sistema 1---N consulta_reasignacion_historial como actor
+```
+
+Los responsables del evento se modelan como identificadores escalares polimórficos:
+
+```text
+tipo_responsable = ESTUDIANTE -> estudiante.id
+tipo_responsable = ASESOR     -> asesor.id
+tipo_responsable = MONITOR    -> monitor.id
+```
+
+PostgreSQL valida esa correspondencia mediante `trg_validar_responsables_reasignacion`. No se define una relación JPA ni una clave foránea hacia una tabla genérica de responsables, porque tal tabla no existe.
+
+La clave foránea hacia la consulta y la clave foránea hacia el actor impiden eliminar sus referencias. El trigger `trg_historial_reasignacion_inmutable` rechaza actualizaciones y eliminaciones de eventos. La reasignación de la consulta y la inserción del historial participan en la misma transacción.
+
+## 7. Relación de proceso
 
 ```text
 proceso N---1 consulta
@@ -113,7 +134,7 @@ organo_control 1---N especialidad
 
 El radicado pertenece al proceso y conserva unicidad cuando existe.
 
-## 7. Relación de seguimiento
+## 8. Relación de seguimiento
 
 ```text
 seguimiento N---1 consulta
@@ -137,7 +158,7 @@ Notificaciones:
 seguimiento_notificacion N---1 seguimiento
 ```
 
-## 8. Relación de conciliación
+## 9. Relación de conciliación
 
 ```text
 conciliacion N---1 consulta
@@ -152,7 +173,7 @@ conciliacion 1---N reunion_conciliacion_notificacion
 
 La conciliación toma el contexto principal desde la consulta.
 
-## 9. Relación de reunión de conciliación
+## 10. Relación de reunión de conciliación
 
 ```text
 reunion_conciliacion 1---1 conciliacion
@@ -164,7 +185,7 @@ reunion_conciliacion_historial N---1 usuario_sistema
 reunion_conciliacion_notificacion N---1 conciliacion
 ```
 
-## 10. Relación de persona con catálogos
+## 11. Relación de persona con catálogos
 
 ```text
 persona N---1 tipo_persona
@@ -177,7 +198,7 @@ persona N---1 ocupacion
 persona N---1 empresa
 ```
 
-## 11. Relación de auditoría
+## 12. Relación de auditoría
 
 ```text
 audit_logs registra actor, acción, entidad, resultado, instante, origen,
@@ -186,7 +207,7 @@ correlación y cambios escalares permitidos
 
 La auditoría se produce mediante aspecto asociado a métodos anotados con `@Auditable` y se protege contra `UPDATE`/`DELETE` con una migración versionada.
 
-## 12. Relación de estadísticas
+## 13. Relación de estadísticas
 
 Las estadísticas se calculan desde entidades operativas, principalmente:
 
@@ -201,7 +222,7 @@ catálogos jurídicos
 
 Los reportes estadísticos se generan dinámicamente desde servicios de consulta y generación PDF a partir de las entidades operativas relacionadas.
 
-## 13. Relación de gestión documental (`file_asset`)
+## 14. Relación de gestión documental (`file_asset`)
 
 ```text
 file_asset N---1 usuario_sistema (mediante uploaded_by_id)
@@ -234,4 +255,3 @@ Reglas de integridad y navegación:
 - Toda versión ($N+1$) referencia a su versión previa mediante `referencia_anterior_id`.
 - La autoría del archivo (`uploaded_by_id`) se vincula de manera obligatoria a la identidad del usuario del sistema autenticado.
 - La consulta documental del expediente consolida y navega estas relaciones en una única consulta optimizada (evitando el problema N+1), vinculando los documentos de todas las entidades hijas hacia la consulta raíz.
-

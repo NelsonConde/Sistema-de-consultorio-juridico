@@ -24,6 +24,7 @@ import co.edu.ufps.legal_cases.security.service.account.cambio.PerfilCambioHandl
 import co.edu.ufps.legal_cases.security.service.account.cambio.UsuarioCambioPerfilHistorialService;
 import co.edu.ufps.legal_cases.security.service.account.cambio.UsuarioCambioPerfilValidator;
 import co.edu.ufps.legal_cases.security.service.account.perfil.PerfilEstadoService;
+import co.edu.ufps.legal_cases.security.service.account.perfil.PerfilOperacionEstadoValidator;
 import co.edu.ufps.legal_cases.security.service.account.perfil.PerfilUsuarioResolverService;
 import co.edu.ufps.legal_cases.security.service.invariant.administracion.AdministracionInvariantService;
 
@@ -42,6 +43,7 @@ public class UsuarioCambioPerfilService {
     private final PerfilCambioHandlerRegistry handlerRegistry;
     private final UsuarioCambioPerfilValidator usuarioCambioPerfilValidator;
     private final AdministracionInvariantService administracionInvariantService;
+    private final PerfilOperacionEstadoValidator perfilOperacionEstadoValidator;
 
     public UsuarioCambioPerfilService(
             UsuarioSistemaRepository usuarioSistemaRepository,
@@ -52,7 +54,8 @@ public class UsuarioCambioPerfilService {
             UsuarioSistemaService usuarioSistemaService,
             PerfilCambioHandlerRegistry handlerRegistry,
             UsuarioCambioPerfilValidator usuarioCambioPerfilValidator,
-            AdministracionInvariantService administracionInvariantService) {
+            AdministracionInvariantService administracionInvariantService,
+            PerfilOperacionEstadoValidator perfilOperacionEstadoValidator) {
 
         this.usuarioSistemaRepository = usuarioSistemaRepository;
         this.rolRepository = rolRepository;
@@ -66,6 +69,8 @@ public class UsuarioCambioPerfilService {
                 usuarioCambioPerfilValidator;
         this.administracionInvariantService =
                 administracionInvariantService;
+        this.perfilOperacionEstadoValidator =
+                perfilOperacionEstadoValidator;
     }
 
     public UsuarioSistemaDTO cambiarAAdministrativo(
@@ -151,6 +156,9 @@ public class UsuarioCambioPerfilService {
                 obtenerUsuarioSistemaActivo(
                         usuarioSistemaId);
 
+        perfilOperacionEstadoValidator
+                .validarExclusividadAntesDeCambioExplicito(usuario);
+
         PerfilUsuarioActual perfilAnterior =
                 obtenerPerfilAnteriorValidandoDestino(
                         usuario,
@@ -204,7 +212,7 @@ public class UsuarioCambioPerfilService {
 
         UsuarioSistema usuario =
                 usuarioSistemaRepository
-                        .findWithRolAndPermisosById(
+                        .findByIdForUpdate(
                                 usuarioSistemaId)
                         .orElseThrow(() ->
                                 new BusinessException(

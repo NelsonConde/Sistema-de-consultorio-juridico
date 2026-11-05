@@ -61,6 +61,21 @@ El frontend también consume respuestas definidas por endpoints concretos:
 | Otra respuesta no exitosa | Usa `getApiErrorTitle(...)` y `getApiErrorDescription(...)` sobre el payload recibido. |
 | Excepción de red | Muestra toast `Error de conexión`. |
 
+`useApiForm` acepta además un callback opcional `onError`. Para respuestas no
+exitosas distintas de `401` y `403`, el callback recibe:
+
+```javascript
+{
+  status,
+  payload,
+  correlationId
+}
+```
+
+Si retorna `true`, el hook entiende que el formulario ya presentó el error y
+no genera un segundo toast con el mismo contenido. Si retorna `false` o no se
+configura, conserva el manejo genérico descrito anteriormente.
+
 ## Manejo de importación de estudiantes
 
 `ImportarEstudiantesForm.jsx` ejecuta directamente:
@@ -114,6 +129,38 @@ El frontend usa Sonner para notificaciones visuales. Los flujos revisados mantie
 | Sesión expirada | Toast y redirección a `/`. |
 | Operación sin permiso | Toast de no autorizado. |
 | Error de red | Toast de conexión. |
+
+## Errores de validación en registro de persona
+
+`PersonaForm` representa las respuestas `400` y `422` con detalles por campo
+en un resumen local. El adaptador `persona-validation.js`:
+
+- acepta `detalles`, `details`, `fieldErrors`, `validaciones` y `errors`;
+- convierte propiedades técnicas como `ocupacionId` o `direccionEmpresa` en
+  etiquetas como `Ocupación` y `Dirección de la empresa`;
+- identifica la pestaña donde se encuentra cada campo;
+- elimina errores duplicados y conserva el orden del formulario;
+- mantiene la referencia de correlación cuando el backend la proporciona;
+- usa una etiqueta humanizada para propiedades no registradas, sin imprimir
+  directamente el identificador técnico como texto de interfaz.
+
+La presentación utiliza contenido con salto de línea y `break-words`, por lo
+que los mensajes largos no deben ampliar horizontalmente el formulario. El
+resumen usa `role="alert"` y `aria-live="assertive"`; cada elemento permite
+abrir la pestaña correspondiente y enfocar el control asociado.
+
+Los errores de red y servidor sin detalles estructurados conservan el toast
+genérico. Un fallo no limpia el formulario ni ejecuta automáticamente un nuevo
+`POST`; el usuario decide cuándo corregir y reenviar.
+
+## Conflictos de operación de perfil
+
+`src/lib/api.js` distingue el conflicto funcional de política del conflicto de concurrencia:
+
+- `isProfileOperationConflict(error)` requiere estado `409` y el código `CONFLICTO_OPERACION_PERFIL`;
+- `isConcurrencyConflict(error)` identifica los demás `409`.
+
+Los formularios de perfiles, usuarios y reactivación presentan mensajes diferentes para cada caso y no muestran éxito cuando el backend rechaza la operación. El detalle de la política y su respuesta se documenta en `doc/api/perfiles.md`.
 
 ## Relación con backend
 

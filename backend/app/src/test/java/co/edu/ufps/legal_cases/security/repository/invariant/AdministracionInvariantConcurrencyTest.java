@@ -528,7 +528,7 @@ class AdministracionInvariantConcurrencyTest
 
         permiso.setNombre(nombre);
         permiso.setDescripcion(
-                "Permiso SEC-08");
+                "Permiso de prueba");
         permiso.setActivo(true);
 
         entityManager.persist(permiso);
@@ -544,7 +544,7 @@ class AdministracionInvariantConcurrencyTest
 
         rol.setNombre(nombre);
         rol.setDescripcion(
-                "Rol SEC-08");
+                "Rol de prueba");
         rol.setActivo(true);
         rol.setTipoPerfil(
                 TipoPerfilUsuario.ADMINISTRATIVO);

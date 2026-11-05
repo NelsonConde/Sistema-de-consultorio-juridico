@@ -57,7 +57,10 @@ Criterio operativo:
 - el usuario del sistema es la entidad de autenticación;
 - el perfil real aporta datos funcionales del rol humano;
 - el sistema resuelve el perfil activo mediante estrategias por tipo de perfil;
-- al desactivar o reactivar perfiles desde sus servicios de comando, el estado se sincroniza con `UsuarioSistema`.
+- `UsuarioSistema.activo` representa el estado independiente de la cuenta y no se sincroniza desde operaciones directas de perfil;
+- una cuenta debe conservar un único perfil operativo activo; las inconsistencias preexistentes se rechazan sin saneamiento automático.
+
+Cada entidad de perfil declara una relación uno a uno con `UsuarioSistema` y unicidad de `usuario_sistema_id` dentro de su propia tabla. Esto evita duplicar una cuenta dentro de una misma tabla de perfil, pero no impone unicidad entre las cinco tablas. La exclusividad de perfil activo entre tipos se valida en la aplicación y se serializa con bloqueo transaccional; no se documenta una restricción de base de datos transversal ni una migración para esa regla.
 
 ### `rol`
 
@@ -570,6 +573,7 @@ Campos principales:
 
 | Columna | Uso |
 |---|---|
+| `version` | Versión de bloqueo optimista administrada por JPA mediante `@Version`. |
 | `fecha` | Fecha de la consulta. |
 | `descripcion` | Descripción breve. |
 | `hechos` | Hechos del caso. |
@@ -606,6 +610,7 @@ consulta -> estudiante
 consulta -> proceso
 consulta -> seguimiento
 consulta -> conciliacion
+consulta -> consulta_reasignacion_historial
 ```
 
 Tablas de relación:
@@ -624,6 +629,49 @@ Reglas implementadas por servicios:
 - una consulta no se cierra con procesos pendientes, seguimientos pendientes, respuestas pendientes, notificaciones pendientes o conciliaciones pendientes;
 - una consulta con procesos, seguimientos o conciliaciones activas no permite modificar datos estructurales;
 - campos narrativos y complementarios se mantienen editables mientras la consulta permita operación.
+
+### `consulta_reasignacion_historial`
+
+Entidad:
+
+```text
+ConsultaReasignacionHistorial
+```
+
+Propósito:
+
+Conserva eventos inmutables de reasignación individual de estudiante, asesor o monitor. La tabla se crea mediante la migración operativa versionada `V20261011_01__create_consulta_reasignacion_historial.sql` dentro del esquema `"DB_consultorioJuridico"`.
+
+Campos:
+
+| Columna | Tipo PostgreSQL | Nulabilidad | Uso |
+|---|---|---|---|
+| `id` | `BIGINT IDENTITY` | No | Identificador del evento. |
+| `consulta_id` | `BIGINT` | No | Consulta modificada. |
+| `tipo_responsable` | `VARCHAR(20)` | No | `ESTUDIANTE`, `ASESOR` o `MONITOR`. |
+| `responsable_anterior_id` | `BIGINT` | Sí | Identificador previo; puede ser nulo si el rol no estaba asignado. |
+| `responsable_nuevo_id` | `BIGINT` | No | Identificador asignado por la operación. |
+| `motivo` | `TEXT` | No | Motivo normalizado de la reasignación. |
+| `actor_usuario_id` | `BIGINT` | No | Usuario del sistema que ejecutó la operación. |
+| `ocurrido_en` | `TIMESTAMPTZ` | No | Instante inequívoco del evento; la entidad lo representa con `Instant`. |
+
+Integridad:
+
+- `consulta_id` referencia `consulta.id` y `actor_usuario_id` referencia `usuario_sistema.id`, ambas con `ON UPDATE RESTRICT` y `ON DELETE RESTRICT`;
+- restricciones `CHECK` limitan el tipo, exigen identificadores positivos, responsables distintos y un motivo no vacío después de `BTRIM`;
+- `trg_validar_responsables_reasignacion` valida los identificadores polimórficos contra `estudiante`, `asesor` o `monitor` según `tipo_responsable`;
+- no existe una clave foránea de responsable hacia una tabla común, porque los tres tipos pertenecen a tablas diferentes;
+- `trg_historial_reasignacion_inmutable` rechaza `UPDATE` y `DELETE` en PostgreSQL;
+- la entidad usa `@Immutable`, columnas no actualizables y un repositorio limitado a inserción.
+
+Índices:
+
+```text
+idx_reasignacion_historial_consulta_fecha (consulta_id, ocurrido_en DESC, id DESC)
+idx_reasignacion_historial_actor_fecha (actor_usuario_id, ocurrido_en DESC)
+```
+
+La tabla conserva todos los eventos sucesivos; una reasignación posterior no sobrescribe registros anteriores.
 
 ## 6. Seguimientos
 
@@ -1211,6 +1259,7 @@ La integridad se protege mediante:
 - bloqueo de cierre de consulta con pendientes;
 - bloqueo de cambio estructural de consulta con actividad asociada;
 - validación condicional de radicado en procesos;
-- sincronización entre perfil y usuario del sistema;
+- separación entre estado de cuenta y estado de perfil;
+- bloqueo pesimista por cuenta y validación de exclusividad en operaciones de perfil;
 - estrategias para cambio y resolución de perfil activo;
 - auditoría de acciones relevantes.

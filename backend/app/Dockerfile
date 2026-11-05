@@ -16,7 +16,8 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-COPY --from=builder /workspace/target/*.jar /app/app.jar
+COPY --from=builder /workspace/target/legal-cases-backend.jar /app/app.jar
+COPY --from=builder /workspace/target/legal-cases-backend-migrations.jar /app/migrations.jar
 
 RUN mkdir -p /app/uploads
 

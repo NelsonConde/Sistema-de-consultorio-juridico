@@ -1,6 +1,7 @@
 package co.edu.ufps.legal_cases.business.controller.consulta;
 
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.ARCHIVAR_CONSULTAS;
+import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.ASIGNAR_RESPONSABLES_CONSULTA;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.GESTIONAR_CONSULTAS;
 import static co.edu.ufps.legal_cases.security.constant.PermisoNombre.VER_CONSULTAS;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -28,6 +29,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import co.edu.ufps.legal_cases.business.dto.consulta.ficha.FichaExpedienteDTO;
+import co.edu.ufps.legal_cases.business.dto.consulta.ConsultaReasignacionDTO;
 import co.edu.ufps.legal_cases.business.service.consulta.ConsultaService;
 import co.edu.ufps.legal_cases.common.dto.PageResponseDTO;
 
@@ -128,6 +130,74 @@ class ConsultaControllerAuthorizationTest {
         assertThrows(
                 AccessDeniedException.class,
                 () -> consultaController.listarArchivadas(null, 1, 10, "fecha", "desc"));
+
+        verifyNoInteractions(consultaService);
+    }
+
+    @Test
+    void soloUsuarioConPermisoAsignarPuedeReasignarResponsable() {
+        autenticarCon(ASIGNAR_RESPONSABLES_CONSULTA);
+        ConsultaReasignacionDTO solicitud = new ConsultaReasignacionDTO();
+
+        assertDoesNotThrow(() -> consultaController.reasignarResponsable(10L, solicitud));
+
+        verify(consultaService).reasignarResponsable(10L, solicitud);
+    }
+
+    @Test
+    void usuarioSinPermisoAsignarNoPuedeReasignarResponsable() {
+        autenticarCon(VER_CONSULTAS);
+        ConsultaReasignacionDTO solicitud = new ConsultaReasignacionDTO();
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> consultaController.reasignarResponsable(10L, solicitud));
+
+        verifyNoInteractions(consultaService);
+    }
+
+    @Test
+    void usuarioConPermisoVerPuedeConsultarHistorialPaginado() {
+        autenticarCon(VER_CONSULTAS);
+        when(consultaService.listarHistorialResponsables(10L, 1, 10))
+                .thenReturn(new PageResponseDTO<>(List.of(), 1, 10, 0, 0));
+
+        assertDoesNotThrow(
+                () -> consultaController.listarHistorialResponsables(10L, 1, 10));
+
+        verify(consultaService).listarHistorialResponsables(10L, 1, 10);
+    }
+
+    @Test
+    void usuarioConPermisoGestionarPuedeConsultarHistorialPaginado() {
+        autenticarCon(GESTIONAR_CONSULTAS);
+        when(consultaService.listarHistorialResponsables(11L, 2, 5))
+                .thenReturn(new PageResponseDTO<>(List.of(), 2, 5, 0, 0));
+
+        assertDoesNotThrow(
+                () -> consultaController.listarHistorialResponsables(11L, 2, 5));
+
+        verify(consultaService).listarHistorialResponsables(11L, 2, 5);
+    }
+
+    @Test
+    void usuarioSinPermisoLecturaNoPuedeConsultarHistorial() {
+        autenticarCon(ASIGNAR_RESPONSABLES_CONSULTA);
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> consultaController.listarHistorialResponsables(10L, 1, 10));
+
+        verifyNoInteractions(consultaService);
+    }
+
+    @Test
+    void peticionSinAutenticacionNoPuedeConsultarHistorial() {
+        SecurityContextHolder.clearContext();
+
+        assertThrows(
+                AuthenticationCredentialsNotFoundException.class,
+                () -> consultaController.listarHistorialResponsables(10L, 1, 10));
 
         verifyNoInteractions(consultaService);
     }

@@ -1,0 +1,40 @@
+name: PR Title Convention
+
+# Work PRs use the target branch's validator. For protected-branch promotions,
+# older targets lack the validator, so use the fixed reviewed validator commit.
+# Workflow permissions remain read-only; changes require independent review.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+    branches: [develop, staging, main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-pr-title:
+    name: Validate PR title
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout trusted validation revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && ((github.event.pull_request.head.ref == 'develop' && github.event.pull_request.base.ref == 'staging') || (github.event.pull_request.head.ref == 'staging' && github.event.pull_request.base.ref == 'main'))) && 'bcc5d37ca954da72b687b957518470fda8420dcf' || github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run trusted validation tests
+        run: node --test .github/scripts/validate-pr-title.test.mjs
+
+      - name: Validate pull request title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_BASE_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
+        run: node .github/scripts/validate-pr-title.mjs

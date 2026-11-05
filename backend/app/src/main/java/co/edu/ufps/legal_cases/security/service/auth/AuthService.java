@@ -18,6 +18,7 @@ import co.edu.ufps.legal_cases.security.service.auth.login.LoginMapper;
 import co.edu.ufps.legal_cases.security.service.auth.login.LoginValidator;
 import co.edu.ufps.legal_cases.security.service.auth.password.CambioPasswordValidator;
 import co.edu.ufps.legal_cases.security.service.jwt.JwtService;
+import co.edu.ufps.legal_cases.audit.aop.log.Auditable;
 
 @Service
 public class AuthService {
@@ -57,15 +58,20 @@ public class AuthService {
                 .findWithRolAndPermisosByUsernameIgnoreCase(username)
                 .orElseThrow(() -> new BusinessException("Usuario o contraseña incorrectos"));
 
-        PerfilUsuarioActual perfilActual = loginValidator.validarUsuarioPuedeAutenticarse(usuario);
+        PerfilUsuarioActual perfilActual =
+                loginValidator.validarUsuarioPuedeAutenticarse(usuario);
 
         loginValidator.validarPasswordCorrecta(
                 dto.getPassword(),
                 usuario,
                 passwordEncoder);
 
-        LoginResponseDTO response = loginMapper.convertirAResponse(usuario, perfilActual);
-        String token = jwtService.generarToken(usuario.getUsername());
+        LoginResponseDTO response =
+                loginMapper.convertirAResponse(usuario, perfilActual);
+
+        String token = jwtService.generarToken(
+                usuario.getUsername(),
+                usuario.getAuthVersion());
 
         return new LoginResultDTO(response, token);
     }
@@ -78,8 +84,16 @@ public class AuthService {
     }
 
     @Transactional
-    public void cambiarPassword(String token, CambiarPasswordRequestDTO dto) {
-        UsuarioSistema usuario = obtenerUsuarioAutenticado(token); // Con el token esta el usuario.
+    @Auditable(
+            action = "CAMBIAR_PASSWORD_PROPIA",
+            entityName = "UsuarioSistema",
+            entityId = "'self'")
+    public String cambiarPassword(
+            String token,
+            CambiarPasswordRequestDTO dto) {
+
+        UsuarioSistema usuario =
+                obtenerUsuarioAutenticadoParaActualizar(token);
 
         cambioPasswordValidator.validarDatosCambioPassword(dto);
 
@@ -93,26 +107,73 @@ public class AuthService {
                 usuario,
                 passwordEncoder);
 
-        usuario.setPasswordHash(passwordEncoder.encode(dto.getPasswordNueva()));
+        usuario.setPasswordHash(
+                passwordEncoder.encode(dto.getPasswordNueva()));
+
+        // Invalida todos los JWT emitidos con la versión anterior.
+        usuario.setAuthVersion(usuario.getAuthVersion() + 1L);
+
         usuarioSistemaRepository.save(usuario);
+
+        // La sesión que realizó correctamente el cambio recibe una credencial nueva.
+        return jwtService.generarToken(
+                usuario.getUsername(),
+                usuario.getAuthVersion());
     }
 
-    // Obtiene el usuario logueado a partir del token enviado en la cookie.
-    // También valida que el usuario, el rol y el perfil asociado estén activos.
+    private UsuarioSistema obtenerUsuarioAutenticadoParaActualizar(
+            String token) {
+
+        if (token == null || token.isBlank()) {
+            throw new BusinessException("No hay sesión activa");
+        }
+
+        String username = jwtService.obtenerUsername(token);
+
+        Long usuarioId = usuarioSistemaRepository
+                .findIdByUsernameIgnoreCase(username)
+                .orElseThrow(() ->
+                        new BusinessException("Usuario no encontrado"));
+
+        UsuarioSistema usuario = usuarioSistemaRepository
+                .findByIdForUpdate(usuarioId)
+                .orElseThrow(() ->
+                        new BusinessException("Usuario no encontrado"));
+
+        validarVersionAutenticacion(token, usuario);
+        loginValidator.validarUsuarioPuedeAutenticarse(usuario);
+
+        return usuario;
+    }
+
+    // Obtiene el usuario autenticado a partir del JWT enviado en la cookie.
+    // También valida que la credencial siga vigente y que usuario, rol y perfil estén activos.
     private UsuarioSistema obtenerUsuarioAutenticado(String token) {
         if (token == null || token.isBlank()) {
             throw new BusinessException("No hay sesión activa");
         }
 
-        // Si expiro o es invalido, el metodo lanza una excepcion.
         String username = jwtService.obtenerUsername(token);
 
         UsuarioSistema usuario = usuarioSistemaRepository
                 .findWithRolAndPermisosByUsernameIgnoreCase(username)
-                .orElseThrow(() -> new BusinessException("Usuario no encontrado"));
+                .orElseThrow(() ->
+                        new BusinessException("Usuario no encontrado"));
 
+        validarVersionAutenticacion(token, usuario);
         loginValidator.validarUsuarioPuedeAutenticarse(usuario);
 
         return usuario;
+    }
+
+    private void validarVersionAutenticacion(
+            String token,
+            UsuarioSistema usuario) {
+
+        long versionToken = jwtService.obtenerAuthVersion(token);
+
+        if (versionToken != usuario.getAuthVersion()) {
+            throw new BusinessException("Token inválido o expirado");
+        }
     }
 }

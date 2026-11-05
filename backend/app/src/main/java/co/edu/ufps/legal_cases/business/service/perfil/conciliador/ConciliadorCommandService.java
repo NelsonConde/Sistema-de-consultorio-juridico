@@ -21,8 +21,11 @@ import co.edu.ufps.legal_cases.business.repository.catalogo.TipoDocumentoReposit
 import co.edu.ufps.legal_cases.business.repository.perfil.ConciliadorRepository;
 import co.edu.ufps.legal_cases.business.service.acceso.perfil.ConciliadorAccessService;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
+import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
-import co.edu.ufps.legal_cases.security.service.account.usuario.UsuarioSistemaPerfilEstadoService;
+import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaRepository;
+import co.edu.ufps.legal_cases.security.service.account.perfil.OperacionEstadoPerfil;
+import co.edu.ufps.legal_cases.security.service.account.perfil.PerfilOperacionEstadoValidator;
 import co.edu.ufps.legal_cases.security.service.account.usuario.UsuarioSistemaRegistroService;
 
 @Service
@@ -32,7 +35,8 @@ public class ConciliadorCommandService {
     private final TipoDocumentoRepository tipoDocumentoRepository;
     private final SedeRepository sedeRepository;
     private final UsuarioSistemaRegistroService usuarioSistemaRegistroService;
-    private final UsuarioSistemaPerfilEstadoService usuarioSistemaPerfilEstadoService;
+    private final UsuarioSistemaRepository usuarioSistemaRepository;
+    private final PerfilOperacionEstadoValidator perfilOperacionEstadoValidator;
     private final ConciliadorAccessService conciliadorAccessService;
     private final ConciliadorValidator conciliadorValidator;
     private final ConciliadorMapper conciliadorMapper;
@@ -42,7 +46,8 @@ public class ConciliadorCommandService {
             TipoDocumentoRepository tipoDocumentoRepository,
             SedeRepository sedeRepository,
             UsuarioSistemaRegistroService usuarioSistemaRegistroService,
-            UsuarioSistemaPerfilEstadoService usuarioSistemaPerfilEstadoService,
+            UsuarioSistemaRepository usuarioSistemaRepository,
+            PerfilOperacionEstadoValidator perfilOperacionEstadoValidator,
             ConciliadorAccessService conciliadorAccessService,
             ConciliadorValidator conciliadorValidator,
             ConciliadorMapper conciliadorMapper) {
@@ -50,7 +55,8 @@ public class ConciliadorCommandService {
         this.tipoDocumentoRepository = tipoDocumentoRepository;
         this.sedeRepository = sedeRepository;
         this.usuarioSistemaRegistroService = usuarioSistemaRegistroService;
-        this.usuarioSistemaPerfilEstadoService = usuarioSistemaPerfilEstadoService;
+        this.usuarioSistemaRepository = usuarioSistemaRepository;
+        this.perfilOperacionEstadoValidator = perfilOperacionEstadoValidator;
         this.conciliadorAccessService = conciliadorAccessService;
         this.conciliadorValidator = conciliadorValidator;
         this.conciliadorMapper = conciliadorMapper;
@@ -126,21 +132,20 @@ public class ConciliadorCommandService {
     public ConciliadorDTO cambiarEstado(Long id, Boolean activo) {
         conciliadorAccessService.validarPuedeGestionarConciliadores();
 
-        Conciliador conciliador = buscarPorId(id);
+        Conciliador conciliador = buscarPorIdConUsuarioBloqueado(id);
+
+        if (activo == null) {
+            conciliadorValidator.validarCambioEstado(conciliador, null);
+        }
+
+        validarOperacionDirectaSiTieneUsuario(conciliador, activo);
 
         conciliadorValidator.validarCambioEstado(conciliador, activo);
 
         conciliador.setActivo(activo);
 
-        Conciliador guardado = conciliadorRepository.save(conciliador);
-
-        // El estado operativo del perfil y del usuario de acceso deben permanecer
-        // sincronizados.
-        usuarioSistemaPerfilEstadoService.sincronizarEstadoSiExiste(
-                guardado.getUsuarioSistema(),
-                activo);
-
-        return conciliadorMapper.convertirADTO(guardado);
+        return conciliadorMapper.convertirADTO(
+                conciliadorRepository.save(conciliador));
     }
 
     @Transactional
@@ -148,7 +153,9 @@ public class ConciliadorCommandService {
     public void eliminar(Long id) {
         conciliadorAccessService.validarPuedeGestionarConciliadores();
 
-        Conciliador conciliador = buscarPorId(id);
+        Conciliador conciliador = buscarPorIdConUsuarioBloqueado(id);
+
+        validarOperacionDirectaSiTieneUsuario(conciliador, false);
 
         // Se conserva el perfil y se desactiva porque puede quedar asociado a
         // conciliaciones.
@@ -156,11 +163,39 @@ public class ConciliadorCommandService {
 
         conciliador.setActivo(false);
 
-        Conciliador guardado = conciliadorRepository.save(conciliador);
+        conciliadorRepository.save(conciliador);
+    }
 
-        usuarioSistemaPerfilEstadoService.sincronizarEstadoSiExiste(
-                guardado.getUsuarioSistema(),
-                false);
+    private Conciliador buscarPorIdConUsuarioBloqueado(Long id) {
+        conciliadorRepository.findUsuarioSistemaIdById(id)
+                .ifPresent(this::bloquearUsuarioSistema);
+
+        return buscarPorId(id);
+    }
+
+    private void bloquearUsuarioSistema(Long usuarioSistemaId) {
+        usuarioSistemaRepository.findByIdForUpdate(usuarioSistemaId)
+                .orElseThrow(() -> new BusinessException(
+                        "Usuario del sistema no encontrado con id: "
+                                + usuarioSistemaId));
+    }
+
+    private void validarOperacionDirectaSiTieneUsuario(
+            Conciliador conciliador,
+            Boolean activo) {
+
+        UsuarioSistema usuarioSistema = conciliador.getUsuarioSistema();
+
+        if (usuarioSistema == null) {
+            return;
+        }
+
+        perfilOperacionEstadoValidator.validarOperacionDirecta(
+                usuarioSistema,
+                TipoPerfilUsuario.CONCILIADOR,
+                Boolean.TRUE.equals(activo)
+                        ? OperacionEstadoPerfil.ACTIVAR
+                        : OperacionEstadoPerfil.DESACTIVAR);
     }
 
     private DatosConciliador prepararDatos(ConciliadorDTO dto, Boolean activo) {

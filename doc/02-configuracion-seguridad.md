@@ -106,6 +106,10 @@ app.mail.app-name=Consultorio Juridico
 
 Los flujos que consumen el servicio de correo incluyen recuperación de contraseña y notificaciones funcionales de otros módulos.
 
+El cambio autenticado y el restablecimiento de contraseña mantienen separadas las credenciales, la habilitación de la cuenta y el perfil operativo. Ambos modifican la cuenta cargada bajo `PESSIMISTIC_WRITE` dentro de la transacción y vuelven a validar las condiciones aplicables después del bloqueo. El restablecimiento relee también el token activo tras bloquear la cuenta, por lo que una solicitud concurrente no puede reutilizar un token ya consumido. Estos flujos no cambian `activo`, rol, permisos, `tipoPerfilActual` ni estados de perfil.
+
+La medida es preventiva ante pérdidas de actualización; no corresponde a un incidente confirmado en producción ni implica que se hayan auditado todos los escritores posibles de `UsuarioSistema`.
+
 ## CORS
 
 `CorsConfig` registra la política de CORS para todas las rutas mediante las propiedades `app.cors.*` cargadas en `CorsProperties`.
@@ -183,6 +187,16 @@ credentials: "include"
 ```
 
 en sus solicitudes para transportar la cookie de sesión.
+
+### Dependencias del frontend y validación
+
+En `develop`, `frontend/package.json` declara Next.js `^16.4.1` y `frontend/package-lock.json` resuelve `16.4.1`. En `main`, esos mismos archivos todavía declaran y resuelven `16.2.6`. La configuración versionada en una rama no acredita por sí sola la versión desplegada en producción; este documento no atribuye ninguna de esas versiones a un despliegue efectivo.
+
+`shadcn` está declarado en `devDependencies` con el rango `^4.2.0`; el lockfile de `develop` resuelve `4.21.4` y marca el paquete como dependencia de desarrollo. Aunque su CLI no se necesita durante la ejecución de la aplicación, las dependencias de desarrollo deben estar disponibles durante la compilación porque `src/app/globals.css` importa `shadcn/tailwind.css`. El Dockerfile y el workflow de integración continua satisfacen esta condición al ejecutar `npm ci` sin `--omit=dev` antes de `npm run build`; el Dockerfile excluye esas dependencias únicamente en la etapa de ejecución posterior al build.
+
+Como antecedente histórico, una validación aislada con Node.js 22 y npm 10.9.4 sobre la actualización que dejó Next.js en `16.4.1` registró `proxy-addr` `2.0.8`, cero vulnerabilidades en dependencias de producción con `npm audit --omit=dev` y, en el árbol completo, 7 vulnerabilidades altas y 2 moderadas. Entre los hallazgos de desarrollo registrados estuvieron `braces@3.0.3` (`GHSA-vfj7-8cjw-p6xm`) a través de la cadena de herramientas de `shadcn` y `uuid` (`GHSA-w5hq-g745-h8pq`) a través de `@hookform/devtools`. No se ejecutó una nueva auditoría para esta revisión documental: estas cifras describen exclusivamente aquella ejecución y no constituyen un resultado actual ni garantizan el estado futuro del registro.
+
+El workflow versionado en `develop` declara permisos globales mínimos para `GITHUB_TOKEN` mediante `permissions: contents: read`, suficientes para obtener el contenido y ejecutar las tareas definidas. El workflow versionado en `main` no contiene todavía esa declaración explícita. En ambas ramas, la CI instala con `npm ci`, ejecuta `npm run build` y `npm run lint`; no ejecuta `npm audit` ni Playwright. Por tanto, los resultados aislados de auditoría y E2E no deben presentarse como comprobaciones de CI.
 
 ## Manejo documental de datos sensibles
 

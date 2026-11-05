@@ -46,6 +46,9 @@ public interface AsesorRepository extends JpaRepository<Asesor, Long> {
 
     Optional<Asesor> findByUsuarioSistema_Id(Long usuarioSistemaId);
 
+    @Query("SELECT a.usuarioSistema.id FROM Asesor a WHERE a.id = :id")
+    Optional<Long> findUsuarioSistemaIdById(@Param("id") Long id);
+
     // Para obtener datos y notificar
     @Query("""
             SELECT new co.edu.ufps.legal_cases.business.dto.seguimiento.notificacion.SeguimientoDestinatarioDTO(

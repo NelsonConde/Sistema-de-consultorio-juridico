@@ -20,8 +20,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+import { AlertTriangle, CheckCircle2, ExternalLink, RefreshCw } from "lucide-react";
 
 import { API_URL_BASE } from "@/lib/config";
+import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import ArchivosConsultaForm from "../parts/ArchivosConsultaForm";
 import { PERMISOS } from "@/lib/permission";
 import { tienePermiso } from "@/lib/authz";
@@ -43,6 +45,9 @@ import {
 } from "./consultas-juridicas.utils";
 import { ModalMultiple, ModalSimple } from "./ConsultaSelectionModals";
 import { RemotePagedSelect } from "../parts/RemotePagedSelect";
+
+const MENSAJE_SESION_VENCIDA =
+  "Tu sesión venció. Inicia sesión nuevamente para guardar esta consulta";
 
 export function NuevaConsultaForm() {
   const router = useRouter();
@@ -67,7 +72,11 @@ export function NuevaConsultaForm() {
   );
   const [guardando, setGuardando] = useState(false);
   const submitLockRef = useRef(false);
+  const identidadInicialRef = useRef(null);
   const [checking, setChecking] = useState(true);
+  const [estadoSesion, setEstadoSesion] = useState("activa");
+  const [mensajeSesion, setMensajeSesion] = useState("");
+  const [confirmarDescarte, setConfirmarDescarte] = useState(false);
   const [puedeAsignarResponsables, setPuedeAsignarResponsables] =
     useState(false);
 
@@ -197,6 +206,33 @@ export function NuevaConsultaForm() {
         ? modalContrapartes.busqueda
         : "";
 
+  const formularioModificado = useMemo(
+    () =>
+      Object.entries(form).some(([campo, valor]) => {
+        if (Array.isArray(valor)) {
+          return valor.length > 0;
+        }
+
+        return String(valor ?? "") !== String(VACIOS[campo] ?? "");
+      }),
+    [form]
+  );
+
+  const tieneBorradorSinGuardar =
+    !consultaCreadaId && (formularioModificado || archivos.length > 0);
+
+  useEffect(() => {
+    if (!tieneBorradorSinGuardar) return;
+
+    function confirmarSalida(event) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", confirmarSalida);
+    return () => window.removeEventListener("beforeunload", confirmarSalida);
+  }, [tieneBorradorSinGuardar]);
+
   useEffect(() => {
     if (!modalPersonasAbierto) return;
 
@@ -274,6 +310,126 @@ export function NuevaConsultaForm() {
     setModal({ abierto: true, busqueda: "" });
   }
 
+  function limpiarBorradorPorCambioDeCuenta() {
+    setForm({ ...VACIOS });
+    setArchivos([]);
+    setConsultaCreadaId(null);
+    setConfirmarDescarte(false);
+    setPuedeAsignarResponsables(false);
+
+    setPersonasResultado([]);
+    setPersonasCache({});
+    setPersonasBusquedaAplicada("");
+    setPersonasPagina(1);
+    setPersonasTotalPaginas(0);
+    setPersonasTotalElementos(0);
+
+    setAsesores([]);
+    setMonitores([]);
+    setEstudiantes([]);
+
+    setModalParte({ abierto: false, busqueda: "" });
+    setModalPartesAdicionales({ abierto: false, busqueda: "" });
+    setModalContrapartes({ abierto: false, busqueda: "" });
+  }
+
+  function abrirInicioSesion() {
+    window.open("/", "_blank", "noopener,noreferrer");
+  }
+
+  async function revalidarSesion() {
+    if (estadoSesion === "comprobando") return;
+
+    setEstadoSesion("comprobando");
+    setMensajeSesion("");
+
+    try {
+      const res = await apiClient.get(`${API_URL_BASE}/auth/me`, {
+        cache: "no-store",
+      });
+
+      if (res.status === 401) {
+        setEstadoSesion("vencida");
+        setMensajeSesion(
+          "La sesión aún no está activa. Completa el inicio de sesión en la otra pestaña y vuelve a comprobar."
+        );
+        return;
+      }
+
+      if (!res.ok) {
+        setEstadoSesion("vencida");
+        setMensajeSesion(
+          res.status === 403
+            ? "La cuenta autenticada no tiene permiso para crear consultas."
+            : "No fue posible comprobar la sesión. Intenta nuevamente."
+        );
+        return;
+      }
+
+      const user = await res.json();
+      const identidadActual =
+          user?.id == null ? null : String(user.id);
+
+      const cambioIdentidad =
+          identidadActual !== identidadInicialRef.current;
+
+      if (cambioIdentidad) {
+        limpiarBorradorPorCambioDeCuenta();
+        identidadInicialRef.current = identidadActual;
+      }
+
+      if (identidadActual === null) {
+        setEstadoSesion("vencida");
+        setMensajeSesion(
+            "No fue posible verificar la identidad. El borrador anterior se descartó por seguridad."
+        );
+        return;
+      }
+      const puedeCrear =
+        tienePermiso(user, PERMISOS.ACCEDER_NUEVA_CONSULTA) &&
+        tienePermiso(user, PERMISOS.CREAR_CONSULTAS);
+
+      if (!puedeCrear) {
+        setEstadoSesion("vencida");
+        setMensajeSesion(
+          "La cuenta autenticada no tiene permiso para crear consultas."
+        );
+        return;
+      }
+
+      await apiClient.refreshCsrfToken();
+
+      setPuedeAsignarResponsables(
+        tienePermiso(user, PERMISOS.ASIGNAR_RESPONSABLES_CONSULTA)
+      );
+      setEstadoSesion("lista");
+      setMensajeSesion(
+          cambioIdentidad
+              ? "Se detectó un cambio de cuenta. El borrador anterior se descartó por seguridad. Completa una nueva consulta antes de enviarla."
+              : "Sesión comprobada. Revisa el formulario y usa “Reintentar creación” para enviarlo."
+      );
+    } catch {
+      setEstadoSesion("vencida");
+      setMensajeSesion(
+        "No fue posible comprobar la sesión. Verifica la conexión e intenta nuevamente."
+      );
+    }
+  }
+
+  function solicitarCancelar() {
+    if (tieneBorradorSinGuardar) {
+      setConfirmarDescarte(true);
+      return;
+    }
+
+    router.push("/consultasjuridicas");
+  }
+
+  function descartarBorrador() {
+    setConfirmarDescarte(false);
+    router.push("/consultasjuridicas");
+  }
+
   useEffect(() => {
     async function verificar() {
       try {
@@ -302,6 +458,13 @@ export function NuevaConsultaForm() {
           router.replace("/inicio");
           return;
         }
+
+        if (user?.id == null) {
+          router.replace("/");
+          return;
+        }
+
+        identidadInicialRef.current = String(user.id);
 
         const puedeAsignar = tienePermiso(
           user,
@@ -698,6 +861,11 @@ export function NuevaConsultaForm() {
       return;
     }
 
+    if (estadoSesion === "vencida" || estadoSesion === "comprobando") {
+      toast.error("Debes volver a comprobar la sesión antes de reenviar");
+      return;
+    }
+
     /*
      * La consulta ya existe. A partir de aquí solo se pueden
      * reintentar operaciones documentales.
@@ -779,7 +947,8 @@ export function NuevaConsultaForm() {
       );
 
       if (res.status === 401) {
-        router.replace("/");
+        setEstadoSesion("vencida");
+        setMensajeSesion("");
         return;
       }
 
@@ -811,6 +980,8 @@ export function NuevaConsultaForm() {
       }
 
       setConsultaCreadaId(consultaId);
+      setEstadoSesion("activa");
+      setMensajeSesion("");
 
       toast.success("Consulta creada");
 
@@ -852,6 +1023,68 @@ export function NuevaConsultaForm() {
   return (
     <>
       <form onSubmit={handleGuardar} className="space-y-4">
+        {estadoSesion !== "activa" && (
+          <section
+            role={estadoSesion === "lista" ? "status" : "alert"}
+            aria-live={estadoSesion === "lista" ? "polite" : "assertive"}
+            className={
+              estadoSesion === "lista"
+                ? "rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-100"
+                : "rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100"
+            }
+          >
+            <div className="flex items-start gap-3">
+              {estadoSesion === "lista" ? (
+                <CheckCircle2 className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+              ) : (
+                <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+              )}
+
+              <div className="min-w-0 flex-1 space-y-3">
+                <div>
+                  <h2 className="font-semibold">
+                    {estadoSesion === "lista" ? "Sesión revalidada" : "Sesión vencida"}
+                  </h2>
+                  <p className="mt-1 text-sm">
+                    {estadoSesion === "lista"
+                      ? mensajeSesion
+                      : MENSAJE_SESION_VENCIDA}
+                  </p>
+                  {estadoSesion !== "lista" && mensajeSesion && (
+                    <p className="mt-1 text-sm">{mensajeSesion}</p>
+                  )}
+                </div>
+
+                {estadoSesion !== "lista" && (
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={abrirInicioSesion}
+                    >
+                      <ExternalLink aria-hidden="true" />
+                      Abrir inicio de sesión
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={revalidarSesion}
+                      disabled={estadoSesion === "comprobando"}
+                    >
+                      <RefreshCw
+                        aria-hidden="true"
+                        className={estadoSesion === "comprobando" ? "animate-spin" : ""}
+                      />
+                      {estadoSesion === "comprobando"
+                        ? "Comprobando..."
+                        : "Volver a comprobar sesión"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <C label="Fecha *">
             <input
@@ -1210,7 +1443,7 @@ export function NuevaConsultaForm() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push("/consultasjuridicas")}
+            onClick={solicitarCancelar}
             disabled={guardando || archivosSubiendo}
           >
             Cancelar
@@ -1218,7 +1451,12 @@ export function NuevaConsultaForm() {
 
           <Button
               type="submit"
-              disabled={guardando || archivosSubiendo}
+              disabled={
+                guardando ||
+                archivosSubiendo ||
+                estadoSesion === "vencida" ||
+                estadoSesion === "comprobando"
+              }
           >
             {guardando || archivosSubiendo
                 ? consultaCreadaId
@@ -1226,7 +1464,9 @@ export function NuevaConsultaForm() {
                     : "Guardando..."
                 : consultaCreadaId
                     ? "Reintentar archivos"
-                    : "Crear consulta"}
+                    : estadoSesion === "lista"
+                      ? "Reintentar creación"
+                      : "Crear consulta"}
           </Button>
         </div>
       </form>
@@ -1339,6 +1579,16 @@ export function NuevaConsultaForm() {
         }}
         seleccionados={form.contrapartesIds}
         renderItem={renderPersona}
+      />
+
+      <ConfirmActionDialog
+        open={confirmarDescarte}
+        title="Descartar consulta sin guardar"
+        description="Los datos de esta consulta se conservan únicamente en memoria. Si sales, el borrador se perderá."
+        confirmText="Descartar y salir"
+        cancelText="Conservar borrador"
+        onConfirm={descartarBorrador}
+        onClose={() => setConfirmarDescarte(false)}
       />
     </>
   );

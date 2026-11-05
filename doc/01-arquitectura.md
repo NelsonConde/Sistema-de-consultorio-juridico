@@ -170,6 +170,18 @@ MonitorPerfilUsuarioActivoResolver
 
 Cada resolver busca el perfil activo del usuario en su repositorio correspondiente.
 
+## Exclusividad y concurrencia de perfiles
+
+La exclusividad de un perfil activo por cuenta es una regla de aplicación. En operaciones directas, los command services bloquean `UsuarioSistema` con `PESSIMISTIC_WRITE`, vuelven a cargar el perfil, validan la política central y persisten dentro de la transacción. El cambio explícito y la suspensión o habilitación de la cuenta también usan ese bloqueo para serializar las escrituras sobre la misma fila de `UsuarioSistema`.
+
+Cuando una operación puede afectar la continuidad administrativa, el orden es: validación y bloqueo de continuidad administrativa, bloqueo pesimista de la cuenta, lectura y validación del estado, modificación y persistencia. Los cambios explícitos hacia `ADMINISTRATIVO` participan igualmente del primer bloqueo para evitar invertir el orden frente a una suspensión concurrente.
+
+Los cambios de contraseña autenticados y los restablecimientos también obtienen la entidad que modifican mediante el bloqueo pesimista de `UsuarioSistema`, dentro de su transacción. La identidad se resuelve primero sin conservar una entidad editable; después del bloqueo se revalidan la cuenta y las condiciones de seguridad. En el restablecimiento, además, el token activo se vuelve a consultar tras adquirir el bloqueo para conservar su uso único frente a solicitudes concurrentes.
+
+Esta garantía cubre los flujos de estado de cuenta, cambio de perfil y credenciales descritos aquí, pero no acredita que todos los escritores presentes o futuros de `UsuarioSistema` usen la misma serialización. Cada nuevo flujo que modifique la entidad debe revisar explícitamente su estrategia de concurrencia.
+
+Las cinco entidades de perfil tienen una relación uno a uno y una columna `usuario_sistema_id` única en su tabla respectiva. Esa unicidad local no constituye una restricción única entre las cinco tablas ni sustituye la validación transaccional de la aplicación.
+
 ## Arquitectura frontend
 
 El frontend usa Next.js con App Router.

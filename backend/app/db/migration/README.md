@@ -21,3 +21,14 @@ En caso de contingencia o fallo de despliegue:
 1. Ejecutar `V20260905_01__version_document_model_rollback.sql` o restaurar el respaldo de la tabla `"DB_consultorioJuridico".file_asset`.
 2. Desplegar la versión previa del backend.
 
+## V20261011_01 - Historial de reasignaciones de consultas
+
+1. Crear un respaldo verificable del esquema `"DB_consultorioJuridico"`.
+2. Ejecutar `V20261011_01__create_consulta_reasignacion_historial.sql` con el propietario del esquema.
+3. Ejecutar `V20261011_01__create_consulta_reasignacion_historial_verify.sql`.
+4. Desplegar el backend solo después de que la verificación finalice sin excepciones.
+
+### Recuperación segura
+
+`V20261011_01__create_consulta_reasignacion_historial_recovery.sql` solo elimina los objetos cuando la tabla está vacía. Si ya existen eventos, el script cancela la operación: se debe conservar el historial y preparar una migración correctiva hacia adelante. No ejecutar la recuperación sin respaldo y revisión previa.
+

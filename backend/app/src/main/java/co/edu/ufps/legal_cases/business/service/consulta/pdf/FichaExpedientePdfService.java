@@ -33,7 +33,7 @@ import co.edu.ufps.legal_cases.business.dto.consulta.ficha.FichaExpedienteDTO.Re
 import co.edu.ufps.legal_cases.business.dto.consulta.ficha.FichaExpedienteDTO.SeguimientoFichaDTO;
 
 /**
- * Servicio encargado de la renderización del expediente integral en formato PDF bajo demanda (PB-35).
+ * Servicio encargado de la renderización del expediente integral en formato PDF bajo demanda.
  * Genera el documento completamente en memoria (sin almacenar copias en disco ni bucket),
  * estructurando la información vigente y garantizando que no se expongan rutas internas de almacenamiento.
  */

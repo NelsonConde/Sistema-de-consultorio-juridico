@@ -65,14 +65,14 @@ public class SeguimientoService {
         return seguimientoQueryService.listarPorAutor(autorId);
     }
 
-    // Calendario por rango – Bloque B (SCRUM-269).
+    // Calendario por rango.
     // Reemplaza listarParaCalendario() que usaba findAll() + filtros en memoria.
     // El endpoint GET /api/seguimientos/calendario ahora requiere from y to.
     public List<SeguimientoResponseDTO> listarCalendarioPorRango(LocalDate from, LocalDate to) {
         return seguimientoQueryService.listarCalendarioPorRango(from, to);
     }
 
-    // Para Agenda – Bloque B (SCRUM-269).
+    // Para Agenda.
     // Resuelve scope internamente; AgendaQueryService solo pasa el rango.
     public List<SeguimientoAgendaProjection> buscarParaAgenda(LocalDate from, LocalDate to) {
         return seguimientoQueryService.buscarParaAgenda(from, to);
