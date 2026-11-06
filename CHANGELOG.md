@@ -10,6 +10,7 @@ Estas entradas describen cambios aún no asignados a una nueva etiqueta de versi
 
 - Reasignación controlada de responsables de consultas con historial inmutable, validaciones de autorización y pruebas asociadas.
 - Scripts de creación, verificación y recuperación para el historial de reasignaciones, con ejecución manual documentada.
+- Artefacto de migración Flyway separado del backend web: el migrador ejecuta operaciones controladas y el runtime valida el historial y esquema sin aplicar DDL.
 - Política de ciclo de vida para operaciones sobre perfiles y cobertura de pruebas para conflictos, concurrencia y reactivación.
 - Pruebas de expiración de sesión y continuidad de operaciones autenticadas.
 
