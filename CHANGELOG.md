@@ -4,7 +4,7 @@ Este archivo registra los cambios técnicos del Sistema de Gestión de Casos Jur
 
 ## [Unreleased]
 
-Los siguientes cambios están presentes en `develop` y no se presentan como publicados en `main` ni como desplegados en producción.
+Estas entradas describen cambios aún no asignados a una nueva etiqueta de versión. Su integración en una rama y los resultados de CI no acreditan por sí solos un despliegue en producción. Al aprobarse una liberación, las entradas correspondientes se registran bajo la versión y fecha verificadas.
 
 ### Added
 
@@ -17,17 +17,17 @@ Los siguientes cambios están presentes en `develop` y no se presentan como publ
 
 - Serialización de cambios de credenciales, recuperación de contraseña, estados de cuenta y transiciones de perfil para reducir pérdidas de actualización concurrentes.
 - Manejo frontend de conflictos en operaciones de perfiles.
-- Actualización de Next.js declarada en `develop` de `^16.2.6` a `^16.4.1`; el lockfile resuelve `16.4.1`.
-- Documentación técnica de autenticación, perfiles, consultas, migraciones, pruebas, seguridad y despliegue alineada con la implementación de `develop`.
+- Actualización de Next.js del incremento candidato de `^16.2.6` a `^16.4.1`; el lockfile resuelve `16.4.1`.
+- Documentación técnica de autenticación, perfiles, consultas, migraciones, pruebas, seguridad y despliegue alineada con la implementación del incremento candidato.
 
 ### Security
 
-- El workflow de GitHub Actions declara `permissions: contents: read` en `develop` para limitar el token del workflow a lectura del repositorio.
+- El workflow de GitHub Actions del incremento candidato declara `permissions: contents: read` para limitar el token del workflow a lectura del repositorio.
 - La documentación diferencia los resultados históricos de auditoría de dependencias de las comprobaciones ejecutadas por integración continua.
 
 ## [v1.1.0] - 2026-10-05
 
-La etiqueta `v1.1.0` apunta al commit `c02f66d04b1baabb6a29d01e5768fbad9ed93d9c`, que coincide con la referencia actual de `main` verificada para este registro.
+La etiqueta histórica `v1.1.0` apunta al commit `c02f66d04b1baabb6a29d01e5768fbad9ed93d9c`. Este identificador permanece fijo aunque la rama `main` avance.
 
 ### Added
 
