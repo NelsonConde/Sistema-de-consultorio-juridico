@@ -48,6 +48,8 @@ public interface EstudianteRepository extends JpaRepository<Estudiante, Long> {
 
     Optional<Estudiante> findByUsuarioSistema_Id(Long usuarioSistemaId);
 
+    @Query("SELECT e.usuarioSistema.id FROM Estudiante e WHERE e.id = :id")
+    Optional<Long> findUsuarioSistemaIdById(@Param("id") Long id);
 
     @Query(value = """
             SELECT e.id AS id,

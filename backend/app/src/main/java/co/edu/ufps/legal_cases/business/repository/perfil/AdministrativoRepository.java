@@ -44,6 +44,9 @@ public interface AdministrativoRepository extends JpaRepository<Administrativo, 
 
     Optional<Administrativo> findByUsuarioSistema_Id(Long usuarioSistemaId);
 
+    @Query("SELECT a.usuarioSistema.id FROM Administrativo a WHERE a.id = :id")
+    Optional<Long> findUsuarioSistemaIdById(@Param("id") Long id);
+
     // Para luego notificar en caso de alertas disiplinarias
     @Query("""
             SELECT new co.edu.ufps.legal_cases.business.dto.seguimiento.notificacion.SeguimientoDestinatarioDTO(

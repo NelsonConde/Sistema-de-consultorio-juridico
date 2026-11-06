@@ -22,9 +22,12 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import co.edu.ufps.legal_cases.audit.service.log.AuditSecurityService;
+import co.edu.ufps.legal_cases.common.exception.AccountActivationException;
 import co.edu.ufps.legal_cases.common.exception.AdministracionInvariantException;
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.common.exception.ConcurrenciaOptimistaException;
+import co.edu.ufps.legal_cases.common.exception.ConsultaReasignacionNoDisponibleException;
+import co.edu.ufps.legal_cases.common.exception.PerfilOperacionConflictException;
 import co.edu.ufps.legal_cases.common.exception.ResourceNotFoundException;
 import co.edu.ufps.legal_cases.common.exception.dto.ErrorResponseDTO;
 import co.edu.ufps.legal_cases.common.observability.CorrelationIdContext;
@@ -46,6 +49,24 @@ public class GlobalExceptionHandler {
             AuditSecurityService auditSecurityService) {
 
         this.auditSecurityService = auditSecurityService;
+    }
+
+    @ExceptionHandler(PerfilOperacionConflictException.class)
+    public ResponseEntity<ErrorResponseDTO>
+    manejarPerfilOperacionConflictException(
+            PerfilOperacionConflictException ex,
+            HttpServletRequest request) {
+
+        ErrorResponseDTO error = construirErrorConDetalles(
+                HttpStatus.CONFLICT,
+                "Conflicto de operacion de perfil",
+                mensajeSeguro(
+                        ex.getMessage(),
+                        "La operacion no es compatible con el perfil actual"),
+                request,
+                Map.of("codigo", ex.getCodigo()));
+
+        return construirRespuesta(HttpStatus.CONFLICT, error);
     }
 
     @ExceptionHandler(AdministracionInvariantException.class)
@@ -90,6 +111,42 @@ public class GlobalExceptionHandler {
                 request);
 
         return construirRespuesta(HttpStatus.CONFLICT, error);
+    }
+
+    @ExceptionHandler(AccountActivationException.class)
+    public ResponseEntity<ErrorResponseDTO>
+    manejarAccountActivationException(
+            AccountActivationException ex,
+            HttpServletRequest request) {
+
+        HttpStatus status =
+                switch (ex.getMotivo()) {
+                    case INVALIDO ->
+                            HttpStatus.BAD_REQUEST;
+
+                    case REVOCADO ->
+                            HttpStatus.FORBIDDEN;
+
+                    case USADO ->
+                            HttpStatus.CONFLICT;
+
+                    case VENCIDO ->
+                            HttpStatus.GONE;
+                };
+
+        ErrorResponseDTO error =
+                construirErrorConDetalles(
+                        status,
+                        "Activación de cuenta no disponible",
+                        ex.getMessage(),
+                        request,
+                        Map.of(
+                                "codigo",
+                                ex.getCodigo()));
+
+        return construirRespuesta(
+                status,
+                error);
     }
 
     @ExceptionHandler(BusinessException.class)
@@ -280,6 +337,22 @@ public class GlobalExceptionHandler {
         return construirRespuesta(
                 HttpStatus.SERVICE_UNAVAILABLE,
                 error);
+    }
+
+    @ExceptionHandler(ConsultaReasignacionNoDisponibleException.class)
+    public ResponseEntity<ErrorResponseDTO> manejarReasignacionNoDisponible(
+            ConsultaReasignacionNoDisponibleException ex,
+            HttpServletRequest request) {
+
+        ErrorResponseDTO error = construirError(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Reasignacion no disponible",
+                mensajeSeguro(
+                        ex.getMessage(),
+                        "La reasignacion no puede completarse en este momento"),
+                request);
+
+        return construirRespuesta(HttpStatus.SERVICE_UNAVAILABLE, error);
     }
 
     @ExceptionHandler(Exception.class)

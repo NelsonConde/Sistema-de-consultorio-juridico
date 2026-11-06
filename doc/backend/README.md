@@ -124,7 +124,8 @@ El backend implementa reglas críticas como:
 - una respuesta de seguimiento rechazada requiere observación de revisión;
 - un seguimiento notificable al estudiante requiere estudiante activo asignado;
 - asesor, estudiante y monitor conservan integridad operativa frente a consultas vivas;
-- el estado del perfil y el usuario del sistema se sincronizan;
+- el estado del perfil y la habilitación del usuario del sistema se administran de forma independiente;
+- una cuenta conserva un único perfil operativo activo y usa el cambio explícito para transiciones;
 - el cambio y resolución de perfil se implementan mediante Strategy;
 - la conciliación finalizada o desactivada cancela notificaciones de reunión programadas.
 

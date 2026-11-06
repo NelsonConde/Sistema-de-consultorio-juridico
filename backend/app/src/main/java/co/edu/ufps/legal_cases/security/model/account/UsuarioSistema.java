@@ -29,10 +29,36 @@ public class UsuarioSistema {
     @Column(name = "username", nullable = false, unique = true, length = 120)
     private String username;
 
-    // La contraseña no se guarda en texto plano, se guarda cifrada.
-    @Column(name = "password_hash", nullable = false, length = 255)
+    /*
+     * Una cuenta pendiente todavía no tiene contraseña.
+     * El hash solo se establece cuando el usuario completa la activación.
+     */
+    @Column(name = "password_hash", length = 255)
     private String passwordHash;
 
+    /**
+     * Versión de las credenciales utilizada para invalidar JWT emitidos
+     * antes de un cambio o restablecimiento de contraseña.
+     */
+    @Column(name = "auth_version", nullable = false)
+    private long authVersion = 0L;
+
+    /*
+     * Estado exclusivo del proceso de activación inicial.
+     *
+     * El valor por defecto ACTIVA conserva el comportamiento de cuentas
+     * existentes y objetos creados por código anterior. El flujo de registro
+     * de nuevas cuentas establecerá PENDIENTE explícitamente.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado_activacion", nullable = false, length = 20)
+    private EstadoActivacionCuenta estadoActivacion =
+            EstadoActivacionCuenta.ACTIVA;
+
+    /*
+     * Estado operativo de acceso de la cuenta.
+     * No debe utilizarse para representar una activación pendiente.
+     */
     @Column(name = "activo", nullable = false)
     private Boolean activo = true;
 

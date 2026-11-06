@@ -219,16 +219,42 @@ Ruta base:
 - En actualización no se permite cambiar el `id` del perfil.
 - `PUT` actualiza datos generales del perfil.
 - `PATCH /activo` cambia estado lógico.
-- `DELETE` realiza desactivación lógica.
+- `DELETE` solicita desactivación lógica, sujeta a la política de perfiles y a las restricciones de integridad del módulo.
 - La desactivación de asesores, estudiantes y monitores valida consultas operativas asociadas.
-- La activación/desactivación realizada desde un endpoint de perfil sincroniza el estado del `UsuarioSistema` asociado.
+- `PATCH /activo` y `DELETE` aplican la política de perfiles a administrativos, asesores, estudiantes, monitores y conciliadores vinculados a una cuenta.
+- Una operación directa de perfil no modifica `UsuarioSistema.activo`, `tipoPerfilActual`, el rol, los permisos ni el historial de cambio de perfil.
+- Activar el perfil actual solo se permite cuando no hay otro perfil activo; los perfiles históricos y el perfil actual no se pueden activar/desactivar directamente en las combinaciones prohibidas por la política.
 - Las respuestas devuelven DTOs del perfil correspondiente.
 
 ---
 
 ## 8. Relación con UsuarioSistema
 
-Cada perfil operativo se vincula con un usuario del sistema. Esa relación permite que autenticación, rol, permisos y alcance se resuelvan desde una cuenta de acceso única, conservando la identidad funcional en el módulo correspondiente.
+Cada perfil operativo puede vincularse con un usuario del sistema. Esa relación permite que autenticación, rol, permisos y alcance se resuelvan desde una cuenta de acceso única, conservando la identidad funcional en el módulo correspondiente.
+
+`UsuarioSistema.activo` es el estado independiente de la cuenta. Para perfiles vinculados, solo puede existir un perfil operativo activo por cuenta. La regla se aplica a los cinco tipos y mantiene como históricos inactivos los perfiles anteriores:
+
+| Operación directa | Resultado |
+|---|---|
+| Activar un perfil histórico diferente de `tipoPerfilActual` | `409 Conflict`, sin modificaciones; debe utilizarse el cambio explícito de perfil. |
+| Desactivar un perfil histórico | `409 Conflict`, sin modificaciones. |
+| Desactivar o eliminar lógicamente el perfil actual | `409 Conflict`, sin modificaciones; para impedir acceso debe suspenderse la cuenta. |
+| Activar el perfil actual | Se permite solo si no existe otro perfil operativo activo; no habilita una cuenta suspendida. |
+| Operar un registro sin cuenta asociada | Conserva el comportamiento anterior y las validaciones propias del módulo. |
+
+El conflicto funcional usa el contrato general `ErrorResponseDTO` y puede distinguirse de otros conflictos `409` mediante este campo:
+
+```json
+{
+  "detalles": {
+    "codigo": "CONFLICTO_OPERACION_PERFIL"
+  }
+}
+```
+
+Una respuesta con este código no debe tratarse como conflicto de concurrencia. Si la cuenta ya contiene varios perfiles activos, la operación incompatible se rechaza sin corregir automáticamente los registros.
+
+El estado de la cuenta no se sincroniza desde estos endpoints: habilitar una cuenta no reactiva un perfil histórico y activar un perfil permitido no habilita una cuenta suspendida. Los registros sin cuenta asociada conservan sus validaciones de módulo.
 
 
 ---
@@ -283,6 +309,16 @@ El procesamiento inicia desde la segunda fila. Cada fila se transforma en un `Es
 
 ### 9.5 Estado del perfil y UsuarioSistema
 
-Cuando el cambio de estado se realiza desde el endpoint propio del perfil (`PATCH /activo` o `DELETE` lógico de administrativos, asesores, estudiantes, monitores o conciliadores), el backend sincroniza el estado del `UsuarioSistema` asociado.
+El cambio directo de estado de `UsuarioSistema` mediante `/api/usuarios-sistema/{id}/activo` modifica únicamente la cuenta de acceso. Los endpoints propios de perfil no habilitan ni suspenden automáticamente la cuenta.
 
-El cambio directo de estado de `UsuarioSistema` mediante `/api/usuarios-sistema/{id}/activo` modifica la cuenta de acceso. Ese endpoint no reactiva ni desactiva automáticamente el perfil real asociado.
+El cambio entre tipos se realiza mediante los endpoints concretos:
+
+```http
+PATCH /api/usuarios-sistema/{id}/perfil/administrativo
+PATCH /api/usuarios-sistema/{id}/perfil/estudiante
+PATCH /api/usuarios-sistema/{id}/perfil/asesor
+PATCH /api/usuarios-sistema/{id}/perfil/monitor
+PATCH /api/usuarios-sistema/{id}/perfil/conciliador
+```
+
+Cada ruta recibe el DTO de su perfil destino. La operación bloquea la cuenta, valida la exclusividad y las restricciones específicas, desactiva el perfil anterior, activa o crea el destino y actualiza rol, `tipoPerfilActual` e historial dentro de la misma transacción. Una cuenta con múltiples perfiles activos preexistentes se rechaza sin saneamiento automático.

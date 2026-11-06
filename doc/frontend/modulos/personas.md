@@ -17,7 +17,11 @@ El frontend lo implementa con dos rutas principales:
 frontend/src/app/(dashboard)/recepcion/page.js
 frontend/src/app/(dashboard)/personas/page.js
 frontend/src/components/forms/persona/PersonaForm.jsx
+frontend/src/components/forms/persona/persona-validation.js
+frontend/src/components/forms/persona/PersonaFormParts.jsx
 frontend/src/components/forms/persona/PersonasForm.jsx
+frontend/src/components/forms/parts/FormInput.jsx
+frontend/src/hooks/useApiForm.js
 frontend/src/lib/config.js
 frontend/src/lib/api.js
 frontend/src/lib/authz.js
@@ -25,6 +29,7 @@ frontend/src/lib/permission.js
 frontend/src/lib/form-validation.js
 frontend/src/components/ui/ConfirmActionDialog.jsx
 frontend/src/components/ui/Pagination.jsx
+frontend/e2e/persona-validation-errors.spec.js
 ```
 
 ## 3. Registro desde recepción
@@ -146,6 +151,38 @@ POST /api/personas
 
 El formulario usa `useApiForm` para manejar envío, estado de carga, mensajes y errores.
 
+### 3.6 Presentación de errores por pestaña
+
+Los errores locales y los detalles de validación retornados por backend se
+presentan como una lista de elementos independientes. Cada elemento contiene:
+
+- nombre legible del campo;
+- pestaña donde se encuentra;
+- mensaje de validación;
+- acción para abrir la pestaña y mover el foco al control.
+
+Las pestañas muestran un contador cuando contienen errores. La presentación
+usa una grilla de una columna en pantallas estrechas y dos columnas a partir
+del breakpoint `sm`, con `min-w-0`, `max-w-full`, `overflow-hidden` y
+`break-words` para evitar desbordamiento horizontal.
+
+El mapa de etiquetas se mantiene en `persona-validation.js`; por tanto, los
+nombres del DTO siguen usándose internamente para enviar el payload, pero no
+se muestran como texto técnico al usuario. Los errores desconocidos usan un
+fallback legible bajo la sección `Formulario`.
+
+### 3.7 Continuidad y reintento
+
+Una respuesta de validación, un error de servidor o un fallo de red no ejecuta
+`reset` ni descarta los valores ingresados. El formulario solo se limpia
+después de una respuesta exitosa o cuando el usuario activa explícitamente
+`Limpiar formulario`.
+
+El reintento requiere volver a seleccionar `Guardar Persona`. No existe reenvío
+automático. Los estados `401` y `403` mantienen el tratamiento central de
+`useApiForm` y no son interceptados por la representación específica de
+validación.
+
 ## 4. Administración de personas
 
 La ruta `/personas` renderiza `PersonasForm`, que permite listar personas activas, buscar, editar y desactivar. El módulo de eliminación/reactivación ofrece la acción de reactivar personas.
@@ -216,6 +253,11 @@ Se manejan situaciones como:
 - error de conexión;
 - confirmación de desactivación.
 
+En el registro de persona, las respuestas `400` y `422` con detalles se
+muestran dentro del formulario. Los errores sin estructura de campos continúan
+usando el toast genérico. Si existe un identificador de correlación, se presenta
+como referencia separada y con ajuste de línea.
+
 ## 7. Relación con otros módulos
 
 Las personas registradas se usan en:
@@ -234,8 +276,28 @@ Las personas registradas se usan en:
 | `PersonasForm` | Listado, edición y desactivación. |
 | `ConfirmActionDialog` | Confirmación de desactivación. |
 | `Pagination` | Paginación del listado. |
+| `persona-validation.js` | Traducción, clasificación, orden y deduplicación de errores del registro. |
+| `useApiForm` | Envío JSON y delegación opcional de errores estructurados mediante `onError`. |
 
-## 9. Consideraciones de mantenimiento
+## 9. Pruebas de regresión del registro
+
+`frontend/e2e/persona-validation-errors.spec.js` define cuatro escenarios con
+fixtures sintéticos y peticiones interceptadas:
+
+1. múltiples errores locales ubicados en distintas pestañas;
+2. múltiples detalles del backend y comprobación de ajuste en 360, 768 y
+   1280 píxeles;
+3. corrección de un único error del servidor y reenvío explícito;
+4. error de red, conservación de datos y reintento.
+
+Las pruebas no contienen datos personales reales. Para ejecutarlas:
+
+```bash
+cd frontend
+npx playwright test e2e/persona-validation-errors.spec.js
+```
+
+## 10. Consideraciones de mantenimiento
 
 Al modificar el módulo debe verificarse:
 

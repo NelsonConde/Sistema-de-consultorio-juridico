@@ -127,11 +127,31 @@ rol_id
 activo
 ```
 
-El perfil real conserva datos funcionales. Al desactivar o reactivar perfiles desde servicios de comando, el sistema sincroniza el estado del perfil con `UsuarioSistema` mediante:
+El perfil real conserva datos funcionales y `UsuarioSistema.activo` conserva exclusivamente el estado de habilitación de la cuenta. Las operaciones directas de los cinco perfiles no sincronizan ese campo, ni modifican implícitamente `tipo_perfil_actual`, `rol_id`, permisos o historial.
 
-```text
-UsuarioSistemaPerfilEstadoService
-```
+La política se aplica mediante `PerfilOperacionEstadoValidator`. Para un perfil vinculado, los command services obtienen `usuario_sistema_id`, adquieren un bloqueo `PESSIMISTIC_WRITE` sobre la cuenta, recargan el perfil y validan antes de persistir. Activar o desactivar un perfil histórico y desactivar el perfil actual se rechazan con `CONFLICTO_OPERACION_PERFIL`; activar el actual exige que no exista otro perfil activo.
+
+La suspensión o habilitación de cuenta y el cambio explícito de perfil se serializan sobre la misma fila de `UsuarioSistema`. El orden aplicable es: continuidad administrativa cuando corresponde, bloqueo pesimista de la cuenta, lectura y validación, modificación y persistencia. El cambio hacia `ADMINISTRATIVO` adquiere el bloqueo administrativo aunque no reduzca la capacidad administrativa, con el fin de no invertir el orden frente a una suspensión concurrente.
+
+La decisión anterior no implica que todos los escritores de `UsuarioSistema` estén cubiertos. Queda como riesgo técnico pendiente revisar `AuthService` y `PasswordResetService`, que modifican la contraseña, frente a pérdidas de actualización si concurren con una transición de perfil o un cambio de estado de cuenta.
+
+`UsuarioSistemaPerfilEstadoService` permanece en el código, pero dejó de ser parte de los flujos directos de los cinco command services. No debe eliminarse sin revisar por separado sus dependencias y compatibilidad.
+
+## Política de estado implementada
+
+Las reglas comunicadas como aprobadas y su correspondencia técnica son:
+
+| Regla | Implementación |
+|---|---|
+| Un único perfil operativo activo | El validador consulta los cinco tipos y exige exclusividad por cuenta. |
+| Sin cambios implícitos de rol o perfil actual | Las operaciones directas no modifican rol, permisos ni `tipoPerfilActual`. |
+| Activación histórica prohibida | Se responde `409` con `CONFLICTO_OPERACION_PERFIL`, sin persistencia. |
+| Operaciones históricas aisladas de la cuenta vigente | La desactivación y `DELETE` históricos se rechazan sin cambiar cuenta ni perfil actual. |
+| Estado de cuenta independiente | Activar un perfil no habilita la cuenta y suspender la cuenta no altera perfiles. |
+| Transiciones mediante cambio explícito | `UsuarioCambioPerfilService` conserva validaciones, transacción e historial. |
+| Perfil actual no desactivable directamente | `PATCH /activo?activo=false` y `DELETE` se rechazan; se usa suspensión de cuenta o cambio explícito según el objetivo. |
+
+Esta sección describe la política implementada en el repositorio. Las verificaciones técnicas reportadas se ejecutaron en corridas aisladas y no equivalen a una única suite completa de backend aprobada ni a una ejecución de CI satisfactoria; el detalle y las limitaciones se registran en `doc/06-pruebas.md`. Tampoco acredita que documentación externa del responsable funcional haya sido actualizada.
 
 ## Relación con consultas vivas
 
@@ -151,7 +171,10 @@ El código incluye pruebas unitarias para validar:
 - delegación de `PerfilUsuarioResolverService` hacia resolver;
 - registry de handlers de estado;
 - registry de resolvers de perfil activo;
-- sincronización entre perfil y usuario del sistema.
+- política central de activación y desactivación para los cinco tipos;
+- independencia entre el estado del perfil y el estado de la cuenta;
+- exclusividad y serialización de cambios sobre una misma cuenta;
+- suspensión concurrente con una transición hacia `ADMINISTRATIVO`, conservando cuenta suspendida, rol, perfil actual, perfil activo único e historial único.
 
 ## Criterios de mantenimiento
 
@@ -180,10 +203,14 @@ El correo del perfil destino no se recibe en los DTO de cambio. Se deriva del `u
 
 Cada handler busca perfiles previos por `UsuarioSistema.id`. Si existe un perfil destino asociado al mismo usuario, lo reactiva y actualiza. Si no existe, crea uno nuevo. Esta decisión evita duplicar perfiles del mismo tipo para una misma cuenta y no reutiliza perfiles pertenecientes a otros usuarios.
 
+Antes de ejecutar los handlers, el cambio explícito aplica la validación de continuidad administrativa cuando corresponde, bloquea `UsuarioSistema` y comprueba la exclusividad. Si encuentra dos o más perfiles activos preexistentes, rechaza la transición sin desactivar registros ni elegir automáticamente cuál debe prevalecer.
+
 ### Perfil anterior y cuenta
 
 `PerfilEstadoHandler` desactiva el perfil anterior, pero no desactiva `UsuarioSistema`. Esa cuenta continúa vigente con el tipo de perfil y rol destino actualizados. Esta separación es necesaria para que el cambio de perfil sea una transición operativa y no una suspensión de acceso.
 
+El perfil anterior, el destino, `tipoPerfilActual`, el rol y `UsuarioCambioPerfilHistorial` participan en la misma transacción. Las operaciones directas de estado no crean historial de transición.
+
 ### Integridad operativa
 
-Los handlers de estado de asesor, estudiante y monitor invocan la validación de consultas operativas antes de desactivar el perfil anterior. De esta manera, el cambio de perfil respeta las mismas reglas que una desactivación directa desde el módulo de perfiles.
+Los handlers de estado de asesor, estudiante y monitor invocan la validación de consultas operativas antes de desactivar el perfil anterior. De esta manera, el cambio explícito conserva las restricciones de responsabilidad operativa aunque la desactivación directa del perfil actual esté prohibida.

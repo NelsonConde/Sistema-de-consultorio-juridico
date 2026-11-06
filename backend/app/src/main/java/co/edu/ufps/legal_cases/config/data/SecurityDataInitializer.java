@@ -161,7 +161,7 @@ public class SecurityDataInitializer {
 
                     /*
                      * Si el nombre esperado ya existe pero no tiene el código base,
-                     * la BD requiere la adopción explícita de SEC-10.
+                     * la BD requiere la adopción explícita del rol base.
                      *
                      * No se adopta automáticamente por nombre porque el nombre es
                      * una etiqueta editable y no una identidad funcional.
@@ -169,7 +169,7 @@ public class SecurityDataInitializer {
                     rolRepository.findByNombreIgnoreCase(nombreNormalizado)
                             .ifPresent(rolExistente -> {
                                 throw new IllegalStateException(
-                                        "SEC-10: existe el rol '"
+                                        "Existe el rol '"
                                                 + nombreNormalizado
                                                 + "' pero no está identificado como "
                                                 + codigoBase
@@ -206,7 +206,7 @@ public class SecurityDataInitializer {
 
         if (rol.getTipoPerfil() != codigoBase.getTipoPerfil()) {
             throw new IllegalStateException(
-                    "SEC-10: el rol base "
+                    "El rol base "
                             + codigoBase
                             + " tiene un tipoPerfil incompatible. Esperado: "
                             + codigoBase.getTipoPerfil()

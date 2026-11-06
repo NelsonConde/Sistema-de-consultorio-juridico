@@ -42,6 +42,8 @@ public interface ConciliadorRepository extends JpaRepository<Conciliador, Long> 
 
     Optional<Conciliador> findByUsuarioSistema_Id(Long usuarioSistemaId);
 
+    @Query("SELECT c.usuarioSistema.id FROM Conciliador c WHERE c.id = :id")
+    Optional<Long> findUsuarioSistemaIdById(@Param("id") Long id);
 
     @Query(value = """
             SELECT c.id AS id,

@@ -33,7 +33,8 @@ Reglas implementadas:
 
 - un usuario inactivo no puede ser tratado como usuario operativo;
 - un perfil inactivo no se resuelve como perfil activo del usuario;
-- la desactivación de perfil sincroniza el usuario del sistema asociado cuando se hace desde gestión directa del perfil;
+- el estado de cuenta y el estado de perfil son independientes;
+- la gestión directa no puede desactivar el perfil actual ni operar sobre un perfil histórico vinculado;
 - el cambio de perfil desactiva el perfil anterior y activa o crea el perfil destino.
 
 ---
@@ -137,13 +138,15 @@ El endpoint de estudiantes habilitados para conciliación retorna estudiantes ac
 
 ### 11.3 Estado de perfil y cuenta de acceso
 
-Cuando se cambia el estado desde el perfil operativo, el backend sincroniza el estado del `UsuarioSistema` asociado. Cuando se cambia directamente el estado de `UsuarioSistema`, el backend modifica la cuenta de acceso y no reactiva o desactiva automáticamente el perfil real.
+`UsuarioSistema.activo` representa el estado independiente de la cuenta. Una operación directa sobre un perfil no habilita ni suspende la cuenta, y una operación sobre la cuenta no activa ni desactiva automáticamente el perfil real.
+
+Para perfiles vinculados, el backend rechaza la activación o desactivación de un perfil histórico y la desactivación del perfil actual. El rechazo responde `409 Conflict` con `detalles.codigo = CONFLICTO_OPERACION_PERFIL`. La activación del perfil actual exige que no exista otro perfil operativo activo.
 
 ### 11.4 Cambio de perfil
 
 El cambio de perfil exige usuario activo, perfil anterior activo, rol destino activo y coherente con el tipo de perfil destino, motivo obligatorio y datos requeridos por el handler concreto.
 
-El correo del perfil destino proviene del `username` de `UsuarioSistema`. El perfil anterior se desactiva sin desactivar la cuenta. El perfil destino se crea o se reutiliza si ya pertenece al mismo usuario.
+El correo del perfil destino proviene del `username` de `UsuarioSistema`. El perfil anterior se desactiva sin desactivar la cuenta. El perfil destino se crea o se reutiliza si ya pertenece al mismo usuario. Si existen varios perfiles activos antes de la transición, el cambio se rechaza sin sanear automáticamente los registros.
 
 ### 11.5 Roles y permisos
 

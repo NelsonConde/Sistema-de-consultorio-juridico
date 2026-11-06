@@ -1,6 +1,7 @@
 import { apiClient } from "@/lib/apiClient";
 
 const REQUEST_ID_HEADER = "X-Request-ID";
+export const PROFILE_OPERATION_CONFLICT_CODE = "CONFLICTO_OPERACION_PERFIL";
 
 /**
  * Implementation detail.
@@ -188,12 +189,65 @@ export class ApiError extends Error {
     this.name = "ApiError";
     this.status = status;
     this.payload = payload;
-    // Keep a body alias because DB-03 conflict helpers may receive errors from
+    // Keep a body alias because optimistic-conflict helpers may receive errors from
     // different transport wrappers while preserving the same backend payload.
     this.body = payload;
     this.response = response;
     this.correlationId = correlationId;
   }
+}
+
+function getErrorStatus(error) {
+  return Number(
+    error?.status ??
+      error?.response?.status ??
+      error?.payload?.estado ??
+      error?.body?.estado ??
+      0
+  );
+}
+
+/**
+ * Reads the stable functional code returned by the backend error contract.
+ */
+export function getApiErrorCode(error) {
+  const payload = error?.payload ?? error?.body ?? null;
+
+  return (
+    payload?.detalles?.codigo ??
+    payload?.details?.code ??
+    payload?.codigo ??
+    payload?.code ??
+    null
+  );
+}
+
+/**
+ * Distinguishes profile-policy conflicts from optimistic-concurrency errors.
+ */
+export function isProfileOperationConflict(error) {
+  return (
+    getErrorStatus(error) === 409 &&
+    getApiErrorCode(error) === PROFILE_OPERATION_CONFLICT_CODE
+  );
+}
+
+/**
+ * Returns a user-safe message for a profile-policy conflict.
+ */
+export function toProfileOperationConflict(
+  error,
+  fallback = "La operación no es compatible con el perfil actual de la cuenta."
+) {
+  const payload = error?.payload ?? error?.body ?? null;
+
+  return {
+    message:
+      payload?.mensaje ||
+      payload?.message ||
+      error?.message ||
+      fallback,
+  };
 }
 
 /**
@@ -202,15 +256,7 @@ export class ApiError extends Error {
  * their existing handling paths.
  */
 export function isConcurrencyConflict(error) {
-  const status = Number(
-    error?.status ??
-      error?.response?.status ??
-      error?.payload?.estado ??
-      error?.body?.estado ??
-      0
-  );
-
-  return status === 409;
+  return getErrorStatus(error) === 409 && !isProfileOperationConflict(error);
 }
 
 /**
@@ -232,7 +278,7 @@ export function toConcurrencyConflict(error) {
 }
 
 /**
- * Returns the exact server-owned version required by a DB-03 mutation.
+ * Returns the exact server-owned version required by an optimistic mutation.
  * The frontend must never invent or increment this value.
  */
 export function requireResourceVersion(resource, label = "recurso") {

@@ -13,6 +13,7 @@ El módulo de consultas jurídicas administra el ciclo principal de atención de
 - El cierre valida que no existan pendientes operativos asociados.
 - El backend filtra las consultas según permisos y alcance del perfil autenticado.
 - Si una consulta ya tiene actividad asociada, el backend protege sus datos estructurales.
+- La reasignación específica modifica un solo responsable y registra un evento histórico en la misma transacción.
 
 ## Estados de consulta
 
@@ -130,6 +131,28 @@ Reglas implementadas:
 - el asesor asignado debe pertenecer al área de la consulta;
 - el estudiante asignado debe corresponder al asesor cuando ambos están definidos.
 
+## Reasignación individual de responsables
+
+La reasignación específica se realiza mediante `PATCH /api/consultas/{id}/responsable` y aplica estas reglas:
+
+- cada solicitud identifica exactamente un tipo: `ESTUDIANTE`, `ASESOR` o `MONITOR`;
+- el actor debe estar autenticado, tener `ASIGNAR_RESPONSABLES_CONSULTA` y alcance sobre la consulta antes del cambio;
+- el perfil estudiante no puede asignar ni reasignar responsables;
+- `PENDIENTE`, `ACTIVO`, `EN_PROCESO` y `URGENTE` permiten la operación;
+- `CERRADO` y `ARCHIVADO` la rechazan;
+- el nuevo responsable debe existir, estar activo y ser compatible con el área, el asesor y el estudiante ya relacionados;
+- el nuevo responsable debe ser distinto del actual;
+- el motivo es obligatorio; el backend elimina espacios extremos y compacta espacios internos consecutivos;
+- la versión esperada es obligatoria y debe coincidir con la versión persistida;
+- no se modifican los otros responsables, la persona principal, las partes, las contrapartes, los datos jurídicos ni el estado;
+- el alcance posterior se deriva de las asignaciones vigentes: quien deja de estar relacionado pierde ese acceso y quien queda asignado lo obtiene, siempre sujeto a sus permisos.
+
+Una reasignación confirmada produce exactamente un evento histórico con consulta, tipo, responsable anterior, responsable nuevo, motivo, actor y fecha/hora. Los identificadores de responsables son polimórficos y se interpretan según el tipo del evento.
+
+El cambio y el evento se escriben en una única transacción. Si falla la validación, la escritura histórica o el control optimista, no se confirma ningún cambio parcial ni se registra un evento de éxito. Una versión desactualizada se informa como conflicto HTTP `409`.
+
+El historial es inmutable en JPA y PostgreSQL. Actualmente se persiste para auditoría y futura consulta, pero no existe un endpoint GET ni una interfaz frontend para visualizarlo.
+
 ## Persona principal, partes y contrapartes
 
 Reglas implementadas:
@@ -234,6 +257,8 @@ El backend devuelve únicamente las consultas permitidas para el usuario autenti
 - enviar responsables solo desde interfaces con permiso de asignación;
 - preservar los datos estructurales cuando la consulta ya tiene actividad asociada.
 
+El backend ya expone el `PATCH` específico de reasignación, pero el frontend actual todavía no implementa un flujo dedicado para consumirlo ni una pantalla de historial.
+
 ## Pruebas unitarias asociadas
 
 El módulo cuenta con pruebas orientadas a reglas críticas:
@@ -243,3 +268,7 @@ El módulo cuenta con pruebas orientadas a reglas críticas:
 | `ConsultaEstadoServiceTest` | Cierre con resultado, bloqueo por pendientes, archivo, desarchivo y operaciones sobre cerradas o archivadas. |
 | `ConsultaCambioEstructuralValidatorTest` | Protección de datos estructurales cuando existe actividad asociada. |
 | `ConsultaResponsableOperacionServiceTest` | Bloqueo de desactivación de responsables con consultas operativas vivas. |
+| `ConsultaReasignacionServiceTest` | Validaciones y cambio individual en la capa de aplicación. |
+| `ConsultaAccessServiceReasignacionTest` | Permiso y alcance efectivo del actor. |
+| `JpaConsultaReasignacionHistorialWriterPostgreSqlTest` | Persistencia e inmutabilidad del historial. |
+| `ConsultaReasignacionEndpointPostgreSqlTest` | Seguridad HTTP, atomicidad, rollback y concurrencia real en PostgreSQL. |

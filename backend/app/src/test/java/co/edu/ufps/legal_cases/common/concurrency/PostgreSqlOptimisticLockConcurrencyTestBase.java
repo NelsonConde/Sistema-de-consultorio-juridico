@@ -1,0 +1,56 @@
+package co.edu.ufps.legal_cases.common.concurrency;
+
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+
+@Testcontainers(disabledWithoutDocker = true)
+abstract class PostgreSqlOptimisticLockConcurrencyTestBase {
+
+    @SuppressWarnings("resource")
+    @Container
+    static final PostgreSQLContainer POSTGRESQL =
+            new PostgreSQLContainer("postgres:16-alpine")
+                    .withDatabaseName("legal_cases_concurrency_test")
+                    .withUsername("legal_cases")
+                    .withPassword("legal_cases");
+
+    @DynamicPropertySource
+    static void configurarPostgreSql(DynamicPropertyRegistry registry) {
+        // This concurrency fixture owns a Hibernate create-drop schema, without an applied history.
+        registry.add("spring.flyway.enabled", () -> "false");
+        registry.add(
+                "spring.datasource.url",
+                POSTGRESQL::getJdbcUrl);
+
+        registry.add(
+                "spring.datasource.username",
+                POSTGRESQL::getUsername);
+
+        registry.add(
+                "spring.datasource.password",
+                POSTGRESQL::getPassword);
+
+        registry.add(
+                "spring.datasource.driver-class-name",
+                () -> "org.postgresql.Driver");
+
+        registry.add(
+                "spring.jpa.hibernate.ddl-auto",
+                () -> "create-drop");
+
+        registry.add(
+                "spring.jpa.properties.hibernate.default_schema",
+                () -> "\"DB_consultorioJuridico\"");
+
+        registry.add(
+                "spring.jpa.properties.hibernate.hbm2ddl.create_namespaces",
+                () -> "true");
+
+        registry.add(
+                "spring.jpa.show-sql",
+                () -> "false");
+    }
+}

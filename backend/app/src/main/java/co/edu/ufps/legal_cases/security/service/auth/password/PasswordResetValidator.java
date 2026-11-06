@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.security.dto.auth.password.RestablecerPasswordDTO;
+import co.edu.ufps.legal_cases.security.model.account.EstadoActivacionCuenta;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
 import co.edu.ufps.legal_cases.security.service.account.perfil.PerfilUsuarioResolverService;
 
@@ -46,22 +47,50 @@ public class PasswordResetValidator {
         }
     }
 
-    // Valida si el usuario tiene todo activo para poder recuperar contraseña.
-    public boolean usuarioPuedeRecuperarPassword(UsuarioSistema usuario) {
+    public boolean usuarioPuedeRecuperarPassword(
+            UsuarioSistema usuario) {
+
         return usuario != null
+                && cuentaActivada(usuario)
+                && passwordConfigurada(usuario)
                 && usuarioActivo(usuario)
                 && rolActivo(usuario)
                 && perfilActivo(usuario);
     }
 
-    // Evita que la nueva contraseña sea igual a la actual.
+    private boolean cuentaActivada(
+            UsuarioSistema usuario) {
+
+        return usuario.getEstadoActivacion()
+                == EstadoActivacionCuenta.ACTIVA;
+    }
+
+    private boolean passwordConfigurada(
+            UsuarioSistema usuario) {
+
+        return usuario.getPasswordHash() != null
+                && !usuario.getPasswordHash().isBlank();
+    }
+
     public void validarPasswordNuevaDiferente(
             String passwordNueva,
             UsuarioSistema usuario,
             PasswordEncoder passwordEncoder) {
 
-        if (passwordEncoder.matches(passwordNueva, usuario.getPasswordHash())) {
-            throw new BusinessException("La nueva contraseña no puede ser igual a la actual");
+        if (usuario == null
+                || usuario.getPasswordHash() == null
+                || usuario.getPasswordHash().isBlank()) {
+
+            throw new BusinessException(
+                    "Token inválido o expirado");
+        }
+
+        if (passwordEncoder.matches(
+                passwordNueva,
+                usuario.getPasswordHash())) {
+
+            throw new BusinessException(
+                    "La nueva contraseña no puede ser igual a la actual");
         }
     }
 

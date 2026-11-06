@@ -9,6 +9,13 @@ import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import Pagination from "@/components/ui/Pagination";
 import { useDebouncedPageSearch } from "@/hooks/useDebouncedValue";
 import { apiClient } from "@/lib/apiClient";
+import {
+  ApiError,
+  isConcurrencyConflict,
+  isProfileOperationConflict,
+  readResponseBody,
+  toProfileOperationConflict,
+} from "@/lib/api";
 import { API_URL_BASE } from "@/lib/config";
 import { fetchPaged, isAbortError } from "@/lib/pagedApi";
 import { PERMISOS } from "@/lib/permission";
@@ -183,8 +190,11 @@ export function AsesoresYMonitoresForm() {
         return;
       }
       if (!res.ok) {
-        toast.error("Error al desactivar");
-        return;
+        const payload = await readResponseBody(res);
+        throw new ApiError(
+          payload?.mensaje || payload?.message || "Error al desactivar",
+          { status: res.status, payload, response: res }
+        );
       }
 
       toast.success(`${confirmDialog.rol} desactivado`);
@@ -194,7 +204,31 @@ export function AsesoresYMonitoresForm() {
       } else {
         setReloadKey((value) => value + 1);
       }
-    } catch {
+    } catch (error) {
+      if (isProfileOperationConflict(error)) {
+        const conflict = toProfileOperationConflict(
+          error,
+          "El perfil actual no puede desactivarse directamente. Para impedir el acceso, suspende la cuenta; para cambiar de cargo, utiliza el cambio de perfil."
+        );
+        toast.error("No se puede desactivar el perfil", {
+          description: conflict.message,
+        });
+        return;
+      }
+
+      if (isConcurrencyConflict(error)) {
+        toast.error("El perfil cambió antes de actualizarlo", {
+          description: "Actualiza la lista y confirma nuevamente la acción.",
+        });
+        setReloadKey((value) => value + 1);
+        return;
+      }
+
+      if (error instanceof ApiError) {
+        toast.error("Error al desactivar");
+        return;
+      }
+
       toast.error("Error de conexión");
     } finally {
       setConfirmLoading(false);

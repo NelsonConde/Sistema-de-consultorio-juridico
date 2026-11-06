@@ -38,7 +38,7 @@ public class SeguimientoController {
 
     private final SeguimientoService seguimientoService;
 
-    // Listado paginado principal – Bloque A (SCRUM-269).
+    // Listado paginado principal.
     @GetMapping
     @PreAuthorize("hasAuthority('" + VER_SEGUIMIENTOS + "')")
     public PageResponseDTO<SeguimientoResumenDTO> buscar(
@@ -91,7 +91,7 @@ public class SeguimientoController {
      * - Estudiante: ve solo los marcados como notificarEstudiante = true.
      * Este endpoint se conserva por compatibilidad; la agenda usa /api/agenda.
      * Rango máximo: 3 meses. from y to son obligatorios y from < to.
-     * Bloque B – SCRUM-269: reemplaza el antiguo no-arg con findAll() + filtros en memoria.
+     * Reemplaza el antiguo no-arg con findAll() + filtros en memoria.
      */
     @GetMapping("/calendario")
     @PreAuthorize("hasAuthority('" + VER_SEGUIMIENTOS + "')")

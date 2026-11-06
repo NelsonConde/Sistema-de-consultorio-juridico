@@ -2,7 +2,7 @@
 
 Este documento describe los endpoints vigentes del módulo de consultas jurídicas expuestos por `ConsultaController` bajo el prefijo `/api/consultas`.
 
-La API de consultas permite buscar, consultar detalle, crear, actualizar, cambiar estado, archivar, listar archivadas y desarchivar consultas jurídicas. Todas las operaciones requieren sesión autenticada y validación de permisos desde backend.
+La API de consultas permite buscar, consultar detalle, crear, actualizar, reasignar individualmente responsables, cambiar estado, archivar, listar archivadas y desarchivar consultas jurídicas. Todas las operaciones requieren sesión autenticada y validación de permisos desde backend.
 
 ## Base path
 
@@ -12,7 +12,9 @@ La API de consultas permite buscar, consultar detalle, crear, actualizar, cambia
 
 ## Autenticación
 
-Todos los endpoints requieren una sesión válida. El frontend consume la API enviando credenciales de sesión mediante cookies, por ejemplo con `credentials: "include"`.
+Todos los endpoints requieren una sesión válida. El backend obtiene el JWT desde la cookie `access_token`; el cliente debe enviar las cookies, por ejemplo con `credentials: "include"`.
+
+Las operaciones que modifican estado, incluido el `PATCH` de reasignación, están protegidas además contra CSRF. El cliente obtiene el nombre del header y el token mediante `GET /api/auth/csrf` y envía ese token en el header indicado por la respuesta. La cookie CSRF es `HttpOnly`, por lo que el valor se toma de la respuesta del endpoint y no se lee desde JavaScript.
 
 ## Permisos aplicados
 
@@ -22,6 +24,7 @@ Todos los endpoints requieren una sesión válida. El frontend consume la API en
 | `GET /api/consultas/{id}` | `VER_CONSULTAS` o `GESTIONAR_CONSULTAS` |
 | `POST /api/consultas` | `CREAR_CONSULTAS` o `GESTIONAR_CONSULTAS` |
 | `PUT /api/consultas/{id}` | `EDITAR_CONSULTAS` o `GESTIONAR_CONSULTAS` |
+| `PATCH /api/consultas/{id}/responsable` | `ASIGNAR_RESPONSABLES_CONSULTA` |
 | `PATCH /api/consultas/{id}/estado` | `CAMBIAR_ESTADO_CONSULTAS`, `ARCHIVAR_CONSULTAS` o `GESTIONAR_CONSULTAS` |
 | `DELETE /api/consultas/{id}` | `ARCHIVAR_CONSULTAS` |
 | `PATCH /api/consultas/{id}/archivar` | `ARCHIVAR_CONSULTAS` |
@@ -59,6 +62,7 @@ DTO principal de entrada y salida.
 ```json
 {
   "id": 1,
+  "version": 4,
   "fecha": "2026-05-31",
   "descripcion": "Descripción de la consulta",
   "hechos": "Relato de hechos",
@@ -86,6 +90,7 @@ DTO principal de entrada y salida.
 
 | Campo | Regla |
 |---|---|
+| `version` | Versión de concurrencia retornada por el backend; debe reenviarse en operaciones que exigen control optimista. |
 | `fecha` | Obligatoria. |
 | `descripcion` | Obligatoria; máximo 500 caracteres. |
 | `hechos` | Obligatorio. |
@@ -125,6 +130,7 @@ DTO retornado por el buscador.
 | `GET` | `/api/consultas/{id}` | Obtiene el detalle de una consulta. |
 | `POST` | `/api/consultas` | Crea una nueva consulta. |
 | `PUT` | `/api/consultas/{id}` | Actualiza datos generales de una consulta. |
+| `PATCH` | `/api/consultas/{id}/responsable` | Reasigna exactamente un estudiante, asesor o monitor. |
 | `PATCH` | `/api/consultas/{id}/estado?estado=` | Cambia el estado funcional de la consulta. |
 | `DELETE` | `/api/consultas/{id}` | Archiva lógicamente la consulta por compatibilidad del endpoint. |
 | `PATCH` | `/api/consultas/{id}/archivar` | Archiva una consulta cerrada. |
@@ -200,6 +206,7 @@ Obtiene el detalle de una consulta jurídica.
 ```json
 {
   "id": 1,
+  "version": 4,
   "fecha": "2026-05-31",
   "descripcion": "Descripción de la consulta",
   "hechos": "Relato de hechos",
@@ -294,6 +301,94 @@ Cuando la consulta tiene actividad asociada, el backend protege:
 ## Response `200 OK`
 
 Retorna `ConsultaDTO` actualizado.
+
+---
+
+# PATCH `/api/consultas/{id}/responsable`
+
+Reasigna exactamente un responsable de la consulta. Esta operación no modifica simultáneamente otros responsables ni reutiliza la actualización general de la consulta.
+
+## Parámetros
+
+| Parámetro | Tipo | Ubicación | Uso |
+|---|---|---|---|
+| `id` | Long | Path | Identificador de la consulta. |
+
+## Request body
+
+Usa `ConsultaReasignacionDTO`:
+
+```json
+{
+  "tipoResponsable": "MONITOR",
+  "nuevoResponsableId": 27,
+  "motivo": "Reasignación por distribución de carga",
+  "version": 4
+}
+```
+
+| Campo | Regla |
+|---|---|
+| `tipoResponsable` | Obligatorio. Valores permitidos: `ESTUDIANTE`, `ASESOR` o `MONITOR`. |
+| `nuevoResponsableId` | Obligatorio y positivo. Su tabla de referencia depende de `tipoResponsable`. |
+| `motivo` | Obligatorio y no vacío. El backend elimina espacios extremos y compacta espacios internos consecutivos antes de persistirlo. |
+| `version` | Obligatoria y no negativa. Debe coincidir con la versión vigente de la consulta. |
+
+## Reglas aplicadas
+
+- requiere autenticación, permiso `ASIGNAR_RESPONSABLES_CONSULTA` y alcance efectivo sobre la consulta;
+- un estudiante no puede ejecutar asignaciones de responsables;
+- permite la operación en `PENDIENTE`, `ACTIVO`, `EN_PROCESO` y `URGENTE`, y la rechaza en `CERRADO` o `ARCHIVADO`;
+- el nuevo responsable debe existir, estar activo y cumplir las reglas vigentes de área, asesor y estudiante;
+- no permite asignar nuevamente al responsable actual;
+- modifica solo el rol indicado y conserva los demás responsables, personas, datos jurídicos y estado;
+- registra consulta, tipo de responsable, identificadores anterior y nuevo, motivo, actor e instante del evento;
+- actualiza la consulta y escribe el historial dentro de la misma transacción. Un error en cualquiera de las dos escrituras revierte ambas;
+- el control `@Version` evita sobrescrituras cuando otra operación ya modificó la consulta.
+
+Los identificadores `responsableAnteriorId` y `responsableNuevoId` del historial son polimórficos: corresponden a `estudiante`, `asesor` o `monitor` según `tipoResponsable`. No representan una relación con una tabla única de responsables.
+
+## Response `200 OK`
+
+Retorna el `ConsultaDTO` completo con el nuevo responsable y la versión incrementada:
+
+```json
+{
+  "id": 10,
+  "version": 5,
+  "fecha": "2026-05-31",
+  "descripcion": "Descripción de la consulta",
+  "hechos": "Relato de hechos",
+  "pretensiones": "Pretensiones",
+  "conceptoJuridico": "Concepto jurídico",
+  "tramite": "Trámite",
+  "observaciones": "Observaciones",
+  "tipoViolencia": null,
+  "estado": "ACTIVO",
+  "resultado": null,
+  "personaId": 1,
+  "partesIds": [2, 3],
+  "contrapartesIds": [4],
+  "sedeId": 1,
+  "areaId": 1,
+  "temaId": 1,
+  "tipoId": 1,
+  "asesorId": 8,
+  "monitorId": 27,
+  "estudianteId": 15
+}
+```
+
+No existe actualmente un endpoint para consultar el historial de reasignaciones.
+
+## Respuestas de error relevantes
+
+| Estado HTTP | Situación |
+|---|---|
+| `400 Bad Request` | Cuerpo inválido, campos obligatorios ausentes, consulta cerrada o archivada, responsable inexistente, inactivo, incompatible o igual al actual. |
+| `401 Unauthorized` | No se envió una autenticación válida. |
+| `403 Forbidden` | El actor no posee el permiso requerido o no tiene alcance sobre la consulta. |
+| `409 Conflict` | La `version` enviada ya no coincide con la versión persistida o se detecta el conflicto durante el `flush` transaccional. El cliente debe recargar la consulta antes de reintentar. |
 
 ---
 
@@ -416,3 +511,4 @@ Retorna `ConsultaDTO`.
 | `401 Unauthorized` | Sesión no autenticada. |
 | `403 Forbidden` | Usuario sin permiso o sin alcance sobre la consulta. |
 | `404 Not Found` | Consulta o relación asociada no encontrada cuando el manejo global lo traduzca a ese estado. |
+| `409 Conflict` | Versión desactualizada o conflicto de concurrencia optimista. |

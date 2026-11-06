@@ -1,0 +1,15 @@
+scrum-373-podman.log
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 72.66 s -- in co.edu.ufps.legal_cases.security.integration.EstudianteSesionExpiradaPostgreSqlTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+[INFO] Total time:  01:20 min
+[INFO] Finished at: 2026-10-15T18:25:06-05:00
+
+scrum-373-security-unit.log
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.632 s -- in co.edu.ufps.legal_cases.security.controller.auth.AuthControllerCsrfTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.702 s -- in co.edu.ufps.legal_cases.config.security.SecurityExceptionHandlerTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.070 s -- in co.edu.ufps.legal_cases.config.security.CsrfFilterSecurityTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+[INFO] Total time:  12.274 s
+[INFO] Finished at: 2026-10-15T18:22:07-05:00

@@ -83,10 +83,17 @@ public class PasswordResetService {
 
         // Se genera el hash del token recibido para compararlo con el hash guardado en BD.
         PasswordResetToken resetToken = passwordResetTokenService.obtenerTokenActivo(dto.getToken());
+        Long usuarioId = resetToken.getUsuarioSistema().getId();
 
+        UsuarioSistema usuario = usuarioSistemaRepository.findByIdForUpdate(usuarioId)
+                .orElseThrow(() -> new BusinessException("Token inválido o expirado"));
+
+        // Relee el token después del bloqueo para impedir reutilizaciones concurrentes.
+        resetToken = passwordResetTokenService.obtenerTokenActivo(dto.getToken());
+        if (!usuarioId.equals(resetToken.getUsuarioSistema().getId())) {
+            throw new BusinessException("Token inválido o expirado");
+        }
         passwordResetTokenService.validarNoExpirado(resetToken);
-
-        UsuarioSistema usuario = resetToken.getUsuarioSistema();
 
         // Valida que el usuario, su rol y su perfil sigan activos.
         if (!passwordResetValidator.usuarioPuedeRecuperarPassword(usuario)) {
@@ -99,9 +106,13 @@ public class PasswordResetService {
                 passwordEncoder);
 
         // Cifra la nueva contraseña antes de guardarla.
-        usuario.setPasswordHash(passwordEncoder.encode(dto.getPasswordNueva()));
+        usuario.setPasswordHash(
+                passwordEncoder.encode(dto.getPasswordNueva()));
 
-        // Marca el token como usado para que no pueda reutilizarse.
+// Invalida todos los JWT emitidos antes del restablecimiento.
+        usuario.setAuthVersion(usuario.getAuthVersion() + 1L);
+
+// Marca el token como usado para que no pueda reutilizarse.
         passwordResetTokenService.marcarComoUsado(resetToken);
 
         usuarioSistemaRepository.save(usuario);

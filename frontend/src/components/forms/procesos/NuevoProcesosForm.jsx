@@ -109,6 +109,8 @@ function CampoConsulta({ label, consultaId, consultas, onSeleccionar, required }
         endpoint="/consultas"
         resourceName="consultas"
         getOptionLabel={labelConsulta}
+        sortBy="fecha"
+        direction="desc"
         required={required}
       />
   );

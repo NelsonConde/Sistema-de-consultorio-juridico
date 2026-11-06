@@ -1,4 +1,4 @@
-﻿-- DB-03 - Verificacion posterior a optimistic_locking.sql
+-- Verificacion posterior a optimistic_locking.sql
 --
 -- Resultado esperado:
 -- 1. La primera consulta debe devolver exactamente 7 filas.

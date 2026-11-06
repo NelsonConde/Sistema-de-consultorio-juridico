@@ -44,7 +44,7 @@ import co.edu.ufps.legal_cases.file_storage.repository.FileAssetRepository;
 
 /**
  * Servicio de consolidación de datos y orquestación para la generación de la ficha
- * integral del expediente (PB-35 / CC-OPT-004).
+ * integral del expediente.
  * Valida autorización de acceso antes de leer datos o generar el documento.
  */
 @Service
@@ -84,7 +84,7 @@ public class FichaExpedienteService {
     }
 
     /**
-     * Consolida toda la información vigente del expediente para PB-35.
+     * Consolida toda la información vigente del expediente.
      * Valida autorización sobre la consulta antes de efectuar cualquier lectura.
      */
     @Transactional(readOnly = true)
@@ -221,7 +221,7 @@ public class FichaExpedienteService {
     }
 
     /**
-     * Genera el archivo PDF bajo demanda para PB-35 sin almacenar copia permanente
+     * Genera el archivo PDF bajo demanda sin almacenar copia permanente
      * ni exponer rutas del almacenamiento interno.
      */
     @Transactional(readOnly = true)

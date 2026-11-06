@@ -19,9 +19,9 @@ export function optionalLabel(label) {
  * @returns {{value:string, label:string} Result value.
  */
 
-export function Seccion({ titulo, descripcion, children }) {
+export function Seccion({ titulo, descripcion, children, hidden = false }) {
   return (
-    <section className="space-y-4">
+    <section hidden={hidden} className="space-y-4">
       <div>
         <h3 className="text-lg font-semibold border-b pb-2">{titulo}</h3>
         {descripcion && (
@@ -55,6 +55,8 @@ export function FormSelectField({
         id={name}
         defaultValue=""
         disabled={disabled}
+        aria-invalid={errors?.[name] ? "true" : "false"}
+        aria-describedby={errors?.[name] ? `${name}-error` : undefined}
         {...register(name, rules)}
         className={`flex h-9 w-full rounded-lg border bg-background px-2.5 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-60 ${
           errors?.[name] ? "border-red-500" : ""
@@ -70,7 +72,9 @@ export function FormSelectField({
       </select>
 
       {errors?.[name] && (
-        <p className="text-xs text-red-500">{errors[name]?.message}</p>
+        <p id={`${name}-error`} className="text-xs text-red-500">
+          {errors[name]?.message}
+        </p>
       )}
     </div>
   );

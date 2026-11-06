@@ -34,7 +34,7 @@ import jakarta.persistence.OptimisticLockException;
         replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class ProcesoOptimisticLockConcurrencyTest
-        extends Db03PostgreSqlTestBase {
+        extends PostgreSqlOptimisticLockConcurrencyTestBase {
 
     private static final Long PROCESO_ID = 900001L;
 
@@ -84,7 +84,7 @@ class ProcesoOptimisticLockConcurrencyTest
                     VALUES (
                         900001,
                         0,
-                        'DB03-BASE',
+                        'CONCURRENCY-BASE',
                         900001,
                         900001,
                         NULL,
@@ -138,7 +138,7 @@ class ProcesoOptimisticLockConcurrencyTest
             /*
              * Usuario A guarda primero.
              */
-            procesoA.setNumeroRadicado("DB03-CAMBIO-A");
+            procesoA.setNumeroRadicado("CONCURRENCY-CHANGE-A");
 
             emUsuarioA.flush();
             txA.commit();
@@ -149,7 +149,7 @@ class ProcesoOptimisticLockConcurrencyTest
              * Usuario B sigue teniendo la entidad que leyó
              * cuando estaba en versión 0.
              */
-            procesoB.setNumeroRadicado("DB03-CAMBIO-B");
+            procesoB.setNumeroRadicado("CONCURRENCY-CHANGE-B");
 
             /*
              * Hibernate debe ejecutar un UPDATE equivalente a:
@@ -202,7 +202,7 @@ class ProcesoOptimisticLockConcurrencyTest
             assertNotNull(persistido);
 
             assertEquals(
-                    "DB03-CAMBIO-A",
+                    "CONCURRENCY-CHANGE-A",
                     persistido.getNumeroRadicado());
 
             assertEquals(

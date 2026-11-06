@@ -101,6 +101,8 @@ El frontend consume la autenticación usando cookie de sesión y envía las peti
 credentials: "include"
 ```
 
+El backend obtiene el JWT desde la cookie `access_token`. Para operaciones que modifican estado, el cliente obtiene el token CSRF en `GET /api/auth/csrf` y lo envía en el header indicado por la respuesta.
+
 ### Usuarios, roles y permisos
 
 Gestiona usuarios del sistema, perfiles internos, roles y permisos funcionales.
@@ -118,6 +120,10 @@ Gestiona datos auxiliares usados por los formularios y flujos principales del si
 ### Consultas jurídicas
 
 Gestiona el registro y ciclo operativo de las consultas jurídicas.
+
+El backend incluye reasignación individual de estudiante, asesor o monitor mediante `PATCH /api/consultas/{id}/responsable`, con permiso y alcance, validación de versión optimista y registro histórico inmutable en la misma transacción. Actualmente no existe un flujo frontend específico para esta operación ni una vista de consulta del historial.
+
+La estructura PostgreSQL del historial se administra mediante scripts operativos versionados en [`backend/app/db/migration`](backend/app/db/migration/README.md). Su aplicación y verificación son manuales y deben completarse antes de desplegar el backend que depende de esa tabla.
 
 ### Seguimientos
 

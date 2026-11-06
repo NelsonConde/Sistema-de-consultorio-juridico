@@ -209,7 +209,7 @@ function notifyState(options, state, extra = {}) {
 /**
  * Starts the backend upload session.
  *
- * checksum is deliberately optional. SCRUM-281 must not invent or force the
+ * checksum is deliberately optional. Callers must not invent or force the
  * checksum contract until the backend requires it.
  */
 export async function initiate(resource, file, { checksum } = {}) {
@@ -546,8 +546,8 @@ async function performUpload(resource, file, options = {}) {
      * previous compensation behavior for them so a failed confirmation does
      * not leave an abandoned upload session.
      *
-     * SCRUM-281 callers explicitly opt in to preserving the session so they can
-     * retry only /complete without transferring the file again.
+     * Callers that expose confirmation retry explicitly opt in to preserving the
+     * session so they can retry only /complete without transferring the file again.
      */
     if (!keepPendingConfirmation) {
       await abortUploadSilently(uploadId);

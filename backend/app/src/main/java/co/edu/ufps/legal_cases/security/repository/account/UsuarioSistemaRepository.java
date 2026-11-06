@@ -8,16 +8,21 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
+import jakarta.persistence.LockModeType;
 
 @Repository
 public interface UsuarioSistemaRepository extends JpaRepository<UsuarioSistema, Long> {
 
         Optional<UsuarioSistema> findByUsernameIgnoreCase(String username);
+
+        @Query("SELECT u.id FROM UsuarioSistema u WHERE LOWER(u.username) = LOWER(:username)")
+        Optional<Long> findIdByUsernameIgnoreCase(@Param("username") String username);
 
         boolean existsByUsernameIgnoreCase(String username);
 
@@ -32,6 +37,10 @@ public interface UsuarioSistemaRepository extends JpaRepository<UsuarioSistema, 
 
         @EntityGraph(attributePaths = { "rol", "rol.permisos" })
         Optional<UsuarioSistema> findWithRolAndPermisosById(Long id);
+
+        @Lock(LockModeType.PESSIMISTIC_WRITE)
+        @Query("SELECT u FROM UsuarioSistema u WHERE u.id = :id")
+        Optional<UsuarioSistema> findByIdForUpdate(@Param("id") Long id);
 
         // Tambien se puede usar para cargar el rol y permisos al buscar por username
         @EntityGraph(attributePaths = { "rol", "rol.permisos" })

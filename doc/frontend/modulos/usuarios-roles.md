@@ -263,6 +263,8 @@ PATCH /api/usuarios-sistema/{usuarioId}/perfil/conciliador
 
 Cuando el destino seleccionado es administrativo, el componente valida nuevamente el permiso `Gestionar administradores` antes de enviar la operación.
 
+Las cinco rutas de cambio son explícitas y corresponden al tipo de destino. Si la API responde `409` con `detalles.codigo = CONFLICTO_OPERACION_PERFIL`, el formulario informa que el cambio fue rechazado; los demás `409` se tratan como conflictos de concurrencia. Ninguno de esos rechazos se presenta como una actualización exitosa.
+
 ## 9. Auditoría administrativa
 
 `AuditLogsTable` se muestra en `/admin`, pestaña `Auditoría`.
@@ -351,8 +353,10 @@ PATCH /api/monitores/{id}/activo?activo=false
 El frontend aplica controles visuales de permisos y formularios, pero las reglas centrales se aplican en backend. Entre ellas:
 
 - creación de usuario asociado al perfil;
-- sincronización entre perfil y usuario del sistema;
+- separación entre la habilitación de cuenta y el estado del perfil;
+- rechazo de activación o desactivación directa incompatible mediante un conflicto funcional distinguible;
 - cambio de perfil mediante Strategy;
+- actualización de rol y perfil vigente junto con historial en la transición explícita;
 - bloqueo de desactivación de responsables con consultas operativas;
 - validación de roles y permisos.
 

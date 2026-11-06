@@ -1,7 +1,13 @@
 "use client"
 
 import { apiClient } from "@/lib/apiClient";
-import { apiResponse, readResponseBody } from "@/lib/api";
+import {
+  ApiError,
+  apiResponse,
+  isProfileOperationConflict,
+  readResponseBody,
+  toProfileOperationConflict,
+} from "@/lib/api";
 /**
  * Form for changing a system user's role/profile.
  *
@@ -472,10 +478,11 @@ export function CambiarRolUsuarioForm() {
       }
 
       if (!response.ok) {
-        throw new Error(
+        throw new ApiError(
           result?.mensaje ||
             result?.message ||
-            "No se pudo cambiar el perfil del usuario"
+            "No se pudo cambiar el perfil del usuario",
+          { status: response.status, payload: result, response }
         );
       }
 
@@ -490,6 +497,17 @@ export function CambiarRolUsuarioForm() {
 
       setAvisoPerfil(null);
     } catch (error) {
+
+      if (isProfileOperationConflict(error)) {
+        const conflict = toProfileOperationConflict(
+          error,
+          "La cuenta tiene perfiles activos inconsistentes y requiere revisión administrativa antes de cambiar de perfil."
+        );
+        toast.error("No se puede cambiar el perfil", {
+          description: `${conflict.message} Revisa administrativamente los perfiles activos de la cuenta antes de intentarlo nuevamente.`,
+        });
+        return;
+      }
 
       toast.error(error.message || "Error cambiando perfil");
     } finally {

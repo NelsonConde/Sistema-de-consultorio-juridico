@@ -128,6 +128,17 @@ public class ConsultaValidator {
                 consulta.getContrapartes());
     }
 
+    public void validarCompatibilidadResponsables(Consulta consulta) {
+        if (consulta == null || consulta.getArea() == null) {
+            throw new BusinessException("La consulta y su area son obligatorias");
+        }
+
+        validarResponsables(
+                consulta.getArea(),
+                consulta.getAsesor(),
+                consulta.getEstudiante());
+    }
+
     public void validarRequisitosParaEstadoOperativo(Consulta consulta, EstadoConsulta estadoNuevo) {
         if (!requiereResponsablesParaAtencion(estadoNuevo)) {
             return;

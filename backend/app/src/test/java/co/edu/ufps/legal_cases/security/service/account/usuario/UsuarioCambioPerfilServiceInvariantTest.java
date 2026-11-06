@@ -21,6 +21,7 @@ import co.edu.ufps.legal_cases.security.service.account.UsuarioCambioPerfilServi
 import co.edu.ufps.legal_cases.security.service.account.UsuarioSistemaService;
 import co.edu.ufps.legal_cases.security.service.account.cambio.*;
 import co.edu.ufps.legal_cases.security.service.account.perfil.PerfilEstadoService;
+import co.edu.ufps.legal_cases.security.service.account.perfil.PerfilOperacionEstadoValidator;
 import co.edu.ufps.legal_cases.security.service.account.perfil.PerfilUsuarioResolverService;
 import co.edu.ufps.legal_cases.security.service.invariant.administracion.AdministracionInvariantService;
 
@@ -33,6 +34,7 @@ class UsuarioCambioPerfilServiceInvariantTest {
     private UsuarioSistemaService usuarioService;
     private PerfilCambioHandlerRegistry registry;
     private AdministracionInvariantService invariantService;
+    private PerfilOperacionEstadoValidator perfilOperacionEstadoValidator;
     private UsuarioCambioPerfilService service;
 
     @BeforeEach
@@ -44,6 +46,7 @@ class UsuarioCambioPerfilServiceInvariantTest {
         usuarioService = mock(UsuarioSistemaService.class);
         registry = mock(PerfilCambioHandlerRegistry.class);
         invariantService = mock(AdministracionInvariantService.class);
+        perfilOperacionEstadoValidator = mock(PerfilOperacionEstadoValidator.class);
 
         service = new UsuarioCambioPerfilService(
                 usuarioRepository,
@@ -54,7 +57,8 @@ class UsuarioCambioPerfilServiceInvariantTest {
                 usuarioService,
                 registry,
                 mock(UsuarioCambioPerfilValidator.class),
-                invariantService);
+                invariantService,
+                perfilOperacionEstadoValidator);
     }
 
     @Test
@@ -68,7 +72,7 @@ class UsuarioCambioPerfilServiceInvariantTest {
         usuario.setTipoPerfilActual(TipoPerfilUsuario.ADMINISTRATIVO);
         usuario.setRol(anterior);
 
-        when(usuarioRepository.findWithRolAndPermisosById(10L))
+        when(usuarioRepository.findByIdForUpdate(10L))
                 .thenReturn(Optional.of(usuario));
         when(perfilResolver.obtenerPerfilActivoObligatorio(usuario))
                 .thenReturn(new PerfilUsuarioActual(
@@ -103,13 +107,16 @@ class UsuarioCambioPerfilServiceInvariantTest {
         InOrder orden = inOrder(
                 invariantService,
                 usuarioRepository,
+                perfilOperacionEstadoValidator,
                 perfilEstadoService);
 
         orden.verify(invariantService).validarCambioPerfil(
                 10L,
                 TipoPerfilUsuario.ESTUDIANTE);
         orden.verify(usuarioRepository)
-                .findWithRolAndPermisosById(10L);
+                .findByIdForUpdate(10L);
+        orden.verify(perfilOperacionEstadoValidator)
+                .validarExclusividadAntesDeCambioExplicito(usuario);
         orden.verify(perfilEstadoService).desactivarPerfilActual(
                 10L,
                 TipoPerfilUsuario.ADMINISTRATIVO);
