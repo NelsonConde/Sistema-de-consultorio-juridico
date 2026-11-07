@@ -4,7 +4,11 @@ Este archivo registra los cambios técnicos del Sistema de Gestión de Casos Jur
 
 ## [Unreleased]
 
-Estas entradas describen cambios aún no asignados a una nueva etiqueta de versión. Su integración en una rama y los resultados de CI no acreditan por sí solos un despliegue en producción. Al aprobarse una liberación, las entradas correspondientes se registran bajo la versión y fecha verificadas.
+Sin cambios registrados después de `v1.2.0`.
+
+## [v1.2.0] - 2026-11-07
+
+La etiqueta `v1.2.0` apunta al commit `c979530401c3b004907cedc29920e4b0a1e9a168` de `main`, integrado mediante el PR [#92](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/92). [Release publicada](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/releases/tag/v1.2.0) y [CI de `main` satisfactoria](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/actions/runs/42278117887). La publicación identifica el código; no acredita por sí sola respaldo, migración ni correspondencia del despliegue en Railway.
 
 ### Added
 
@@ -18,12 +22,12 @@ Estas entradas describen cambios aún no asignados a una nueva etiqueta de versi
 
 - Serialización de cambios de credenciales, recuperación de contraseña, estados de cuenta y transiciones de perfil para reducir pérdidas de actualización concurrentes.
 - Manejo frontend de conflictos en operaciones de perfiles.
-- Actualización de Next.js del incremento candidato de `^16.2.6` a `^16.4.1`; el lockfile resuelve `16.4.1`.
-- Documentación técnica de autenticación, perfiles, consultas, migraciones, pruebas, seguridad y despliegue alineada con la implementación del incremento candidato.
+- Actualización de Next.js de `^16.2.6` a `^16.4.1`; el lockfile resuelve `16.4.1`.
+- Documentación técnica de autenticación, perfiles, consultas, migraciones, pruebas, seguridad y despliegue alineada con la implementación de esta versión.
 
 ### Security
 
-- El workflow de GitHub Actions del incremento candidato declara `permissions: contents: read` para limitar el token del workflow a lectura del repositorio.
+- El workflow de GitHub Actions de esta versión declara `permissions: contents: read` para limitar el token del workflow a lectura del repositorio.
 - La documentación diferencia los resultados históricos de auditoría de dependencias de las comprobaciones ejecutadas por integración continua.
 
 ## [v1.1.0] - 2026-10-05
