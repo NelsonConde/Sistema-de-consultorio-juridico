@@ -4,7 +4,31 @@ Este archivo registra los cambios técnicos del Sistema de Gestión de Casos Jur
 
 ## [Unreleased]
 
-Sin cambios registrados después de `v1.2.0`.
+Sin cambios registrados después de `v1.2.1`.
+
+## [v1.2.1] - 2026-11-07
+
+La etiqueta `v1.2.1` identifica el commit `26251d026911d395315f7621aaf610b6da729f1a` de `main`. [Release publicada](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/releases/tag/v1.2.1). Es una actualización correctiva (PATCH) del proceso de construcción Docker del backend para Railway.
+
+### Fixed
+
+- Instalación de `unzip` únicamente en la etapa de construcción del [Dockerfile del backend](backend/app/Dockerfile) para permitir la verificación SHA-256 de la distribución de Maven Wrapper sin desactivar el control de integridad.
+- Restablecimiento de la compilación y publicación de la imagen Docker en Railway, manteniendo Java 21 y Maven 3.9.14.
+
+### Verification
+
+- Construcción Docker local satisfactoria con `docker build --no-cache -f backend/app/Dockerfile backend/app`; el empaquetado utiliza `-DskipTests` y no acredita la ejecución de pruebas unitarias.
+- Comprobaciones automáticas de GitHub Actions y revisiones independientes de los cambios de los PR correspondientes.
+- Registros de Railway: imagen Docker compilada y publicada; Spring Boot 4.0.6 inició correctamente y estableció conexión PostgreSQL mediante Supabase Pooler.
+- Flyway validó correctamente 4 migraciones; JPA/Hibernate inicializó el contexto de persistencia. La navegación funcional del sistema desplegado fue comprobada por el responsable.
+
+### Traceability
+
+- [PR #99](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/99): corrección del Dockerfile.
+- [PR #100](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/100): promoción a `staging`.
+- [PR #101](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/101): promoción a `main`.
+
+Esta corrección no modificó código de aplicación, contratos API, migraciones, credenciales ni la etiqueta `v1.2.0`. La presente actualización documental se realiza después de publicar `v1.2.1` y no forma parte del commit etiquetado.
 
 ## [v1.2.0] - 2026-11-07
 
