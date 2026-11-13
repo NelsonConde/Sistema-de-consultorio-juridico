@@ -31,6 +31,7 @@ public class UsuarioSistemaMapper {
         dto.setId(usuario.getId());
         dto.setUsername(usuario.getUsername());
         dto.setActivo(usuario.getActivo());
+        dto.setEstadoActivacion(usuario.getEstadoActivacion());
 
         asignarRolYPermisos(dto, usuario);
         asignarPerfil(dto, usuario);
@@ -44,6 +45,7 @@ public class UsuarioSistemaMapper {
         dto.setId(usuario.getId());
         dto.setUsername(usuario.getUsername());
         dto.setActivo(usuario.getActivo());
+        dto.setEstadoActivacion(usuario.getEstadoActivacion());
         dto.setRolId(usuario.getRolId());
         dto.setRolNombre(usuario.getRolNombre());
         dto.setTipoPerfil(usuario.getTipoPerfil());

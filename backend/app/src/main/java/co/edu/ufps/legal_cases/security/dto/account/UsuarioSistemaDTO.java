@@ -4,6 +4,7 @@ import java.util.List;
 
 import lombok.Getter;
 import lombok.Setter;
+import co.edu.ufps.legal_cases.security.model.account.EstadoActivacionCuenta;
 
 // DTO de salida para usuarios del sistema.
 // No tiene validaciones porque no se recibe como entrada.
@@ -16,6 +17,8 @@ public class UsuarioSistemaDTO {
     private String username;
 
     private Boolean activo;
+
+    private EstadoActivacionCuenta estadoActivacion;
 
     private Long rolId;
 
