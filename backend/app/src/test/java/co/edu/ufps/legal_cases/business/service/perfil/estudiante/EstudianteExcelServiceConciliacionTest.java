@@ -3,6 +3,8 @@ package co.edu.ufps.legal_cases.business.service.perfil.estudiante;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
 
@@ -49,6 +51,30 @@ class EstudianteExcelServiceConciliacionTest {
 
         assertEquals(Boolean.TRUE, primero.getConciliacion());
         assertEquals(Boolean.FALSE, segundo.getConciliacion());
+    }
+
+    @Test
+    void importarAislaUnaFilaFallidaYContinuaConLasSiguientes() throws Exception {
+        EstudianteCommandService commandService = mock(EstudianteCommandService.class);
+        EstudianteExcelService excelService = new EstudianteExcelService(commandService);
+        when(commandService.crear(any(EstudianteDTO.class)))
+                .thenThrow(new IllegalStateException("correo duplicado"))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        MockMultipartFile archivo = new MockMultipartFile(
+                "archivo",
+                "estudiantes-parcial.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                crearExcelPrueba());
+
+        ImportacionEstudiantesDTO resultado = excelService.importar(archivo);
+
+        assertEquals(2, resultado.getTotalFilas());
+        assertEquals(1, resultado.getExitosos());
+        assertEquals(1, resultado.getFallidos());
+        assertEquals(1, resultado.getErrores().size());
+        verify(commandService, org.mockito.Mockito.times(2))
+                .crear(any(EstudianteDTO.class));
     }
 
     private byte[] crearExcelPrueba() throws Exception {
