@@ -16,6 +16,7 @@ import co.edu.ufps.legal_cases.common.exception.BusinessException;
 import co.edu.ufps.legal_cases.security.dto.account.UsuarioSistemaResumenDTO;
 import co.edu.ufps.legal_cases.security.dto.account.UsuarioSistemaDTO;
 import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
+import co.edu.ufps.legal_cases.security.model.account.EstadoActivacionCuenta;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
 import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaRepository;
 import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaResumenProjection;
@@ -68,6 +69,7 @@ public class UsuarioSistemaService {
             String sortBy,
             String direction,
             Boolean activo,
+            EstadoActivacionCuenta estadoActivacion,
             TipoPerfilUsuario tipoPerfil) {
         validarPaginacion(page, size);
 
@@ -79,6 +81,7 @@ public class UsuarioSistemaService {
                 usuarioSistemaRepository.buscarResumenPaginado(
                         termino,
                         activo,
+                        estadoActivacion,
                         tipoPerfil,
                         pageable);
 

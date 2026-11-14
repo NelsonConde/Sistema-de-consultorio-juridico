@@ -27,6 +27,9 @@ public interface AccountActivationTokenRepository
             UsuarioSistema usuarioSistema,
             LocalDateTime fechaLimite);
 
+    boolean existsByUsuarioSistemaAndUsadoFalseAndRevocadoFalse(
+            UsuarioSistema usuarioSistema);
+
     /*
      * Obtiene únicamente el identificador del usuario para poder
      * adquirir primero su lock sin introducir entidades obsoletas
