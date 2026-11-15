@@ -10,6 +10,7 @@ on:
       - bugfix/**
       - hotfix/**
       - chore/**
+      - docs/**
   pull_request:
     branches:
       - develop
@@ -145,3 +146,22 @@ jobs:
           path: frontend/playwright-report/
           if-no-files-found: warn
           retention-days: 7
+
+  backend-docker:
+    name: Backend Docker image
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build backend image with release Dockerfile
+        run: docker build --pull --no-cache --file backend/app/Dockerfile --tag legal-cases-backend:ci backend/app
+
+      - name: Check packaged runtime and migrations artifacts
+        run: |
+          docker run --rm --entrypoint sh legal-cases-backend:ci -ec '
+            test -s /app/app.jar
+            test -s /app/migrations.jar
+            java -version
+          '
