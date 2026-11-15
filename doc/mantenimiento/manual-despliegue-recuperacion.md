@@ -8,14 +8,20 @@
 
 El sistema se compone de los siguientes elementos de infraestructura en producción:
 
-- **Frontend**: Aplicación Next.js con App Router. En la línea base histórica `v1.1.0`, `package.json` y el lockfile conservan Next.js `16.2.6`. En el incremento candidato, `package.json` declara `^16.4.1` y el lockfile resuelve `16.4.1`. Se compila mediante `next build` y se ejecuta mediante el runtime de Next.js (`next start`) o el Dockerfile versionado del frontend. La versión efectivamente desplegada se confirma contra el commit del ambiente, no por la presencia de estos archivos en una rama.
+- **Frontend**: Aplicación Next.js con App Router. La versión publicada `v1.2.1` incluye Next.js `16.4.1`; el candidato `v1.3.0` conserva el rango `^16.4.1` en `frontend/package.json` y debe contrastarse con `frontend/package-lock.json` durante el preflight. Se compila con `npm ci` y `next build`, y se ejecuta mediante `next start` o el Dockerfile versionado. El commit desplegado se verifica en el proveedor; un archivo presente en `develop` no acredita el deploy.
 - **Backend**: Servicio Spring Boot empaquetado en contenedor Docker y ejecutado en Railway.
 - **Base de Datos**: PostgreSQL 16 con migraciones Flyway ejecutadas por un artefacto separado antes de iniciar el backend. El proceso web únicamente valida el historial de Flyway y el esquema de Hibernate; no aplica DDL.
 - **Almacenamiento de Objetos**: Bucket privado `legal-documents` en Supabase Storage (API S3 compatible), con políticas de acceso privado (RLS y acceso restringido por claves de servicio).
 
-Durante la compilación deben instalarse las dependencias de desarrollo. `shadcn` está declarado en `devDependencies` porque su CLI no forma parte del runtime, pero debe estar disponible en el entorno de build mientras `src/app/globals.css` importe `shadcn/tailwind.css`; el CSS resultante queda incorporado en la salida generada por Next.js. En el incremento candidato, el rango declarado es `^4.2.0` y el lockfile resuelve `4.21.4`. El workflow de GitHub Actions ejecuta `npm ci` antes de `npm run build`. De forma equivalente, el Dockerfile instala todas las dependencias en la etapa inicial, compila en la etapa `builder` y solo omite las dependencias de desarrollo en la etapa de ejecución posterior al build.
+Durante la compilación frontend deben instalarse las dependencias de desarrollo con `npm ci`; el archivo actual `src/app/globals.css` importa `tailwindcss`, `tw-animate-css` y `./shadcn-tailwind.css` (archivo local), no `shadcn/tailwind.css`. El Dockerfile instala dependencias de build, ejecuta `npm run build` y utiliza una etapa runtime con `npm ci --omit=dev`. `NEXT_PUBLIC_API_URL_BASE` o `NEXT_PUBLIC_API_URL` deben configurarse **en el momento del build** cuando se use un Dockerfile o Vercel, porque Next.js incorpora los valores públicos en el cliente. La configuración normaliza la URL y agrega `/api` cuando es necesario; no incluir secretos en variables `NEXT_PUBLIC_*`.
 
 El repositorio no contiene una configuración versionada de Vercel que permita acreditar su despliegue. Si se utiliza ese proveedor, deben comprobarse externamente el Root Directory del frontend y la instalación de `devDependencies` antes del build. Esta documentación no presenta esa configuración externa como verificada.
+
+### Preflight preventivo de promoción a main — candidato v1.3.0
+
+Antes del PR de `develop` a `staging`, cumplir [la lista de liberación candidata](preflight-liberacion-v1.3.0.md), incluido el job `Backend Docker image` que construye la imagen real desde `backend/app` y valida los dos JAR. Este job no sustituye la verificación de arranque con Railway: confirmar fuera de Git el **Dockerfile Path**, **Root Directory / build context**, rama asociada, variables de entorno, comando de inicio y commit efectivamente desplegado. El Dockerfile del backend requiere `unzip` en la etapa builder para verificar Maven Wrapper, Java 21 y los artefactos `legal-cases-backend.jar` y `legal-cases-backend-migrations.jar`.
+
+El release anterior `v1.2.1` ya incorporó la corrección del Dockerfile; no crear una nueva corrección si el CI y el build real confirman que sigue funcionando. Los errores detectados en staging deben corregirse en rama temporal desde `develop`, no mediante cambios directos en `staging` o `main`. La futura etiqueta `v1.3.0` y su SHA no se registran como publicados hasta la aprobación y fusión definitiva.
 
 ---
 
