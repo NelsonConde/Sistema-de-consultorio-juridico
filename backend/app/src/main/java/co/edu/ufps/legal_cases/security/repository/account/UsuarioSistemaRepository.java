@@ -1,6 +1,7 @@
 package co.edu.ufps.legal_cases.security.repository.account;
 
 import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
+import co.edu.ufps.legal_cases.security.model.account.EstadoActivacionCuenta;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Page;
 import java.util.List;
@@ -75,6 +76,7 @@ public interface UsuarioSistemaRepository extends JpaRepository<UsuarioSistema, 
                         SELECT u.id AS id,
                                u.username AS username,
                                u.activo AS activo,
+                               u.estadoActivacion AS estadoActivacion,
                                r.id AS rolId,
                                r.nombre AS rolNombre,
                                u.tipoPerfilActual AS tipoPerfil
@@ -88,6 +90,7 @@ public interface UsuarioSistemaRepository extends JpaRepository<UsuarioSistema, 
                                    LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
                           )
                           AND (:activo IS NULL OR u.activo = :activo)
+                          AND (:estadoActivacion IS NULL OR u.estadoActivacion = :estadoActivacion)
                           AND (:tipoPerfil IS NULL OR u.tipoPerfilActual = :tipoPerfil)
                         """, countQuery = """
                         SELECT COUNT(u.id)
@@ -101,11 +104,13 @@ public interface UsuarioSistemaRepository extends JpaRepository<UsuarioSistema, 
                                    LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
                           )
                           AND (:activo IS NULL OR u.activo = :activo)
+                          AND (:estadoActivacion IS NULL OR u.estadoActivacion = :estadoActivacion)
                           AND (:tipoPerfil IS NULL OR u.tipoPerfilActual = :tipoPerfil)
                         """)
         Page<UsuarioSistemaResumenProjection> buscarResumenPaginado(
                         @Param("search") String search,
                         @Param("activo") Boolean activo,
+                        @Param("estadoActivacion") EstadoActivacionCuenta estadoActivacion,
                         @Param("tipoPerfil") TipoPerfilUsuario tipoPerfil,
                         Pageable pageable);
 }

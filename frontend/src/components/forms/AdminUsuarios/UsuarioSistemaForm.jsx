@@ -30,6 +30,7 @@ import { tieneAlgunPermiso, tienePermiso } from "@/lib/authz";
 import { digitsOnlyRule, maxLengthRule, requiredEmailRule } from "@/lib/form-validation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImportarEstudiantesForm } from "../usuarios/ImportarEstudiantesForm";
+import { InvitacionesActivacionForm } from "./InvitacionesActivacionForm";
 
 const REQUIRED = "Campo obligatorio";
 
@@ -93,6 +94,7 @@ export function UsuarioSistemaForm() {
   const [tiposDocumento, setTiposDocumento] = useState([]);
   const [sedes, setSedes] = useState([]);
   const [areas, setAreas] = useState([]);
+  const [invitationsReloadKey, setInvitationsReloadKey] = useState(0);
 
   const {
     register,
@@ -316,6 +318,8 @@ export function UsuarioSistemaForm() {
       }
 
       toast.success("Usuario creado correctamente");
+      toast.info("La invitación de activación se procesa después de confirmar la cuenta.");
+      setInvitationsReloadKey((current) => current + 1);
       reset();
     } catch (error) {
 
@@ -432,6 +436,7 @@ export function UsuarioSistemaForm() {
   }
 
   return (
+    <>
     <div className="rounded-xl border bg-card p-6 shadow">
       <h2 className="mb-4 text-xl font-bold">Crear Usuario</h2>
 
@@ -550,7 +555,12 @@ export function UsuarioSistemaForm() {
               </TabsContent>
 
               <TabsContent key="masivo" value="masivo">
-                <ImportarEstudiantesForm puedeImportar={puedeCrearUsuarios} />
+                <ImportarEstudiantesForm
+                  puedeImportar={puedeCrearUsuarios}
+                  onImportCompleted={() =>
+                    setInvitationsReloadKey((current) => current + 1)
+                  }
+                />
               </TabsContent>
             </Tabs>
           ) : (
@@ -652,6 +662,10 @@ export function UsuarioSistemaForm() {
         )}
       </div>
     </div>
+    {tienePermiso(user, PERMISO_GESTIONAR_USUARIOS_LEGACY) && (
+      <InvitacionesActivacionForm reloadKey={invitationsReloadKey} />
+    )}
+    </>
   );
 }
 

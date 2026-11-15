@@ -2,6 +2,7 @@ package co.edu.ufps.legal_cases.security.service.account.usuario;
 
 import static co.edu.ufps.legal_cases.common.util.NormalizacionUtils.normalizarEmail;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,13 +29,16 @@ public class UsuarioSistemaRegistroService {
 
     private final UsuarioSistemaRepository usuarioSistemaRepository;
     private final RolRepository rolRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public UsuarioSistemaRegistroService(
             UsuarioSistemaRepository usuarioSistemaRepository,
-            RolRepository rolRepository) {
+            RolRepository rolRepository,
+            ApplicationEventPublisher eventPublisher) {
 
         this.usuarioSistemaRepository = usuarioSistemaRepository;
         this.rolRepository = rolRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     public UsuarioSistema crearParaAsesor(Asesor asesor) {
@@ -86,7 +90,15 @@ public class UsuarioSistemaRegistroService {
                 codigoRolBase);
 
         // Arriba se creó el objeto pero aquí es donde se guarda.
-        return usuarioSistemaRepository.save(usuario);
+        UsuarioSistema usuarioGuardado =
+                usuarioSistemaRepository.save(usuario);
+
+        eventPublisher.publishEvent(
+                new UsuarioSistemaRegistradoEvent(
+                        usuarioGuardado.getId(),
+                        usuarioGuardado.getUsername()));
+
+        return usuarioGuardado;
     }
 
     // Aquí se crea el objeto pero no se guarda.

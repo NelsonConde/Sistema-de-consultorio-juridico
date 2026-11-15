@@ -8,8 +8,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -23,15 +27,19 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.sql.DataSource;
 
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -53,6 +61,7 @@ import co.edu.ufps.legal_cases.security.model.account.EstadoActivacionCuenta;
 import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
 import co.edu.ufps.legal_cases.security.model.account.UsuarioSistema;
 import co.edu.ufps.legal_cases.security.repository.account.UsuarioSistemaRepository;
+import co.edu.ufps.legal_cases.security.service.account.usuario.UsuarioSistemaRegistradoEvent;
 import co.edu.ufps.legal_cases.security.service.auth.activation.AccountActivationService;
 import co.edu.ufps.legal_cases.security.service.auth.activation.AccountActivationEmailService;
 import co.edu.ufps.legal_cases.security.service.auth.activation.AccountActivationTokenService;
@@ -114,6 +123,9 @@ class AccountActivationPostgreSqlTest
     private PlatformTransactionManager transactionManager;
 
     @Autowired
+    private ApplicationEventPublisher eventPublisher;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -142,6 +154,172 @@ class AccountActivationPostgreSqlTest
                     "legal_cases_test",
                     connection.getCatalog());
         }
+    }
+
+    @BeforeEach
+    void resetEmailProvider() {
+        reset(invitationEmailService);
+    }
+
+    @Test
+    void initialInvitationIsPersistedAfterCommitBeforeEmailAndSkippedOnRollback() {
+        PendingAccount committed = createPendingAccount("initial-commit");
+        AtomicReference<String> deliveredToken = new AtomicReference<>();
+
+        doAnswer(invocation -> {
+            deliveredToken.set(invocation.getArgument(1));
+            assertEquals(
+                    1,
+                    count(
+                            """
+                            SELECT COUNT(*)
+                            FROM "DB_consultorioJuridico".account_activation_token
+                            WHERE usuario_sistema_id = ?
+                              AND usado = FALSE
+                              AND revocado = FALSE
+                            """,
+                            committed.usuarioId()),
+                    "El token debe estar confirmado antes de invocar el correo");
+            return null;
+        }).when(invitationEmailService)
+                .enviarInvitacionActivacion(eq(committed.username()), anyString());
+
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        transaction.executeWithoutResult(status -> {
+            eventPublisher.publishEvent(
+                    new UsuarioSistemaRegistradoEvent(
+                            committed.usuarioId(),
+                            committed.username()));
+
+            verifyNoInteractions(invitationEmailService);
+            assertEquals(
+                    0,
+                    count(
+                            """
+                            SELECT COUNT(*)
+                            FROM "DB_consultorioJuridico".account_activation_token
+                            WHERE usuario_sistema_id = ?
+                            """,
+                            committed.usuarioId()));
+        });
+
+        verify(invitationEmailService)
+                .enviarInvitacionActivacion(eq(committed.username()), anyString());
+        assertNotNull(deliveredToken.get());
+
+        transaction.executeWithoutResult(status ->
+                eventPublisher.publishEvent(
+                        new UsuarioSistemaRegistradoEvent(
+                                committed.usuarioId(),
+                                committed.username())));
+
+        verify(invitationEmailService, times(1))
+                .enviarInvitacionActivacion(eq(committed.username()), anyString());
+        assertEquals(
+                1,
+                count(
+                        """
+                        SELECT COUNT(*)
+                        FROM "DB_consultorioJuridico".account_activation_token
+                        WHERE usuario_sistema_id = ?
+                        """,
+                        committed.usuarioId()),
+                "Un evento repetido no debe duplicar tokens ni correos");
+        assertEquals(
+                0,
+                count(
+                        """
+                        SELECT COUNT(*)
+                        FROM "DB_consultorioJuridico".account_activation_token
+                        WHERE usuario_sistema_id = ?
+                          AND token_hash = ?
+                        """,
+                        committed.usuarioId(),
+                        deliveredToken.get()),
+                "PostgreSQL no debe almacenar el token sin procesar");
+
+        reset(invitationEmailService);
+        PendingAccount rolledBack = createPendingAccount("initial-rollback");
+
+        transaction.executeWithoutResult(status -> {
+            eventPublisher.publishEvent(
+                    new UsuarioSistemaRegistradoEvent(
+                            rolledBack.usuarioId(),
+                            rolledBack.username()));
+            status.setRollbackOnly();
+        });
+
+        verifyNoInteractions(invitationEmailService);
+        assertEquals(
+                0,
+                count(
+                        """
+                        SELECT COUNT(*)
+                        FROM "DB_consultorioJuridico".account_activation_token
+                        WHERE usuario_sistema_id = ?
+                        """,
+                        rolledBack.usuarioId()));
+    }
+
+    @Test
+    void emailFailureKeepsPendingAccountAndAllowsAdministrativeRecovery() {
+        PendingAccount account = createPendingAccount("provider-failure");
+        doThrow(new IllegalStateException("provider unavailable"))
+                .when(invitationEmailService)
+                .enviarInvitacionActivacion(eq(account.username()), anyString());
+
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        transaction.executeWithoutResult(status ->
+                eventPublisher.publishEvent(
+                        new UsuarioSistemaRegistradoEvent(
+                                account.usuarioId(),
+                                account.username())));
+
+        UsuarioSistema pending = usuarioSistemaRepository
+                .findById(account.usuarioId())
+                .orElseThrow();
+        assertEquals(EstadoActivacionCuenta.PENDIENTE, pending.getEstadoActivacion());
+        assertNull(pending.getPasswordHash());
+        assertEquals(
+                1,
+                count(
+                        """
+                        SELECT COUNT(*)
+                        FROM "DB_consultorioJuridico".account_activation_token
+                        WHERE usuario_sistema_id = ?
+                          AND usado = FALSE
+                          AND revocado = FALSE
+                        """,
+                        account.usuarioId()));
+
+        jdbcTemplate.update(
+                """
+                UPDATE "DB_consultorioJuridico".account_activation_token
+                SET fecha_creacion = NOW() - INTERVAL '61 seconds'
+                WHERE usuario_sistema_id = ?
+                """,
+                account.usuarioId());
+        reset(invitationEmailService);
+
+        activationService.reenviarInvitacion(account.usuarioId());
+
+        ArgumentCaptor<String> resentToken = ArgumentCaptor.forClass(String.class);
+        verify(invitationEmailService)
+                .enviarInvitacionActivacion(
+                        eq(account.username()),
+                        resentToken.capture());
+        assertFalse(resentToken.getValue().isBlank());
+        assertEquals(
+                1,
+                count(
+                        """
+                        SELECT COUNT(*)
+                        FROM "DB_consultorioJuridico".account_activation_token
+                        WHERE usuario_sistema_id = ?
+                          AND usado = FALSE
+                          AND revocado = FALSE
+                        """,
+                        account.usuarioId()));
     }
 
     @Test
@@ -735,7 +913,9 @@ class AccountActivationPostgreSqlTest
                     String identifier =
                             executionId
                                     + "-"
-                                    + suffix;
+                                    + Integer.toUnsignedString(
+                                            suffix.hashCode(),
+                                            Character.MAX_RADIX);
 
                     TipoDocumento documentType =
                             new TipoDocumento();
