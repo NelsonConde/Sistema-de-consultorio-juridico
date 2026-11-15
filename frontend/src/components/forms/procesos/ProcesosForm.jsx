@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ import {
   puedeVerProcesos,
 } from "./procesos.permissions";
 import { Aviso, ModalCambioEstado, ModalEdicion } from "./ProcesosFormParts";
+import { ProcesoDocumentosDialog } from "./ProcesoDocumentosDialog";
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 
@@ -70,6 +71,7 @@ export function ProcesosForm() {
     proceso: null,
     loading: false,
   });
+  const [procesoDocumentos, setProcesoDocumentos] = useState(null);
 
   const puedeVer = puedeVerProcesos(user);
   const puedeGestionar = puedeGestionarProcesos(user);
@@ -552,19 +554,19 @@ export function ProcesosForm() {
                   <th className="px-3 py-2 font-medium">Órgano</th>
                   <th className="px-3 py-2 font-medium">Especialidad</th>
                   <th className="px-3 py-2 font-medium">Estado</th>
-                  {puedeGestionar && <th className="px-3 py-2 font-medium">Acciones</th>}
+                  <th className="px-3 py-2 font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {cargando && procesos.length === 0 ? (
                   <tr>
-                    <td colSpan={puedeGestionar ? 8 : 7} className="px-3 py-8 text-center text-muted-foreground">
+                    <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
                       Cargando procesos...
                     </td>
                   </tr>
                 ) : procesos.length === 0 ? (
                   <tr>
-                    <td colSpan={puedeGestionar ? 8 : 7} className="px-3 py-8 text-center text-muted-foreground">
+                    <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
                       No se encontraron procesos con los filtros seleccionados.
                     </td>
                   </tr>
@@ -602,21 +604,26 @@ export function ProcesosForm() {
                           {labelEstadoProceso(proceso.estado)}
                         </span>
                       </td>
-                      {puedeGestionar && (
-                        <td className="px-3 py-2">
-                          <div className="flex flex-wrap gap-2">
-                            <Button type="button" size="sm" variant="outline" onClick={() => abrirEdicion(proceso)}>
-                              Editar
-                            </Button>
-                            <Button type="button" size="sm" variant="outline" onClick={() => abrirCambioEstado(proceso)}>
-                              Cambiar estado
-                            </Button>
-                            <Button type="button" size="sm" variant="destructive" onClick={() => eliminarProceso(proceso)}>
-                              Eliminar
-                            </Button>
-                          </div>
-                        </td>
-                      )}
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap gap-2">
+                          <Button type="button" size="sm" variant="outline" onClick={() => setProcesoDocumentos(proceso)}>
+                            Documentos
+                          </Button>
+                          {puedeGestionar && (
+                            <>
+                              <Button type="button" size="sm" variant="outline" onClick={() => abrirEdicion(proceso)}>
+                                Editar
+                              </Button>
+                              <Button type="button" size="sm" variant="outline" onClick={() => abrirCambioEstado(proceso)}>
+                                Cambiar estado
+                              </Button>
+                              <Button type="button" size="sm" variant="destructive" onClick={() => eliminarProceso(proceso)}>
+                                Eliminar
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -661,6 +668,14 @@ export function ProcesosForm() {
           onCerrar={cerrarCambioEstado}
           onGuardar={cambiarEstadoProceso}
           guardando={guardando}
+        />
+      )}
+
+      {procesoDocumentos && (
+        <ProcesoDocumentosDialog
+          proceso={procesoDocumentos}
+          puedeGestionar={puedeGestionar}
+          onClose={() => setProcesoDocumentos(null)}
         />
       )}
 
