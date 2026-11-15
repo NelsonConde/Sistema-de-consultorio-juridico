@@ -120,7 +120,7 @@ export function useFileResource(resource, { load = true } = {}) {
   }, []);
 
   const upload = useCallback(
-      async (selectedFiles, resourceOverride = null) => {
+      async (selectedFiles, resourceOverride = null, uploadOptions = {}) => {
         const filesToUpload = Array.from(selectedFiles || []);
 
         const targetResource = resourceOverride
@@ -162,6 +162,8 @@ export function useFileResource(resource, { load = true } = {}) {
 
           try {
             const data = await fileApi.upload(targetResource, file, {
+              documentoLogico: uploadOptions.documentoLogico,
+              tipoDocumental: uploadOptions.tipoDocumental,
               signal: controller.signal,
               keepPendingOnConfirmationFailure: true,
 
