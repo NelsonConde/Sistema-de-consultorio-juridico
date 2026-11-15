@@ -123,13 +123,13 @@ public class EstudianteExcelService {
             Cell cell = header.getCell(i);
 
             String valor =
-                    cell == null
+                    cell == null || cell.getCellType() != CellType.STRING
                             ? ""
                             : cell.getStringCellValue().trim();
 
             if (!esperados[i].equalsIgnoreCase(valor)) {
 
-                throw new RuntimeException(
+                throw new IllegalArgumentException(
                         "Formato inválido. Se esperaba la columna '"
                                 + esperados[i]
                                 + "' en la posición "

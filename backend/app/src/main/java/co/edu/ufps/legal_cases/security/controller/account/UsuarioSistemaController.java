@@ -25,6 +25,7 @@ import co.edu.ufps.legal_cases.security.dto.account.cambio.CambiarPerfilAConcili
 import co.edu.ufps.legal_cases.security.dto.account.cambio.CambiarPerfilAEstudianteDTO;
 import co.edu.ufps.legal_cases.security.dto.account.cambio.CambiarPerfilAMonitorDTO;
 import co.edu.ufps.legal_cases.security.model.account.TipoPerfilUsuario;
+import co.edu.ufps.legal_cases.security.model.account.EstadoActivacionCuenta;
 import co.edu.ufps.legal_cases.security.service.account.UsuarioCambioPerfilService;
 import co.edu.ufps.legal_cases.security.service.account.UsuarioSistemaService;
 import co.edu.ufps.legal_cases.security.service.auth.activation.AccountActivationService;
@@ -60,6 +61,7 @@ public class UsuarioSistemaController {
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "desc") String direction,
             @RequestParam(required = false) Boolean activo,
+            @RequestParam(required = false) EstadoActivacionCuenta estadoActivacion,
             @RequestParam(required = false) TipoPerfilUsuario tipoPerfil) {
         return usuarioSistemaService.buscar(
                 search,
@@ -68,6 +70,7 @@ public class UsuarioSistemaController {
                 sortBy,
                 direction,
                 activo,
+                estadoActivacion,
                 tipoPerfil);
     }
 

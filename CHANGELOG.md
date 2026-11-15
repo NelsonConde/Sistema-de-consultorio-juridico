@@ -4,7 +4,28 @@ Este archivo registra los cambios técnicos del Sistema de Gestión de Casos Jur
 
 ## [Unreleased]
 
-Sin cambios registrados después de `v1.2.1`.
+Candidato de liberación `v1.3.0`, **sin aprobar ni publicar**. El último release aprobado es `v1.2.1`; la versión candidata se confirmará después de las pruebas integradas en `staging` y de la autorización del Product Owner.
+
+### Added
+
+- Invitación inicial tras la creación de cuentas y administración de activaciones pendientes, con recuperación operativa ([PR #105](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/105)).
+- Programación de la primera reunión de conciliación desde la interfaz ([PR #106](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/106)).
+- Plantilla XLSX válida para importación de estudiantes ([PR #107](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/107)).
+- Gestión documental de procesos: carga, listado, descarga, nuevas versiones, historial, eliminación autorizada y reintento seguro de confirmación ([PR #111](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/111)).
+
+### Fixed
+
+- Validación de encabezados XLSX inválidos con error de cliente en vez de fallo interno ([PR #108](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/108)).
+- Tareas pendientes de Inicio consultadas sin depender de la primera página de consultas ([PR #109](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/109)).
+- Fecha predeterminada de estadísticas calculada según el calendario local, no UTC ([PR #110](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/110)).
+- Etiquetas de estadísticas y PDF alineadas con la semántica temporal de los datos ([PR #111](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/111)).
+
+### Release readiness
+
+- Preflight propuesto: [preflight-liberacion-v1.3.0.md](doc/mantenimiento/preflight-liberacion-v1.3.0.md).
+- El CI de preparación debe construir la imagen real del backend con Docker y comprobar la presencia de los JAR de aplicación y migraciones.
+- **Pendiente:** pruebas funcionales independientes con Railway, Vercel, Supabase Storage y base de datos; aprobación para `staging` y `main`; verificación del SHA desplegado; registro de línea base y etiqueta de release.
+- Estos cambios no justifican modificar directamente los valores `0.0.1-SNAPSHOT` de Maven o `0.1.0` de NPM sin decisión expresa de política de artefactos.
 
 ## [v1.2.1] - 2026-11-07
 

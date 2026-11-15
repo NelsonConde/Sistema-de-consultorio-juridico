@@ -29,7 +29,7 @@ function descargarPlantilla() {
  * @param {{puedeImportar:boolean}} props - Parameter description.
  * @returns {JSX.Element} Result value.
  */
-export function ImportarEstudiantesForm({ puedeImportar }) {
+export function ImportarEstudiantesForm({ puedeImportar, onImportCompleted }) {
   const inputRef = useRef(null);
 
   const [archivoSeleccionado, setArchivoSeleccionado] = useState(null);
@@ -108,6 +108,7 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
       }
 
       setResultado(data);
+      onImportCompleted?.(data);
 
       if (data.fallidos === 0) {
         toast.success(`${data.exitosos} estudiante(s) importado(s) correctamente.`);
@@ -115,6 +116,10 @@ export function ImportarEstudiantesForm({ puedeImportar }) {
         toast.warning(`Importación parcial: ${data.exitosos} exitoso(s), ${data.fallidos} fallido(s).`);
       } else {
         toast.error(`Todos los registros fallaron (${data.fallidos} error(es)).`);
+      }
+
+      if (data.exitosos > 0) {
+        toast.info("Las invitaciones de activación se procesan por separado después de confirmar cada cuenta.");
       }
 
       // File handling.

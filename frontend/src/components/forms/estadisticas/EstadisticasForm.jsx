@@ -52,7 +52,12 @@ function etiquetaEstado(nombre) {
  *
  * @returns {string} Result value.
  */
-function hoyStr() { return new Date().toISOString().slice(0, 10); }
+function hoyStr() {
+  const hoy = new Date();
+  const mes = String(hoy.getMonth() + 1).padStart(2, "0");
+  const dia = String(hoy.getDate()).padStart(2, "0");
+  return `${hoy.getFullYear()}-${mes}-${dia}`;
+}
 
 
 const CHART_COLORS = [
@@ -281,7 +286,7 @@ function DetalleSeguimientos({ stats }) {
         <BarrasHorizontales items={stats.seguimientosPorEstado} />
       </Panel>
       <Panel title="Procesos por estado"
-        badge="Sin filtro semestral">
+        badge="Período seleccionado">
         <BarrasHorizontales items={stats.procesosPorEstado} />
       </Panel>
     </div>
@@ -293,7 +298,7 @@ function DetalleEstudiantes({ stats }) {
     <div className="grid grid-cols-2 gap-3">
       <Panel title="Estudiantes activos">
         <p className="text-4xl font-extrabold text-primary">{stats.totalEstudiantesActivos ?? "—"}</p>
-        <p className="text-xs text-muted-foreground mt-1">En el semestre</p>
+        <p className="text-xs text-muted-foreground mt-1">Estado actual (sin filtro de período)</p>
       </Panel>
       <Panel title="Habilitados conciliación">
         <p className="text-4xl font-extrabold text-primary">

@@ -57,7 +57,8 @@ public class EstadisticasPdfService {
         agregarFilaResumen(resumen, "Total de personas atendidas", stats.getTotalPersonasAtendidas(), true);
         agregarFilaResumen(resumen, "Total de conciliaciones", stats.getTotalConciliaciones(), false);
         agregarFilaResumen(resumen, "Total de seguimientos", stats.getTotalSeguimientos(), true);
-        agregarFilaResumen(resumen, "Estudiantes activos", stats.getTotalEstudiantesActivos(), false);
+        agregarFilaResumen(resumen, "Estudiantes activos (estado actual, sin filtro de período)",
+                stats.getTotalEstudiantesActivos(), false);
         agregarFilaResumen(resumen, "Estudiantes habilitados para conciliación",
                 stats.getTotalEstudiantesHabilitadosConciliacion(), true);
         doc.add(resumen);
@@ -72,7 +73,8 @@ public class EstadisticasPdfService {
         agregarSeccionConteo(doc, "8. Personas por Grupo Étnico", stats.getPersonasPorGrupoEtnico(), "Grupo Étnico", "Personas");
         agregarSeccionConteo(doc, "9. Personas por Municipio", stats.getPersonasPorMunicipio(), "Municipio", "Personas");
         agregarSeccionConteo(doc, "10. Personas por Condición", stats.getPersonasPorCondicion(), "Condición", "Personas");
-        agregarSeccionConteo(doc, "11. Procesos por Estado", stats.getProcesosPorEstado(), "Estado", "Cantidad");
+        agregarSeccionConteo(doc, "11. Procesos por Estado (período del reporte)",
+                stats.getProcesosPorEstado(), "Estado", "Cantidad");
         agregarSeccionConteo(doc, "12. Conciliaciones por Estado", stats.getConciliacionesPorEstado(), "Estado", "Cantidad");
         agregarSeccionConteo(doc, "13. Seguimientos por Estado", stats.getSeguimientosPorEstado(), "Estado", "Cantidad");
 

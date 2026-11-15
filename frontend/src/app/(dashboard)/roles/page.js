@@ -11,7 +11,7 @@ export default function UsuarioSistemaPage() {
             Crear Usuario
           </h1>
           <p className="text-muted-foreground">
-            Registra un nuevo usuario del sistema y asigna sus credenciales de acceso.
+            Registra usuarios y gestiona sus invitaciones de activación.
           </p>
         </div>
         <div className="rounded-2xl border border-border bg-background shadow-sm p-6 lg:p-8 relative overflow-hidden">

@@ -92,6 +92,12 @@ public class AccountActivationTokenService {
         return tokenRepository.existsByUsuarioSistemaAndFechaCreacionAfter(usuario, fechaLimite);
     }
 
+    public boolean existeTokenActivo(UsuarioSistema usuario) {
+        validarUsuarioPersistido(usuario);
+        return tokenRepository
+                .existsByUsuarioSistemaAndUsadoFalseAndRevocadoFalse(usuario);
+    }
+
     /*
      * Esta consulta devuelve únicamente un valor escalar.
      * No carga UsuarioSistema ni AccountActivationToken en el

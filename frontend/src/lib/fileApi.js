@@ -24,6 +24,7 @@ const RESOURCE_PATHS = {
   respuesta: (resource) =>
       `/seguimientos/${resource.parentId}/respuestas/${resource.id}/archivos`,
   conciliacion: (resource) => `/conciliaciones/${resource.id}/archivos`,
+  proceso: (resource) => `/procesos/${resource.id}/archivos`,
 };
 
 /**
@@ -212,7 +213,11 @@ function notifyState(options, state, extra = {}) {
  * checksum is deliberately optional. Callers must not invent or force the
  * checksum contract until the backend requires it.
  */
-export async function initiate(resource, file, { checksum } = {}) {
+export async function initiate(
+    resource,
+    file,
+    { checksum, documentoLogico, tipoDocumental } = {},
+) {
   if (!file) {
     throw new Error("El archivo es obligatorio");
   }
@@ -225,6 +230,12 @@ export async function initiate(resource, file, { checksum } = {}) {
 
   if (checksum) {
     body.checksum = checksum;
+  }
+  if (documentoLogico) {
+    body.documentoLogico = documentoLogico;
+  }
+  if (tipoDocumental) {
+    body.tipoDocumental = tipoDocumental;
   }
 
   const response = await apiClient.post(
@@ -472,6 +483,8 @@ async function performUpload(resource, file, options = {}) {
   try {
     uploadSession = await initiate(resource, file, {
       checksum: options.checksum,
+      documentoLogico: options.documentoLogico,
+      tipoDocumental: options.tipoDocumental,
     });
   } catch (error) {
     notifyState(options, "initiation_failed", {
@@ -674,6 +687,30 @@ export async function list(resource) {
   return Array.isArray(data) ? data : [];
 }
 
+export async function listVersions(documentoLogico, resource = null) {
+  if (!documentoLogico) {
+    throw new Error("El documento lógico es obligatorio");
+  }
+
+  const parentId = resource?.type === "respuesta" ? resource.parentId : null;
+  const query = parentId
+    ? `?parentId=${encodeURIComponent(parentId)}`
+    : "";
+  const response = await apiClient.get(
+      `/documentos/${encodeURIComponent(documentoLogico)}/versiones${query}`,
+  );
+
+  if (!response.ok) {
+    throw await buildApiError(
+        response,
+        "No se pudo consultar el historial del documento",
+    );
+  }
+
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+}
+
 export async function download(file, resource = null) {
   if (!file?.id) {
     throw new Error("El archivo solicitado no es válido.");
@@ -785,6 +822,7 @@ export const fileApi = {
   upload,
   uploadMany,
   list,
+  listVersions,
   download,
   remove,
 };
