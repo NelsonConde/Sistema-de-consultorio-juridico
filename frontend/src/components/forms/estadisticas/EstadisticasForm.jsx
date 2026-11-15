@@ -52,7 +52,12 @@ function etiquetaEstado(nombre) {
  *
  * @returns {string} Result value.
  */
-function hoyStr() { return new Date().toISOString().slice(0, 10); }
+function hoyStr() {
+  const hoy = new Date();
+  const mes = String(hoy.getMonth() + 1).padStart(2, "0");
+  const dia = String(hoy.getDate()).padStart(2, "0");
+  return `${hoy.getFullYear()}-${mes}-${dia}`;
+}
 
 
 const CHART_COLORS = [
