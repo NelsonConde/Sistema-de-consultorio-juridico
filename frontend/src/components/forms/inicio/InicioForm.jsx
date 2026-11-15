@@ -318,10 +318,18 @@ function ConsultasPendientesLista({ items, cargando }) {
  * @param {Object} props - Component properties.
  * @param {Array<Object>} props.items - Item to process.
  * @param {boolean} props.cargando - Whether data is loading.
+ * @param {string} props.error - Loading error message.
  * @returns {JSX.Element} Result value.
  */
-function TareasPendientesLista({ items, cargando }) {
+function TareasPendientesLista({ items, cargando, error }) {
   if (cargando) return <div className="space-y-1.5">{[1,2,3].map(i => <Skeleton key={i} className="h-10" />)}</div>
+  if (error)
+    return (
+      <div role="alert" className="flex items-center gap-2 text-xs text-primary py-2">
+        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+        {error}
+      </div>
+    )
   if (!items || items.length === 0)
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
@@ -436,6 +444,7 @@ export function InicioForm() {
   // listas
   const [consultasPendientes, setConsultasPendientes] = React.useState([])
   const [tareasPendientes, setTareasPendientes] = React.useState([])
+  const [errorTareas, setErrorTareas] = React.useState("")
   const [respuestasPendientes, setRespuestasPendientes] = React.useState([])
   const [cargandoConsultas, setCargandoConsultas] = React.useState(false)
   const [cargandoTareas, setCargandoTareas] = React.useState(false)
@@ -517,33 +526,27 @@ export function InicioForm() {
 
   const cargarTareasPendientes = React.useCallback(async () => {
     setCargandoTareas(true)
+    setErrorTareas("")
     try {
-      const { response: resConsultas, data: payload } = await apiResponse(`${API_URL_BASE}/consultas?page=1&size=5`, { method: "GET" })
-      if (!resConsultas.ok) { setTareasPendientes([]); return }
-
-      const consultas = Array.isArray(payload?.content) ? payload.content : []
-
-      const resultados = await Promise.allSettled(
-        consultas.map((c) => {
-          const cid = c.id || c.consultaId
-          return apiResponse(
-            `${API_URL_BASE}/seguimientos/consulta/${cid}/visibles-estudiante`,
-            { method: "GET" }
-          ).then(({ response, data }) => response.ok ? data : [])
-        })
+      const { response: res, data: payload, correlationId } = await apiResponse(
+        `${API_URL_BASE}/seguimientos?estado=PENDIENTE&page=1&size=10&sortBy=fechaEntrega&direction=asc`,
+        { method: "GET" }
       )
+      if (!res.ok) {
+        setErrorTareas(withErrorReference(
+          "No se pudieron cargar las tareas pendientes.",
+          correlationId
+        ))
+        return
+      }
 
-      const todasLasTareas = resultados.flatMap((r) =>
-        r.status === "fulfilled" ? obtenerArrayDesdeRespuesta(r.value) : []
-      )
-
-      const pendientes = todasLasTareas
-        .filter((t) => String(t.estado || "PENDIENTE").toUpperCase() === "PENDIENTE")
+      const pendientes = obtenerArrayDesdeRespuesta(payload)
+        .filter((t) => String(t.estado || "").toUpperCase() === "PENDIENTE")
         .slice(0, 10)
 
       setTareasPendientes(pendientes)
     } catch {
-      setTareasPendientes([])
+      setErrorTareas("No se pudieron cargar las tareas pendientes.")
     } finally {
       setCargandoTareas(false)
     }
@@ -723,7 +726,11 @@ export function InicioForm() {
             icon={ClipboardList}
             count={tareasPendientes.length > 0 ? tareasPendientes.length : undefined}
           >
-            <TareasPendientesLista items={tareasPendientes} cargando={cargandoTareas} />
+            <TareasPendientesLista
+              items={tareasPendientes}
+              cargando={cargandoTareas}
+              error={errorTareas}
+            />
           </Panel>
         )}
 
