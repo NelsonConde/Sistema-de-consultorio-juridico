@@ -1,0 +1,38 @@
+{
+  "año" : 2026,
+  "semestre" : 2,
+  "periodoInicio" : "2026-06-01",
+  "periodoFin" : "2026-12-31",
+  "consultasFinalizadas" : 30,
+  "consultasPendientes" : 15,
+  "totalConsultas" : 45,
+  "consultasPorEstado" : [ {
+    "nombre" : "FINALIZADA",
+    "cantidad" : 30
+  }, {
+    "nombre" : "EN_PROCESO",
+    "cantidad" : 15
+  } ],
+  "consultasPorArea" : null,
+  "consultasPorTipoViolencia" : null,
+  "totalPersonasAtendidas" : 42,
+  "personasPorGenero" : null,
+  "personasPorEstrato" : null,
+  "personasPorZona" : null,
+  "personasPorGrupoEtnico" : null,
+  "personasPorMunicipio" : null,
+  "personasPorCondicion" : null,
+  "procesosPorEstado" : [ {
+    "nombre" : "EN_TRAMITE",
+    "cantidad" : 6
+  }, {
+    "nombre" : "FALLADO",
+    "cantidad" : 4
+  } ],
+  "totalConciliaciones" : 12,
+  "conciliacionesPorEstado" : null,
+  "totalSeguimientos" : 68,
+  "seguimientosPorEstado" : null,
+  "totalEstudiantesActivos" : 23,
+  "totalEstudiantesHabilitadosConciliacion" : 18
+}
