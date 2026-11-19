@@ -705,7 +705,14 @@ export function PersonasForm() {
       setError("");
       setMensaje("");
 
-      const version = requireResourceVersion(personaADesactivar, "registro de persona");
+      const personaActual = await obtenerPersonaDetalle(
+        personaADesactivar.id
+      );
+
+      const version = requireResourceVersion(
+        personaActual,
+        "registro de persona"
+      );
       const res = await apiClient.request(
         `${API_URL_BASE}/personas/${personaADesactivar.id}/desactivar?version=${encodeURIComponent(String(version))}`,
         {
@@ -1120,9 +1127,8 @@ export function PersonasForm() {
       <ConfirmActionDialog
         open={Boolean(personaADesactivar)}
         title="Desactivar persona"
-        description={`¿Deseas desactivar a "${
-          nombreCompleto(personaADesactivar) || "esta persona"
-        }"? Podrás reactivarla después desde la página de eliminación.`}
+        description={`¿Deseas desactivar a "${nombreCompleto(personaADesactivar) || "esta persona"
+          }"? Podrás reactivarla después desde la página de eliminación.`}
         confirmText="Desactivar"
         cancelText="Cancelar"
         loading={desactivando}

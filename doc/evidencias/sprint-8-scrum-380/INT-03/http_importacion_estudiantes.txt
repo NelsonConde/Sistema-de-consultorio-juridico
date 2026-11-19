@@ -1,0 +1,19 @@
+=== EVIDENCIA DE INTEGRACIÓN HTTP: INT-03 IMPORTACIÓN DE ESTUDIANTES ===
+
+1. CASO CABECERA INVÁLIDA (Retest SCRUM-383):
+POST /api/estudiantes/importar
+Content-Type: multipart/form-data; filename="estudiantes_cabecera_invalida.xlsx"
+Cabecera enviada en columna 1: 'Nombres_Completos' (esperada: 'Nombre')
+HTTP Status: 400 BAD_REQUEST
+Response Body:
+Formato inválido. Se esperaba la columna 'Nombre' en la posición 1
+Filas persistidas / llamadas a crear(): 0 (Atomicidad y rechazo total verificado)
+
+2. CASO CABECERA VÁLIDA:
+POST /api/estudiantes/importar
+Content-Type: multipart/form-data; filename="estudiantes_valido.xlsx"
+Cabeceras enviadas: ['Nombre', 'TipoDocumentoId', 'Documento', 'Email', 'Telefono', 'Usuario', 'SedeId', 'Codigo', 'AsesorId', 'Activo', 'Conciliacion']
+HTTP Status: 200 OK
+Response Body:
+{"errores":[],"exitosos":2,"fallidos":0,"totalFilas":2}
+Llamadas a persistir ejecutadas conforme a las filas del archivo.

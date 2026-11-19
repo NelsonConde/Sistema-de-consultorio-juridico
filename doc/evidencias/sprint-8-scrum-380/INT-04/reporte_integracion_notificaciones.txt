@@ -1,0 +1,13 @@
+=== EVIDENCIA INT-04: MANEJO DE FALLO DEL PROVEEDOR EXTERNO DE CORREO ===
+Seguimiento ID: 77
+Tipo de Notificación: PARTES (INMEDIATA)
+Destinatarios Identificados: [consultante@ufps.edu.co]
+Proveedor Simulado: Brevo / SMTP externo
+Evento: Error simulado durante transporte -> '503 Service Unavailable: Conexión rechazada por proveedor SMTP'
+
+RESULTADOS OBSERVADOS:
+- Estado 'enviada': false (FALSE - Sin falso positivo de entrega)
+- Fecha de envío: null
+- Contador de intentos: 1
+- Mensaje de error registrado en BD: '503 Service Unavailable: Conexión rechazada por proveedor SMTP'
+- Persistencia: Invocación verify(notificacionRepository.save(notificacion)) ejecutada exitosamente.
