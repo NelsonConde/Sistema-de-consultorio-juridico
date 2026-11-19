@@ -1,19 +1,15 @@
-FROM eclipse-temurin:21-jdk AS builder
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends unzip \
-    && rm -rf /var/lib/apt/lists/*
+FROM maven:3.9.14-eclipse-temurin-21 AS builder
 
 WORKDIR /workspace
 
 COPY .mvn/ .mvn/
-COPY mvnw pom.xml ./
+COPY pom.xml ./
 
-RUN sed -i 's/\r$//' mvnw && chmod +x mvnw && ./mvnw -q -DskipTests dependency:go-offline
+RUN mvn -B -ntp -DskipTests dependency:go-offline
 
 COPY src/ src/
 
-RUN ./mvnw -q -DskipTests package
+RUN mvn -B -ntp -DskipTests package
 
 
 FROM eclipse-temurin:21-jre
