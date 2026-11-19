@@ -9,12 +9,13 @@
 
 ## Resumen
 
-Esta entrega corrige la desactivación de personas cuando el frontend necesita actualizar la versión del registro antes de enviar la operación, y amplía la cobertura de pruebas y evidencias de integración del Sprint 8.
+Esta entrega corrige la desactivación de personas y mejora la identificación de campos obligatorios en tareas. Amplía las pruebas funcionales y de integración del Sprint 8 y fortalece la confiabilidad de construcción Docker/CI del backend.
 
 ## Corrección funcional
 
 - **Desactivación de personas:** consulta del detalle vigente antes de invocar el endpoint `PATCH` de desactivación y uso de la versión actual del registro, preservando el control optimista de concurrencia. No se introduce un reintento automático de una acción rechazada por conflicto.
 - Trazabilidad: [PR #117 — SCRUM-386](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/117).
+- **Seguimientos/tareas:** etiquetas visuales de Categoría y Descripción como campos obligatorios, sin alterar el contrato de validación ([PR #122 — SCRUM-378](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/122)).
 
 ## Pruebas y evidencias
 
@@ -24,25 +25,32 @@ Esta entrega corrige la desactivación de personas cuando el frontend necesita a
 - **INT-04 — Notificaciones y correo:** selección de destinatarios y comportamiento ante indisponibilidad simulada del proveedor.
 - Trazabilidad: [PR #116 — SCRUM-380](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/116) y [documento de auditoría](../evidencias/SCRUM-380-auditoria-qa-integracion-sprint-8.md).
 - El informe de QA local documenta cuatro casos aprobados. No se presenta como prueba de despliegue funcional sobre un entorno remoto.
+- **FUN-01 a FUN-04:** pruebas funcionales locales de consulta, proceso, seguimiento/tarea y conciliación. Reporte y capturas incorporados mediante [PR #122 — SCRUM-378](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/122). La evidencia disponible no acredita por sí misma ejecución en `staging`.
+
+## Confiabilidad de compilación y despliegue
+
+- El backend utiliza una imagen de construcción con Maven 3.9.14 y Java 21 ya instalados, evitando descargar la distribución de Maven Wrapper durante la construcción Docker.
+- GitHub Actions almacena en caché la distribución del Maven Wrapper y reintenta su inicialización hasta tres veces, conservando la comprobación SHA-256 ([PR #119 — SCRUM-340](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/119)).
+- Se mantienen las comprobaciones de presencia de los artefactos JAR de ejecución y migraciones. La construcción exitosa no garantiza disponibilidad de todos los servicios externos en Railway.
 
 ## Compatibilidad y configuración
 
 - Cambios compatibles con la versión anterior.
-- Los PR #116 y #117 no incorporan migraciones SQL ni modificaciones a dependencias, archivos de entorno o credenciales.
+- No se identificaron cambios de migraciones SQL ni de versiones internas Maven/npm en los PR de alcance funcional y técnico de esta candidata.
 - No se modifican las versiones internas de los artefactos Maven/npm; el sistema se identifica mediante la etiqueta global Git.
-- El backend conserva la corrección de Docker/Maven Wrapper publicada previamente.
+- La corrección de construcción del [PR #119](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/119) es adicional a la del Dockerfile publicada en `v1.2.1`.
 
 ## Verificaciones disponibles
 
 - El CI post-merge de `develop` en `58bce3b61ac23dd2636f9850680a4557aeed7c23` finalizó con éxito: Backend, Frontend, Playwright E2E, Backend Docker image y análisis de seguridad.
 - El primer intento del job Backend falló al descargar Maven 3.9.14 desde Maven Central; la nueva ejecución fue satisfactoria.
-- Los controles de los PR de preparación y promoción y sus autorizaciones deberán corroborarse antes de publicar esta entrega.
+- La actualización funcional de [PR #122](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/122) está fusionada en `develop`; sus controles finales, la revisión de promoción y las autorizaciones correspondientes deben corroborarse antes de publicar esta entrega.
 
 ## Trazabilidad de promoción
 
-- Cambios funcionales y QA: [PR #117](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/117) y [PR #116](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/116).
+- Cambios funcionales, técnicos y QA: [PR #117](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/117), [PR #116](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/116), [PR #119](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/119) y [PR #122](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/122).
 - Preparación del candidato: [PR #118](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/118).
-- PR `develop` → `staging`: pendiente.
+- PR `develop` → `staging`: [PR #121](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/121) abierto, pendiente de aprobación independiente y verificación completa del alcance actualizado.
 - PR `staging` → `main`: pendiente.
 - SHA final de liberación, etiqueta y enlace de GitHub Release: pendientes de verificación y publicación.
 
