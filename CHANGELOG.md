@@ -9,19 +9,25 @@ Candidato PATCH `v1.3.1` para los cambios integrados en `develop` después de la
 ### Fixed
 
 - Desactivación de personas: obtener el detalle vigente inmediatamente antes de la operación y enviar la versión de recurso actual para respetar el control de concurrencia ([PR #117](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/117), SCRUM-386).
+- Formulario de seguimiento: señalización visual de los campos obligatorios Categoría y Descripción al crear una tarea ([PR #122](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/122), SCRUM-378).
 
 ### Tests and evidence
 
 - Cuatro casos de integración y regresión (INT-01 a INT-04): historial de reasignación PostgreSQL, estadísticas/PDF y fechas locales, importación XLSX, resiliencia de notificaciones y correo ([PR #116](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/116), SCRUM-380).
 - Nuevas pruebas Java y evidencias versionadas en `doc/evidencias/sprint-8-scrum-380/`. Las cuatro fichas documentan PASS en el ambiente de QA local; estos resultados no certifican por sí solos una ejecución real en `staging`.
+- Pruebas funcionales FUN-01 a FUN-04 de consultas, procesos, seguimientos y conciliaciones, con capturas y reporte local de QA ([PR #122](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/122), SCRUM-378).
 - CI de `develop` del commit `58bce3b61ac23dd2636f9850680a4557aeed7c23`: Backend, Frontend, Playwright E2E, construcción Docker y análisis de código finalizados satisfactoriamente, después de repetir el job Backend por un fallo de descarga del Maven Wrapper.
+
+### Build reliability
+
+- Construcción Docker del backend con imagen Maven 3.9.14/Java 21 y sin descarga inicial del Maven Wrapper; GitHub Actions utiliza caché y reintentos controlados durante el arranque del wrapper ([PR #119](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/119), SCRUM-340).
 
 ### Release control
 
 - Alcance previsto: corrección compatible y evidencias QA; clasificación PATCH bajo SemVer.
-- Sin cambios nuevos de migración SQL ni de los manifiestos Maven/npm dentro de PR #116/#117.
+- No se identificaron cambios en migraciones SQL ni en versiones internas Maven/npm en el conjunto de PR #116, #117, #119 y #122.
 - Documentación de preparación: [preflight-liberacion-v1.3.1.md](doc/mantenimiento/preflight-liberacion-v1.3.1.md).
-- Pendiente: revisión independiente del PR documental, promoción `develop` → `staging`, CI y validación correspondiente, aprobación expresa del Product Owner para `main`, promoción `staging` → `main`, verificación del commit definitivo, etiqueta Git, notas de entrega y registro de línea base.
+- PR #118 de preparación documental fusionado en `develop`; PR #121 de promoción a `staging` abierto e incorpora los cambios del PR #122. Pendientes: checks posteriores a la integración más reciente, aprobación independiente de #121, validación del ambiente, autorización expresa del Product Owner para `main`, promoción `staging` → `main`, verificación del SHA final, etiqueta Git, notas de entrega y registro de línea base.
 
 ## [v1.3.0] - 2026-11-15
 
