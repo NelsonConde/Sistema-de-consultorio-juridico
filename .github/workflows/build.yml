@@ -37,10 +37,27 @@ jobs:
           cache: maven
           cache-dependency-path: backend/app/pom.xml
 
-      - name: Ensure Maven Wrapper is executable
-        working-directory: backend/app
-        run: chmod +x mvnw
+      - name: Restore Maven Wrapper distribution cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/wrapper/dists
+          key: ${{ runner.os }}-maven-wrapper-${{ hashFiles('backend/app/.mvn/wrapper/maven-wrapper.properties') }}
 
+      - name: Ensure Maven Wrapper is available
+        working-directory: backend/app
+        shell: bash
+        run: |
+          chmod +x mvnw
+          for attempt in 1 2 3; do
+            if ./mvnw --version; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Maven Wrapper distribution download failed after three attempts"
+              exit 1
+            fi
+            sleep 5
+          done
 
       - name: Verify backend and generate coverage
         working-directory: backend/app
