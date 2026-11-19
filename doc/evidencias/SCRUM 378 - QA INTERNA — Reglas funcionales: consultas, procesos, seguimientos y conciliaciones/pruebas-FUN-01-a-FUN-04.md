@@ -50,7 +50,7 @@ Tras recargar, todos los campos se conservan idénticos a los de la creación. �
 
 Los asesores mostrados corresponden solo a los que cumplen la regla (misma área de la consulta).
 
-![Opciones de cambio de asesor](opciones_cambio_asesor.png)
+![Opciones de cambio de asesor](opciones%20cambio%20asesor.png)
 
 #### Back
 
@@ -132,7 +132,7 @@ La regla indica que el radicado debe tener **exactamente 23 caracteres**.
 
 **Validación en el front.** Un radicado que no cumple el estándar (20 caracteres) es rechazado desde la interfaz, sin enviar petición al back.
 
-![Radicado de 20 caracteres rechazado en el front](radicado20chars.png)
+![Radicado de 20 caracteres rechazado en el front](radicado%2020%20chars.png)
 
 Un radicado que cumple el estándar es aceptado correctamente:
 
@@ -205,7 +205,7 @@ Date: Mon, 16 Nov 2026 23:59:09 GMT
 | Paso | Resultado | Evidencia |
 |---|---|---|
 | Creación de la conciliación | ✅ Se crea una conciliación con la actividad 20 | ![Conciliación creada](conciliacion.png) |
-| Listado inmediato | ✅ La conciliación es listada inmediatamente | ![Listado de conciliaciones](lista_conc.png) |
+| Listado inmediato | ✅ La conciliación es listada inmediatamente | *Captura del listado de conciliaciones pendiente de adjuntar: la imagen `lista_conc.png` referenciada originalmente no está versionada junto con las demás evidencias.* |
 | Listado para programar reuniones | ✅ Se listan las conciliaciones para programar reuniones | ![Listado para reuniones](lista_reu.png) |
 | Programación de la reunión | ✅ Se programa la reunión adecuadamente | ![Reunión programada](reunion.png) |
 | Vista de quien programó | ✅ La reunión se lista adecuadamente para quien la programó | ![Vista del programador](vista_programador.png) |
