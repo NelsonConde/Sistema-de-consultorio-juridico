@@ -4,7 +4,34 @@ Este archivo registra los cambios técnicos del Sistema de Gestión de Casos Jur
 
 ## [Unreleased]
 
-Candidato de liberación `v1.3.0`, **sin aprobar ni publicar**. El último release aprobado es `v1.2.1`; la versión candidata se confirmará después de las pruebas integradas en `staging` y de la autorización del Product Owner.
+Candidato PATCH `v1.3.1` para los cambios integrados en `develop` después de la publicación de `v1.3.0`. **No existe todavía etiqueta, Release ni commit de `main` para `v1.3.1`.**
+
+### Fixed
+
+- Desactivación de personas: obtener el detalle vigente inmediatamente antes de la operación y enviar la versión de recurso actual para respetar el control de concurrencia ([PR #117](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/117), SCRUM-386).
+- Formulario de seguimiento: señalización visual de los campos obligatorios Categoría y Descripción al crear una tarea ([PR #122](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/122), SCRUM-378).
+
+### Tests and evidence
+
+- Cuatro casos de integración y regresión (INT-01 a INT-04): historial de reasignación PostgreSQL, estadísticas/PDF y fechas locales, importación XLSX, resiliencia de notificaciones y correo ([PR #116](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/116), SCRUM-380).
+- Nuevas pruebas Java y evidencias versionadas en `doc/evidencias/sprint-8-scrum-380/`. Las cuatro fichas documentan PASS en el ambiente de QA local; estos resultados no certifican por sí solos una ejecución real en `staging`.
+- Pruebas funcionales FUN-01 a FUN-04 de consultas, procesos, seguimientos y conciliaciones, con capturas y reporte local de QA ([PR #122](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/122), SCRUM-378).
+- CI de `develop` del commit `58bce3b61ac23dd2636f9850680a4557aeed7c23`: Backend, Frontend, Playwright E2E, construcción Docker y análisis de código finalizados satisfactoriamente, después de repetir el job Backend por un fallo de descarga del Maven Wrapper.
+
+### Build reliability
+
+- Construcción Docker del backend con imagen Maven 3.9.14/Java 21 y sin descarga inicial del Maven Wrapper; GitHub Actions utiliza caché y reintentos controlados durante el arranque del wrapper ([PR #119](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/119), SCRUM-340).
+
+### Release control
+
+- Alcance previsto: corrección compatible y evidencias QA; clasificación PATCH bajo SemVer.
+- No se identificaron cambios en migraciones SQL ni en versiones internas Maven/npm en el conjunto de PR #116, #117, #119 y #122.
+- Documentación de preparación: [preflight-liberacion-v1.3.1.md](doc/mantenimiento/preflight-liberacion-v1.3.1.md).
+- PR #118 de preparación documental fusionado en `develop`; PR #121 de promoción a `staging` abierto e incorpora los cambios del PR #122. Pendientes: checks posteriores a la integración más reciente, aprobación independiente de #121, validación del ambiente, autorización expresa del Product Owner para `main`, promoción `staging` → `main`, verificación del SHA final, etiqueta Git, notas de entrega y registro de línea base.
+
+## [v1.3.0] - 2026-11-15
+
+La etiqueta `v1.3.0` identifica el commit `d3f71570d41033092ffe366ee177f85fabeaa6fb` de `main`, con [publicación oficial en GitHub](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/releases/tag/v1.3.0). Se trata de una versión MINOR con funcionalidades compatibles y correcciones.
 
 ### Added
 
@@ -20,12 +47,13 @@ Candidato de liberación `v1.3.0`, **sin aprobar ni publicar**. El último relea
 - Fecha predeterminada de estadísticas calculada según el calendario local, no UTC ([PR #110](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/110)).
 - Etiquetas de estadísticas y PDF alineadas con la semántica temporal de los datos ([PR #111](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/111)).
 
-### Release readiness
+### Release verification and traceability
 
-- Preflight propuesto: [preflight-liberacion-v1.3.0.md](doc/mantenimiento/preflight-liberacion-v1.3.0.md).
-- El CI de preparación debe construir la imagen real del backend con Docker y comprobar la presencia de los JAR de aplicación y migraciones.
-- **Pendiente:** pruebas funcionales independientes con Railway, Vercel, Supabase Storage y base de datos; aprobación para `staging` y `main`; verificación del SHA desplegado; registro de línea base y etiqueta de release.
-- Estos cambios no justifican modificar directamente los valores `0.0.1-SNAPSHOT` de Maven o `0.1.0` de NPM sin decisión expresa de política de artefactos.
+- [PR #113](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/113): preparación de la liberación, validación de imagen Docker y documentación.
+- [PR #114](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/114): promoción a `staging`.
+- [PR #115](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/115): promoción a `main`.
+- Los 8 controles CI del commit final de `main` concluyeron satisfactoriamente. Railway informó `SUCCESS` en la compilación y arranque del backend de ese commit, con conexión PostgreSQL y validación de 4 migraciones Flyway; el despliegue fue posteriormente detenido.
+- Las verificaciones técnicas y la publicación GitHub no sustituyen la evidencia documental de aprobación del Product Owner ni la aceptación funcional correspondiente.
 
 ## [v1.2.1] - 2026-11-07
 

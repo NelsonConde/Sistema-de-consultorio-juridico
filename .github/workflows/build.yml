@@ -37,14 +37,51 @@ jobs:
           cache: maven
           cache-dependency-path: backend/app/pom.xml
 
-      - name: Ensure Maven Wrapper is executable
-        working-directory: backend/app
-        run: chmod +x mvnw
+      - name: Restore Maven Wrapper distribution cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/wrapper/dists
+          key: ${{ runner.os }}-maven-wrapper-${{ hashFiles('backend/app/.mvn/wrapper/maven-wrapper.properties') }}
 
+      - name: Ensure Maven Wrapper is available
+        working-directory: backend/app
+        shell: bash
+        run: |
+          chmod +x mvnw
+          for attempt in 1 2 3; do
+            # The alternate official Maven Central hostname is used only after the first failure.
+            if [ "$attempt" -eq 1 ]; then
+              if ./mvnw --version; then exit 0; fi
+            elif MVNW_REPOURL=https://repo1.maven.org/maven2 ./mvnw --version; then
+              echo "MVNW_REPOURL=https://repo1.maven.org/maven2" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Maven Wrapper distribution download failed from both Maven Central hostnames"
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Resolve backend dependencies with fallback
+        working-directory: backend/app
+        shell: bash
+        run: |
+          if ./mvnw -B -ntp -U -DskipTests dependency:go-offline; then
+            exit 0
+          fi
+          ./mvnw -B -ntp -U -s .mvn/settings-central-fallback.xml -DskipTests dependency:go-offline
+          echo "MAVEN_CENTRAL_FALLBACK=true" >> "$GITHUB_ENV"
 
       - name: Verify backend and generate coverage
         working-directory: backend/app
-        run: ./mvnw clean verify
+        shell: bash
+        run: |
+          if [ "${MAVEN_CENTRAL_FALLBACK:-}" = "true" ]; then
+            ./mvnw -B -ntp -U -s .mvn/settings-central-fallback.xml clean verify
+          else
+            ./mvnw -B -ntp -U clean verify
+          fi
 
       - name: Validate JaCoCo artifacts
         working-directory: backend/app

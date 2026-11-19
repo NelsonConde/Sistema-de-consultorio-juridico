@@ -1,0 +1,22 @@
+CONSULTORIO JURÍDICO UFPS
+Reporte de Estadísticas Semestrales
+Período: 2026-06-01 — 2026-12-31
+Semestre 2 — 2026
+1. Resumen General
+Total de consultas atendidas 45
+Consultas finalizadas 30
+Consultas pendientes 15
+Total de personas atendidas 42
+Total de conciliaciones 12
+Total de seguimientos 68
+Estudiantes activos (estado actual, sin filtro de período) 23
+Estudiantes habilitados para conciliación 18
+2. Consultas por Estado
+Estado Cantidad
+FINALIZADA 30
+EN_PROCESO 15
+11. Procesos por Estado (período del reporte)
+Estado Cantidad
+EN_TRAMITE 6
+FALLADO 4
+Documento generado el 2026-11-17 — Sistema de Gestión de Casos Jurídicos UFPS

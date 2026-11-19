@@ -1510,7 +1510,7 @@ export function SeguimientosForm() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium">Categoría</label>
+                  <label className="text-sm font-medium">Categoría*</label>
                   <select
                     name="categoriaId"
                     value={formTarea.categoriaId}
@@ -1552,7 +1552,7 @@ export function SeguimientosForm() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Descripción</label>
+                <label className="text-sm font-medium">Descripción*</label>
                 <textarea
                   name="descripcion"
                   value={formTarea.descripcion}

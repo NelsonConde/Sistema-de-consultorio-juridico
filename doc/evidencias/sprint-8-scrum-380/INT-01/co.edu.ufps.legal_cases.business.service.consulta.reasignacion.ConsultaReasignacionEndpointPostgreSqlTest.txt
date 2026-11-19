@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: co.edu.ufps.legal_cases.business.service.consulta.reasignacion.ConsultaReasignacionEndpointPostgreSqlTest
+-------------------------------------------------------------------------------
+Tests run: 19, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 87.75 s -- in co.edu.ufps.legal_cases.business.service.consulta.reasignacion.ConsultaReasignacionEndpointPostgreSqlTest
