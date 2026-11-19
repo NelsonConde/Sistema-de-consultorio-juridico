@@ -63,9 +63,25 @@ jobs:
             sleep 5
           done
 
+      - name: Resolve backend dependencies with fallback
+        working-directory: backend/app
+        shell: bash
+        run: |
+          if ./mvnw -B -ntp -U -DskipTests dependency:go-offline; then
+            exit 0
+          fi
+          ./mvnw -B -ntp -U -s .mvn/settings-central-fallback.xml -DskipTests dependency:go-offline
+          echo "MAVEN_CENTRAL_FALLBACK=true" >> "$GITHUB_ENV"
+
       - name: Verify backend and generate coverage
         working-directory: backend/app
-        run: ./mvnw clean verify
+        shell: bash
+        run: |
+          if [ "${MAVEN_CENTRAL_FALLBACK:-}" = "true" ]; then
+            ./mvnw -B -ntp -U -s .mvn/settings-central-fallback.xml clean verify
+          else
+            ./mvnw -B -ntp -U clean verify
+          fi
 
       - name: Validate JaCoCo artifacts
         working-directory: backend/app
