@@ -5,11 +5,21 @@ WORKDIR /workspace
 COPY .mvn/ .mvn/
 COPY pom.xml ./
 
-RUN mvn -B -ntp -DskipTests dependency:go-offline
+# Use the normal Maven Central hostname first; use its official alternate only when resolution fails.
+RUN if mvn -B -ntp -U -DskipTests dependency:go-offline; then \
+      :; \
+    else \
+      cp .mvn/settings-central-fallback.xml /tmp/maven-settings.xml; \
+      mvn -B -ntp -U -s /tmp/maven-settings.xml -DskipTests dependency:go-offline; \
+    fi
 
 COPY src/ src/
 
-RUN mvn -B -ntp -DskipTests package
+RUN if [ -f /tmp/maven-settings.xml ]; then \
+      mvn -B -ntp -U -s /tmp/maven-settings.xml -DskipTests package; \
+    else \
+      mvn -B -ntp -U -DskipTests package; \
+    fi
 
 
 FROM eclipse-temurin:21-jre
