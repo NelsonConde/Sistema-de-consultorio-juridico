@@ -49,11 +49,14 @@ jobs:
         run: |
           chmod +x mvnw
           for attempt in 1 2 3; do
-            if ./mvnw --version; then
+            # The alternate official Maven Central hostname is used only after the first failure.
+            if [ "$attempt" -eq 1 ]; then
+              if ./mvnw --version; then exit 0; fi
+            elif MVNW_REPOURL=https://repo1.maven.org/maven2 ./mvnw --version; then
               exit 0
             fi
             if [ "$attempt" -eq 3 ]; then
-              echo "::error::Maven Wrapper distribution download failed after three attempts"
+              echo "::error::Maven Wrapper distribution download failed from both Maven Central hostnames"
               exit 1
             fi
             sleep 5
