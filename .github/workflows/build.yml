@@ -126,6 +126,10 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Verify reconciliation document download contract
+        working-directory: frontend
+        run: node --test tests/conciliacion-download-contract.test.mjs
+
       - name: Build
         working-directory: frontend
         run: npm run build
