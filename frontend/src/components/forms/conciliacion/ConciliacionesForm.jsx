@@ -588,9 +588,7 @@ export function ConciliacionesForm() {
       const files = await fileApi.list({ type: "conciliacion", id: conciliacionId });
       const file = files.find((item) => Number(item.id) === Number(fileId));
       if (!file) throw new Error("El documento ya no está disponible");
-      await fileApi.downloadById(file.id, { type: "conciliacion", id: conciliacionId }, {
-        fileName: file.fileName || file.nombre,
-      });
+      await fileApi.download(file, { type: "conciliacion", id: conciliacionId });
     } catch (err) {
       setError(
         withErrorReference(
