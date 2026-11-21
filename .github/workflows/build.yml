@@ -126,6 +126,10 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Verify API proxy compatibility
+        working-directory: frontend
+        run: node --test tests/api-proxy.test.mjs
+
       - name: Build
         working-directory: frontend
         run: npm run build
