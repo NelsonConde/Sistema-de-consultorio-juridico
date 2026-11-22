@@ -76,6 +76,22 @@ El frontend usa variables públicas de Next.js para conocer las URLs del backend
 
 Las variables `NEXT_PUBLIC_*` son visibles para el navegador y no deben contener secretos, tokens, llaves, credenciales ni datos sensibles.
 
+### Proxy de API del mismo origen (opcional)
+
+Desde la PR #128, Next.js puede reenviar `/api/:path*` al backend con el mismo origen público del frontend, útil para autenticación mediante cookies HttpOnly en navegación privada.
+
+| Variable | Ámbito | Uso |
+|---|---|---|
+| `API_PROXY_ORIGIN` | Servidor/compilación de Next.js; **no pública** | Origen HTTPS del backend, sin `/api`, rutas, parámetros ni credenciales. Activa el `rewrite` opcional de `next.config.mjs`. |
+| `NEXT_PUBLIC_API_URL_BASE` | Compilación del frontend; **pública** | URL absoluta `https://<dominio-del-frontend>/api` cuando se usa el proxy (la función `normalizarApiUrl` no admite rutas relativas). |
+
+- Sin `API_PROXY_ORIGIN`, el proxy **no se activa** y se conserva el funcionamiento anterior.
+- En desarrollo local se admite HTTP únicamente con `localhost` o `127.0.0.1`; en producción el upstream debe ser HTTPS.
+- Configurar ambas variables según **cada entorno y dominio**. Las variables restringidas a una rama Preview no se propagan automáticamente a `staging` ni a Production.
+- Reconstruir y volver a validar el frontend cuando cambie `NEXT_PUBLIC_API_URL_BASE`, porque queda incorporada en el bundle.
+- Verificar sesión (`POST /api/auth/login`, `GET /api/auth/me`, logout), CSRF, archivos firmados y autorización en el dominio final. No publicar cabeceras, tokens, cookies ni archivos reales como evidencias.
+- La configuración del backend (`CORS_ALLOWED_ORIGINS`, `FRONTEND_URL` y cookies) se revisa por ambiente; ningún cambio de variable sustituye la aprobación de la liberación.
+
 ## Autenticación
 
 Las peticiones protegidas deben enviarse con:
