@@ -13,8 +13,10 @@ Su propósito es facilitar revisiones futuras cuando cambien endpoints, DTOs, se
 | `matriz-actualizacion-documental.md` | Relación entre tipo de cambio y documentos que deben revisarse. |
 | `versionado-documentacion.md` | Criterios para versionar y registrar cambios documentales. |
 | `preflight-liberacion-v1.3.0.md` | Checklist histórico de preparación de la versión v1.3.0 (publicada el 15/11/2026); conserva el estado documental previo a su liberación. |
-| `preflight-liberacion-v1.3.1.md` | Preparación de la candidata PATCH v1.3.1: PR #116/#117, CI y QA, requisitos para promocionar a `staging` y `main`, y registro de liberación pendiente. |
-| `notas-liberacion-v1.3.1.md` | Notas preparatorias de entrega PATCH v1.3.1; no se atribuye estado publicado ni SHA de `main` antes de verificarlos. |
+| `preflight-liberacion-v1.3.1.md` | Registro histórico de preparación de v1.3.1, publicada el 18/11/2026 (America/Bogota); conserva las condiciones pendientes al redactarse. |
+| `notas-liberacion-v1.3.1.md` | Notas preparatorias históricas de v1.3.1; la publicación efectiva está registrada en GitHub Releases. |
+| `preflight-liberacion-v1.3.2.md` | Controles de la próxima promoción consolidada: cambios #127/#128, CI, configuración Vercel/Railway, aprobación y despliegue. |
+| `notas-liberacion-v1.3.2.md` | Notas candidatas de v1.3.2, con alcance, evidencias y límites. |
 | `SCRUM-343-respaldo-restauracion-coordinada.md` | Propuesta de política y runbook coordinado BD/Storage; aprobación y ejecución pendientes. |
 
 ## Fuente de verdad

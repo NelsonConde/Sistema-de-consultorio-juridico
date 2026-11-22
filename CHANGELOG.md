@@ -4,7 +4,28 @@ Este archivo registra los cambios técnicos del Sistema de Gestión de Casos Jur
 
 ## [Unreleased]
 
-Candidato PATCH `v1.3.1` para los cambios integrados en `develop` después de la publicación de `v1.3.0`. **No existe todavía etiqueta, Release ni commit de `main` para `v1.3.1`.**
+Candidata PATCH **`v1.3.2`** para integrar en una sola promoción los cambios aprobados posteriores a [v1.3.1](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/releases/tag/v1.3.1). Esta candidata **no está publicada**.
+
+### Fixed
+
+- **Conciliaciones — descarga de Solicitud y Acta PDF:** sustituir una llamada inexistente a `fileApi.downloadById` por el servicio disponible `fileApi.download` sin modificar los controles de acceso ([PR #127](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/127), referencia histórica SCRUM-232).
+- **Autenticación en navegación privada:** proxy de API del mismo origen, optativo y validado, para evitar depender de cookies de terceros cuando se configura en el despliegue ([PR #128](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/pull/128), referencia histórica SCRUM-112).
+
+### Tests and evidence
+
+- Regresión del contrato de descarga: `frontend/tests/conciliacion-download-contract.test.mjs` y paso CI asociado.
+- Regresión y compatibilidad del proxy: `frontend/tests/api-proxy.test.mjs` y paso CI asociado.
+- Los controles de GitHub Actions y Vercel de las PR #127 y #128 terminaron satisfactoriamente. La comprobación manual en Preview incluyó login en Edge InPrivate, consultas, personas, solicitudes/actas PDF, estadísticas y documentos; se trata de **validación informada por el usuario sobre Preview**, no de una certificación en `staging` ni en producción.
+
+### Release control
+
+- Diferencia funcional verificada entre `develop` y `main` antes de preparar estas notas: cinco archivos (dos de configuración/consumo, dos pruebas y un workflow); sin cambios nuevos de backend ni migraciones SQL en este diferencial.
+- Antes de promocionar, cerrar la documentación de [preflight v1.3.2](doc/mantenimiento/preflight-liberacion-v1.3.2.md), revisar CI, configurar el proxy para cada entorno y obtener la autorización de liberación.
+- No hay etiqueta ni GitHub Release `v1.3.2` hasta completar la promoción a `main` y verificar su commit.
+
+## [v1.3.1] - 2026-11-18
+
+Publicada como [GitHub Release v1.3.1](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/releases/tag/v1.3.1) el 18/11/2026 (America/Bogota). El siguiente apartado conserva el alcance y las evidencias que se prepararon para esa versión; las referencias a actividades entonces pendientes representan su estado de planificación, no el estado actual de la liberación.
 
 ### Fixed
 
@@ -27,7 +48,7 @@ Candidato PATCH `v1.3.1` para los cambios integrados en `develop` después de la
 - Alcance previsto: corrección compatible y evidencias QA; clasificación PATCH bajo SemVer.
 - No se identificaron cambios en migraciones SQL ni en versiones internas Maven/npm en el conjunto de PR #116, #117, #119 y #122.
 - Documentación de preparación: [preflight-liberacion-v1.3.1.md](doc/mantenimiento/preflight-liberacion-v1.3.1.md).
-- PR #118 de preparación documental fusionado en `develop`; PR #121 de promoción a `staging` abierto e incorpora los cambios del PR #122. Pendientes: checks posteriores a la integración más reciente, aprobación independiente de #121, validación del ambiente, autorización expresa del Product Owner para `main`, promoción `staging` → `main`, verificación del SHA final, etiqueta Git, notas de entrega y registro de línea base.
+- Preparación histórica: PR #118 y #121; la publicación efectiva de v1.3.1 se registró posteriormente mediante la promoción a `main` y la [Release oficial](https://github.com/NelsonConde/Sistema-de-consultorio-juridico/releases/tag/v1.3.1).
 
 ## [v1.3.0] - 2026-11-15
 
